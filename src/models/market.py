@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, Date, Numeric, ForeignKey, UniqueConstraint
 from src.core.database import Base
 
+
 class MarketDaily(Base):
     __tablename__ = "market_daily"
 
@@ -11,10 +12,11 @@ class MarketDaily(Base):
     high_price = Column(Numeric(precision=18, scale=2), nullable=True)
     low_price = Column(Numeric(precision=18, scale=2), nullable=True)
     close_price = Column(Numeric(precision=18, scale=2), nullable=True)
-    adjusted_close = Column(Numeric(precision=18, scale=2), nullable=False)
+    adjusted_close = Column(Numeric(precision=18, scale=2), nullable=True)
     volume = Column(Integer, nullable=True)
     value = Column(Numeric(precision=24, scale=2), nullable=True)
     trade_count = Column(Integer, nullable=True)
+    source = Column(String(100), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("company_id", "trade_date", name="uq_company_trade_date"),
