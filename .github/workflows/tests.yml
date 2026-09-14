@@ -26,6 +26,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest SQLAlchemy
 
+
       - name: Run test suite
+        env:
+          PYTHONPATH: .
         run: |
           pytest src/tests -v
