@@ -96,7 +96,7 @@ def test_reliability_uses_accuracy_bias_and_baseline_with_confidence():
                 horizon="3M",
                 model_version="V1",
                 forecast_cutoff_datetime=cutoff + timedelta(days=period_id),
-                baseline_value=120.0,
+                baseline_value=90.0,
             )
         )
 
