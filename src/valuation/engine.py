@@ -18,6 +18,7 @@ from src.valuation.parameters import (
     PROBABILITY_EVIDENCE_BLEND,
     RISK_THRESHOLDS,
     SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT,
+    SCENARIO_MULTIPLE_POLICY_VERSION,
     SCENARIO_WEIGHTS,
     SENSITIVITY_PERTURBATION,
     VALUATION_THRESHOLDS,
@@ -202,7 +203,7 @@ class ValuationEngine:
                 },
                 "benchmark_peer_minimum": MIN_INDUSTRY_PEERS,
                 "scenario_probability_sum": sum(probabilities.values()),
-                "probability_adjustments_applied": probability_adjustments or {},
+                "probability_adjustments_applied": {},
                 "probability_evidence": probability_meta,
                 "probability_evidence_families": list(PROBABILITY_EVIDENCE_FAMILIES),
                 "scenario_multiple_policy": multiple_meta,
@@ -235,11 +236,10 @@ class ValuationEngine:
         probability_adjustments: Optional[Dict[str, float]],
         probability_evidence: Optional[Dict[str, Dict[str, float]]],
     ) -> tuple[Dict[str, float], Dict[str, object]]:
-        values = dict(SCENARIO_WEIGHTS)
         if probability_adjustments:
-            for name in values:
-                values[name] += probability_adjustments.get(name, 0.0)
+            raise ValueError("Direct probability_adjustments are not allowed in Stage 7 V1; use family-level probability_evidence")
 
+        values = dict(SCENARIO_WEIGHTS)
         family_distributions: Dict[str, Dict[str, float]] = {}
         if probability_evidence:
             unknown = set(probability_evidence) - set(PROBABILITY_EVIDENCE_FAMILIES)
@@ -272,7 +272,7 @@ class ValuationEngine:
             total = sum(values.values())
         resolved = {name: value / total for name, value in values.items()}
         return resolved, {
-            "mode": "FAMILY_LEVEL_EQUAL_WEIGHT" if family_distributions else "PRIOR_OR_LEGACY_ADJUSTMENT",
+            "mode": "FAMILY_LEVEL_EQUAL_WEIGHT" if family_distributions else "PRIOR_ONLY",
             "families_used": list(family_distributions),
             "family_count": len(family_distributions),
             "correlated_metric_protection": "ONE_DISTRIBUTION_PER_FAMILY",
@@ -294,6 +294,7 @@ class ValuationEngine:
                 "economic_justification_required": True,
                 "versioned": True,
                 "backtestable": True,
+                "policy_version": SCENARIO_MULTIPLE_POLICY_VERSION,
             }
 
         unknown = set(scenario_pe_adjustments) - set(adjustments)
@@ -317,6 +318,7 @@ class ValuationEngine:
             "versioned": True,
             "backtestable": True,
             "max_abs_adjustment": SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT,
+            "policy_version": SCENARIO_MULTIPLE_POLICY_VERSION,
         }
 
     @staticmethod
