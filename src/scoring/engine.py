@@ -46,7 +46,9 @@ class FundamentalScoringEngine:
         else:
             less = sum(v < value for v in ordered)
             equal = sum(v == value for v in ordered)
-            percentile = ((less + 0.5 * equal) / (len(ordered) - 1)) * 100.0
+            # Endpoint-preserving midrank percentile: minimum ranks at 0,
+            # maximum ranks at 100, with ties centered between their ranks.
+            percentile = ((less + 0.5 * (equal - 1)) / (len(ordered) - 1)) * 100.0
         if direction == "LOWER_IS_BETTER":
             percentile = 100.0 - percentile
         return max(0.0, min(100.0, percentile))
