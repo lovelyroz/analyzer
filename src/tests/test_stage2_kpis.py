@@ -132,7 +132,71 @@ def test_optional_sales_volume_missing_is_not_zero():
         assert kpis[0].quality_status == "MISSING"
 
 # ----------------------------------------------------------------------
-# 5. KPI Engine Execution Test
+# 5. Stage 2 Contract Tests: EPS comparability + Data Quality
+# ----------------------------------------------------------------------
+def test_eps_growth_requires_share_count_corporate_action_comparability():
+    engine = KPIEngine()
+    data = {
+        "revenue_curr": 1000.0, "revenue_prev": 800.0,
+        "op_profit_curr": 200.0, "op_profit_prev": 150.0,
+        "net_profit_curr": 150.0, "net_profit_prev": 100.0,
+        "eps_curr": 15.0, "eps_prev": 10.0,
+        "gross_profit": 300.0, "net_profit_ttm": 150.0,
+        "avg_assets": 1000.0, "avg_equity": 500.0,
+        "ocf": 180.0, "financial_expenses": 20.0,
+        "eps_comparable": False,
+    }
+    results = engine.calculate_all_kpis_for_company(1, 10, "PETROCHEMICAL", data)
+    eps = next(r for r in results if r.kpi_code == "EPS_GROWTH")
+    assert eps.value is None
+    assert eps.quality_status == "MISSING"
+    assert eps.metadata["comparability_status"] == "UNRESOLVED_SHARE_COUNT_OR_CORPORATE_ACTION"
+
+
+def test_data_quality_status_propagates_from_stage1_inputs():
+    engine = KPIEngine()
+    data = {
+        "revenue_curr": 1000.0, "revenue_prev": 800.0,
+        "op_profit_curr": 200.0, "op_profit_prev": 150.0,
+        "net_profit_curr": 150.0, "net_profit_prev": 100.0,
+        "eps_curr": 15.0, "eps_prev": 10.0,
+        "gross_profit": 300.0, "net_profit_ttm": 150.0,
+        "avg_assets": 1000.0, "avg_equity": 500.0,
+        "ocf": 180.0, "financial_expenses": 20.0,
+        "quality_statuses": {"revenue_curr": "ESTIMATED", "op_profit_curr": "SUSPICIOUS"},
+    }
+    results = engine.calculate_all_kpis_for_company(1, 10, "PETROCHEMICAL", data)
+    revenue_growth = next(r for r in results if r.kpi_code == "REVENUE_GROWTH")
+    op_margin = next(r for r in results if r.kpi_code == "OPERATING_MARGIN")
+    net_margin = next(r for r in results if r.kpi_code == "NET_MARGIN")
+    assert revenue_growth.quality_status == "ESTIMATED"
+    assert op_margin.quality_status == "SUSPICIOUS"
+    assert net_margin.quality_status == "VALID"
+
+
+def test_industry_kpi_data_quality_propagates():
+    engine = KPIEngine()
+    data = {
+        "revenue_curr": 1000.0, "revenue_prev": 800.0,
+        "op_profit_curr": 200.0, "op_profit_prev": 150.0,
+        "net_profit_curr": 150.0, "net_profit_prev": 100.0,
+        "eps_curr": 15.0, "eps_prev": 10.0,
+        "gross_profit": 300.0, "net_profit_ttm": 150.0,
+        "avg_assets": 1000.0, "avg_equity": 500.0,
+        "ocf": 180.0, "financial_expenses": 20.0,
+        "nii": 100.0, "nim": 4.0, "loan_growth": 10.0, "deposit_growth": 12.0, "npl": 1.5,
+        "quality_statuses": {"nii": "RESTATED", "npl": "SUSPICIOUS"},
+    }
+    results = engine.calculate_all_kpis_for_company(1, 10, "BANK", data)
+    nii = next(r for r in results if r.kpi_code == "BANK_NII")
+    npl = next(r for r in results if r.kpi_code == "BANK_NPL")
+    nim = next(r for r in results if r.kpi_code == "BANK_NIM")
+    assert nii.quality_status == "RESTATED"
+    assert npl.quality_status == "SUSPICIOUS"
+    assert nim.quality_status == "VALID"
+
+# ----------------------------------------------------------------------
+# 6. KPI Engine Execution Test
 # ----------------------------------------------------------------------
 def test_kpi_engine_full_run():
     engine = KPIEngine()
