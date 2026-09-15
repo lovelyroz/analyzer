@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Sequence
+from typing import Optional, Sequence
 from datetime import datetime
 from src.trend.schema import ComparisonResult, TrendResult
 from src.trend.utils import (
@@ -48,6 +48,10 @@ class TrendEngine:
         else:
             coverage = "FULL" if len(valid) == 3 else "LIMITED"
             strengths = {h: relative_strength(v, histories[h]) for h, v in valid.items()}
+
+            # Direction and relative strength are deliberately separate.
+            # Direction comes from the sign of the current momentum; Strength
+            # describes the magnitude relative to the same-horizon history.
             directions = {
                 h: ("Positive" if v > 0 else "Negative" if v < 0 else "Weak")
                 for h, v in valid.items()
@@ -57,7 +61,7 @@ class TrendEngine:
             negative = sum(d == "Negative" for d in directions.values())
             all_positive = positive == len(valid)
             all_negative = negative == len(valid)
-            all_weak = all(strengths.get(h) == "Weak" for h in valid)
+            all_weak_direction = all(directions[h] == "Weak" for h in valid)
             strong_positive = sum(
                 directions[h] == "Positive" and strengths.get(h) == "Strong"
                 for h in valid
@@ -71,7 +75,7 @@ class TrendEngine:
                 state = "Strong Improvement"
             elif all_negative and len(valid) == 3 and strong_negative >= 2:
                 state = "Strong Deterioration"
-            elif all_weak or positive == negative:
+            elif all_weak_direction or positive == negative:
                 state = "Stable"
             elif positive > negative:
                 state = "Improving"
