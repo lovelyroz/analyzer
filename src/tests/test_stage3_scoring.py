@@ -51,6 +51,17 @@ def test_lower_is_better_direction_is_inverted_for_npl():
     assert item.score == 100.0
 
 
+def test_lower_is_better_maximum_gets_zero():
+    engine = FundamentalScoringEngine()
+    peers = [1, 2, 3, 4, 5, 6, 7, 8]
+    result = engine.calculate_score(
+        1, 10, "BANK",
+        [kpi("BANK_NPL", 8)],
+        peer_values={"BANK_NPL": peers},
+    )
+    assert result.kpi_scores[0].score == 0.0
+
+
 def test_historical_benchmark_is_fallback_when_peer_count_is_below_eight():
     engine = FundamentalScoringEngine()
     result = engine.calculate_score(
