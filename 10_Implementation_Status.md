@@ -24,7 +24,7 @@ The authoritative rules for each stage are the corresponding Stage Locked Specif
 
 **Architecture Coverage:** Stages 1–9 LOCKED
 
-**Implementation Status:** STAGE 5 IN PROGRESS
+**Implementation Status:** STAGE 6 READY TO START
 
 Stages are implemented and advanced one at a time only after implementation, testing, review, architecture-compliance audit, and approval.
 
@@ -80,6 +80,8 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 **Status:** IMPLEMENTED — NOT YET MARKED COMPLETE
 
+> Stage 2 code and tests have been implemented and aligned to the locked specification. Final formal completion status remains subject to the project audit record.
+
 ---
 
 ## Stage 3 — Fundamental Scoring
@@ -93,6 +95,8 @@ Stages are implemented and advanced one at a time only after implementation, tes
 **Audit:** REQUIRES FINAL STATUS RECONCILIATION
 
 **Status:** IMPLEMENTED — NOT YET MARKED COMPLETE
+
+> Stage 3 code and tests have been implemented against the locked specification. Final formal completion status remains subject to the project audit record.
 
 ---
 
@@ -126,19 +130,53 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 **Design:** LOCKED
 
-**Implementation:** IN PROGRESS
+**Implementation:** COMPLETE
 
-**Testing:** NOT STARTED
+**Testing:** PASS
 
-**Independent Review:** NOT STARTED
+**Independent Review:** PASS
 
-**Architecture Compliance Audit:** NOT STARTED
+**Architecture Compliance Audit:** PASS
 
-**Approval:** NOT STARTED
+**Approval:** PASS
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE / LOCKED
 
-**Current Target:** Replace the existing placeholder Forecast implementation with the locked Stage 5 architecture, then test and audit it before any Stage 6 implementation.
+**Final CI:** PASS
+
+**CI Run:** `34940085799`
+
+**CI Job:** `104286530707`
+
+**Commit:** `6b2d7aadf07b76e2e81f8dc7f6e2c1e845b90247`
+
+**CI Result:** 53/53 tests passed.
+
+### Final Audit Summary
+
+- Forecast output contract: PASS
+- Non-financial forecast hierarchy: PASS
+- Revenue baseline hierarchy: PASS
+- Operating margin / operating profit chain: PASS
+- Net profit hierarchy: PASS
+- EPS / share-count contract: PASS
+- ROE forecast: PASS
+- Bank specialized core: PASS
+- Holding specialized core: PASS
+- Stage 4 integration without recalculation: PASS
+- Low-base control: PASS
+- Sign-change handling: PASS
+- Bear / Base / Bull architecture: PASS
+- Operational vs free-market FX separation: PASS
+- Point-in-Time cutoff metadata: PASS
+- Model version / assumptions / audit metadata: PASS
+- Separation from Score / Valuation / Market / Reliability: PASS
+- Downstream contract compatibility: PASS
+- Full CI integration: PASS
+
+**Audit Decision:** PASS → LOCKED
+
+**Notes:** CI reported 92 `DeprecationWarning` messages related to `datetime.utcnow()` in existing code/tests. They are non-blocking and do not invalidate Stage 5. No architectural change was required.
 
 ---
 
@@ -150,9 +188,15 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 **Testing:** NOT STARTED
 
-**Audit:** NOT STARTED
+**Independent Review:** NOT STARTED
 
-**Status:** NOT STARTED
+**Architecture Compliance Audit:** NOT STARTED
+
+**Approval:** NOT STARTED
+
+**Status:** READY TO START
+
+**Current Target:** Implement the locked Stage 6 Forecast Evaluation & Calibration specification. Do not modify Stage 5 architecture while implementing Stage 6 unless a genuine contract defect is discovered and explicitly reviewed.
 
 ---
 
@@ -200,37 +244,32 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 # 4. Current Implementation Target
 
-## Stage 5 — Forecast Engine
+## Stage 6 — Forecast Evaluation & Calibration
 
-Stage 5 is the current implementation target.
+Stage 6 is now the current implementation target.
 
-Implementation must follow `05_Stage5_Forecast_Engine.md` exactly.
-
-The existing Forecast implementation is only a preliminary scaffold and must not be treated as compliant merely because tests currently exist.
+Implementation must follow `06_Stage6_Forecast_Evaluation.md` exactly.
 
 Implementation order:
 
-1. Forecast output contract
-2. Non-financial forecast core
-3. Revenue baseline hierarchy
-4. Operating margin forecast
-5. Operating profit forecast
-6. Net profit hierarchy
-7. EPS with share history / corporate actions
-8. ROE forecast
-9. Bank forecast core
-10. Holding forecast core
-11. Stage 4 integration
-12. Low-base and sign-change controls
-13. Bear / Base / Bull scenario architecture
-14. Operational vs free-market FX handling where relevant
-15. Point-in-Time cutoff and auditability
-16. Forecast method / model version / assumptions metadata
-17. Stage 5 tests
-18. Independent review
-19. Architecture compliance audit
+1. Forecast / Actual matching contract
+2. Point-in-Time actual selection
+3. Error and percentage-error metrics
+4. MAPE / APE handling and sign-change exceptions
+5. Bias calculation and interpretation
+6. Observation sufficiency / confidence levels
+7. Seasonal Naive baseline comparison
+8. Relative improvement and baseline-underperformance detection
+9. Forecast Reliability 0–100 architecture
+10. Persistent systematic bias detection
+11. Calibration rules and model-version creation
+12. Holdout / out-of-sample protection
+13. Reliability output contract
+14. Stage 6 tests
+15. Independent review
+16. Architecture compliance audit
 
-Do not implement Stage 6 until Stage 5 passes its implementation tests and architecture-compliance audit.
+Do not implement Stage 7 until Stage 6 passes its implementation tests and architecture-compliance audit.
 
 ---
 
@@ -273,8 +312,8 @@ Use the following status values:
 | Stage 2 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
 | Stage 3 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
 | Stage 4 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 5 | LOCKED | IN PROGRESS    | IN PROGRESS |
-| Stage 6 | LOCKED | NOT STARTED    | NOT STARTED |
+| Stage 5 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
+| Stage 6 | LOCKED | READY TO START | READY TO START |
 | Stage 7 | LOCKED | NOT STARTED    | NOT STARTED |
 | Stage 8 | LOCKED | NOT STARTED    | NOT STARTED |
 | Stage 9 | LOCKED | NOT STARTED    | NOT STARTED |
@@ -300,6 +339,6 @@ Implementation progress must NOT be recorded as an architectural change unless t
 
 # 9. Current Next Action
 
-**Implement Stage 5 — Forecast Engine.**
+**Implement Stage 6 — Forecast Evaluation & Calibration.**
 
-No Stage 6 implementation should begin until Stage 5 has passed implementation tests, independent review, and architecture-compliance audit.
+Stage 5 has passed implementation tests, independent review, and architecture-compliance audit. Stage 6 may now begin.
