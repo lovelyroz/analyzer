@@ -24,7 +24,7 @@ The authoritative rules for each stage are the corresponding Stage Locked Specif
 
 **Architecture Coverage:** Stages 1–9 LOCKED
 
-**Implementation Status:** STAGE 7 COMPLETE / LOCKED
+**Implementation Status:** STAGE 8 COMPLETE / LOCKED
 
 Stages are implemented and advanced one at a time only after implementation, testing, review, architecture-compliance audit, and approval.
 
@@ -322,13 +322,71 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 **Design:** LOCKED
 
-**Implementation:** NOT STARTED
+**Implementation:** COMPLETE
 
-**Testing:** NOT STARTED
+**Testing:** PASS
 
-**Audit:** NOT STARTED
+**Independent Review:** PASS
 
-**Status:** NOT STARTED
+**Architecture Compliance Audit:** PASS
+
+**Approval:** PASS
+
+**Status:** COMPLETE / LOCKED
+
+**Final CI:** PASS
+
+**Final CI Run:** `34976472345`
+
+**Final CI Job:** `104405339871`
+
+**Final Commit:** `e308f52640936295b575e97f75b244bd672c803d`
+
+**Final CI Result:** 102/102 tests passed.
+
+### Final Audit Summary
+
+- Adjusted Close as primary price basis: PASS
+- Return horizons 1D/5D/20D/60D/120D/252D: PASS
+- Trading-day horizon handling: PASS
+- Price-position windows: PASS
+- 52-week high distance: PASS
+- MA20/60/120 descriptive context: PASS
+- Multi-horizon trend state: PASS
+- Trend conflict protection: PASS
+- Strong trend requires broad agreement: PASS
+- Momentum separated from trend: PASS
+- Momentum acceleration: PASS
+- Volatility and annualization: PASS
+- Drawdown state and recovery distinction: PASS
+- Liquidity state and trading-value context: PASS
+- Abnormal volume remains direction-neutral: PASS
+- Price-volume confirmation remains contextual: PASS
+- Industry-first relative strength with market fallback context: PASS
+- Missing benchmark produces INSUFFICIENT_DATA; no synthetic benchmark: PASS
+- Market regime remains contextual: PASS
+- Point-in-Time filtering: PASS
+- Missing data / insufficient history handling: PASS
+- Suspension/gap handling does not fabricate future observations: PASS
+- No Market Score: PASS
+- No Buy/Sell/Hold signal: PASS
+- No Fundamental Score modification: PASS
+- No Forecast modification: PASS
+- No Valuation modification: PASS
+- Versioned model/contract metadata: PASS
+- Stage 9 compatibility preserved: PASS
+- Full repository CI integration: PASS
+
+**Audit Decision:** PASS → LOCKED
+
+### Audit Fixes Applied Before Lock
+
+1. Corrected Drawdown recovery classification so a moderate drawdown is not labeled `RECOVERING` merely because the current price is above the recent low.
+2. Recovery now requires both improvement in current drawdown versus the previous observation and a parameterized rebound from the recent low.
+3. Strengthened Stage 8 tests to distinguish stable moderate drawdown, valid recovery, deep drawdown, and new-low states.
+4. Final repository CI passed all 102 tests after the correction.
+
+**Notes:** The first implementation correction produced an expected intermediate CI failure because the existing recovery test did not satisfy the locked `RECOVERY_FROM_LOW = 0.05` parameter. The test was corrected to represent a genuine 5% rebound. The final run passed 102/102 tests. Existing `datetime.utcnow()` deprecation warnings remain non-blocking.
 
 ---
 
@@ -348,13 +406,13 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 # 4. Current Implementation Target
 
-## Stage 8 — Market Engine
+## Stage 9 — Decision Engine & Dashboard Contract
 
-Stage 7 is COMPLETE / LOCKED. Stage 8 is now the current implementation target.
+Stages 1–8 are COMPLETE / LOCKED. Stage 9 is now the current implementation target.
 
-Implementation must follow `08_Stage8_Market_Engine.md` exactly and preserve the locked Stage 1–7 contracts.
+Implementation must follow the locked Stage 9 specification exactly and preserve the locked Stage 1–8 contracts.
 
-Do not modify Stage 7 unless a genuine contract defect is discovered.
+Do not modify Stages 1–8 unless a genuine contract defect is discovered.
 
 ---
 
@@ -400,7 +458,7 @@ Use the following status values:
 | Stage 5 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
 | Stage 6 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
 | Stage 7 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 8 | LOCKED | NOT STARTED    | NOT STARTED |
+| Stage 8 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
 | Stage 9 | LOCKED | NOT STARTED    | NOT STARTED |
 
 ---
@@ -424,6 +482,6 @@ Implementation progress must NOT be recorded as an architectural change unless t
 
 # 9. Current Next Action
 
-**Start Stage 8 — Market Engine implementation, following `08_Stage8_Market_Engine.md` and preserving the locked Stage 1–7 contracts.**
+**Start Stage 9 — Decision Engine & Dashboard Contract implementation, preserving the locked Stage 1–8 contracts.**
 
-Stages 4, 5, 6 and 7 are COMPLETE / LOCKED. No Stage 5, Stage 6 or Stage 7 architectural change is pending.
+Stages 4, 5, 6, 7 and 8 are COMPLETE / LOCKED. No Stage 4–8 architectural change is pending.
