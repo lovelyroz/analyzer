@@ -4,35 +4,39 @@ from statistics import median
 
 from src.kpi.schema import KPIResult
 from src.scoring.schema import KPIScoreResult, CategoryScoreResult, FundamentalScoreResult
+from src.scoring.weights import AXIS_WEIGHTS, get_kpi_weights_for_industry
 
 
 class FundamentalScoringEngine:
     """Stage 3 contract-aligned Fundamental Scoring Engine."""
 
-    AXIS_WEIGHTS = {"GROWTH": 0.30, "PROFITABILITY": 0.45, "RISK_QUALITY": 0.25}
+    AXIS_WEIGHTS = AXIS_WEIGHTS
     MIN_PEER_COUNT = 8
     MIN_AXIS_COVERAGE = 0.60
 
-    KPI_PROFILES: Dict[str, Tuple[str, str, float]] = {
-        "REVENUE_GROWTH": ("GROWTH", "HIGHER_IS_BETTER", 0.15),
-        "OP_PROFIT_GROWTH": ("GROWTH", "HIGHER_IS_BETTER", 0.25),
-        "NET_PROFIT_GROWTH": ("GROWTH", "HIGHER_IS_BETTER", 0.30),
-        "EPS_GROWTH": ("GROWTH", "HIGHER_IS_BETTER", 0.30),
-        "GROSS_MARGIN": ("PROFITABILITY", "HIGHER_IS_BETTER", 0.10),
-        "OPERATING_MARGIN": ("PROFITABILITY", "HIGHER_IS_BETTER", 0.25),
-        "NET_MARGIN": ("PROFITABILITY", "HIGHER_IS_BETTER", 0.20),
-        "ROA": ("PROFITABILITY", "HIGHER_IS_BETTER", 0.20),
-        "ROE": ("PROFITABILITY", "HIGHER_IS_BETTER", 0.25),
-        "CASH_CONVERSION": ("RISK_QUALITY", "HIGHER_IS_BETTER", 0.40),
-        "EARNINGS_QUALITY": ("RISK_QUALITY", "HIGHER_IS_BETTER", 0.60),
-        "BANK_LOAN_GROWTH": ("GROWTH", "HIGHER_IS_BETTER", 0.0),
-        "BANK_DEPOSIT_GROWTH": ("GROWTH", "HIGHER_IS_BETTER", 0.0),
-        "BANK_NII": ("PROFITABILITY", "HIGHER_IS_BETTER", 0.0),
-        "BANK_NIM": ("PROFITABILITY", "HIGHER_IS_BETTER", 0.0),
-        "BANK_NPL": ("RISK_QUALITY", "LOWER_IS_BETTER", 0.0),
-        "HOLDING_NAV": ("PROFITABILITY", "HIGHER_IS_BETTER", 0.0),
-        "HOLDING_NAV_GROWTH": ("GROWTH", "HIGHER_IS_BETTER", 0.0),
-        "HOLDING_P_NAV": ("EXCLUDED", "HIGHER_IS_BETTER", 0.0),
+    KPI_DIRECTIONS: Dict[str, Tuple[str, str]] = {
+        "REVENUE_GROWTH": ("GROWTH", "HIGHER_IS_BETTER"),
+        "OP_PROFIT_GROWTH": ("GROWTH", "HIGHER_IS_BETTER"),
+        "NET_PROFIT_GROWTH": ("GROWTH", "HIGHER_IS_BETTER"),
+        "EPS_GROWTH": ("GROWTH", "HIGHER_IS_BETTER"),
+        "GROSS_MARGIN": ("PROFITABILITY", "HIGHER_IS_BETTER"),
+        "OPERATING_MARGIN": ("PROFITABILITY", "HIGHER_IS_BETTER"),
+        "NET_MARGIN": ("PROFITABILITY", "HIGHER_IS_BETTER"),
+        "ROA": ("PROFITABILITY", "HIGHER_IS_BETTER"),
+        "ROE": ("PROFITABILITY", "HIGHER_IS_BETTER"),
+        "CASH_CONVERSION": ("RISK_QUALITY", "HIGHER_IS_BETTER"),
+        "EARNINGS_QUALITY": ("RISK_QUALITY", "HIGHER_IS_BETTER"),
+        "BANK_LOAN_GROWTH": ("GROWTH", "HIGHER_IS_BETTER"),
+        "BANK_DEPOSIT_GROWTH": ("GROWTH", "HIGHER_IS_BETTER"),
+        "BANK_NII": ("PROFITABILITY", "HIGHER_IS_BETTER"),
+        "BANK_NIM": ("PROFITABILITY", "HIGHER_IS_BETTER"),
+        "BANK_NPL": ("RISK_QUALITY", "LOWER_IS_BETTER"),
+        "HOLDING_NAV": ("PROFITABILITY", "HIGHER_IS_BETTER"),
+        "HOLDING_NAV_GROWTH": ("GROWTH", "HIGHER_IS_BETTER"),
+        "HOLDING_P_NAV": ("EXCLUDED", "HIGHER_IS_BETTER"),
+        "CEMENT_SALES_VOLUME": ("GROWTH", "HIGHER_IS_BETTER"),
+        "FOOD_SALES_VOLUME": ("GROWTH", "HIGHER_IS_BETTER"),
+        "PHARMACEUTICAL_SALES_VOLUME": ("GROWTH", "HIGHER_IS_BETTER"),
     }
 
     @staticmethod
@@ -46,8 +50,6 @@ class FundamentalScoringEngine:
         else:
             less = sum(v < value for v in ordered)
             equal = sum(v == value for v in ordered)
-            # Endpoint-preserving midrank percentile: minimum ranks at 0,
-            # maximum ranks at 100, with ties centered between their ranks.
             percentile = ((less + 0.5 * (equal - 1)) / (len(ordered) - 1)) * 100.0
         if direction == "LOWER_IS_BETTER":
             percentile = 100.0 - percentile
@@ -72,13 +74,9 @@ class FundamentalScoringEngine:
             raw = 50.0
         return max(0.0, min(100.0, raw))
 
-    def _score_kpi(self, result: KPIResult, peers: Optional[Sequence[float]], history: Optional[Sequence[float]]) -> Tuple[Optional[float], str]:
-        profile = self.KPI_PROFILES.get(result.kpi_code)
-        if profile is None or profile[0] == "EXCLUDED":
-            return None, "EXCLUDED"
+    def _score_kpi(self, result: KPIResult, peers: Optional[Sequence[float]], history: Optional[Sequence[float]], direction: str) -> Tuple[Optional[float], str]:
         if result.value is None or result.quality_status in {"MISSING", "UNMAPPED", "SUSPICIOUS"}:
             return None, result.quality_status
-        axis, direction, _ = profile
         peer_values = list(peers or [])
         if len(peer_values) >= self.MIN_PEER_COUNT:
             return self._percentile_score(result.value, peer_values, direction), "INDUSTRY_PERCENTILE"
@@ -90,15 +88,24 @@ class FundamentalScoringEngine:
     def calculate_score(self, company_id: int, period_id: int, industry_code: str, kpi_results: List[KPIResult], peer_values: Optional[Dict[str, Sequence[float]]] = None, historical_values: Optional[Dict[str, Sequence[float]]] = None) -> FundamentalScoreResult:
         peer_values = peer_values or {}
         historical_values = historical_values or {}
+        weights = get_kpi_weights_for_industry(industry_code)
         kpi_scores: List[KPIScoreResult] = []
         axis_items: Dict[str, List[Tuple[KPIScoreResult, float]]] = {axis: [] for axis in self.AXIS_WEIGHTS}
 
         for kpi in kpi_results:
-            profile = self.KPI_PROFILES.get(kpi.kpi_code)
-            if profile is None or profile[0] == "EXCLUDED":
+            mapping = self.KPI_DIRECTIONS.get(kpi.kpi_code)
+            if mapping is None:
                 continue
-            axis, direction, base_weight = profile
-            score, benchmark_method = self._score_kpi(kpi, peer_values.get(kpi.kpi_code), historical_values.get(kpi.kpi_code))
+            axis, direction = mapping
+            if axis == "EXCLUDED":
+                continue
+            base_weight = weights.get(axis, {}).get(kpi.kpi_code, 0.0)
+            score, benchmark_method = self._score_kpi(
+                kpi,
+                peer_values.get(kpi.kpi_code),
+                historical_values.get(kpi.kpi_code),
+                direction,
+            )
             item = KPIScoreResult(
                 kpi_code=kpi.kpi_code,
                 raw_value=kpi.value,
@@ -116,13 +123,11 @@ class FundamentalScoringEngine:
 
         category_scores: Dict[str, CategoryScoreResult] = {}
         axis_scores: Dict[str, float] = {}
-        axis_coverages: Dict[str, float] = {}
         for axis, axis_weight in self.AXIS_WEIGHTS.items():
             items = axis_items[axis]
-            full_weight = sum(profile[2] for profile in self.KPI_PROFILES.values() if profile[0] == axis and profile[2] > 0)
+            full_weight = sum(weights.get(axis, {}).values())
             available_weight = sum(weight for _item, weight in items)
             coverage = available_weight / full_weight if full_weight else 0.0
-            axis_coverages[axis] = coverage
             if coverage < self.MIN_AXIS_COVERAGE:
                 category_scores[axis] = CategoryScoreResult(axis, None, axis_weight, coverage)
                 continue
