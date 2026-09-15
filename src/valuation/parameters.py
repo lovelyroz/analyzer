@@ -11,6 +11,15 @@ SCENARIO_WEIGHTS: Dict[str, float] = {
     "bull": 0.20,
 }
 
+# Backward-compatible neutral export. V1 intentionally does not use arbitrary
+# 0.9/1.0/1.1 scenario gaps; absent explicit economic evidence, all scenarios
+# use the benchmark multiple unchanged.
+SCENARIO_PE_MULTIPLIER: Dict[str, float] = {
+    "bear": 1.00,
+    "base": 1.00,
+    "bull": 1.00,
+}
+
 # Scenario probabilities are built from four family-level evidence distributions.
 # Each family receives one vote; correlated metrics must be aggregated before this
 # contract. The blend is versioned and backtestable rather than an architecture constant.
