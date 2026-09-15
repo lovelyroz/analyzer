@@ -1,19 +1,83 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
-def map_score_to_recommendation(
-    composite_score: float, 
-    margin_of_safety: float
-) -> Tuple[str, float]:
+
+DECISION_STATES = (
+    "STRONG_BUY",
+    "BUY",
+    "HOLD",
+    "WATCH",
+    "REDUCE",
+    "SELL",
+    "STRONG_SELL",
+)
+
+HOLDING_STATES = (
+    "STRONG_HOLD",
+    "HOLD",
+    "HOLD_WITH_CAUTION",
+    "REVIEW_HOLD",
+    "EXIT_CANDIDATE",
+)
+
+
+VALUATION_ATTRACTIVE = {"VERY_ATTRACTIVE", "ATTRACTIVE"}
+VALUATION_EXPENSIVE = {"VERY_EXPENSIVE", "EXPENSIVE"}
+
+
+def classify_fundamental(score: Optional[float]) -> str:
+    if score is None:
+        return "INSUFFICIENT_DATA"
+    if score >= 70:
+        return "STRONG"
+    if score <= 40:
+        return "WEAK"
+    return "ACCEPTABLE"
+
+
+def classify_reliability(score: Optional[float]) -> str:
+    if score is None:
+        return "INSUFFICIENT_DATA"
+    if score >= 75:
+        return "HIGH"
+    if score >= 60:
+        return "MODERATE"
+    if score >= 40:
+        return "LOW"
+    return "VERY_LOW"
+
+
+def classify_valuation(status: Optional[str]) -> str:
+    status = str(status or "INSUFFICIENT_DATA").upper()
+    if status in VALUATION_ATTRACTIVE:
+        return "ATTRACTIVE"
+    if status in VALUATION_EXPENSIVE:
+        return "EXPENSIVE"
+    if status in {"FAIR", "FAIRLY_VALUED", "FAIR_VALUE", "FAIRLY VALUED"}:
+        return "FAIR"
+    if status in {"NOT_APPLICABLE", "INSUFFICIENT_DATA"}:
+        return status
+    # Preserve future Stage 7 status names without inventing a new valuation rule.
+    return status
+
+
+def is_positive_direction(state: Optional[str]) -> bool:
+    return str(state or "").upper() in {
+        "STRONG_IMPROVEMENT", "IMPROVING", "POSITIVE", "STRONG_POSITIVE",
+        "UPTREND", "STRONG_UPTREND", "ACCELERATING", "ABOVE_AVERAGE", "STRONG",
+    }
+
+
+def is_negative_direction(state: Optional[str]) -> bool:
+    return str(state or "").upper() in {
+        "STRONG_DETERIORATION", "DETERIORATING", "NEGATIVE", "STRONG_NEGATIVE",
+        "DOWNTREND", "STRONG_DOWNTREND", "DECELERATING", "WEAK", "BELOW_AVERAGE",
+    }
+
+
+def map_score_to_recommendation(*args, **kwargs) -> Tuple[str, float]:
+    """Legacy entry point retained without restoring the obsolete allocation model.
+
+    Stage 9 V1 has no position sizing. Callers using the old weighted-score API
+    receive a HOLD decision and zero allocation rather than the obsolete logic.
     """
-    نگاشت امتیاز تلفیقی و حاشیه امنیت به توصیه نهایی و وزن پیشنهادی در پرتفوی
-    """
-    if composite_score >= 80.0 and margin_of_safety >= 25.0:
-        return "STRONG_BUY", 10.0  # حداکثر ۱۰٪ تخصیص
-    elif composite_score >= 65.0 and margin_of_safety >= 10.0:
-        return "BUY", 6.0          # تخصیص ۶٪
-    elif composite_score <= 35.0 or margin_of_safety <= -25.0:
-        return "STRONG_SELL", 0.0  # خروج کامل
-    elif composite_score <= 45.0 or margin_of_safety < -10.0:
-        return "SELL", 0.0         # پیشنهاد فروش
-    else:
-        return "HOLD", 2.0         # نگهداری / وزن کم
+    return "HOLD", 0.0
