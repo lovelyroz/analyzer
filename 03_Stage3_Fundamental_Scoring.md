@@ -363,6 +363,97 @@ The same principle applies to other Stage 2 industry groups.
 
 ---
 
+# 13A. Stage 3 V1 Industry Weighting Rule — Locked Parameter
+
+For Stage 3 V1, the industry-specific redistribution rule is explicitly fixed as follows:
+
+```text
+INDUSTRY_KPI_BUDGET = 20% of an affected axis
+```
+
+This is a **redistribution budget, not an additive bonus**.
+
+For every axis containing one or more applicable industry KPIs:
+
+1. Allocate 20% of that axis to the applicable industry KPIs.
+2. Scale the universal KPI weights in that axis proportionally into the remaining 80%.
+3. Split the 20% industry budget equally among the applicable industry KPIs mapped to that axis.
+4. The resulting KPI weights within the axis must sum to exactly 100%.
+5. Axes without applicable industry KPIs retain their universal KPI weights unchanged.
+
+Example — Bank Growth axis:
+
+```text
+Universal weights:
+Revenue Growth       15%
+Operating Growth     25%
+Net Profit Growth    30%
+EPS Growth           30%
+
+Industry budget      20%
+Universal budget     80%
+```
+
+Therefore the universal weights are proportionally scaled by 0.80 and the two applicable Bank industry KPIs receive 10% each:
+
+```text
+Revenue Growth        12%
+Operating Growth      20%
+Net Profit Growth     24%
+EPS Growth            24%
+Loan Growth            10%
+Deposit Growth         10%
+Total                 100%
+```
+
+Example — Cement Growth axis:
+
+```text
+Revenue Growth        12%
+Operating Growth      20%
+Net Profit Growth     24%
+EPS Growth            24%
+Sales Volume           20%
+Total                 100%
+```
+
+The same 20% redistribution rule applies to affected Profitability and Risk & Quality axes.
+
+For Stage 3 V1, the implemented industry mappings are:
+
+```text
+BANK
+  Loan Growth       → Growth
+  Deposit Growth    → Growth
+  NII               → Profitability
+  NIM               → Profitability
+  NPL               → Risk & Quality
+
+INVESTMENT / HOLDING
+  NAV               → Profitability
+  NAV Growth        → Growth
+  P/NAV             → Valuation-only / excluded from Stage 3
+
+CEMENT
+  Sales Volume      → Growth
+
+FOOD
+  Sales Volume      → Growth
+
+PHARMACEUTICAL
+  Sales Volume      → Growth
+
+PETROCHEMICAL / CHEMICAL
+  No Stage 3 industry KPI in V1
+
+METALS / MINING
+  No Stage 3 industry KPI in V1
+```
+
+The industry weighting profile is part of the Stage 3 scoring method version. Any future change to the 20% budget, allocation method, or industry mapping must create a new scoring method version and must not silently alter historical scores.
+
+---
+
 # 14. Double Counting Control
 
 Double counting is a core Stage 3 control.
@@ -679,6 +770,9 @@ Therefore every score must be traceable to:
 22. Point-in-Time rules from Stage 1 must be respected.
 23. Report versions and availability dates must be respected.
 24. Restated/future information must not leak into historical scoring or backtests.
+25. Stage 3 V1 industry KPI redistribution budget is fixed at 20% of each affected axis.
+26. The 20% industry budget is redistributed, never added as a bonus.
+27. Any future weighting-profile change requires a new scoring method version.
 
 ---
 
