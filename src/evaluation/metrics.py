@@ -48,8 +48,14 @@ def classify_regime(forecast: float, actual: float) -> Optional[str]:
 
 
 def calculate_mape(ape_values: Iterable[Optional[float]]) -> Optional[float]:
-    """Mean APE over valid, non-regime observations."""
-    values = [value for value in ape_values if value is not None]
+    """Mean absolute percentage error over valid APE observations.
+
+    The public helper accepts APE values, so each supplied observation is
+    normalized to its absolute magnitude before averaging. This prevents a
+    signed percentage-error value from accidentally cancelling a true APE.
+    Regime-invalid observations are represented by None upstream.
+    """
+    values = [abs(value) for value in ape_values if value is not None and _valid_number(value)]
     if not values:
         return None
     return mean(values)
