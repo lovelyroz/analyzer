@@ -326,15 +326,19 @@ class MarketEngine:
         if current is None or not prices:
             return "INSUFFICIENT_DATA"
         recent_low = min(prices[-20:])
-        recovering = prices[-1] >= recent_low * (1.0 + RECOVERY_FROM_LOW)
         if current >= DRAWDOWN_NEAR_PEAK:
             return "NEAR_PEAK"
         if current <= DRAWDOWN_EXTREME and prices[-1] == recent_low:
             return "NEW_LOW"
-        if recovering:
-            return "RECOVERING"
         if current <= DRAWDOWN_DEEP:
             return "DEEP_DRAWDOWN"
+        if len(prices) >= 2:
+            previous_peak = max(prices[:-1])
+            previous_dd = prices[-2] / previous_peak - 1.0 if previous_peak else None
+            current_is_improving = previous_dd is not None and current > previous_dd
+            recovered_from_recent_low = prices[-1] >= recent_low * (1.0 + RECOVERY_FROM_LOW)
+            if current_is_improving and recovered_from_recent_low:
+                return "RECOVERING"
         return "STABLE_DRAWDOWN"
 
     @staticmethod
