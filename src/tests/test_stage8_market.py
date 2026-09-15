@@ -29,7 +29,7 @@ def test_market_engine_returns_state_not_score():
     prices = list(range(1, 260))
     result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), rows(prices))
     assert result.model_version == "STAGE8_V1"
-    assert result.market_contract_version == "MARKET_CONTRACT_V1"
+    assert result.market_contract_version == "MARKET_CONTRACT_V1.1"
     assert result.trend_state in {"UPTREND", "STRONG_UPTREND"}
     assert result.momentum_state in {"POSITIVE", "STRONG_POSITIVE"}
     assert result.metadata["market_score"] is None
@@ -104,6 +104,24 @@ def test_negative_market_state_generates_context_alerts_not_decision():
     assert result.momentum_state in {"NEGATIVE", "STRONG_NEGATIVE"}
     assert any("DOWNTREND" in alert or "DRAWDOWN" in alert for alert in result.alerts)
     assert all(not alert.startswith("BUY") and not alert.startswith("SELL") for alert in result.alerts)
+
+
+def test_drawdown_moderate_non_recovering_is_not_labeled_recovering():
+    prices = [100.0] * 30
+    prices[-1] = 90.0
+    assert MarketEngine._drawdown_state(-0.10, prices) == "STABLE_DRAWDOWN"
+
+
+def test_drawdown_recovery_requires_rebound_from_recent_low():
+    prices = [100.0] * 18 + [80.0, 81.0]
+    assert MarketEngine._drawdown_state(-0.19, prices) == "RECOVERING"
+
+
+def test_drawdown_deep_and_new_low_states_remain_distinct():
+    deep = [100.0] * 19 + [80.0]
+    extreme_low = [100.0] * 19 + [50.0]
+    assert MarketEngine._drawdown_state(-0.20, deep) == "DEEP_DRAWDOWN"
+    assert MarketEngine._drawdown_state(-0.50, extreme_low) == "NEW_LOW"
 
 
 def test_legacy_api_is_compatibility_only():
