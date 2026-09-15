@@ -129,6 +129,7 @@ def test_axis_below_sixty_percent_is_insufficient_data():
     assert result.category_scores["GROWTH"].score is None
     assert result.category_scores["GROWTH"].coverage == 0.15
     assert result.overall_score is None
+    assert result.score_data_quality == "INSUFFICIENT_DATA"
 
 
 def test_three_axis_formula_and_missing_axis_renormalization():
@@ -142,8 +143,8 @@ def test_three_axis_formula_and_missing_axis_renormalization():
         ],
         historical_values={
             "REVENUE_GROWTH": [50], "OP_PROFIT_GROWTH": [50], "NET_PROFIT_GROWTH": [50], "EPS_GROWTH": [50],
-            "GROSS_MARGIN": [60], "OPERATING_MARGIN": [60], "NET_MARGIN": [60], "ROA": [60], "ROE": [60],
-            "CASH_CONVERSION": [80], "EARNINGS_QUALITY": [80],
+            "GROSS_MARGIN": [50], "OPERATING_MARGIN": [50], "NET_MARGIN": [50], "ROA": [50], "ROE": [50],
+            "CASH_CONVERSION": [50], "EARNINGS_QUALITY": [50],
         },
     )
     assert results.category_scores["GROWTH"].score == 50.0
