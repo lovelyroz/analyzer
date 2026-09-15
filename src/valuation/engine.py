@@ -1,5 +1,4 @@
 from datetime import datetime
-from statistics import median
 from typing import Dict, List, Optional, Sequence
 
 from src.forecast.schema import CompanyForecastResult
@@ -15,8 +14,10 @@ from src.valuation.parameters import (
     CONTRACT_VERSION,
     MIN_INDUSTRY_PEERS,
     MODEL_VERSION,
+    PROBABILITY_EVIDENCE_FAMILIES,
+    PROBABILITY_EVIDENCE_BLEND,
     RISK_THRESHOLDS,
-    SCENARIO_PE_MULTIPLIER,
+    SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT,
     SCENARIO_WEIGHTS,
     SENSITIVITY_PERTURBATION,
     VALUATION_THRESHOLDS,
@@ -44,8 +45,11 @@ class ValuationEngine:
         industry_forward_pe_values: Optional[Sequence[Optional[float]]] = None,
         industry_ttm_pe_values: Optional[Sequence[Optional[float]]] = None,
         probability_adjustments: Optional[Dict[str, float]] = None,
+        probability_evidence: Optional[Dict[str, Dict[str, float]]] = None,
         probability_confidence: float = 50.0,
         data_quality_score: float = 100.0,
+        scenario_pe_adjustments: Optional[Dict[str, float]] = None,
+        scenario_pe_rationales: Optional[Dict[str, str]] = None,
     ) -> ValuationResult:
         scenarios_input = {
             "bear": forecast_result.scenario_forecasts.bear,
@@ -68,14 +72,22 @@ class ValuationEngine:
             valid_forward_count,
         )
 
-        probabilities = self._resolve_probabilities(probability_adjustments)
+        probabilities, probability_meta = self._resolve_probabilities(
+            probability_adjustments=probability_adjustments,
+            probability_evidence=probability_evidence,
+        )
+        multiple_adjustments, multiple_meta = self._resolve_scenario_multiple_adjustments(
+            scenario_pe_adjustments=scenario_pe_adjustments,
+            scenario_pe_rationales=scenario_pe_rationales,
+        )
+
         scenarios: Dict[str, ScenarioValuation] = {}
         flags: List[str] = []
 
         for name, chain in scenarios_input.items():
             eps = chain.eps
-            scenario_flags = self._eps_flags(eps, name)
-            target_pe = None if target_pe_base is None else target_pe_base * SCENARIO_PE_MULTIPLIER[name]
+            scenario_flags = self._eps_flags(eps)
+            target_pe = None if target_pe_base is None else target_pe_base * (1.0 + multiple_adjustments[name])
             forward_pe = calculate_forward_pe(eps, current_price)
             fair_value = calculate_forward_pe_fair_value(eps, target_pe)
             upside = calculate_margin_of_safety(fair_value, current_price)
@@ -91,6 +103,11 @@ class ValuationEngine:
             )
             flags.extend(scenario_flags)
 
+        sign_flags = self._scenario_sign_change_flags(scenarios)
+        for name, scenario_flags in sign_flags.items():
+            scenarios[name].flags.extend(flag for flag in scenario_flags if flag not in scenarios[name].flags)
+            flags.extend(scenario_flags)
+
         expected_fv = self._expected_fair_value(scenarios)
         expected_upside = calculate_margin_of_safety(expected_fv, current_price)
         base_upside = scenarios["base"].upside_downside_pct
@@ -100,6 +117,9 @@ class ValuationEngine:
             status = "INSUFFICIENT_DATA"
         else:
             status = self._valuation_status(expected_upside, base_upside)
+
+        if self._scenario_order_warning(scenarios):
+            flags.append("SCENARIO_ORDER_WARNING")
 
         reliability = forecast_reliability_score
         if reliability is not None and reliability < ALERT_THRESHOLDS["low_forecast_reliability"]:
@@ -183,12 +203,9 @@ class ValuationEngine:
                 "benchmark_peer_minimum": MIN_INDUSTRY_PEERS,
                 "scenario_probability_sum": sum(probabilities.values()),
                 "probability_adjustments_applied": probability_adjustments or {},
-                "probability_evidence_families": [
-                    "FUNDAMENTAL_DIRECTION",
-                    "FORECAST_DIRECTION",
-                    "PROFITABILITY_ASSUMPTION_RISK",
-                    "DATA_STRUCTURAL_RISK",
-                ],
+                "probability_evidence": probability_meta,
+                "probability_evidence_families": list(PROBABILITY_EVIDENCE_FAMILIES),
+                "scenario_multiple_policy": multiple_meta,
                 "nav_per_share_received": nav_per_share,
                 "pit_inputs_required": True,
             },
@@ -214,27 +231,121 @@ class ValuationEngine:
         return None, "INSUFFICIENT_DATA"
 
     @staticmethod
-    def _resolve_probabilities(adjustments: Optional[Dict[str, float]]) -> Dict[str, float]:
+    def _resolve_probabilities(
+        probability_adjustments: Optional[Dict[str, float]],
+        probability_evidence: Optional[Dict[str, Dict[str, float]]],
+    ) -> tuple[Dict[str, float], Dict[str, object]]:
         values = dict(SCENARIO_WEIGHTS)
-        if adjustments:
+        if probability_adjustments:
             for name in values:
-                values[name] += adjustments.get(name, 0.0)
+                values[name] += probability_adjustments.get(name, 0.0)
+
+        family_distributions: Dict[str, Dict[str, float]] = {}
+        if probability_evidence:
+            unknown = set(probability_evidence) - set(PROBABILITY_EVIDENCE_FAMILIES)
+            if unknown:
+                raise ValueError(f"Unknown probability evidence families: {sorted(unknown)}")
+            for family, evidence in probability_evidence.items():
+                if set(evidence) != set(values):
+                    raise ValueError(f"Evidence family {family} must provide bear/base/bull scores")
+                scores = {name: float(evidence[name]) for name in values}
+                if any(score < 0 or score > 1 for score in scores.values()):
+                    raise ValueError(f"Evidence family {family} scores must be in [0, 1]")
+                total = sum(scores.values())
+                if total <= 0:
+                    raise ValueError(f"Evidence family {family} must contain positive evidence")
+                family_distributions[family] = {name: scores[name] / total for name in values}
+
+            if family_distributions:
+                family_mean = {
+                    name: sum(dist[name] for dist in family_distributions.values()) / len(family_distributions)
+                    for name in values
+                }
+                blend = max(0.0, min(1.0, PROBABILITY_EVIDENCE_BLEND))
+                for name in values:
+                    values[name] = (1.0 - blend) * values[name] + blend * family_mean[name]
+
         values = {name: max(0.0, value) for name, value in values.items()}
         total = sum(values.values())
         if total <= 0:
-            return dict(SCENARIO_WEIGHTS)
-        return {name: value / total for name, value in values.items()}
+            values = dict(SCENARIO_WEIGHTS)
+            total = sum(values.values())
+        resolved = {name: value / total for name, value in values.items()}
+        return resolved, {
+            "mode": "FAMILY_LEVEL_EQUAL_WEIGHT" if family_distributions else "PRIOR_OR_LEGACY_ADJUSTMENT",
+            "families_used": list(family_distributions),
+            "family_count": len(family_distributions),
+            "correlated_metric_protection": "ONE_DISTRIBUTION_PER_FAMILY",
+            "blend": PROBABILITY_EVIDENCE_BLEND if family_distributions else 0.0,
+            "family_distributions": family_distributions,
+        }
 
     @staticmethod
-    def _eps_flags(eps: Optional[float], scenario: str) -> List[str]:
+    def _resolve_scenario_multiple_adjustments(
+        scenario_pe_adjustments: Optional[Dict[str, float]],
+        scenario_pe_rationales: Optional[Dict[str, str]],
+    ) -> tuple[Dict[str, float], Dict[str, object]]:
+        adjustments = {name: 0.0 for name in SCENARIO_WEIGHTS}
+        if scenario_pe_adjustments is None:
+            return adjustments, {
+                "mode": "NEUTRAL_BENCHMARK_MULTIPLE",
+                "adjustments": adjustments,
+                "rationales": {},
+                "economic_justification_required": True,
+                "versioned": True,
+                "backtestable": True,
+            }
+
+        unknown = set(scenario_pe_adjustments) - set(adjustments)
+        if unknown:
+            raise ValueError(f"Unknown scenario multiple names: {sorted(unknown)}")
+        rationales = scenario_pe_rationales or {}
+        for name, adjustment in scenario_pe_adjustments.items():
+            value = float(adjustment)
+            if abs(value) > SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT:
+                raise ValueError(f"Scenario multiple adjustment for {name} exceeds V1 bound")
+            if name != "base" and not str(rationales.get(name, "")).strip():
+                raise ValueError(f"Economic rationale required for {name} scenario multiple adjustment")
+            adjustments[name] = value
+        if "base" in rationales and not str(rationales["base"]).strip():
+            raise ValueError("Economic rationale for base scenario cannot be empty")
+        return adjustments, {
+            "mode": "EXPLICIT_ECONOMIC_SCENARIO_ADJUSTMENT",
+            "adjustments": adjustments,
+            "rationales": {name: str(value) for name, value in rationales.items() if name in adjustments},
+            "economic_justification_required": True,
+            "versioned": True,
+            "backtestable": True,
+            "max_abs_adjustment": SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT,
+        }
+
+    @staticmethod
+    def _eps_flags(eps: Optional[float]) -> List[str]:
         if eps is None:
             return ["NOT_APPLICABLE"]
         if eps < 0:
             return ["NEGATIVE_EPS", "NOT_APPLICABLE"]
         if eps == 0:
             return ["ZERO_EPS", "NOT_APPLICABLE"]
-        # A sign-change flag is added when scenarios cross zero.
         return []
+
+    @staticmethod
+    def _scenario_sign_change_flags(scenarios: Dict[str, ScenarioValuation]) -> Dict[str, List[str]]:
+        eps_values = {name: scenario.eps_forecast for name, scenario in scenarios.items()}
+        if any(value is None for value in eps_values.values()):
+            return {}
+        signs = {name: value > 0 for name, value in eps_values.items()}
+        if len(set(signs.values())) == 1:
+            return {}
+        result: Dict[str, List[str]] = {}
+        for name, positive in signs.items():
+            result[name] = ["SIGN_CHANGE", "PROFIT_TO_LOSS" if positive else "LOSS_TO_PROFIT"]
+        return result
+
+    @staticmethod
+    def _scenario_order_warning(scenarios: Dict[str, ScenarioValuation]) -> bool:
+        values = [scenarios[name].fair_value for name in ("bear", "base", "bull")]
+        return all(value is not None for value in values) and not (values[0] <= values[1] <= values[2])
 
     @staticmethod
     def _expected_fair_value(scenarios: Dict[str, ScenarioValuation]) -> Optional[float]:
@@ -323,14 +434,8 @@ class ValuationEngine:
         base = scenarios["base"]
         if base.fair_value is None:
             return [], {}, {}, {}
-
         p = SENSITIVITY_PERTURBATION
-        eps_impact = abs(base.fair_value * p)
-        pe_impact = abs(base.fair_value * p)
-        drivers = {
-            "EPS": eps_impact,
-            "TARGET_PE": pe_impact,
-        }
+        drivers = {"EPS": abs(base.fair_value * p), "TARGET_PE": abs(base.fair_value * p)}
         total = max(sum(drivers.values()), 1e-9)
         reliability = 50.0 if forecast_reliability is None else max(0.0, min(100.0, forecast_reliability))
         uncertainty_base = max(0.0, min(100.0, (100.0 - reliability) * 0.5 + (100.0 - probability_confidence) * 0.3 + (100.0 - data_quality_score) * 0.2))
