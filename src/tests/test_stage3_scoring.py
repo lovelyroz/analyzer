@@ -2,7 +2,7 @@ from datetime import datetime
 
 from src.kpi.schema import KPIResult
 from src.scoring.engine import FundamentalScoringEngine
-from src.scoring.weights import AXIS_WEIGHTS, KPI_WEIGHTS
+from src.scoring.weights import AXIS_WEIGHTS, KPI_WEIGHTS, get_kpi_weights_for_industry
 
 
 def kpi(code, value, status="VALID"):
@@ -23,6 +23,31 @@ def test_fixed_axis_weights_match_locked_spec():
     assert sum(KPI_WEIGHTS["GROWTH"].values()) == 1.0
     assert sum(KPI_WEIGHTS["PROFITABILITY"].values()) == 1.0
     assert sum(KPI_WEIGHTS["RISK_QUALITY"].values()) == 1.0
+
+
+def test_industry_profiles_keep_each_axis_at_one_hundred_percent():
+    for industry in ["BANK", "HOLDING", "CEMENT", "FOOD", "PHARMACEUTICAL", "GENERAL"]:
+        profile = get_kpi_weights_for_industry(industry)
+        for axis in AXIS_WEIGHTS:
+            assert abs(sum(profile[axis].values()) - 1.0) < 1e-12
+
+
+def test_bank_industry_kpis_receive_redistributed_weight_not_bonus_weight():
+    profile = get_kpi_weights_for_industry("BANK")
+    assert profile["GROWTH"]["BANK_LOAN_GROWTH"] > 0
+    assert profile["GROWTH"]["BANK_DEPOSIT_GROWTH"] > 0
+    assert profile["PROFITABILITY"]["BANK_NII"] > 0
+    assert profile["PROFITABILITY"]["BANK_NIM"] > 0
+    assert profile["RISK_QUALITY"]["BANK_NPL"] > 0
+    assert profile["GROWTH"]["REVENUE_GROWTH"] < KPI_WEIGHTS["GROWTH"]["REVENUE_GROWTH"]
+    assert profile["RISK_QUALITY"]["CASH_CONVERSION"] < KPI_WEIGHTS["RISK_QUALITY"]["CASH_CONVERSION"]
+
+
+def test_sales_volume_replaces_part_of_growth_weight():
+    profile = get_kpi_weights_for_industry("CEMENT")
+    assert profile["GROWTH"]["CEMENT_SALES_VOLUME"] == 0.20
+    assert profile["GROWTH"]["REVENUE_GROWTH"] < KPI_WEIGHTS["GROWTH"]["REVENUE_GROWTH"]
+    assert sum(profile["GROWTH"].values()) == 1.0
 
 
 def test_industry_percentile_is_primary_when_peer_count_is_at_least_eight():
