@@ -29,7 +29,7 @@ class MarketSignalResult:
     trend_alignment: str = "NEUTRAL"  # legacy field
     rsi_status: str = "NEUTRAL"  # legacy field; RSI is not Core V1
     money_flow_status: str = "NEUTRAL"  # legacy field
-    technical_score: float = 50.0  # legacy field; Stage 8 V1 does not use Market Score
+    technical_score: Optional[float] = None  # legacy field; Stage 8 V1 has no Market Score
     indicators: TechnicalIndicatorsResult = field(default_factory=TechnicalIndicatorsResult)
     calculation_timestamp: Optional[datetime] = None
     trend_state: str = "INSUFFICIENT_DATA"
