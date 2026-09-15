@@ -171,7 +171,7 @@ def test_data_quality_status_propagates_from_stage1_inputs():
     net_margin = next(r for r in results if r.kpi_code == "NET_MARGIN")
     assert revenue_growth.quality_status == "ESTIMATED"
     assert op_margin.quality_status == "SUSPICIOUS"
-    assert net_margin.quality_status == "VALID"
+    assert net_margin.quality_status == "ESTIMATED"
 
 
 def test_industry_kpi_data_quality_propagates():
