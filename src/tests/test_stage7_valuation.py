@@ -61,6 +61,7 @@ def test_valuation_engine_forward_pe_and_expected_fair_value():
     assert set(result.driver_impact) == {"EPS", "TARGET_PE"}
     assert all(value >= 0 for value in result.review_priority.values())
     assert result.metadata["scenario_multiple_policy"]["mode"] == "NEUTRAL_BENCHMARK_MULTIPLE"
+    assert result.metadata["scenario_multiple_policy"]["policy_version"] == "STAGE7_V1_EVIDENCE_BACKED"
 
 
 def test_industry_forward_pe_requires_eight_valid_peers():
@@ -113,23 +114,19 @@ def test_reliability_does_not_change_forward_pe_or_fair_value():
     assert low.valuation_confidence < high.valuation_confidence
 
 
-def test_probability_adjustments_are_normalized_and_separate_from_reliability():
-    result = ValuationEngine().calculate_valuation(
-        1,
-        101,
-        "PETROCHEMICAL",
-        1000.0,
-        make_forecast(),
-        forecast_reliability_score=25.0,
-        historical_pe_values=[7.0],
-        probability_adjustments={"bear": 0.10, "bull": -0.05},
-        probability_confidence=80.0,
-    )
-    assert abs(sum(s.probability for s in result.scenarios.values()) - 1.0) < 1e-9
-    assert result.scenarios["bear"].probability > 0.20
-    assert result.scenarios["bull"].probability < 0.20
-    assert result.forecast_reliability_score == 25.0
-    assert result.metadata["scenario_dependency"]["separate_from_probability"] is True
+def test_direct_probability_adjustments_are_rejected_in_favor_of_family_evidence():
+    with pytest.raises(ValueError, match="family-level probability_evidence"):
+        ValuationEngine().calculate_valuation(
+            1,
+            101,
+            "PETROCHEMICAL",
+            1000.0,
+            make_forecast(),
+            forecast_reliability_score=25.0,
+            historical_pe_values=[7.0],
+            probability_adjustments={"bear": 0.10, "bull": -0.05},
+            probability_confidence=80.0,
+        )
 
 
 def test_probability_evidence_is_family_level_and_equal_weighted():
@@ -200,6 +197,7 @@ def test_scenario_multiple_adjustments_require_economic_rationale_and_are_bounde
     assert result.scenarios["bear"].fair_value == 945.0
     assert result.scenarios["bull"].fair_value == 1617.0
     assert result.metadata["scenario_multiple_policy"]["mode"] == "EXPLICIT_ECONOMIC_SCENARIO_ADJUSTMENT"
+    assert result.metadata["scenario_multiple_policy"]["policy_version"] == "STAGE7_V1_EVIDENCE_BACKED"
 
     with pytest.raises(ValueError, match="Economic rationale required"):
         ValuationEngine().calculate_valuation(
