@@ -50,10 +50,16 @@ class TrendEngine:
             strengths = {h: relative_strength(v, histories[h]) for h, v in valid.items()}
 
             # Direction and relative strength are deliberately separate.
-            # Direction comes from the sign of the current momentum; Strength
-            # describes the magnitude relative to the same-horizon history.
+            # Relative strength is company-relative; direction also preserves
+            # a small-magnitude Near/Weak category so low momentum does not
+            # become an Improving/Deteriorating state by itself.
+            direction_threshold = 2.0
             directions = {
-                h: ("Positive" if v > 0 else "Negative" if v < 0 else "Weak")
+                h: (
+                    "Positive" if v > direction_threshold
+                    else "Negative" if v < -direction_threshold
+                    else "Weak"
+                )
                 for h, v in valid.items()
             }
 
