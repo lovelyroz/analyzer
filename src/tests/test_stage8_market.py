@@ -1,27 +1,85 @@
-import pytest
-from datetime import datetime
-from src.market.indicators import calculate_sma, calculate_rsi
+from datetime import datetime, timedelta
+
 from src.market.engine import MarketEngine
+from src.market.indicators import calculate_rsi, calculate_sma, cumulative_return, maximum_drawdown, price_position, realized_volatility
 
-def test_indicators():
-    prices = [float(i) for i in range(1, 60)]  # 1 to 59
+
+def rows(prices, volume=1000.0, value=100000.0, start=datetime(2026, 1, 1)):
+    return [
+        {"date": start + timedelta(days=i), "close": price, "adjusted_close": price, "volume": volume, "value": value}
+        for i, price in enumerate(prices)
+    ]
+
+
+def test_legacy_indicator_helpers_remain_available():
+    prices = [float(i) for i in range(1, 60)]
     assert calculate_sma(prices, 50) is not None
-    assert calculate_rsi(prices, 14) == 100.0  # همواره صعودی
+    assert calculate_rsi(prices, 14) == 100.0
 
-def test_market_engine():
-    engine = MarketEngine()
-    prices = [100.0 + i for i in range(200)]  # صعودی مداوم
-    
-    result = engine.analyze_market_signals(
-        company_id=1,
-        as_of_date=datetime.utcnow(),
-        close_prices=prices,
-        individual_buy_vol=500.0,
-        individual_sell_vol=200.0,
-        close_price_today=300.0
-    )
 
-    assert result.company_id == 1
-    assert result.trend_alignment == "BULLISH"
+def test_core_market_indicators():
+    prices = list(range(1, 30))
+    assert round(cumulative_return(prices, 5), 6) == round(29 / 24 - 1, 6)
+    assert price_position(prices, 20) == 1.0
+    assert maximum_drawdown(prices, 20) == 0.0
+    assert realized_volatility(prices, 20) is not None
+
+
+def test_market_engine_returns_state_not_score():
+    prices = list(range(1, 260))
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), rows(prices))
+    assert result.model_version == "STAGE8_V1"
+    assert result.market_contract_version == "MARKET_CONTRACT_V1"
+    assert result.trend_state in {"UPTREND", "STRONG_UPTREND"}
+    assert result.momentum_state in {"POSITIVE", "STRONG_POSITIVE"}
+    assert result.metadata["market_score"] is None
+    assert result.metadata["decision_signal"] is None
+    assert result.indicators.returns["20D"] is not None
+    assert result.indicators.price_vs_ma["MA20"] is not None
+    assert result.indicators.max_drawdown["252D"] == 0.0
+
+
+def test_point_in_time_excludes_future_rows():
+    prices = list(range(1, 260))
+    data = rows(prices)
+    data.append({"date": datetime(2027, 1, 1), "close": 100000.0, "adjusted_close": 100000.0, "volume": 1.0, "value": 1.0})
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), data, point_in_time=True)
+    assert result.indicators.returns["20D"] == (259 / 239 - 1)
+
+
+def test_adjusted_close_drives_historical_returns():
+    data = rows(list(range(1, 260)))
+    for row in data:
+        row["close"] = row["adjusted_close"] * 2
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), data)
+    assert result.indicators.returns["20D"] == (259 / 239 - 1)
+
+
+def test_missing_benchmark_does_not_create_synthetic_relative_strength():
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), rows(list(range(1, 260))))
+    assert result.relative_strength_industry == "INSUFFICIENT_DATA"
+    assert result.relative_strength_market == "INSUFFICIENT_DATA"
+    assert result.market_regime == "INSUFFICIENT_DATA"
+
+
+def test_relative_strength_uses_same_horizon():
+    stock = rows(list(range(1, 260)))
+    industry = rows([x * 1.5 for x in range(1, 260)])
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), stock, industry_benchmark=industry)
+    assert result.relative_strength_industry == "NEUTRAL"
+
+
+def test_negative_market_state_generates_context_alerts_not_decision():
+    prices = list(range(260, 0, -1))
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), rows(prices))
+    assert result.trend_state in {"DOWNTREND", "STRONG_DOWNTREND"}
+    assert result.momentum_state in {"NEGATIVE", "STRONG_NEGATIVE"}
+    assert any("DOWNTREND" in alert or "DRAWDOWN" in alert for alert in result.alerts)
+    assert all(not alert.startswith("BUY") and not alert.startswith("SELL") for alert in result.alerts)
+
+
+def test_legacy_api_is_compatibility_only():
+    result = MarketEngine().analyze_market_signals(1, datetime(2026, 9, 16), list(range(1, 260)), 100, 50)
+    assert result.metadata["market_score"] is None
     assert result.money_flow_status == "INFLOW"
-    assert result.technical_score >= 60.0
+    assert result.trend_state != ""
