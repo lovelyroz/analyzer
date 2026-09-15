@@ -41,7 +41,11 @@ class IndustryKPIEngine:
 
     @staticmethod
     def get_industry_kpis(industry_code: str, financial_data: Dict[str, Any], company_id: int, period_id: int) -> list:
-        """Return only the Stage 2 Industry Core KPI inventory for the selected industry."""
+        """Return only the Stage 2 Industry Core KPI inventory for the selected industry.
+
+        Canonical Stage 2 V1 names are accepted, while legacy shorthand aliases
+        remain supported for compatibility.
+        """
         if industry_code == "BANK":
             return IndustryKPIEngine.calc_bank_kpis(
                 financial_data.get("nii"), financial_data.get("nim"),
@@ -53,7 +57,7 @@ class IndustryKPIEngine:
                 financial_data.get("nav"), financial_data.get("nav_growth"),
                 financial_data.get("p_nav"), company_id, period_id,
             )
-        if industry_code in {"CEMENT", "FOOD", "PHARMA"}:
+        if industry_code in {"CEMENT", "FOOD", "PHARMACEUTICAL", "PHARMA"}:
             return [IndustryKPIEngine.calc_sales_volume_kpi(
                 financial_data.get("sales_volume"), company_id, period_id, industry_code,
             )]
