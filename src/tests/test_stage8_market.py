@@ -39,6 +39,34 @@ def test_market_engine_returns_state_not_score():
     assert result.indicators.max_drawdown["252D"] == 0.0
 
 
+def test_market_output_contract_includes_52w_volume_and_value_context():
+    prices = list(range(1, 260))
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), rows(prices, volume=2000.0, value=100000.0))
+    assert result.indicators.distance_from_52w_high == 0.0
+    assert result.indicators.average_volume_20d == 2000.0
+    assert result.indicators.average_trading_value_20d == 100000.0
+    assert result.indicators.trading_value_stability_20d == 0.0
+    assert result.metadata["price_basis"] == "ADJUSTED_CLOSE"
+
+
+def test_trading_value_stability_is_coefficient_of_variation():
+    data = rows(list(range(1, 260)), value=100000.0)
+    for i, row in enumerate(data[-20:]):
+        row["value"] = 100000.0 * (1.0 + i / 20.0)
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), data)
+    assert result.indicators.trading_value_stability_20d is not None
+    assert result.indicators.trading_value_stability_20d > 0.0
+    assert result.metadata["trading_value_stability_definition"] == "20D coefficient_of_variation"
+
+
+def test_close_fallback_is_explicitly_flagged():
+    data = rows(list(range(1, 260)))
+    for row in data:
+        row.pop("adjusted_close")
+    result = MarketEngine().analyze_market(1, datetime(2026, 9, 16), data)
+    assert result.metadata["price_basis"] == "CLOSE_FALLBACK"
+
+
 def test_point_in_time_excludes_future_rows():
     prices = list(range(1, 260))
     data = rows(prices)
