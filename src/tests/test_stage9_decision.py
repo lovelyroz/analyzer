@@ -57,7 +57,6 @@ def test_strong_buy_requires_aligned_families():
         trend_state="STRONG_IMPROVEMENT",
         forecast_direction="POSITIVE",
     )
-
     assert result.recommendation == "STRONG_BUY"
     assert result.holding_status == "STRONG_HOLD"
     assert result.decision_confidence >= 75
@@ -68,11 +67,8 @@ def test_strong_buy_requires_aligned_families():
 def test_value_trap_does_not_become_buy():
     result = DecisionEngine().make_decision(
         1, 10, make_fundamental(30), make_valuation("ATTRACTIVE"), make_market("DOWNTREND"),
-        forecast_reliability_score=80,
-        trend_state="DETERIORATING",
-        forecast_direction="NEGATIVE",
+        forecast_reliability_score=80, trend_state="DETERIORATING", forecast_direction="NEGATIVE",
     )
-
     assert result.recommendation == "WATCH"
     assert "CHEAP_BUT_WEAK" in result.conflicts
 
@@ -80,11 +76,8 @@ def test_value_trap_does_not_become_buy():
 def test_strong_but_expensive_is_not_buy():
     result = DecisionEngine().make_decision(
         1, 10, make_fundamental(85), make_valuation("VERY_EXPENSIVE", "HIGH"), make_market(),
-        forecast_reliability_score=85,
-        trend_state="IMPROVING",
-        forecast_direction="POSITIVE",
+        forecast_reliability_score=85, trend_state="IMPROVING", forecast_direction="POSITIVE",
     )
-
     assert result.recommendation == "HOLD"
     assert result.holding_status in {"HOLD", "HOLD_WITH_CAUTION"}
     assert "STRONG_BUT_EXPENSIVE" in result.conflicts
@@ -93,11 +86,8 @@ def test_strong_but_expensive_is_not_buy():
 def test_low_forecast_reliability_limits_strong_conviction():
     result = DecisionEngine().make_decision(
         1, 10, make_fundamental(85), make_valuation("ATTRACTIVE", "LOW", 35), make_market(),
-        forecast_reliability_score=35,
-        trend_state="IMPROVING",
-        forecast_direction="POSITIVE",
+        forecast_reliability_score=35, trend_state="IMPROVING", forecast_direction="POSITIVE",
     )
-
     assert result.recommendation == "WATCH"
     assert "POSITIVE_FORECAST_LOW_RELIABILITY" in result.conflicts
     assert result.decision_confidence < 75
@@ -106,11 +96,8 @@ def test_low_forecast_reliability_limits_strong_conviction():
 def test_market_does_not_override_strong_fundamentals():
     result = DecisionEngine().make_decision(
         1, 10, make_fundamental(85), make_valuation(), make_market("DOWNTREND"),
-        forecast_reliability_score=85,
-        trend_state="IMPROVING",
-        forecast_direction="POSITIVE",
+        forecast_reliability_score=85, trend_state="IMPROVING", forecast_direction="POSITIVE",
     )
-
     assert result.recommendation == "STRONG_BUY"
     assert "STRONG_FUNDAMENTAL_WEAK_MARKET" in result.conflicts
 
@@ -118,12 +105,9 @@ def test_market_does_not_override_strong_fundamentals():
 def test_usd_share_value_is_context_not_a_new_score():
     result = DecisionEngine().make_decision(
         1, 10, make_fundamental(35), make_valuation("ATTRACTIVE"), make_market(),
-        forecast_reliability_score=70,
-        trend_state="STABLE",
-        forecast_direction="NEUTRAL",
+        forecast_reliability_score=70, trend_state="STABLE", forecast_direction="NEUTRAL",
         usd_share_value_change_pct=12.0,
     )
-
     assert "POSITIVE_FX_NEGATIVE_FUNDAMENTAL" in result.conflicts
     assert result.usd_context["share_value_change_pct"] == 12.0
 
@@ -131,11 +115,8 @@ def test_usd_share_value_is_context_not_a_new_score():
 def test_negative_eps_valuation_is_not_reconstructed_by_stage9():
     result = DecisionEngine().make_decision(
         1, 10, make_fundamental(70), make_valuation("NOT_APPLICABLE"), make_market(),
-        forecast_reliability_score=80,
-        trend_state="IMPROVING",
-        forecast_direction="POSITIVE",
+        forecast_reliability_score=80, trend_state="IMPROVING", forecast_direction="POSITIVE",
     )
-
     assert result.recommendation in {"WATCH", "HOLD", "BUY"}
     assert "VALUATION_NOT_APPLICABLE" in result.conflicts
     assert result.metadata["upstream_recalculation"] is False
@@ -144,10 +125,70 @@ def test_negative_eps_valuation_is_not_reconstructed_by_stage9():
 def test_no_position_sizing_contract():
     result = DecisionEngine().make_decision(
         1, 10, make_fundamental(60), make_valuation("FAIR"), make_market(),
-        forecast_reliability_score=70,
-        trend_state="STABLE",
-        forecast_direction="NEUTRAL",
+        forecast_reliability_score=70, trend_state="STABLE", forecast_direction="NEUTRAL",
     )
-
     assert not hasattr(result, "suggested_allocation_pct")
     assert not hasattr(result, "composite_score")
+
+
+def test_hysteresis_prevents_small_buy_to_hold_change():
+    result = DecisionEngine().make_decision(
+        1, 10, make_fundamental(85), make_valuation("FAIR"), make_market(),
+        forecast_reliability_score=70, trend_state="IMPROVING", forecast_direction="POSITIVE",
+        previous_decision="BUY", previous_decision_confidence=80,
+    )
+    assert result.previous_decision == "BUY"
+    assert result.recommendation == "BUY"
+    assert result.metadata["hysteresis_enabled"] is True
+
+
+def test_hysteresis_allows_material_deterioration():
+    result = DecisionEngine().make_decision(
+        1, 10, make_fundamental(30), make_valuation("EXPENSIVE", "HIGH"), make_market("DOWNTREND"),
+        forecast_reliability_score=80, trend_state="DETERIORATING", forecast_direction="NEGATIVE",
+        previous_decision="BUY", previous_decision_confidence=80,
+    )
+    assert result.recommendation in {"SELL", "STRONG_SELL", "WATCH"}
+    assert result.decision_change == "CHANGED"
+
+
+def test_decision_history_contract():
+    result = DecisionEngine().make_decision(
+        1, 10, make_fundamental(60), make_valuation("FAIR"), make_market(),
+        forecast_reliability_score=70, trend_state="STABLE", forecast_direction="NEUTRAL",
+        previous_decision="HOLD",
+    )
+    assert result.previous_decision == "HOLD"
+    assert result.decision_change == "UNCHANGED"
+    assert isinstance(result.decision_change_reasons, list)
+
+
+def test_ranking_contract_has_no_new_score():
+    result = DecisionEngine().make_decision(
+        1, 10, make_fundamental(80), make_valuation("ATTRACTIVE"), make_market(),
+        forecast_reliability_score=80, trend_state="IMPROVING", forecast_direction="POSITIVE",
+    )
+    assert result.ranking_eligibility is True
+    assert result.rank_within_industry is None
+    assert result.ranking_inputs["within_industry"] is True
+    assert result.ranking_inputs["new_ranking_score_created"] is False
+
+
+def test_dashboard_contract_carries_fx_and_valuation_context():
+    result = DecisionEngine().make_decision(
+        1, 10, make_fundamental(80), make_valuation("ATTRACTIVE"), make_market(),
+        forecast_reliability_score=80, trend_state="IMPROVING", forecast_direction="POSITIVE",
+        fx_context={
+            "fx_regime": "RISING",
+            "fx_company_impact": "POSITIVE",
+            "free_market_fx": 120000.0,
+            "operational_fx": 90000.0,
+            "fx_gap": 0.3333,
+        },
+    )
+    assert result.expected_upside == 30.0
+    assert result.valuation_confidence == 85.0
+    assert result.fx_regime == "RISING"
+    assert result.free_market_fx == 120000.0
+    assert result.operational_fx == 90000.0
+    assert result.fx_gap == 0.3333
