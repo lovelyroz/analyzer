@@ -21,6 +21,20 @@ class FinalDecisionResult:
     rationale_cons: List[str] = field(default_factory=list)
     evidence_summary: Dict[str, str] = field(default_factory=dict)
     usd_context: Dict[str, Optional[float]] = field(default_factory=dict)
+    expected_upside: Optional[float] = None
+    valuation_confidence: Optional[float] = None
+    relative_strength_state: str = "INSUFFICIENT_DATA"
+    fx_regime: Optional[str] = None
+    fx_company_impact: Optional[str] = None
+    free_market_fx: Optional[float] = None
+    operational_fx: Optional[float] = None
+    fx_gap: Optional[float] = None
+    previous_decision: Optional[str] = None
+    decision_change: Optional[str] = None
+    decision_change_reasons: List[str] = field(default_factory=list)
+    ranking_eligibility: bool = False
+    rank_within_industry: Optional[int] = None
+    ranking_inputs: Dict[str, object] = field(default_factory=dict)
     calculation_timestamp: datetime = field(default_factory=datetime.utcnow)
     model_version: str = "STAGE9_V1"
     contract_version: str = "DECISION_CONTRACT_V1"
