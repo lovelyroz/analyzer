@@ -21,6 +21,14 @@ class KPIEngine:
         "CASH_CONVERSION": ("ocf", "net_profit_curr"),
         "EARNINGS_QUALITY": ("ocf", "op_profit_curr"),
         "FINANCIAL_COST_PRESSURE": ("financial_expenses", "op_profit_curr"),
+        "BANK_NII": ("nii",),
+        "BANK_NIM": ("nim",),
+        "BANK_LOAN_GROWTH": ("loan_growth",),
+        "BANK_DEPOSIT_GROWTH": ("deposit_growth",),
+        "BANK_NPL": ("npl",),
+        "HOLDING_NAV": ("nav",),
+        "HOLDING_NAV_GROWTH": ("nav_growth",),
+        "HOLDING_P_NAV": ("p_nav",),
     }
 
     @staticmethod
@@ -30,6 +38,8 @@ class KPIEngine:
         priority = {"VALID": 0, "ESTIMATED": 1, "RESTATED": 2, "SUSPICIOUS": 3, "UNMAPPED": 4, "MISSING": 5}
         for result in results:
             fields = KPIEngine._KPI_INPUTS.get(result.kpi_code, ())
+            if result.kpi_code.endswith("_SALES_VOLUME"):
+                fields = ("sales_volume",)
             statuses = [quality.get(field, "VALID") for field in fields]
             nonvalid = [status for status in statuses if status != "VALID"]
             if nonvalid:
