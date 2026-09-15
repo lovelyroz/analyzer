@@ -8,6 +8,33 @@ from src.kpi.industry import IndustryKPIEngine
 class KPIEngine:
     """Coordinator for the Stage 2 KPI specification layer."""
 
+    _KPI_INPUTS = {
+        "REVENUE_GROWTH": ("revenue_curr", "revenue_prev"),
+        "OP_PROFIT_GROWTH": ("op_profit_curr", "op_profit_prev"),
+        "NET_PROFIT_GROWTH": ("net_profit_curr", "net_profit_prev"),
+        "EPS_GROWTH": ("eps_curr", "eps_prev"),
+        "GROSS_MARGIN": ("gross_profit", "revenue_curr"),
+        "OPERATING_MARGIN": ("op_profit_curr", "revenue_curr"),
+        "NET_MARGIN": ("net_profit_curr", "revenue_curr"),
+        "ROA": ("net_profit_ttm", "avg_assets"),
+        "ROE": ("net_profit_ttm", "avg_equity"),
+        "CASH_CONVERSION": ("ocf", "net_profit_curr"),
+        "EARNINGS_QUALITY": ("ocf", "op_profit_curr"),
+        "FINANCIAL_COST_PRESSURE": ("financial_expenses", "op_profit_curr"),
+    }
+
+    @staticmethod
+    def _propagate_quality_status(results: List[KPIResult], financial_data: Dict[str, Any]) -> None:
+        """Propagate non-VALID Stage 1 input quality without changing KPI math."""
+        quality = financial_data.get("quality_statuses", {}) or {}
+        priority = {"VALID": 0, "ESTIMATED": 1, "RESTATED": 2, "SUSPICIOUS": 3, "UNMAPPED": 4, "MISSING": 5}
+        for result in results:
+            fields = KPIEngine._KPI_INPUTS.get(result.kpi_code, ())
+            statuses = [quality.get(field, "VALID") for field in fields]
+            nonvalid = [status for status in statuses if status != "VALID"]
+            if nonvalid:
+                result.quality_status = max(nonvalid, key=lambda status: priority.get(status, 99))
+
     def calculate_all_kpis_for_company(
         self,
         company_id: int,
@@ -54,9 +81,18 @@ class KPIEngine:
             ),
         ]
 
+        # EPS growth is comparable only when the EPS series has already been
+        # normalized for share-count changes/corporate actions by Stage 1.
+        if financial_data.get("eps_comparable", True) is False:
+            eps_result = next(r for r in results if r.kpi_code == "EPS_GROWTH")
+            eps_result.value = None
+            eps_result.quality_status = "MISSING"
+            eps_result.metadata = {"comparability_status": "UNRESOLVED_SHARE_COUNT_OR_CORPORATE_ACTION"}
+
         results.extend(
             IndustryKPIEngine.get_industry_kpis(
                 industry_code, financial_data, company_id, period_id
             )
         )
+        self._propagate_quality_status(results, financial_data)
         return results
