@@ -5,12 +5,15 @@ from typing import Any, Dict, Optional
 
 @dataclass
 class SingleForecastChain:
-    """Forecast chain for one scenario."""
+    """Forecast chain for one scenario.
+
+    The first four fields preserve the original Stage 5 positional contract.
+    """
     revenue: Optional[float] = None
-    operating_margin: Optional[float] = None
     operating_profit: Optional[float] = None
     net_profit: Optional[float] = None
     eps: Optional[float] = None
+    operating_margin: Optional[float] = None
     roe: Optional[float] = None
     method: str = "INSUFFICIENT_DATA"
     quality: str = "INSUFFICIENT_DATA"
@@ -29,14 +32,14 @@ class ScenarioForecastResult:
 class CompanyForecastResult:
     company_id: int
     forecast_period_id: int
-    horizon: str
     data_cutoff_datetime: datetime
     industry_code: str
     scenario_forecasts: ScenarioForecastResult
-    baseline_method: str
     forecast_method: str
     model_version: str
     calculation_timestamp: datetime
+    horizon: str = "12M"
+    baseline_method: str = "UNKNOWN"
     data_quality: str = "VALID"
     assumptions: Dict[str, Any] = field(default_factory=dict)
     benchmark: Optional[SingleForecastChain] = None
