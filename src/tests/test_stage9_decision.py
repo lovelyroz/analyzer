@@ -132,14 +132,18 @@ def test_no_position_sizing_contract():
 
 
 def test_hysteresis_prevents_small_buy_to_hold_change():
+    # Base rules produce HOLD here; previous BUY should persist because the
+    # normal exit threshold is not breached by a material negative event.
     result = DecisionEngine().make_decision(
-        1, 10, make_fundamental(85), make_valuation("FAIR"), make_market(),
-        forecast_reliability_score=70, trend_state="IMPROVING", forecast_direction="POSITIVE",
+        1, 10, make_fundamental(60), make_valuation("FAIR"), make_market(),
+        forecast_reliability_score=70, trend_state="STABLE", forecast_direction="NEUTRAL",
         previous_decision="BUY", previous_decision_confidence=80,
     )
     assert result.previous_decision == "BUY"
     assert result.recommendation == "BUY"
+    assert result.decision_change == "UNCHANGED"
     assert result.metadata["hysteresis_enabled"] is True
+    assert result.metadata["hysteresis_applied"] is True
 
 
 def test_hysteresis_allows_material_deterioration():
@@ -150,6 +154,7 @@ def test_hysteresis_allows_material_deterioration():
     )
     assert result.recommendation in {"SELL", "STRONG_SELL", "WATCH"}
     assert result.decision_change == "CHANGED"
+    assert result.decision_change_date is not None
 
 
 def test_decision_history_contract():
@@ -160,6 +165,8 @@ def test_decision_history_contract():
     )
     assert result.previous_decision == "HOLD"
     assert result.decision_change == "UNCHANGED"
+    assert result.decision_change_date is None
+    assert result.decision_date is not None
     assert isinstance(result.decision_change_reasons, list)
 
 
@@ -168,27 +175,50 @@ def test_ranking_contract_has_no_new_score():
         1, 10, make_fundamental(80), make_valuation("ATTRACTIVE"), make_market(),
         forecast_reliability_score=80, trend_state="IMPROVING", forecast_direction="POSITIVE",
     )
+    assert result.decision_ranking_eligibility is True
+    assert result.decision_rank_within_industry is None
     assert result.ranking_eligibility is True
     assert result.rank_within_industry is None
     assert result.ranking_inputs["within_industry"] is True
     assert result.ranking_inputs["new_ranking_score_created"] is False
 
 
-def test_dashboard_contract_carries_fx_and_valuation_context():
+def test_dashboard_contract_carries_required_fields():
     result = DecisionEngine().make_decision(
         1, 10, make_fundamental(80), make_valuation("ATTRACTIVE"), make_market(),
         forecast_reliability_score=80, trend_state="IMPROVING", forecast_direction="POSITIVE",
         fx_context={
             "fx_regime": "RISING",
             "fx_company_impact": "POSITIVE",
+            "usd_relative_valuation_context": "POSITIVE",
             "free_market_fx": 120000.0,
             "operational_fx": 90000.0,
             "fx_gap": 0.3333,
         },
     )
+    assert result.fundamental_state == "STRONG"
+    assert result.fundamental_score == 80
+    assert result.trend_state == "IMPROVING"
+    assert result.forecast_state == "POSITIVE"
+    assert result.forecast_reliability == 80
+    assert result.valuation_status == "ATTRACTIVE"
     assert result.expected_upside == 30.0
+    assert result.valuation_risk == "LOW"
     assert result.valuation_confidence == 85.0
+    assert result.market_trend_state == "UPTREND"
+    assert result.market_momentum_state == "POSITIVE"
+    assert result.relative_strength_state == "INSUFFICIENT_DATA"
+    assert result.liquidity_state == "NORMAL"
     assert result.fx_regime == "RISING"
+    assert result.fx_company_impact == "POSITIVE"
+    assert result.usd_relative_valuation_context == "POSITIVE"
     assert result.free_market_fx == 120000.0
     assert result.operational_fx == 90000.0
     assert result.fx_gap == 0.3333
+    assert result.decision == result.recommendation
+    assert result.decision_conflict == result.conflicts
+    assert isinstance(result.decision_reasons, list)
+    assert isinstance(result.decision_risks, list)
+    assert result.decision_date is not None
+    assert result.model_version == "STAGE9_V1"
+    assert result.contract_version == "DECISION_CONTRACT_V1"
