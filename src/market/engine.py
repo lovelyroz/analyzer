@@ -335,7 +335,7 @@ class MarketEngine:
             return "RECOVERING"
         if current <= DRAWDOWN_DEEP:
             return "DEEP_DRAWDOWN"
-        return "RECOVERING"
+        return "STABLE_DRAWDOWN"
 
     @staticmethod
     def _liquidity_state(avg_value: Optional[float], values: List[float]) -> str:
