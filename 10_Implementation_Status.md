@@ -24,7 +24,7 @@ The authoritative rules for each stage are the corresponding Stage Locked Specif
 
 **Architecture Coverage:** Stages 1–9 LOCKED
 
-**Implementation Status:** STAGE 7 READY TO START
+**Implementation Status:** STAGE 7 COMPLETE / LOCKED
 
 Stages are implemented and advanced one at a time only after implementation, testing, review, architecture-compliance audit, and approval.
 
@@ -240,13 +240,81 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 **Design:** LOCKED
 
-**Implementation:** NOT STARTED
+**Implementation:** COMPLETE
 
-**Testing:** NOT STARTED
+**Testing:** PASS
 
-**Audit:** NOT STARTED
+**Independent Review:** PASS
 
-**Status:** READY TO START
+**Architecture Compliance Audit:** PASS
+
+**Approval:** PASS
+
+**Status:** COMPLETE / LOCKED
+
+**Final CI:** PASS
+
+**Final CI Run:** `34945721906`
+
+**Final CI Job:** `104304519333`
+
+**Final Commit:** `24fc37776c25938510ecad4b30019210c3120b8f`
+
+**Final CI Result:** 70/70 tests passed.
+
+### Final Audit Summary
+
+- Forward P/E calculation from Stage 5 EPS: PASS
+- Bear / Base / Bull independent Forward P/E: PASS
+- Negative / zero EPS protection: PASS
+- Scenario sign-change handling: PASS
+- Current price / valuation date / market price date contract: PASS
+- Historical P/E benchmark hierarchy: PASS
+- Industry Forward P/E minimum 8 valid peers: PASS
+- Industry TTM P/E fallback: PASS
+- No Forward/TTM peer population mixing: PASS
+- Fundamental Score does not directly scale Target P/E: PASS
+- Trend does not directly scale Target P/E: PASS
+- Forecast Reliability does not mathematically alter P/E or Fair Value: PASS
+- Scenario Target P/E no longer uses arbitrary fixed 0.9/1.0/1.1 gaps: PASS
+- Neutral benchmark multiple when no economic scenario-multiple evidence exists: PASS
+- Explicit scenario multiple adjustment requires economic rationale: PASS
+- Scenario multiple adjustment is bounded, versioned, and backtestable: PASS
+- Scenario ordering warning without artificial reordering: PASS
+- V1 prior 20/60/20 preserved as model parameter: PASS
+- Probability sum normalization: PASS
+- Four required probability evidence families defined and supported: PASS
+- Family-level equal weighting: PASS
+- Correlated metric double-counting protection through one distribution per family: PASS
+- Direct unstructured probability adjustment rejected: PASS
+- Probability Confidence kept separate from Forecast Reliability: PASS
+- Scenario Dependency kept separate from Probability: PASS
+- Expected Fair Value / Expected Upside: PASS
+- Valuation Assessment states: PASS
+- Valuation Confidence / Risk: PASS
+- EPS and Target P/E sensitivity ranking: PASS
+- Review Priority = Impact × Uncertainty: PASS
+- Severity-based valuation alerts: PASS
+- Stage 7 output contract and model/version metadata: PASS
+- Point-in-Time architecture preserved at input contract level: PASS
+- No Buy / Sell / Hold signal: PASS
+- No Forecast generation inside Stage 7: PASS
+- No Fundamental Score modification: PASS
+- No Market Engine integration: PASS
+- No Stage 5 / Stage 6 architectural change: PASS
+- Full CI integration: PASS
+
+**Audit Decision:** PASS → LOCKED
+
+### Audit Fixes Applied Before Lock
+
+1. Removed the arbitrary `0.90 / 1.00 / 1.10` scenario multiple mechanism. V1 now uses the benchmark multiple unchanged unless explicit economic scenario evidence is supplied.
+2. Added versioned scenario-multiple policy metadata and required economic rationale for non-neutral scenario multiple adjustments.
+3. Added the four probability evidence families with equal family-level treatment and normalization.
+4. Rejected direct unstructured probability adjustments so probability changes cannot bypass the family-level anti-double-counting contract.
+5. Added dedicated tests for scenario-multiple rationale/bounds, probability-family validation, and correlated-evidence protection.
+
+**Notes:** An intermediate CI run failed on the removed legacy scenario-multiple export and was corrected by restoring the neutral compatibility export. A subsequent intermediate run correctly exposed the obsolete probability-adjustment test and was corrected. The final CI run passed 70/70 tests. Existing `datetime.utcnow()` deprecation warnings remain non-blocking and are outside the Stage 7 architectural scope.
 
 ---
 
@@ -280,35 +348,13 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 # 4. Current Implementation Target
 
-## Stage 7 — Valuation Engine
+## Stage 8 — Market Engine
 
-Stage 7 is now the current implementation target.
+Stage 7 is COMPLETE / LOCKED. Stage 8 is now the current implementation target.
 
-Implementation follows `07_Stage7_Valuation.md` exactly.
+Implementation must follow `08_Stage8_Market_Engine.md` exactly and preserve the locked Stage 1–7 contracts.
 
-Implementation order:
-
-1. Forecast EPS → Forward P/E contract
-2. Bear / Base / Bull scenario valuation
-3. Negative EPS / zero EPS / sign-change handling
-4. Point-in-Time historical P/E
-5. Historical P/E time series and median
-6. Industry Forward P/E benchmark
-7. Benchmark fallback hierarchy
-8. Target P/E scenario architecture
-9. Scenario probabilities
-10. Probability confidence vs Forecast Reliability
-11. Fair value and expected fair value
-12. Expected upside
-13. Valuation assessment states
-14. Sensitivity and driver ranking
-15. Valuation alerts
-16. Stage 7 output contract
-17. Stage 7 tests
-18. Independent review
-19. Architecture compliance audit
-
-Do not implement Stage 8 until Stage 7 passes its implementation tests and architecture-compliance audit.
+Do not modify Stage 7 unless a genuine contract defect is discovered.
 
 ---
 
@@ -345,15 +391,15 @@ Use the following status values:
 
 # 7. Current Status Snapshot
 
-| Stage   | Design | Implementation | Overall     |
-| ------- | ------ | -------------- | ----------- |
+| Stage   | Design | Implementation | Overall |
+| ------- | ------ | -------------- | ------- |
 | Stage 1 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
 | Stage 2 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
 | Stage 3 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
 | Stage 4 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
 | Stage 5 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
 | Stage 6 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 7 | LOCKED | NOT STARTED    | READY TO START |
+| Stage 7 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
 | Stage 8 | LOCKED | NOT STARTED    | NOT STARTED |
 | Stage 9 | LOCKED | NOT STARTED    | NOT STARTED |
 
@@ -378,6 +424,6 @@ Implementation progress must NOT be recorded as an architectural change unless t
 
 # 9. Current Next Action
 
-**Start Stage 7 — Valuation Engine implementation, following `07_Stage7_Valuation.md` and preserving the locked Stage 5/6 contracts.**
+**Start Stage 8 — Market Engine implementation, following `08_Stage8_Market_Engine.md` and preserving the locked Stage 1–7 contracts.**
 
-Stage 5 and Stage 6 remain COMPLETE / LOCKED. No Stage 5 or Stage 6 architectural change has been introduced.
+Stages 4, 5, 6 and 7 are COMPLETE / LOCKED. No Stage 5, Stage 6 or Stage 7 architectural change is pending.
