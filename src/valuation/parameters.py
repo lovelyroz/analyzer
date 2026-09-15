@@ -1,20 +1,19 @@
 from typing import Dict
 
-# P/E تاریخی/تارگت پیش‌فرض صنایع
-INDUSTRY_TARGET_PE: Dict[str, float] = {
-    "GENERAL": 7.0,
-    "PETROCHEMICAL": 6.5,
-    "METALS": 6.0,
-    "FOOD": 8.0,
-    "PHARMA": 8.5,
-    "CEMENT": 7.5,
-    "BANK": 5.0,
-    "INVESTMENT": 0.70  # برای هلدینگ‌ها این ضریب P/NAV است
-}
-
-# وزن سناریوها برای محاسبه Expected Fair Value
+# V1 scenario prior. This is a versioned model parameter, not an architecture constant.
 SCENARIO_WEIGHTS: Dict[str, float] = {
     "bear": 0.20,
     "base": 0.60,
     "bull": 0.20,
 }
+
+# Explicit, versioned scenario multiple parameters. These do not use Fundamental Score
+# or Forecast Reliability. They remain backtestable model parameters.
+SCENARIO_PE_MULTIPLIER: Dict[str, float] = {
+    "bear": 0.90,
+    "base": 1.00,
+    "bull": 1.10,
+}
+
+MIN_INDUSTRY_PEERS = 8
+MODEL_VERSION = "STAGE7_V1"
