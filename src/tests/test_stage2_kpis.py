@@ -38,6 +38,18 @@ def test_universal_growth_kpis():
     assert res_missing.quality_status == "MISSING"
 
 
+def test_universal_growth_zero_base_is_not_zero_growth():
+    for calculator in (
+        UniversalKPIEngine.calc_revenue_growth,
+        UniversalKPIEngine.calc_op_profit_growth,
+        UniversalKPIEngine.calc_net_profit_growth,
+        UniversalKPIEngine.calc_eps_growth,
+    ):
+        res = calculator(100.0, 0.0, company_id=1, period_id=10)
+        assert res.value is None
+        assert res.quality_status == "MISSING"
+
+
 def test_universal_profitability_kpis():
     res = UniversalKPIEngine.calc_op_margin(20.0, 100.0, company_id=1, period_id=10)
     assert res.value == 20.0
@@ -45,6 +57,14 @@ def test_universal_profitability_kpis():
 
     res_roe = UniversalKPIEngine.calc_roe(50.0, 200.0, company_id=1, period_id=10)
     assert res_roe.value == 25.0
+
+
+def test_universal_profitability_zero_denominators_are_missing():
+    assert UniversalKPIEngine.calc_gross_margin(20.0, 0.0, 1, 10).value is None
+    assert UniversalKPIEngine.calc_op_margin(20.0, 0.0, 1, 10).value is None
+    assert UniversalKPIEngine.calc_net_margin(20.0, 0.0, 1, 10).value is None
+    assert UniversalKPIEngine.calc_roa(20.0, 0.0, 1, 10).value is None
+    assert UniversalKPIEngine.calc_roe(20.0, 0.0, 1, 10).value is None
 
 
 def test_universal_risk_and_quality_kpis():
@@ -99,13 +119,13 @@ def test_holding_industry_kpis():
 
 
 def test_industry_zero_kpis():
-    for industry in ("PETROCHEMICAL", "METALS"):
+    for industry in ("PETROCHEMICAL", "CHEMICAL", "METALS", "MINING"):
         kpis = IndustryKPIEngine.get_industry_kpis(industry, {}, company_id=1, period_id=10)
         assert len(kpis) == 0
 
 
 def test_optional_sales_volume_missing_is_not_zero():
-    for industry in ("CEMENT", "FOOD", "PHARMA"):
+    for industry in ("CEMENT", "FOOD", "PHARMACEUTICAL", "PHARMA"):
         kpis = IndustryKPIEngine.get_industry_kpis(industry, {}, company_id=1, period_id=10)
         assert len(kpis) == 1
         assert kpis[0].value is None
