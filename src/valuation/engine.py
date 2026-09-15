@@ -1,15 +1,31 @@
 from datetime import datetime
 from statistics import median
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from src.forecast.schema import CompanyForecastResult
-from src.valuation.models import calculate_forward_pe, calculate_forward_pe_fair_value, calculate_margin_of_safety, median_valid
-from src.valuation.parameters import MIN_INDUSTRY_PEERS, MODEL_VERSION, SCENARIO_PE_MULTIPLIER, SCENARIO_WEIGHTS
+from src.valuation.models import (
+    calculate_forward_pe,
+    calculate_forward_pe_fair_value,
+    calculate_margin_of_safety,
+    median_valid,
+)
+from src.valuation.parameters import (
+    ALERT_THRESHOLDS,
+    CONFIDENCE_THRESHOLDS,
+    CONTRACT_VERSION,
+    MIN_INDUSTRY_PEERS,
+    MODEL_VERSION,
+    RISK_THRESHOLDS,
+    SCENARIO_PE_MULTIPLIER,
+    SCENARIO_WEIGHTS,
+    SENSITIVITY_PERTURBATION,
+    VALUATION_THRESHOLDS,
+)
 from src.valuation.schema import ScenarioValuation, ValuationResult
 
 
 class ValuationEngine:
-    """Stage 7 V1: Forward P/E valuation, benchmark hierarchy and scenario valuation."""
+    """Stage 7 V1: Forward P/E valuation, benchmark hierarchy, scenarios and audit metadata."""
 
     def calculate_valuation(
         self,
@@ -19,7 +35,7 @@ class ValuationEngine:
         current_price: float,
         forecast_result: CompanyForecastResult,
         forecast_reliability_score: Optional[float] = None,
-        nav_per_share: Optional[float] = None,  # retained for caller compatibility; not used as primary V1 axis
+        nav_per_share: Optional[float] = None,
         *,
         valuation_date: Optional[datetime] = None,
         market_price_date: Optional[datetime] = None,
@@ -37,15 +53,19 @@ class ValuationEngine:
             "bull": forecast_result.scenario_forecasts.bull,
         }
 
-        historical_median = median_valid(historical_pe_values or [])
-        industry_forward_median = median_valid(industry_forward_pe_values or [])
-        industry_ttm_median = median_valid(industry_ttm_pe_values or [])
+        historical_values = historical_pe_values or []
+        forward_values = industry_forward_pe_values or []
+        ttm_values = industry_ttm_pe_values or []
+        valid_forward_count = self._valid_positive_count(forward_values)
 
+        historical_median = median_valid(historical_values)
+        industry_forward_median = median_valid(forward_values)
+        industry_ttm_median = median_valid(ttm_values)
         target_pe_base, target_source = self._select_target_pe(
             industry_forward_median,
             historical_median,
             industry_ttm_median,
-            len([x for x in (industry_forward_pe_values or []) if x is not None and x > 0]),
+            valid_forward_count,
         )
 
         probabilities = self._resolve_probabilities(probability_adjustments)
@@ -54,7 +74,7 @@ class ValuationEngine:
 
         for name, chain in scenarios_input.items():
             eps = chain.eps
-            scenario_flags = self._eps_flags(eps, forecast_result, name)
+            scenario_flags = self._eps_flags(eps, name)
             target_pe = None if target_pe_base is None else target_pe_base * SCENARIO_PE_MULTIPLIER[name]
             forward_pe = calculate_forward_pe(eps, current_price)
             fair_value = calculate_forward_pe_fair_value(eps, target_pe)
@@ -82,11 +102,11 @@ class ValuationEngine:
             status = self._valuation_status(expected_upside, base_upside)
 
         reliability = forecast_reliability_score
-        if reliability is not None and reliability < 40:
+        if reliability is not None and reliability < ALERT_THRESHOLDS["low_forecast_reliability"]:
             flags.append("LOW_FORECAST_RELIABILITY")
-        if len([x for x in (industry_forward_pe_values or []) if x is not None and x > 0]) < MIN_INDUSTRY_PEERS and industry_forward_pe_values:
+        if forward_values and valid_forward_count < MIN_INDUSTRY_PEERS:
             flags.append("INSUFFICIENT_PEER_DATA")
-        if scenario_dispersion is not None and scenario_dispersion > 0.50:
+        if scenario_dispersion is not None and scenario_dispersion > RISK_THRESHOLDS["high_scenario_dispersion"]:
             flags.append("HIGH_SCENARIO_DISPERSION")
         if target_source == "INSUFFICIENT_DATA":
             flags.append("INDUSTRY_BENCHMARK_INSUFFICIENT")
@@ -100,6 +120,22 @@ class ValuationEngine:
         )
         risk = self._valuation_risk(scenarios, confidence, flags, scenario_dispersion)
         confidence_label = self._confidence_label(confidence)
+        driver_ranking, driver_impact, driver_uncertainty, review_priority = self._driver_analysis(
+            scenarios=scenarios,
+            probability_confidence=probability_confidence,
+            forecast_reliability=reliability,
+            data_quality_score=data_quality_score,
+        )
+        alerts = self._alerts(
+            scenarios=scenarios,
+            target_source=target_source,
+            reliability=reliability,
+            dispersion=scenario_dispersion,
+            historical_median=historical_median,
+            industry_forward_median=industry_forward_median,
+            driver_ranking=driver_ranking,
+        )
+        flags.extend(alerts)
 
         if any(flag in flags for flag in ("NEGATIVE_EPS", "ZERO_EPS", "SIGN_CHANGE")):
             if expected_fv is None:
@@ -128,15 +164,39 @@ class ValuationEngine:
             probability_confidence=probability_confidence,
             valuation_confidence_label=confidence_label,
             valuation_risk_flags=sorted(set(flags)),
-            alerts=self._alerts(scenarios, target_source, reliability, scenario_dispersion),
+            alerts=alerts,
+            valuation_driver_ranking=driver_ranking,
+            driver_impact=driver_impact,
+            driver_uncertainty=driver_uncertainty,
+            review_priority=review_priority,
+            valuation_data_quality=max(0.0, min(100.0, data_quality_score)),
+            contract_version=CONTRACT_VERSION,
             metadata={
+                "industry_code": industry_code,
                 "expected_upside": expected_upside,
                 "scenario_dispersion": scenario_dispersion,
+                "scenario_dependency": {
+                    "measure": "fair_value_dispersion",
+                    "score": scenario_dispersion,
+                    "separate_from_probability": True,
+                },
                 "benchmark_peer_minimum": MIN_INDUSTRY_PEERS,
                 "scenario_probability_sum": sum(probabilities.values()),
                 "probability_adjustments_applied": probability_adjustments or {},
+                "probability_evidence_families": [
+                    "FUNDAMENTAL_DIRECTION",
+                    "FORECAST_DIRECTION",
+                    "PROFITABILITY_ASSUMPTION_RISK",
+                    "DATA_STRUCTURAL_RISK",
+                ],
+                "nav_per_share_received": nav_per_share,
+                "pit_inputs_required": True,
             },
         )
+
+    @staticmethod
+    def _valid_positive_count(values: Sequence[Optional[float]]) -> int:
+        return sum(1 for value in values if value is not None and value == value and value > 0)
 
     @staticmethod
     def _select_target_pe(
@@ -149,7 +209,7 @@ class ValuationEngine:
             return industry_forward, "INDUSTRY_FORWARD_PE"
         if historical is not None:
             return historical, "HISTORICAL_MEDIAN_PE"
-        if industry_ttm is not None and forward_peer_count < MIN_INDUSTRY_PEERS:
+        if industry_ttm is not None:
             return industry_ttm, "INDUSTRY_TTM_PE"
         return None, "INSUFFICIENT_DATA"
 
@@ -166,13 +226,14 @@ class ValuationEngine:
         return {name: value / total for name, value in values.items()}
 
     @staticmethod
-    def _eps_flags(eps: Optional[float], forecast_result: CompanyForecastResult, scenario: str) -> List[str]:
+    def _eps_flags(eps: Optional[float], scenario: str) -> List[str]:
         if eps is None:
             return ["NOT_APPLICABLE"]
         if eps < 0:
             return ["NEGATIVE_EPS", "NOT_APPLICABLE"]
         if eps == 0:
             return ["ZERO_EPS", "NOT_APPLICABLE"]
+        # A sign-change flag is added when scenarios cross zero.
         return []
 
     @staticmethod
@@ -194,13 +255,14 @@ class ValuationEngine:
 
     @staticmethod
     def _valuation_status(expected_upside: float, base_upside: float) -> str:
-        if expected_upside >= 30.0 and base_upside >= 15.0:
+        t = VALUATION_THRESHOLDS
+        if expected_upside >= t["very_attractive_expected_upside"] and base_upside >= t["very_attractive_base_upside"]:
             return "VERY_ATTRACTIVE"
-        if expected_upside >= 15.0 and base_upside >= 5.0:
+        if expected_upside >= t["attractive_expected_upside"] and base_upside >= t["attractive_base_upside"]:
             return "ATTRACTIVE"
-        if expected_upside <= -25.0 and base_upside <= -10.0:
+        if expected_upside <= t["very_expensive_expected_upside"] and base_upside <= t["very_expensive_base_upside"]:
             return "VERY_EXPENSIVE"
-        if expected_upside <= -10.0 and base_upside < 0.0:
+        if expected_upside <= t["expensive_expected_upside"] and base_upside < 0.0:
             return "EXPENSIVE"
         return "FAIR"
 
@@ -221,13 +283,14 @@ class ValuationEngine:
 
     @staticmethod
     def _confidence_label(score: float) -> str:
-        if score >= 90:
+        t = CONFIDENCE_THRESHOLDS
+        if score >= t["very_high"]:
             return "VERY_HIGH"
-        if score >= 75:
+        if score >= t["high"]:
             return "HIGH"
-        if score >= 60:
+        if score >= t["moderate"]:
             return "MODERATE"
-        if score >= 40:
+        if score >= t["low"]:
             return "LOW"
         return "VERY_LOW"
 
@@ -238,16 +301,44 @@ class ValuationEngine:
         flags: List[str],
         dispersion: Optional[float],
     ) -> str:
-        if confidence < 40 or "NEGATIVE_EPS" in flags or "SIGN_CHANGE" in flags:
+        t = RISK_THRESHOLDS
+        if confidence < t["extreme_confidence"] or "NEGATIVE_EPS" in flags or "SIGN_CHANGE" in flags:
             return "EXTREME"
         bear = scenarios["bear"].upside_downside_pct
-        if dispersion is not None and dispersion > 0.50:
+        if dispersion is not None and dispersion > t["high_scenario_dispersion"]:
             return "HIGH"
-        if bear is not None and bear < -30:
+        if bear is not None and bear < t["high_bear_downside"]:
             return "HIGH"
-        if confidence < 60 or (bear is not None and bear < -15):
+        if confidence < t["medium_confidence"] or (bear is not None and bear < t["medium_bear_downside"]):
             return "MEDIUM"
         return "LOW"
+
+    @staticmethod
+    def _driver_analysis(
+        scenarios: Dict[str, ScenarioValuation],
+        probability_confidence: float,
+        forecast_reliability: Optional[float],
+        data_quality_score: float,
+    ) -> tuple[List[str], Dict[str, float], Dict[str, float], Dict[str, float]]:
+        base = scenarios["base"]
+        if base.fair_value is None:
+            return [], {}, {}, {}
+
+        p = SENSITIVITY_PERTURBATION
+        eps_impact = abs(base.fair_value * p)
+        pe_impact = abs(base.fair_value * p)
+        drivers = {
+            "EPS": eps_impact,
+            "TARGET_PE": pe_impact,
+        }
+        total = max(sum(drivers.values()), 1e-9)
+        reliability = 50.0 if forecast_reliability is None else max(0.0, min(100.0, forecast_reliability))
+        uncertainty_base = max(0.0, min(100.0, (100.0 - reliability) * 0.5 + (100.0 - probability_confidence) * 0.3 + (100.0 - data_quality_score) * 0.2))
+        ranking = sorted(drivers, key=lambda key: (-drivers[key], key))
+        impact_pct = {key: round(100.0 * value / total, 4) for key, value in drivers.items()}
+        uncertainty = {key: round(uncertainty_base, 4) for key in drivers}
+        review = {key: round(impact_pct[key] * uncertainty[key] / 100.0, 4) for key in drivers}
+        return ranking, impact_pct, uncertainty, review
 
     @staticmethod
     def _alerts(
@@ -255,15 +346,33 @@ class ValuationEngine:
         target_source: str,
         reliability: Optional[float],
         dispersion: Optional[float],
+        historical_median: Optional[float],
+        industry_forward_median: Optional[float],
+        driver_ranking: List[str],
     ) -> List[str]:
         alerts: List[str] = []
-        if dispersion is not None and dispersion > 0.50:
-            alerts.append("HIGH_SCENARIO_DISPERSION")
-        if reliability is not None and reliability < 40:
-            alerts.append("LOW_FORECAST_RELIABILITY")
+        if dispersion is not None and dispersion > ALERT_THRESHOLDS["high_scenario_dispersion"]:
+            alerts.append("WARNING:HIGH_SCENARIO_DISPERSION")
+        if reliability is not None and reliability < ALERT_THRESHOLDS["low_forecast_reliability"]:
+            alerts.append("WARNING:LOW_FORECAST_RELIABILITY")
         if target_source == "INSUFFICIENT_DATA":
-            alerts.append("INSUFFICIENT_PEER_DATA")
-        if scenarios["base"].target_pe is not None and scenarios["base"].forward_pe is not None:
-            if scenarios["base"].forward_pe > scenarios["base"].target_pe * 1.5:
-                alerts.append("VALUATION_BENCHMARK_DIVERGENCE")
+            alerts.append("CRITICAL:INSUFFICIENT_BENCHMARK_DATA")
+        base = scenarios["base"]
+        if base.target_pe is not None and base.forward_pe is not None and base.target_pe > 0:
+            if base.forward_pe / base.target_pe >= ALERT_THRESHOLDS["benchmark_divergence_ratio"]:
+                alerts.append("WATCH:VALUATION_ABOVE_TARGET_PE")
+            elif base.target_pe / base.forward_pe >= ALERT_THRESHOLDS["benchmark_divergence_ratio"]:
+                alerts.append("WATCH:VALUATION_BELOW_TARGET_PE")
+        if historical_median is not None and base.forward_pe is not None and historical_median > 0:
+            if base.forward_pe / historical_median >= ALERT_THRESHOLDS["historical_divergence_ratio"]:
+                alerts.append("WATCH:FORWARD_PE_ABOVE_HISTORICAL")
+            elif historical_median / base.forward_pe >= ALERT_THRESHOLDS["historical_divergence_ratio"]:
+                alerts.append("WATCH:FORWARD_PE_BELOW_HISTORICAL")
+        if industry_forward_median is not None and base.forward_pe is not None and industry_forward_median > 0:
+            if base.forward_pe / industry_forward_median >= ALERT_THRESHOLDS["industry_divergence_ratio"]:
+                alerts.append("WATCH:FORWARD_PE_ABOVE_INDUSTRY")
+            elif industry_forward_median / base.forward_pe >= ALERT_THRESHOLDS["industry_divergence_ratio"]:
+                alerts.append("WATCH:FORWARD_PE_BELOW_INDUSTRY")
+        if driver_ranking:
+            alerts.append(f"INFO:TOP_DRIVER:{driver_ranking[0]}")
         return sorted(set(alerts))
