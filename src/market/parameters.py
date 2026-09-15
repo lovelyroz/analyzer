@@ -1,3 +1,7 @@
+# Stage 8 V1 Model Version Parameters
+# Thresholds/windows live here so internal calibration can be versioned without
+# changing the external Market Engine contract.
+
 MODEL_VERSION = "STAGE8_V1"
 CONTRACT_VERSION = "MARKET_CONTRACT_V1"
 
@@ -24,6 +28,8 @@ DRAWDOWN_DEEP = -0.20
 DRAWDOWN_EXTREME = -0.50
 RECOVERY_FROM_LOW = 0.05
 
-MARKET_REGIME_RETURN_THRESHOLD = 0.05
 LIQUIDITY_ACTIVE_DAY_MINIMUM = 0.50
 LIQUIDITY_HIGH_RELATIVE_VALUE = 2.0
+LIQUIDITY_LOW_RELATIVE_VALUE = 0.50
+
+MARKET_REGIME_RETURN_THRESHOLD = 0.05
