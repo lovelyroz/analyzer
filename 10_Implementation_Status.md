@@ -10,7 +10,7 @@ It does NOT redefine the architecture.
 
 The authoritative architectural reference is:
 
-`00_Master_Architecture.md`
+`00_a_Master_Architecture.md`
 
 The authoritative rules for each stage are the corresponding Stage Locked Specification files.
 
@@ -24,11 +24,9 @@ The authoritative rules for each stage are the corresponding Stage Locked Specif
 
 **Architecture Coverage:** Stages 1–9 LOCKED
 
-**Implementation Status:** NOT STARTED
+**Implementation Status:** STAGE 5 IN PROGRESS
 
-The project has completed the V1 architecture-design phase and is now transitioning to implementation.
-
-Implementation must follow the locked architecture.
+Stages are implemented and advanced one at a time only after implementation, testing, review, architecture-compliance audit, and approval.
 
 ---
 
@@ -40,8 +38,7 @@ Implementation must follow the locked architecture.
 4. Preserve the contract between stages.
 5. Internal implementation may change without affecting other stages if the public contract remains compatible.
 6. Never silently change an architectural rule.
-7. Any genuine architectural change must be recorded in:
-   `99_Architecture_Change_Log.md`
+7. Any genuine architectural change must be recorded in `99_Architecture_Change_Log.md`.
 8. Point-in-Time requirements must remain enforced.
 9. Raw data must remain traceable to its source.
 10. Restatements and ReportVersions must remain distinguishable.
@@ -59,25 +56,15 @@ Implementation must follow the locked architecture.
 
 **Design:** LOCKED
 
-**Implementation:** NOT STARTED
+**Implementation:** IMPLEMENTED
 
-**Database Schema:** NOT STARTED
+**Testing:** IMPLEMENTED / TESTED
 
-**Migrations:** NOT STARTED
+**Audit:** REQUIRES FINAL STATUS RECONCILIATION
 
-**Data Ingestion:** NOT STARTED
+**Status:** IMPLEMENTED — NOT YET MARKED COMPLETE
 
-**Normalization:** NOT STARTED
-
-**Data Quality Layer:** NOT STARTED
-
-**Point-in-Time Controls:** NOT STARTED
-
-**Testing:** NOT STARTED
-
-**Audit:** NOT STARTED
-
-**Status:** NOT STARTED
+> Stage 1 code and tests have been implemented and corrected against the locked specification. Final formal completion status remains subject to the project audit record.
 
 ---
 
@@ -85,13 +72,13 @@ Implementation must follow the locked architecture.
 
 **Design:** LOCKED
 
-**Implementation:** NOT STARTED
+**Implementation:** IMPLEMENTED
 
-**Testing:** NOT STARTED
+**Testing:** IMPLEMENTED / TESTED
 
-**Audit:** NOT STARTED
+**Audit:** REQUIRES FINAL STATUS RECONCILIATION
 
-**Status:** NOT STARTED
+**Status:** IMPLEMENTED — NOT YET MARKED COMPLETE
 
 ---
 
@@ -99,13 +86,13 @@ Implementation must follow the locked architecture.
 
 **Design:** LOCKED
 
-**Implementation:** NOT STARTED
+**Implementation:** IMPLEMENTED
 
-**Testing:** NOT STARTED
+**Testing:** IMPLEMENTED / TESTED
 
-**Audit:** NOT STARTED
+**Audit:** REQUIRES FINAL STATUS RECONCILIATION
 
-**Status:** NOT STARTED
+**Status:** IMPLEMENTED — NOT YET MARKED COMPLETE
 
 ---
 
@@ -113,13 +100,25 @@ Implementation must follow the locked architecture.
 
 **Design:** LOCKED
 
-**Implementation:** NOT STARTED
+**Implementation:** IMPLEMENTED
 
-**Testing:** NOT STARTED
+**Testing:** PASS
 
-**Audit:** NOT STARTED
+**Independent Review:** PASS
 
-**Status:** NOT STARTED
+**Architecture Compliance Audit:** PASS
+
+**Approval:** PASS
+
+**Status:** COMPLETE / LOCKED
+
+**Final CI:** PASS
+
+**CI Run:** `34939205373`
+
+**CI Job:** `104283758593`
+
+**Notes:** 47/47 tests passed. 94 `DeprecationWarning` messages related to `datetime.utcnow()` were non-blocking and outside Stage 4 scope.
 
 ---
 
@@ -127,13 +126,19 @@ Implementation must follow the locked architecture.
 
 **Design:** LOCKED
 
-**Implementation:** NOT STARTED
+**Implementation:** IN PROGRESS
 
 **Testing:** NOT STARTED
 
-**Audit:** NOT STARTED
+**Independent Review:** NOT STARTED
 
-**Status:** NOT STARTED
+**Architecture Compliance Audit:** NOT STARTED
+
+**Approval:** NOT STARTED
+
+**Status:** IN PROGRESS
+
+**Current Target:** Replace the existing placeholder Forecast implementation with the locked Stage 5 architecture, then test and audit it before any Stage 6 implementation.
 
 ---
 
@@ -195,28 +200,37 @@ Implementation must follow the locked architecture.
 
 # 4. Current Implementation Target
 
-## Stage 1 — Data Foundation & Data Model
+## Stage 5 — Forecast Engine
 
-Stage 1 is the first implementation target.
+Stage 5 is the current implementation target.
 
-Implementation should begin with:
+Implementation must follow `05_Stage5_Forecast_Engine.md` exactly.
 
-1. Project/database structure
-2. Database schema
-3. Entity relationships
-4. Constraints and indexes
-5. Migration strategy
-6. Raw financial data model
-7. Normalized financial data model
-8. FX data model
-9. MarketDaily data model
-10. Share count and Corporate Action model
-11. Data Quality model
-12. IngestionRun model
-13. Point-in-Time and ReportVersion handling
-14. Tests for Stage 1 rules
+The existing Forecast implementation is only a preliminary scaffold and must not be treated as compliant merely because tests currently exist.
 
-Do not implement Stage 2 until Stage 1 passes implementation review.
+Implementation order:
+
+1. Forecast output contract
+2. Non-financial forecast core
+3. Revenue baseline hierarchy
+4. Operating margin forecast
+5. Operating profit forecast
+6. Net profit hierarchy
+7. EPS with share history / corporate actions
+8. ROE forecast
+9. Bank forecast core
+10. Holding forecast core
+11. Stage 4 integration
+12. Low-base and sign-change controls
+13. Bear / Base / Bull scenario architecture
+14. Operational vs free-market FX handling where relevant
+15. Point-in-Time cutoff and auditability
+16. Forecast method / model version / assumptions metadata
+17. Stage 5 tests
+18. Independent review
+19. Architecture compliance audit
+
+Do not implement Stage 6 until Stage 5 passes its implementation tests and architecture-compliance audit.
 
 ---
 
@@ -255,11 +269,11 @@ Use the following status values:
 
 | Stage   | Design | Implementation | Overall     |
 | ------- | ------ | -------------- | ----------- |
-| Stage 1 | LOCKED | NOT STARTED    | NOT STARTED |
-| Stage 2 | LOCKED | NOT STARTED    | NOT STARTED |
-| Stage 3 | LOCKED | NOT STARTED    | NOT STARTED |
-| Stage 4 | LOCKED | NOT STARTED    | NOT STARTED |
-| Stage 5 | LOCKED | NOT STARTED    | NOT STARTED |
+| Stage 1 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
+| Stage 2 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
+| Stage 3 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
+| Stage 4 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
+| Stage 5 | LOCKED | IN PROGRESS    | IN PROGRESS |
 | Stage 6 | LOCKED | NOT STARTED    | NOT STARTED |
 | Stage 7 | LOCKED | NOT STARTED    | NOT STARTED |
 | Stage 8 | LOCKED | NOT STARTED    | NOT STARTED |
@@ -286,6 +300,6 @@ Implementation progress must NOT be recorded as an architectural change unless t
 
 # 9. Current Next Action
 
-**Implement Stage 1 — Data Foundation & Data Model.**
+**Implement Stage 5 — Forecast Engine.**
 
-No Stage 2 implementation should begin until Stage 1 has passed its implementation tests and architecture-compliance audit.
+No Stage 6 implementation should begin until Stage 5 has passed implementation tests, independent review, and architecture-compliance audit.
