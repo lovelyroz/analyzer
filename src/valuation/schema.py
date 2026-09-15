@@ -40,4 +40,10 @@ class ValuationResult:
     valuation_confidence_label: str = "INSUFFICIENT_DATA"
     valuation_risk_flags: List[str] = field(default_factory=list)
     alerts: List[str] = field(default_factory=list)
+    valuation_driver_ranking: List[str] = field(default_factory=list)
+    driver_impact: Dict[str, float] = field(default_factory=dict)
+    driver_uncertainty: Dict[str, float] = field(default_factory=dict)
+    review_priority: Dict[str, float] = field(default_factory=dict)
+    valuation_data_quality: float = 0.0
+    contract_version: str = "VALUATION_CONTRACT_V1"
     metadata: Dict[str, object] = field(default_factory=dict)
