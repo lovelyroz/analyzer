@@ -19,11 +19,7 @@ CONTRACT_VERSION = "DECISION_CONTRACT_V1"
 
 
 class DecisionEngine:
-    """Stage 9 V1: rule-based evidence integration.
-
-    The engine consumes upstream contracts. It does not recalculate KPI,
-    forecast, valuation, volatility, relative strength, or any Market Score.
-    """
+    """Stage 9 V1: rule-based evidence integration."""
 
     def make_decision(
         self,
@@ -57,8 +53,6 @@ class DecisionEngine:
         reliability_state = classify_reliability(reliability)
 
         future_state = (forecast_direction or trend_state or "INSUFFICIENT_DATA").upper()
-        trend = (trend_state or "INSUFFICIENT_DATA").upper()
-        forecast = (forecast_direction or "INSUFFICIENT_DATA").upper()
         revision = (forecast_revision_trend or "INSUFFICIENT_DATA").upper()
         market_trend = (market_result.trend_state or market_result.trend_alignment or "INSUFFICIENT_DATA").upper()
         market_momentum = (market_result.momentum_state or "INSUFFICIENT_DATA").upper()
@@ -89,8 +83,6 @@ class DecisionEngine:
         elif reliability_state == "HIGH":
             pros.append("Forecast reliability is high")
 
-        # Value-trap and strong-but-expensive conflicts are family-level conflicts,
-        # not extra votes.
         if valuation_state == "ATTRACTIVE" and fundamental_state == "WEAK" and is_negative_direction(future_state):
             conflicts.append("CHEAP_BUT_WEAK")
         if valuation_state == "EXPENSIVE" and fundamental_state == "STRONG" and is_positive_direction(future_state):
@@ -107,8 +99,6 @@ class DecisionEngine:
         if market_liquidity in {"LOW", "VERY_LOW"}:
             conflicts.append("LOW_LIQUIDITY")
 
-        # USD share value is supplied as Stage 8/FX context; Stage 9 does not
-        # recalculate FX or the USD price itself.
         if usd_share_value_change_pct is not None:
             if usd_share_value_change_pct < 0:
                 cons.append("USD share value is declining")
@@ -125,21 +115,18 @@ class DecisionEngine:
         elif market_trend in {"DOWNTREND", "STRONG_DOWNTREND"} and is_negative_direction(future_state):
             cons.append("Market context confirms the negative direction")
 
-        # Decision confidence is confidence in the evidence integration, not a
-        # replacement score for the upstream Fundamental Score.
         confidence = 100.0
-        missing_families = 0
-        if fundamental_state == "INSUFFICIENT_DATA":
-            missing_families += 1
-        if future_state == "INSUFFICIENT_DATA":
-            missing_families += 1
-        if valuation_state == "INSUFFICIENT_DATA":
-            missing_families += 1
-        if market_trend == "INSUFFICIENT_DATA":
-            missing_families += 1
+        missing_families = sum(
+            [
+                fundamental_state == "INSUFFICIENT_DATA",
+                future_state == "INSUFFICIENT_DATA",
+                valuation_state == "INSUFFICIENT_DATA",
+                market_trend == "INSUFFICIENT_DATA",
+            ]
+        )
         confidence -= missing_families * 15.0
         if reliability_state == "VERY_LOW":
-            confidence -= 20.0
+            confidence -= 30.0
         elif reliability_state == "LOW":
             confidence -= 15.0
         elif reliability_state == "MODERATE":
@@ -151,14 +138,6 @@ class DecisionEngine:
         if "LOW_LIQUIDITY" in conflicts:
             confidence -= 5.0
         confidence = round(max(0.0, min(100.0, confidence)), 2)
-
-        severe_conflicts = {
-            "CHEAP_BUT_WEAK",
-            "STRONG_BUT_EXPENSIVE",
-            "POSITIVE_FORECAST_LOW_RELIABILITY",
-            "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK",
-            "VALUATION_NOT_APPLICABLE",
-        }
 
         positive_future = is_positive_direction(future_state)
         negative_future = is_negative_direction(future_state)
@@ -172,7 +151,7 @@ class DecisionEngine:
             and attractive
             and reliable_for_strong
             and confidence >= 75
-            and not any(c in severe_conflicts for c in conflicts)
+            and not any(c in {"CHEAP_BUT_WEAK", "STRONG_BUT_EXPENSIVE", "POSITIVE_FORECAST_LOW_RELIABILITY", "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK", "VALUATION_NOT_APPLICABLE"} for c in conflicts)
         ):
             recommendation = "STRONG_BUY"
         elif (
@@ -191,7 +170,6 @@ class DecisionEngine:
             and reliability >= 60
             and confidence >= 60
         ):
-            # Turnaround requires confirmation; without it the proper state is WATCH.
             recommendation = "BUY" if market_trend in {"UPTREND", "STRONG_UPTREND"} else "WATCH"
         elif (
             fundamental_state == "WEAK"
@@ -202,7 +180,7 @@ class DecisionEngine:
         ):
             recommendation = "STRONG_SELL"
         elif (
-            (fundamental_state == "WEAK" and negative_future)
+            (fundamental_state == "WEAK" and negative_future and "CHEAP_BUT_WEAK" not in conflicts)
             or (expensive and negative_future)
             or (valuation_state == "EXPENSIVE" and fundamental_state == "ACCEPTABLE")
         ):
@@ -223,28 +201,21 @@ class DecisionEngine:
         else:
             recommendation = "HOLD"
 
-        # HOLD is intentionally a first-class decision. Market weakness does not
-        # automatically override sound fundamentals.
         if recommendation == "BUY" and "STRONG_BUT_EXPENSIVE" in conflicts:
             recommendation = "HOLD"
-        if recommendation == "STRONG_BUY" and conflicts:
-            recommendation = "BUY"
         if recommendation == "STRONG_SELL" and reliability_state in {"LOW", "VERY_LOW"}:
             recommendation = "SELL"
 
-        if recommendation == "STRONG_HOLD":
-            recommendation = "HOLD"
-
         if recommendation in {"STRONG_BUY", "BUY"}:
-            if fundamental_state == "STRONG" and valuation_state in {"ATTRACTIVE", "FAIR"} and not negative_future:
-                holding_status = "STRONG_HOLD" if recommendation == "STRONG_BUY" else "HOLD"
-            else:
-                holding_status = "HOLD_WITH_CAUTION"
+            holding_status = (
+                "STRONG_HOLD"
+                if recommendation == "STRONG_BUY" and fundamental_state == "STRONG" and valuation_state in {"ATTRACTIVE", "FAIR"} and not negative_future
+                else "HOLD_WITH_CAUTION" if negative_future or expensive
+                else "HOLD"
+            )
         elif recommendation == "HOLD":
             holding_status = "HOLD_WITH_CAUTION" if negative_future or expensive else "HOLD"
-        elif recommendation == "WATCH":
-            holding_status = "REVIEW_HOLD"
-        elif recommendation == "REDUCE":
+        elif recommendation in {"WATCH", "REDUCE"}:
             holding_status = "REVIEW_HOLD"
         else:
             holding_status = "EXIT_CANDIDATE"
@@ -281,7 +252,7 @@ class DecisionEngine:
             recommendation=recommendation,
             holding_status=holding_status,
             decision_confidence=confidence,
-            risk_level=valuation_result.valuation_risk_level if valuation_result.valuation_risk_level else "MEDIUM",
+            risk_level=valuation_result.valuation_risk_level or "MEDIUM",
             conflicts=conflicts,
             rationale_pros=pros,
             rationale_cons=cons,
