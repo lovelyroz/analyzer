@@ -24,7 +24,7 @@ The authoritative rules for each stage are the corresponding Stage Locked Specif
 
 **Architecture Coverage:** Stages 1–9 LOCKED
 
-**Implementation Status:** STAGE 6 READY TO START
+**Implementation Status:** STAGE 6 IN PROGRESS
 
 Stages are implemented and advanced one at a time only after implementation, testing, review, architecture-compliance audit, and approval.
 
@@ -184,9 +184,9 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 **Design:** LOCKED
 
-**Implementation:** NOT STARTED
+**Implementation:** IN PROGRESS
 
-**Testing:** NOT STARTED
+**Testing:** IN PROGRESS
 
 **Independent Review:** NOT STARTED
 
@@ -194,9 +194,37 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 **Approval:** NOT STARTED
 
-**Status:** READY TO START
+**Status:** IN PROGRESS
 
-**Current Target:** Implement the locked Stage 6 Forecast Evaluation & Calibration specification. Do not modify Stage 5 architecture while implementing Stage 6 unless a genuine contract defect is discovered and explicitly reviewed.
+### Current implementation scope
+
+Implemented in the current Stage 6 pass:
+
+- Canonical Actual − Forecast error
+- Signed Percentage Error using absolute Forecast denominator
+- APE / MAPE
+- Zero-base and sign-change exceptions
+- Bias calculation and persistent-bias detection
+- Observation sufficiency bands
+- Forecast / Actual evaluation record with horizon, model version and cutoff
+- Point-in-Time actual candidate selection
+- Seasonal Naive baseline helper
+- Model-vs-baseline relative improvement
+- Baseline-underperformance detection
+- Versioned-friendly Accuracy / Bias / Baseline mappings
+- Reliability architecture with Accuracy 50%, Bias Control 20%, Baseline Advantage 30%
+- Confidence adjustment by observation sufficiency
+- Calibration Candidate state
+- Holdout-gated creation of a new calibration model version
+- Stage 6 test coverage for the above contract
+
+### CI status
+
+Latest Stage 6 test workflow is currently running after commit `3f2e8ee61f66beb81e584062700e5c3c132707a1`.
+
+The previous intermediate CI run for commit `66ea60a0b4d899f9b4b03234520a9053cf881b8f` failed before the final Stage 6 test update; it is not treated as a final Stage 6 result.
+
+**Important:** Stage 6 is NOT marked PASS / LOCKED yet. Final status will only be updated after the complete test suite, independent review, and architecture-compliance audit pass.
 
 ---
 
@@ -246,9 +274,9 @@ Stages are implemented and advanced one at a time only after implementation, tes
 
 ## Stage 6 — Forecast Evaluation & Calibration
 
-Stage 6 is now the current implementation target.
+Stage 6 is the current implementation target.
 
-Implementation must follow `06_Stage6_Forecast_Evaluation.md` exactly.
+Implementation follows `06_Stage6_Forecast_Evaluation.md` exactly.
 
 Implementation order:
 
@@ -313,7 +341,7 @@ Use the following status values:
 | Stage 3 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
 | Stage 4 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
 | Stage 5 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 6 | LOCKED | READY TO START | READY TO START |
+| Stage 6 | LOCKED | IN PROGRESS    | IN PROGRESS |
 | Stage 7 | LOCKED | NOT STARTED    | NOT STARTED |
 | Stage 8 | LOCKED | NOT STARTED    | NOT STARTED |
 | Stage 9 | LOCKED | NOT STARTED    | NOT STARTED |
@@ -339,6 +367,6 @@ Implementation progress must NOT be recorded as an architectural change unless t
 
 # 9. Current Next Action
 
-**Implement Stage 6 — Forecast Evaluation & Calibration.**
+**Complete Stage 6 implementation testing, then perform independent review and architecture-compliance audit.**
 
-Stage 5 has passed implementation tests, independent review, and architecture-compliance audit. Stage 6 may now begin.
+Stage 5 remains COMPLETE / LOCKED. No Stage 5 architectural change has been introduced by the Stage 6 implementation.
