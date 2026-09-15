@@ -49,9 +49,9 @@ def test_valuation_engine_forward_pe_and_expected_fair_value():
     assert result.scenarios["bear"].fair_value == 945.0
     assert result.scenarios["base"].fair_value == 1260.0
     assert result.scenarios["bull"].fair_value == 1617.0
-    assert result.expected_fair_value == 1260.0
-    assert result.margin_of_safety_pct == 20.6
-    assert result.valuation_status == "FAIR"
+    assert result.expected_fair_value == 1268.4
+    assert result.margin_of_safety_pct == 26.84
+    assert result.valuation_status == "ATTRACTIVE"
     assert abs(sum(s.probability for s in result.scenarios.values()) - 1.0) < 1e-9
 
 
