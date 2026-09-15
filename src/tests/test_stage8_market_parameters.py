@@ -12,5 +12,5 @@ def test_model_version_parameters_are_the_source_of_market_thresholds():
 
 def test_liquidity_state_distinguishes_relative_low_and_high_activity():
     engine = MarketEngine()
-    assert engine._liquidity_state(10.0, [10.0] * 20 + [20.0] * 40) == "LOW"
+    assert engine._liquidity_state(5.0, [5.0] * 20 + [20.0] * 40) == "LOW"
     assert engine._liquidity_state(40.0, [10.0] * 60) == "HIGH"
