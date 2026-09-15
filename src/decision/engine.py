@@ -188,7 +188,7 @@ class DecisionEngine:
 
         # Explicit hysteresis: normal one-step changes require a stronger
         # confidence condition than the reverse transition. Hard risk rules
-        # (e.g. severe deterioration) are allowed to bypass the buffer.
+        # are allowed to bypass the buffer.
         hysteresis_applied = False
         hysteresis_reason = None
         if previous_decision and previous_decision in DECISION_ORDER and recommendation in DECISION_ORDER:
@@ -229,7 +229,6 @@ class DecisionEngine:
         if valuation_result.valuation_data_quality < 60 or market_result.market_data_quality not in {"VALID", ""}:
             data_quality = "LIMITED"
 
-        # Ranking is an eligibility/context contract; it does not create a new score.
         ranking_eligibility = (
             data_quality in {"VALID", "GOOD"}
             and fundamental_state != "INSUFFICIENT_DATA"
@@ -258,17 +257,42 @@ class DecisionEngine:
             decision_change = "UNCHANGED" if previous_decision == recommendation else "CHANGED"
             if decision_change == "CHANGED":
                 change_reasons = list(conflicts[:5]) or ["Decision evidence changed"]
+        calculation_timestamp = datetime.utcnow()
+        decision_change_date = calculation_timestamp if decision_change == "CHANGED" else None
+        expected_upside = valuation_result.metadata.get("expected_upside", valuation_result.margin_of_safety_pct)
+        usd_relative_context = fx.get("usd_relative_valuation_context")
 
-        return FinalDecisionResult(
+        result = FinalDecisionResult(
             company_id=company_id,
             period_id=period_id,
             recommendation=recommendation,
             holding_status=holding_status,
             decision_confidence=confidence,
             risk_level=valuation_result.valuation_risk_level or "MEDIUM",
+            fundamental_state=fundamental_state,
+            fundamental_score=fund_score,
+            trend_state=trend_state or future_state,
+            forecast_state=future_state,
+            forecast_reliability=reliability,
+            valuation_status=valuation_result.valuation_status,
+            expected_upside=expected_upside,
+            valuation_risk=valuation_result.valuation_risk_level,
+            valuation_confidence=valuation_result.valuation_confidence,
+            market_trend_state=market_trend,
+            market_momentum_state=market_momentum,
+            relative_strength_state=relative_strength,
+            liquidity_state=market_liquidity,
+            fx_regime=fx.get("fx_regime"),
+            fx_company_impact=fx.get("fx_company_impact"),
+            usd_relative_valuation_context=usd_relative_context,
+            free_market_fx=fx.get("free_market_fx"),
+            operational_fx=fx.get("operational_fx"),
+            fx_gap=fx.get("fx_gap"),
+            decision=recommendation,
+            decision_conflict=conflicts,
             conflicts=conflicts,
-            rationale_pros=pros,
-            rationale_cons=cons,
+            rationale_pros=pros[:5],
+            rationale_cons=cons[:5],
             evidence_summary={
                 "fundamental_quality": fundamental_state,
                 "future_direction": future_state,
@@ -282,21 +306,17 @@ class DecisionEngine:
                 "forecast_quality": forecast_quality or "UNKNOWN",
             },
             usd_context=usd_context,
-            expected_upside=valuation_result.metadata.get("expected_upside", valuation_result.margin_of_safety_pct),
-            valuation_confidence=valuation_result.valuation_confidence,
-            relative_strength_state=relative_strength,
-            fx_regime=fx.get("fx_regime"),
-            fx_company_impact=fx.get("fx_company_impact"),
-            free_market_fx=fx.get("free_market_fx"),
-            operational_fx=fx.get("operational_fx"),
-            fx_gap=fx.get("fx_gap"),
             previous_decision=previous_decision,
             decision_change=decision_change,
+            decision_change_date=decision_change_date,
             decision_change_reasons=change_reasons,
-            ranking_eligibility=ranking_eligibility,
-            rank_within_industry=rank_within_industry if ranking_eligibility else None,
+            decision_reasons=pros[:5],
+            decision_risks=cons[:5],
+            decision_ranking_eligibility=ranking_eligibility,
+            decision_rank_within_industry=rank_within_industry if ranking_eligibility else None,
             ranking_inputs=ranking_inputs,
-            calculation_timestamp=datetime.utcnow(),
+            calculation_timestamp=calculation_timestamp,
+            decision_date=calculation_timestamp,
             model_version=MODEL_VERSION,
             contract_version=CONTRACT_VERSION,
             data_cutoff_datetime=cutoff,
@@ -316,7 +336,9 @@ class DecisionEngine:
                     "entry_confidence": ENTRY_CONFIDENCE,
                     "exit_confidence": EXIT_CONFIDENCE,
                 },
+                "previous_decision_confidence_supplied": previous_decision_confidence is not None,
                 "decision_history_persistence": "UPSTREAM_CALLER_SUPPLIED_PREVIOUS_DECISION",
                 "ranking_score_created": False,
             },
         )
+        return result
