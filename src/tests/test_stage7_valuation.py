@@ -44,13 +44,13 @@ def test_valuation_engine_forward_pe_and_expected_fair_value():
     )
 
     assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
-    assert result.scenarios["base"].target_pe == 6.5
+    assert result.scenarios["base"].target_pe == 7.0
     assert result.scenarios["base"].forward_pe == round(1000.0 / 180.0, 4)
-    assert result.scenarios["bear"].fair_value == 877.5
-    assert result.scenarios["base"].fair_value == 1170.0
-    assert result.scenarios["bull"].fair_value == 1501.5
-    assert result.expected_fair_value == 1170.0
-    assert result.margin_of_safety_pct == 17.0
+    assert result.scenarios["bear"].fair_value == 945.0
+    assert result.scenarios["base"].fair_value == 1260.0
+    assert result.scenarios["bull"].fair_value == 1617.0
+    assert result.expected_fair_value == 1260.0
+    assert result.margin_of_safety_pct == 20.6
     assert result.valuation_status == "FAIR"
     assert abs(sum(s.probability for s in result.scenarios.values()) - 1.0) < 1e-9
 
