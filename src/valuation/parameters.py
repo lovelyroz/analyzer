@@ -1,8 +1,8 @@
-from typing import Dict
+from typing import Dict, Tuple
 
 # Backward-compatible export retained for existing package consumers.
 # Stage 7 V1 no longer uses hard-coded industry target P/E values; target multiples
-# come from the benchmark hierarchy and versioned scenario parameters.
+# come from the benchmark hierarchy and explicit, evidence-backed scenario inputs.
 INDUSTRY_TARGET_PE: Dict[str, float] = {}
 
 SCENARIO_WEIGHTS: Dict[str, float] = {
@@ -11,13 +11,23 @@ SCENARIO_WEIGHTS: Dict[str, float] = {
     "bull": 0.20,
 }
 
-# Versioned scenario multiple parameters. They do not use Fundamental Score or
-# Forecast Reliability and are intended to be backtested/calibrated later.
-SCENARIO_PE_MULTIPLIER: Dict[str, float] = {
-    "bear": 0.90,
-    "base": 1.00,
-    "bull": 1.10,
-}
+# Scenario probabilities are built from four family-level evidence distributions.
+# Each family receives one vote; correlated metrics must be aggregated before this
+# contract. The blend is versioned and backtestable rather than an architecture constant.
+PROBABILITY_EVIDENCE_FAMILIES: Tuple[str, ...] = (
+    "FUNDAMENTAL_DIRECTION",
+    "FORECAST_DIRECTION",
+    "PROFITABILITY_ASSUMPTION_RISK",
+    "DATA_STRUCTURAL_RISK",
+)
+PROBABILITY_EVIDENCE_BLEND = 0.25
+
+# V1 does not impose an arbitrary Bear/Base/Bull P/E gap. With no explicit
+# economic evidence, all scenarios use the same benchmark multiple. Scenario-
+# specific multiple changes must be supplied with an economic rationale and are
+# bounded so the mechanism remains explainable, versioned and backtestable.
+SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT = 0.20
+SCENARIO_MULTIPLE_POLICY_VERSION = "STAGE7_V1_EVIDENCE_BACKED"
 
 VALUATION_THRESHOLDS: Dict[str, float] = {
     "very_attractive_expected_upside": 30.0,
