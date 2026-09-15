@@ -13,9 +13,16 @@ from src.decision.rules import (
     is_positive_direction,
 )
 
-
 MODEL_VERSION = "STAGE9_V1"
 CONTRACT_VERSION = "DECISION_CONTRACT_V1"
+
+# Hysteresis is a model parameter, not an architecture constant.
+ENTRY_CONFIDENCE = {"BUY": 55.0, "STRONG_BUY": 75.0}
+EXIT_CONFIDENCE = {"BUY": 45.0, "STRONG_BUY": 60.0, "HOLD": 45.0}
+DECISION_ORDER = {
+    "STRONG_SELL": 0, "SELL": 1, "REDUCE": 2, "WATCH": 3,
+    "HOLD": 4, "BUY": 5, "STRONG_BUY": 6,
+}
 
 
 class DecisionEngine:
@@ -37,6 +44,9 @@ class DecisionEngine:
         usd_share_value_change_pct: Optional[float] = None,
         fx_context: Optional[Dict[str, object]] = None,
         data_cutoff_datetime: Optional[datetime] = None,
+        previous_decision: Optional[str] = None,
+        previous_decision_confidence: Optional[float] = None,
+        rank_within_industry: Optional[int] = None,
     ) -> FinalDecisionResult:
         conflicts: List[str] = []
         pros: List[str] = []
@@ -51,12 +61,12 @@ class DecisionEngine:
             else valuation_result.forecast_reliability_score
         )
         reliability_state = classify_reliability(reliability)
-
         future_state = (forecast_direction or trend_state or "INSUFFICIENT_DATA").upper()
         revision = (forecast_revision_trend or "INSUFFICIENT_DATA").upper()
         market_trend = (market_result.trend_state or market_result.trend_alignment or "INSUFFICIENT_DATA").upper()
         market_momentum = (market_result.momentum_state or "INSUFFICIENT_DATA").upper()
         market_liquidity = (market_result.liquidity_state or "INSUFFICIENT_DATA").upper()
+        relative_strength = (getattr(market_result, "relative_strength_state", None) or "INSUFFICIENT_DATA").upper()
 
         if fundamental_state == "STRONG":
             pros.append(f"Fundamental quality is strong ({fund_score})")
@@ -91,7 +101,6 @@ class DecisionEngine:
             conflicts.append("STRONG_FUNDAMENTAL_NEGATIVE_FUTURE")
         if fundamental_state == "WEAK" and is_positive_direction(future_state):
             conflicts.append("TURNAROUND")
-
         if fundamental_state == "STRONG" and market_trend in {"DOWNTREND", "STRONG_DOWNTREND"}:
             conflicts.append("STRONG_FUNDAMENTAL_WEAK_MARKET")
         if fundamental_state == "WEAK" and market_trend in {"UPTREND", "STRONG_UPTREND"}:
@@ -116,14 +125,12 @@ class DecisionEngine:
             cons.append("Market context confirms the negative direction")
 
         confidence = 100.0
-        missing_families = sum(
-            [
-                fundamental_state == "INSUFFICIENT_DATA",
-                future_state == "INSUFFICIENT_DATA",
-                valuation_state == "INSUFFICIENT_DATA",
-                market_trend == "INSUFFICIENT_DATA",
-            ]
-        )
+        missing_families = sum([
+            fundamental_state == "INSUFFICIENT_DATA",
+            future_state == "INSUFFICIENT_DATA",
+            valuation_state == "INSUFFICIENT_DATA",
+            market_trend == "INSUFFICIENT_DATA",
+        ])
         confidence -= missing_families * 15.0
         if reliability_state == "VERY_LOW":
             confidence -= 30.0
@@ -145,58 +152,31 @@ class DecisionEngine:
         expensive = valuation_state == "EXPENSIVE"
         reliable_for_strong = reliability is not None and reliability >= 75
 
-        if (
-            fundamental_state == "STRONG"
-            and positive_future
-            and attractive
-            and reliable_for_strong
-            and confidence >= 75
-            and not any(c in {"CHEAP_BUT_WEAK", "STRONG_BUT_EXPENSIVE", "POSITIVE_FORECAST_LOW_RELIABILITY", "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK", "VALUATION_NOT_APPLICABLE"} for c in conflicts)
-        ):
+        if (fundamental_state == "STRONG" and positive_future and attractive and reliable_for_strong
+                and confidence >= 75 and not any(c in {
+                    "CHEAP_BUT_WEAK", "STRONG_BUT_EXPENSIVE", "POSITIVE_FORECAST_LOW_RELIABILITY",
+                    "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK", "VALUATION_NOT_APPLICABLE"
+                } for c in conflicts)):
             recommendation = "STRONG_BUY"
-        elif (
-            fundamental_state in {"STRONG", "ACCEPTABLE"}
-            and positive_future
-            and valuation_state in {"ATTRACTIVE", "FAIR"}
-            and (reliability is None or reliability >= 60)
-            and confidence >= 55
-        ):
+        elif (fundamental_state in {"STRONG", "ACCEPTABLE"} and positive_future
+              and valuation_state in {"ATTRACTIVE", "FAIR"} and (reliability is None or reliability >= 60)
+              and confidence >= 55):
             recommendation = "BUY"
-        elif (
-            fundamental_state == "WEAK"
-            and positive_future
-            and attractive
-            and reliability is not None
-            and reliability >= 60
-            and confidence >= 60
-        ):
+        elif (fundamental_state == "WEAK" and positive_future and attractive
+              and reliability is not None and reliability >= 60 and confidence >= 60):
             recommendation = "BUY" if market_trend in {"UPTREND", "STRONG_UPTREND"} else "WATCH"
-        elif (
-            fundamental_state == "WEAK"
-            and negative_future
-            and expensive
-            and reliable_for_strong
-            and confidence >= 75
-        ):
+        elif (fundamental_state == "WEAK" and negative_future and expensive and reliable_for_strong and confidence >= 75):
             recommendation = "STRONG_SELL"
-        elif (
-            (fundamental_state == "WEAK" and negative_future and "CHEAP_BUT_WEAK" not in conflicts)
-            or (expensive and negative_future)
-            or (valuation_state == "EXPENSIVE" and fundamental_state == "ACCEPTABLE")
-        ):
+        elif ((fundamental_state == "WEAK" and negative_future and "CHEAP_BUT_WEAK" not in conflicts)
+              or (expensive and negative_future)
+              or (valuation_state == "EXPENSIVE" and fundamental_state == "ACCEPTABLE")):
             recommendation = "SELL"
-        elif (
-            (fundamental_state in {"STRONG", "ACCEPTABLE"} and expensive)
-            or (fundamental_state == "STRONG" and negative_future)
-        ):
+        elif ((fundamental_state in {"STRONG", "ACCEPTABLE"} and expensive)
+              or (fundamental_state == "STRONG" and negative_future)):
             recommendation = "REDUCE" if fundamental_state != "STRONG" or negative_future else "HOLD"
-        elif (
-            "CHEAP_BUT_WEAK" in conflicts
-            or "POSITIVE_FORECAST_LOW_RELIABILITY" in conflicts
-            or fundamental_state == "INSUFFICIENT_DATA"
-            or future_state == "INSUFFICIENT_DATA"
-            or valuation_state in {"INSUFFICIENT_DATA", "NOT_APPLICABLE"}
-        ):
+        elif ("CHEAP_BUT_WEAK" in conflicts or "POSITIVE_FORECAST_LOW_RELIABILITY" in conflicts
+              or fundamental_state == "INSUFFICIENT_DATA" or future_state == "INSUFFICIENT_DATA"
+              or valuation_state in {"INSUFFICIENT_DATA", "NOT_APPLICABLE"}):
             recommendation = "WATCH"
         else:
             recommendation = "HOLD"
@@ -206,12 +186,31 @@ class DecisionEngine:
         if recommendation == "STRONG_SELL" and reliability_state in {"LOW", "VERY_LOW"}:
             recommendation = "SELL"
 
+        # Explicit hysteresis: normal one-step changes require a stronger
+        # confidence condition than the reverse transition. Hard risk rules
+        # (e.g. severe deterioration) are allowed to bypass the buffer.
+        hysteresis_applied = False
+        hysteresis_reason = None
+        if previous_decision and previous_decision in DECISION_ORDER and recommendation in DECISION_ORDER:
+            delta = DECISION_ORDER[recommendation] - DECISION_ORDER[previous_decision]
+            hard_negative = negative_future and (
+                "STRONG_FUNDAMENTAL_NEGATIVE_FUTURE" in conflicts or valuation_state == "EXPENSIVE"
+            )
+            hard_positive = (fundamental_state == "STRONG" and positive_future and attractive and reliable_for_strong)
+            if delta < 0 and not hard_negative and confidence >= EXIT_CONFIDENCE.get(previous_decision, 0.0):
+                recommendation = previous_decision
+                hysteresis_applied = True
+                hysteresis_reason = "EXIT_THRESHOLD_NOT_BREACHED"
+            elif delta > 0 and not hard_positive and confidence < ENTRY_CONFIDENCE.get(recommendation, 55.0):
+                recommendation = previous_decision
+                hysteresis_applied = True
+                hysteresis_reason = "ENTRY_THRESHOLD_NOT_CONFIRMED"
+
         if recommendation in {"STRONG_BUY", "BUY"}:
             holding_status = (
-                "STRONG_HOLD"
-                if recommendation == "STRONG_BUY" and fundamental_state == "STRONG" and valuation_state in {"ATTRACTIVE", "FAIR"} and not negative_future
-                else "HOLD_WITH_CAUTION" if negative_future or expensive
-                else "HOLD"
+                "STRONG_HOLD" if recommendation == "STRONG_BUY" and fundamental_state == "STRONG"
+                and valuation_state in {"ATTRACTIVE", "FAIR"} and not negative_future
+                else "HOLD_WITH_CAUTION" if negative_future or expensive else "HOLD"
             )
         elif recommendation == "HOLD":
             holding_status = "HOLD_WITH_CAUTION" if negative_future or expensive else "HOLD"
@@ -230,21 +229,35 @@ class DecisionEngine:
         if valuation_result.valuation_data_quality < 60 or market_result.market_data_quality not in {"VALID", ""}:
             data_quality = "LIMITED"
 
-        evidence_summary = {
-            "fundamental_quality": fundamental_state,
-            "future_direction": future_state,
-            "forecast_revision": revision,
-            "forecast_reliability": reliability_state,
-            "valuation": valuation_state,
-            "market_trend": market_trend,
-            "market_momentum": market_momentum,
-            "market_regime": market_result.market_regime,
-            "forecast_quality": forecast_quality or "UNKNOWN",
+        # Ranking is an eligibility/context contract; it does not create a new score.
+        ranking_eligibility = (
+            data_quality in {"VALID", "GOOD"}
+            and fundamental_state != "INSUFFICIENT_DATA"
+            and valuation_state not in {"INSUFFICIENT_DATA"}
+            and valuation_result.valuation_confidence >= 60
+            and reliability_state not in {"VERY_LOW"}
+        )
+        ranking_inputs = {
+            "decision_tier": recommendation,
+            "decision_confidence": confidence,
+            "expected_upside": valuation_result.metadata.get("expected_upside", valuation_result.margin_of_safety_pct),
+            "valuation_risk": valuation_result.valuation_risk_level,
+            "forecast_reliability": reliability,
+            "fundamental_quality": fund_score,
+            "within_industry": True,
+            "new_ranking_score_created": False,
         }
 
         cutoff = data_cutoff_datetime or valuation_result.data_cutoff_datetime
-        usd_context = dict(fx_context or {})
+        fx = dict(fx_context or {})
+        usd_context = dict(fx)
         usd_context["share_value_change_pct"] = usd_share_value_change_pct
+        decision_change = None
+        change_reasons: List[str] = []
+        if previous_decision:
+            decision_change = "UNCHANGED" if previous_decision == recommendation else "CHANGED"
+            if decision_change == "CHANGED":
+                change_reasons = list(conflicts[:5]) or ["Decision evidence changed"]
 
         return FinalDecisionResult(
             company_id=company_id,
@@ -256,8 +269,33 @@ class DecisionEngine:
             conflicts=conflicts,
             rationale_pros=pros,
             rationale_cons=cons,
-            evidence_summary=evidence_summary,
+            evidence_summary={
+                "fundamental_quality": fundamental_state,
+                "future_direction": future_state,
+                "forecast_revision": revision,
+                "forecast_reliability": reliability_state,
+                "valuation": valuation_state,
+                "market_trend": market_trend,
+                "market_momentum": market_momentum,
+                "relative_strength": relative_strength,
+                "market_regime": market_result.market_regime,
+                "forecast_quality": forecast_quality or "UNKNOWN",
+            },
             usd_context=usd_context,
+            expected_upside=valuation_result.metadata.get("expected_upside", valuation_result.margin_of_safety_pct),
+            valuation_confidence=valuation_result.valuation_confidence,
+            relative_strength_state=relative_strength,
+            fx_regime=fx.get("fx_regime"),
+            fx_company_impact=fx.get("fx_company_impact"),
+            free_market_fx=fx.get("free_market_fx"),
+            operational_fx=fx.get("operational_fx"),
+            fx_gap=fx.get("fx_gap"),
+            previous_decision=previous_decision,
+            decision_change=decision_change,
+            decision_change_reasons=change_reasons,
+            ranking_eligibility=ranking_eligibility,
+            rank_within_industry=rank_within_industry if ranking_eligibility else None,
+            ranking_inputs=ranking_inputs,
             calculation_timestamp=datetime.utcnow(),
             model_version=MODEL_VERSION,
             contract_version=CONTRACT_VERSION,
@@ -271,5 +309,14 @@ class DecisionEngine:
                 "fundamental_dominance": True,
                 "double_counting_control": "FAMILY_LEVEL",
                 "forecast_reliability_affects_confidence_only": True,
+                "hysteresis_enabled": True,
+                "hysteresis_applied": hysteresis_applied,
+                "hysteresis_reason": hysteresis_reason,
+                "hysteresis_parameters": {
+                    "entry_confidence": ENTRY_CONFIDENCE,
+                    "exit_confidence": EXIT_CONFIDENCE,
+                },
+                "decision_history_persistence": "UPSTREAM_CALLER_SUPPLIED_PREVIOUS_DECISION",
+                "ranking_score_created": False,
             },
         )
