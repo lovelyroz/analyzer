@@ -1,4 +1,5 @@
 from datetime import datetime
+from statistics import pstdev
 from typing import Any, Dict, List, Optional, Sequence
 
 from src.market.indicators import (
@@ -11,7 +12,9 @@ from src.market.indicators import (
 )
 from src.market.parameters import (
     ABNORMAL_VOLUME_RATIO,
+    AVERAGE_VOLUME_WINDOW,
     CONTRACT_VERSION,
+    DISTANCE_FROM_52W_HIGH_WINDOW,
     DRAWDOWN_DEEP,
     DRAWDOWN_EXTREME,
     DRAWDOWN_NEAR_PEAK,
@@ -29,6 +32,7 @@ from src.market.parameters import (
     RELATIVE_ABOVE_AVERAGE_GAP,
     RELATIVE_STRONG_RETURN_GAP,
     RETURN_HORIZONS,
+    TRADING_VALUE_STABILITY_WINDOW,
     TREND_HORIZONS,
     TREND_STRONG_RETURN,
     VOLATILITY_EXTREME_RATIO,
@@ -57,20 +61,33 @@ class MarketEngine:
         volumes = [self._number(row.get("volume")) for row in rows]
         values = [self._number(row.get("value")) for row in rows]
         if not rows or any(price is None for price in prices):
-            return MarketSignalResult(company_id=company_id, as_of_date=as_of_date, calculation_timestamp=datetime.utcnow(), market_data_quality="INSUFFICIENT_DATA")
+            return MarketSignalResult(
+                company_id=company_id,
+                as_of_date=as_of_date,
+                calculation_timestamp=datetime.utcnow(),
+                market_data_quality="INSUFFICIENT_DATA",
+            )
+
         prices = [float(x) for x in prices]
         volumes = [float(x or 0.0) for x in volumes]
         values = [float(x or 0.0) for x in values]
+        price_basis = "ADJUSTED_CLOSE" if all(row.get("adjusted_close") is not None for row in rows) else "CLOSE_FALLBACK"
 
         returns = {name: cumulative_return(prices, n) for name, n in RETURN_HORIZONS.items()}
         positions = {name: price_position(prices, n) for name, n in PRICE_POSITION_WINDOWS.items()}
         ma = {name: self._price_vs_ma(prices, n) for name, n in MA_WINDOWS.items()}
         vol = {name: realized_volatility(prices, n, annualized=True) for name, n in VOLATILITY_WINDOWS.items()}
         dd = {name: maximum_drawdown(prices, n) for name, n in DRAWDOWN_WINDOWS.items()}
+
+        peak_52w = max(prices[-DISTANCE_FROM_52W_HIGH_WINDOW:]) if len(prices) >= DISTANCE_FROM_52W_HIGH_WINDOW else None
+        distance_52w_high = prices[-1] / peak_52w - 1.0 if peak_52w else None
         peak = max(prices)
         current_dd = prices[-1] / peak - 1.0 if peak else None
-        vr = volume_ratio(volumes, 20)
-        avg_value = sum(values[-20:]) / 20.0 if len(values) >= 20 else None
+
+        vr = volume_ratio(volumes, AVERAGE_VOLUME_WINDOW)
+        avg_volume = self._average(volumes, AVERAGE_VOLUME_WINDOW)
+        avg_value = self._average(values, AVERAGE_VOLUME_WINDOW)
+        trading_value_stability = self._coefficient_of_variation(values, TRADING_VALUE_STABILITY_WINDOW)
 
         trend_short = self._trend_state(returns.get("20D"), ma.get("MA20"))
         trend_medium = self._trend_state(returns.get("60D"), ma.get("MA60"))
@@ -85,7 +102,16 @@ class MarketEngine:
         market_rs = self._relative_strength(returns, market_benchmark, as_of_date)
         market_regime = self._market_regime(market_benchmark, as_of_date)
         price_volume = self._price_volume_state(returns.get("20D"), vr)
-        alerts = self._alerts(trend_state, momentum, volatility_state, drawdown_state, liquidity_state, vr, industry_rs, market_rs)
+        alerts = self._alerts(
+            trend_state,
+            momentum,
+            volatility_state,
+            drawdown_state,
+            liquidity_state,
+            vr,
+            industry_rs,
+            market_rs,
+        )
 
         indicators = TechnicalIndicatorsResult(
             sma_50=calculate_sma(prices, 50),
@@ -96,9 +122,13 @@ class MarketEngine:
             volatility=vol,
             max_drawdown=dd,
             current_drawdown=current_dd,
+            distance_from_52w_high=distance_52w_high,
             volume_ratio=vr,
+            average_volume_20d=avg_volume,
             average_trading_value_20d=avg_value,
+            trading_value_stability_20d=trading_value_stability,
         )
+
         return MarketSignalResult(
             company_id=company_id,
             as_of_date=as_of_date,
@@ -122,18 +152,49 @@ class MarketEngine:
             market_data_quality="VALID",
             market_contract_version=CONTRACT_VERSION,
             model_version=MODEL_VERSION,
-            metadata={"market_score": None, "decision_signal": None, "point_in_time": point_in_time, "as_of_date": as_of_date.isoformat()},
+            metadata={
+                "market_score": None,
+                "decision_signal": None,
+                "point_in_time": point_in_time,
+                "as_of_date": as_of_date.isoformat(),
+                "price_basis": price_basis,
+                "distance_from_52w_high_window": DISTANCE_FROM_52W_HIGH_WINDOW,
+                "trading_value_stability_definition": "20D coefficient_of_variation",
+            },
         )
 
-    def analyze_market_signals(self, company_id: int, as_of_date: datetime, close_prices: List[float], individual_buy_vol: float = 0.0, individual_sell_vol: float = 0.0, close_price_today: float = 0.0) -> MarketSignalResult:
+    def analyze_market_signals(
+        self,
+        company_id: int,
+        as_of_date: datetime,
+        close_prices: List[float],
+        individual_buy_vol: float = 0.0,
+        individual_sell_vol: float = 0.0,
+        close_price_today: float = 0.0,
+    ) -> MarketSignalResult:
         """Compatibility adapter for the pre-V1 API; no Market Score is produced by V1."""
-        rows = [{"date": as_of_date, "adjusted_close": price, "close": price, "volume": 0.0, "value": 0.0} for price in close_prices]
+        rows = [
+            {
+                "date": as_of_date,
+                "adjusted_close": price,
+                "close": price,
+                "volume": 0.0,
+                "value": 0.0,
+            }
+            for price in close_prices
+        ]
         result = self.analyze_market(company_id, as_of_date, rows, point_in_time=False)
-        result.money_flow_status = "INFLOW" if individual_buy_vol > individual_sell_vol else ("OUTFLOW" if individual_buy_vol < individual_sell_vol else "NEUTRAL")
+        result.money_flow_status = (
+            "INFLOW"
+            if individual_buy_vol > individual_sell_vol
+            else ("OUTFLOW" if individual_buy_vol < individual_sell_vol else "NEUTRAL")
+        )
         return result
 
     @staticmethod
-    def _prepare_rows(data: Sequence[Dict[str, Any]], as_of_date: datetime, point_in_time: bool) -> List[Dict[str, Any]]:
+    def _prepare_rows(
+        data: Sequence[Dict[str, Any]], as_of_date: datetime, point_in_time: bool
+    ) -> List[Dict[str, Any]]:
         rows = []
         for row in data:
             date = row.get("date")
@@ -162,6 +223,22 @@ class MarketEngine:
             return float(value) if value is not None else None
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _average(values: List[float], window: int) -> Optional[float]:
+        if len(values) < window:
+            return None
+        return sum(values[-window:]) / float(window)
+
+    @staticmethod
+    def _coefficient_of_variation(values: List[float], window: int) -> Optional[float]:
+        if len(values) < window:
+            return None
+        sample = values[-window:]
+        mean = sum(sample) / float(window)
+        if mean <= 0:
+            return None
+        return pstdev(sample) / mean
 
     @staticmethod
     def _price_vs_ma(prices: List[float], window: int) -> Optional[float]:
@@ -278,7 +355,12 @@ class MarketEngine:
             return "LOW"
         return "NORMAL"
 
-    def _relative_strength(self, stock_returns: Dict[str, Optional[float]], benchmark: Optional[Sequence[Dict[str, Any]]], as_of_date: datetime) -> str:
+    def _relative_strength(
+        self,
+        stock_returns: Dict[str, Optional[float]],
+        benchmark: Optional[Sequence[Dict[str, Any]]],
+        as_of_date: datetime,
+    ) -> str:
         if not benchmark:
             return "INSUFFICIENT_DATA"
         rows = self._prepare_rows(benchmark, as_of_date, True)
@@ -316,7 +398,11 @@ class MarketEngine:
             if date is not None and date <= as_of_date:
                 rows.append(dict(row, date=date))
         rows.sort(key=lambda r: r["date"])
-        prices = [float(r.get("adjusted_close", r.get("close"))) for r in rows if r.get("adjusted_close", r.get("close")) is not None]
+        prices = [
+            float(r.get("adjusted_close", r.get("close")))
+            for r in rows
+            if r.get("adjusted_close", r.get("close")) is not None
+        ]
         r20 = cumulative_return(prices, RETURN_HORIZONS["20D"])
         if r20 is None:
             return "INSUFFICIENT_DATA"
@@ -339,7 +425,16 @@ class MarketEngine:
         return "NEUTRAL"
 
     @staticmethod
-    def _alerts(trend: str, momentum: str, volatility: str, drawdown: str, liquidity: str, vr: Optional[float], industry_rs: str, market_rs: str) -> List[str]:
+    def _alerts(
+        trend: str,
+        momentum: str,
+        volatility: str,
+        drawdown: str,
+        liquidity: str,
+        vr: Optional[float],
+        industry_rs: str,
+        market_rs: str,
+    ) -> List[str]:
         alerts = []
         if volatility in ("HIGH", "EXTREME"):
             alerts.append("WARNING:HIGH_VOLATILITY")
