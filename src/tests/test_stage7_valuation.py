@@ -31,8 +31,7 @@ def test_valuation_models():
 
 
 def test_valuation_engine_forward_pe_and_expected_fair_value():
-    engine = ValuationEngine()
-    result = engine.calculate_valuation(
+    result = ValuationEngine().calculate_valuation(
         company_id=1,
         period_id=101,
         industry_code="PETROCHEMICAL",
@@ -53,6 +52,10 @@ def test_valuation_engine_forward_pe_and_expected_fair_value():
     assert result.margin_of_safety_pct == 26.84
     assert result.valuation_status == "ATTRACTIVE"
     assert abs(sum(s.probability for s in result.scenarios.values()) - 1.0) < 1e-9
+    assert result.contract_version == "VALUATION_CONTRACT_V1"
+    assert result.valuation_driver_ranking[:2] == ["EPS", "TARGET_PE"]
+    assert set(result.driver_impact) == {"EPS", "TARGET_PE"}
+    assert all(value >= 0 for value in result.review_priority.values())
 
 
 def test_industry_forward_pe_requires_eight_valid_peers():
@@ -69,11 +72,23 @@ def test_industry_forward_pe_requires_eight_valid_peers():
     assert result.scenarios["base"].target_pe == 6.0
 
 
+def test_industry_ttm_is_fallback_after_historical_median():
+    result = ValuationEngine().calculate_valuation(
+        1,
+        101,
+        "PETROCHEMICAL",
+        1000.0,
+        make_forecast(),
+        industry_forward_pe_values=[6.0] * 7,
+        industry_ttm_pe_values=[5.0, 6.0, 7.0],
+    )
+    assert result.target_pe_source == "INDUSTRY_TTM_PE"
+    assert result.scenarios["base"].target_pe == 6.0
+
+
 def test_negative_eps_does_not_create_fake_pe_or_fair_value():
-    engine = ValuationEngine()
-    forecast = make_forecast(-50.0, -20.0, 10.0)
-    result = engine.calculate_valuation(
-        1, 101, "PETROCHEMICAL", 1000.0, forecast, historical_pe_values=[7.0]
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(-50.0, -20.0, 10.0), historical_pe_values=[7.0]
     )
     assert result.scenarios["bear"].forward_pe is None
     assert result.scenarios["bear"].fair_value is None
@@ -90,3 +105,38 @@ def test_reliability_does_not_change_forward_pe_or_fair_value():
     assert low.scenarios["base"].fair_value == high.scenarios["base"].fair_value
     assert low.expected_fair_value == high.expected_fair_value
     assert low.valuation_confidence < high.valuation_confidence
+
+
+def test_probability_adjustments_are_normalized_and_separate_from_reliability():
+    result = ValuationEngine().calculate_valuation(
+        1,
+        101,
+        "PETROCHEMICAL",
+        1000.0,
+        make_forecast(),
+        forecast_reliability_score=25.0,
+        historical_pe_values=[7.0],
+        probability_adjustments={"bear": 0.10, "bull": -0.05},
+        probability_confidence=80.0,
+    )
+    assert abs(sum(s.probability for s in result.scenarios.values()) - 1.0) < 1e-9
+    assert result.scenarios["bear"].probability > 0.20
+    assert result.scenarios["bull"].probability < 0.20
+    assert result.forecast_reliability_score == 25.0
+    assert result.metadata["scenario_dependency"]["separate_from_probability"] is True
+
+
+def test_alerts_include_severity_and_driver_focus():
+    result = ValuationEngine().calculate_valuation(
+        1,
+        101,
+        "PETROCHEMICAL",
+        1000.0,
+        make_forecast(80.0, 180.0, 320.0),
+        forecast_reliability_score=30.0,
+        historical_pe_values=[7.0],
+        probability_confidence=50.0,
+    )
+    assert any(alert.startswith("WARNING:LOW_FORECAST_RELIABILITY") for alert in result.alerts)
+    assert any(alert.startswith("INFO:TOP_DRIVER:") for alert in result.alerts)
+    assert "HIGH_SCENARIO_DISPERSION" in result.valuation_risk_flags
