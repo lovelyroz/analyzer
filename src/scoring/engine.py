@@ -144,8 +144,12 @@ class FundamentalScoringEngine:
             overall_score = sum(self.AXIS_WEIGHTS[axis] * axis_scores[axis] for axis in axis_scores) / available_axis_weight
             overall_score = max(0.0, min(100.0, overall_score))
 
-        quality_values = [k.quality_status for k in kpi_scores if k.score is not None]
-        score_quality = "VALID" if quality_values and all(v == "VALID" for v in quality_values) else ("INSUFFICIENT_DATA" if not axis_scores else "LIMITED")
+        if not axis_scores:
+            score_quality = "INSUFFICIENT_DATA"
+        else:
+            quality_values = [k.quality_status for k in kpi_scores if k.score is not None]
+            score_quality = "VALID" if quality_values and all(v == "VALID" for v in quality_values) else "LIMITED"
+
         return FundamentalScoreResult(
             company_id=company_id,
             period_id=period_id,
