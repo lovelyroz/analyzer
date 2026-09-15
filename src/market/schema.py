@@ -15,8 +15,11 @@ class TechnicalIndicatorsResult:
     volatility: Dict[str, Optional[float]] = field(default_factory=dict)
     max_drawdown: Dict[str, Optional[float]] = field(default_factory=dict)
     current_drawdown: Optional[float] = None
+    distance_from_52w_high: Optional[float] = None
     volume_ratio: Optional[float] = None
+    average_volume_20d: Optional[float] = None
     average_trading_value_20d: Optional[float] = None
+    trading_value_stability_20d: Optional[float] = None
 
 
 @dataclass
