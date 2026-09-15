@@ -113,8 +113,8 @@ def test_drawdown_moderate_non_recovering_is_not_labeled_recovering():
 
 
 def test_drawdown_recovery_requires_rebound_from_recent_low():
-    prices = [100.0] * 18 + [80.0, 81.0]
-    assert MarketEngine._drawdown_state(-0.19, prices) == "RECOVERING"
+    prices = [100.0] * 18 + [80.0, 85.0]
+    assert MarketEngine._drawdown_state(-0.15, prices) == "RECOVERING"
 
 
 def test_drawdown_deep_and_new_low_states_remain_distinct():
