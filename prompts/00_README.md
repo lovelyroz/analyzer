@@ -3,15 +3,18 @@
 These are the clean, implementation-oriented prompts for the nine locked stages of Analyzer V1.
 
 ## Authority order
+
 1. `00_a_Master_Architecture.md`
 2. `01_Stage1_Data_Foundation.md` … `09_Stage9_Decision_Dashboard.md`
-3. `10_Implementation_Status.md`
-4. `99_Architecture_Change_Log.md`
-5. The corresponding prompt in this directory is the execution instruction, not a replacement for the locked specification.
+3. Approved contract amendments recorded in `99_Architecture_Change_Log.md`
+4. Database architecture references `11_Database_Architecture_Stage1.md` and `12_Database_Architecture_V1.md`, plus approved database amendments
+5. `10_Implementation_Status.md`
+6. The corresponding prompt in this directory is the execution instruction, not a replacement for the locked specification.
 
-The prompt files translate the already-validated V1 contracts into repeatable agent instructions. They must not introduce new requirements.
+The prompt files translate validated contracts into repeatable agent instructions. They must not introduce new requirements.
 
 ## Global execution rule
+
 For every stage:
 
 **Read → Inspect → Implement → Test → Audit → CI → Lock**
@@ -19,6 +22,7 @@ For every stage:
 Do not redesign a locked stage because of an implementation defect. If a genuine contract or architecture contradiction is found, stop, document the exact contradiction, and use the project change-control process.
 
 ## Global invariants
+
 - `NULL != 0`.
 - Point-in-Time correctness is mandatory.
 - Report versions and historical model versions remain reproducible.
@@ -46,4 +50,4 @@ Do not redesign a locked stage because of an implementation defect. If a genuine
 
 Use only the prompt corresponding to the stage being implemented or audited. Do not paste all nine prompts into an agent context when only one stage is required.
 
-These prompts are intentionally concise; the locked stage specification remains the detailed source of truth.
+These prompts are intentionally concise. The locked stage specification and approved amendments remain the detailed source of truth.
