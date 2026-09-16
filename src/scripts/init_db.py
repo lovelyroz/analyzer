@@ -5,7 +5,15 @@ from src.core.database import engine, Base
 from src.models.entity import Industry, Company
 from src.models.period import FinancialPeriod
 from src.models.report import Report, ReportVersion
-from src.models.normalized import RawFinancialFact, FinancialMetric, NormalizedFinancialFact
+from src.models.normalized import (
+    DerivedFinancialFact,
+    DerivedFinancialFactInput,
+    FinancialMetric,
+    MappingDecision,
+    MappingRule,
+    NormalizedFinancialFact,
+    RawFinancialFact,
+)
 from src.models.fx import FXRate, FXConversionRule
 from src.models.market import MarketDaily
 from src.models.share_action import ShareCountHistory, CorporateAction
