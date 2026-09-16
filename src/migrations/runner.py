@@ -53,7 +53,6 @@ def _baseline_exists(engine: Engine) -> bool:
 
 
 def _apply_baseline(engine: Engine) -> None:
-    # Version 1 is the initial schema bootstrap for a new database.
     Base.metadata.create_all(bind=engine)
 
 
@@ -65,7 +64,6 @@ def _add_column_if_missing(engine: Engine, table_name: str, column_name: str, de
 
 
 def _apply_mapping_and_derived_schema(engine: Engine) -> None:
-    # Existing tables are upgraded without rewriting existing values.
     _add_column_if_missing(engine, "financial_metrics", "statement_type", "VARCHAR(30)")
     _add_column_if_missing(engine, "financial_metrics", "parent_metric_id", "INTEGER")
     _add_column_if_missing(engine, "financial_metrics", "sign_convention", "VARCHAR(20) NOT NULL DEFAULT 'NATURAL'")
@@ -82,10 +80,18 @@ def _apply_mapping_and_derived_schema(engine: Engine) -> None:
 
 
 def _apply_normalized_provenance_schema(engine: Engine) -> None:
-    # Adds the multi-source provenance bridge without rewriting existing facts.
     Base.metadata.create_all(bind=engine, tables=[
         Base.metadata.tables["normalized_financial_fact_inputs"],
     ])
+
+
+def _apply_report_current_version_index(engine: Engine) -> None:
+    # The index is additive and preserves all existing report-version rows.
+    with engine.begin() as connection:
+        connection.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_report_current_version "
+            "ON report_versions(report_id) WHERE is_current_version = 1"
+        ))
 
 
 def _migration_list() -> Iterable[Migration]:
@@ -93,6 +99,7 @@ def _migration_list() -> Iterable[Migration]:
         Migration(1, "baseline_schema", _apply_baseline),
         Migration(2, "mapping_and_derived_schema", _apply_mapping_and_derived_schema),
         Migration(3, "normalized_fact_multi_source_provenance", _apply_normalized_provenance_schema),
+        Migration(4, "one_current_report_version", _apply_report_current_version_index),
     )
 
 
