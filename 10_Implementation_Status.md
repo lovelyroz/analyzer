@@ -50,6 +50,10 @@ Added `STABLE_DRAWDOWN` and corrected recovery semantics. The model version rema
 
 Reference: `08_Stage8_Market_Engine_Contract_Amendment_V1.1.md`
 
+## Repository hygiene correction
+
+Tracked generated Python bytecode and the local SQLite database were removed from version control. `.gitignore` now prevents these artifacts from being reintroduced.
+
 ## Previous verified project baseline
 
 Before the current database re-audit, the project had a verified whole-project baseline:
