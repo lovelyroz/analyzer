@@ -14,6 +14,7 @@ from src.models.normalized import (
     NormalizedFinancialFact,
     RawFinancialFact,
 )
+from src.models.normalized_provenance import NormalizedFinancialFactInput
 from src.models.fx import FXRate, FXConversionRule
 from src.models.market import MarketDaily
 from src.models.share_action import ShareCountHistory, CorporateAction
