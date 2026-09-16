@@ -86,7 +86,20 @@ def _apply_normalized_provenance_schema(engine: Engine) -> None:
 
 
 def _apply_report_current_version_index(engine: Engine) -> None:
-    # The index is additive and preserves all existing report-version rows.
+    with engine.connect() as connection:
+        duplicate_count = connection.execute(text(
+            "SELECT COUNT(*) FROM ("
+            "SELECT report_id FROM report_versions "
+            "WHERE is_current_version = 1 "
+            "GROUP BY report_id HAVING COUNT(*) > 1"
+            ")"
+        )).scalar_one()
+    if duplicate_count:
+        raise RuntimeError(
+            "Cannot enforce one current ReportVersion per report: "
+            "existing data contains multiple current versions. Resolve the data explicitly before migration 4."
+        )
+
     with engine.begin() as connection:
         connection.execute(text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_report_current_version "
