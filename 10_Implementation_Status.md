@@ -4,484 +4,281 @@
 
 **Tehran Stock Analysis — V1**
 
-This document tracks the implementation status of the project.
+This document tracks implementation status. It does not redefine the architecture.
 
-It does NOT redefine the architecture.
+Authoritative architecture: `00_a_Master_Architecture.md`
 
-The authoritative architectural reference is:
-
-`00_a_Master_Architecture.md`
-
-The authoritative rules for each stage are the corresponding Stage Locked Specification files.
+Authoritative stage rules: Stage Locked Specification files `01_Stage1_Data_Foundation.md` through `09_Stage9_Decision_Dashboard.md`.
 
 ---
 
-# 1. Current Project Phase
+# 1. Final Project Status
 
-**Current Phase:** IMPLEMENTATION
-
-**Architecture Status:** LOCKED
+**Architecture:** LOCKED — V1
 
 **Architecture Coverage:** Stages 1–9 LOCKED
 
-**Implementation Status:** STAGE 8 COMPLETE / LOCKED
-
-Stages are implemented and advanced one at a time only after implementation, testing, review, architecture-compliance audit, and approval.
-
----
-
-# 2. Global Implementation Rules
-
-1. Do not redesign locked stages during implementation.
-2. Implement one stage at a time.
-3. Do not start the next stage before the current stage has been implemented, tested, and reviewed.
-4. Preserve the contract between stages.
-5. Internal implementation may change without affecting other stages if the public contract remains compatible.
-6. Never silently change an architectural rule.
-7. Any genuine architectural change must be recorded in `99_Architecture_Change_Log.md`.
-8. Point-in-Time requirements must remain enforced.
-9. Raw data must remain traceable to its source.
-10. Restatements and ReportVersions must remain distinguishable.
-11. Free-market FX and operational FX must remain separate.
-12. USD valuation must use the appropriate free-market FX context.
-13. Operational/company FX exposure must not silently use free-market FX as a substitute.
-14. No stage may silently duplicate calculations owned by another stage.
-15. V1 should remain simple, explainable, auditable, modular, and testable.
-
----
-
-# 3. Stage Implementation Status
-
-## Stage 1 — Data Foundation & Data Model
-
-**Design:** LOCKED
-
-**Implementation:** IMPLEMENTED
-
-**Testing:** IMPLEMENTED / TESTED
-
-**Audit:** REQUIRES FINAL STATUS RECONCILIATION
-
-**Status:** IMPLEMENTED — NOT YET MARKED COMPLETE
-
-> Stage 1 code and tests have been implemented and corrected against the locked specification. Final formal completion status remains subject to the project audit record.
-
----
-
-## Stage 2 — KPI Specification
-
-**Design:** LOCKED
-
-**Implementation:** IMPLEMENTED
-
-**Testing:** IMPLEMENTED / TESTED
-
-**Audit:** REQUIRES FINAL STATUS RECONCILIATION
-
-**Status:** IMPLEMENTED — NOT YET MARKED COMPLETE
-
-> Stage 2 code and tests have been implemented and aligned to the locked specification. Final formal completion status remains subject to the project audit record.
-
----
-
-## Stage 3 — Fundamental Scoring
-
-**Design:** LOCKED
-
-**Implementation:** IMPLEMENTED
-
-**Testing:** IMPLEMENTED / TESTED
-
-**Audit:** REQUIRES FINAL STATUS RECONCILIATION
-
-**Status:** IMPLEMENTED — NOT YET MARKED COMPLETE
-
-> Stage 3 code and tests have been implemented against the locked specification. Final formal completion status remains subject to the project audit record.
-
----
-
-## Stage 4 — Historical, Seasonal & Trend Engine
-
-**Design:** LOCKED
-
-**Implementation:** IMPLEMENTED
-
-**Testing:** PASS
-
-**Independent Review:** PASS
-
-**Architecture Compliance Audit:** PASS
-
-**Approval:** PASS
-
-**Status:** COMPLETE / LOCKED
-
-**Final CI:** PASS
-
-**CI Run:** `34939205373`
-
-**CI Job:** `104283758593`
-
-**Notes:** 47/47 tests passed. 94 `DeprecationWarning` messages related to `datetime.utcnow()` were non-blocking and outside Stage 4 scope.
-
----
-
-## Stage 5 — Forecast Engine
-
-**Design:** LOCKED
-
 **Implementation:** COMPLETE
 
 **Testing:** PASS
 
-**Independent Review:** PASS
+**Whole-Project Final Audit:** PASS
 
-**Architecture Compliance Audit:** PASS
+**Overall Project Status:** COMPLETE / LOCKED
 
-**Approval:** PASS
+**Final audited commit:** `31d9b8ed278d8e35c64445c6003dcbde9a73eeb0`
 
-**Status:** COMPLETE / LOCKED
+**Final CI workflow:** Tests #100
 
-**Final CI:** PASS
+**Final CI run:** `35017310950`
 
-**CI Run:** `34940085799`
+**Final CI job:** `104543883848`
 
-**CI Job:** `104286530707`
-
-**Commit:** `6b2d7aadf07b76e2e81f8dc7f6e2c1e845b90247`
-
-**CI Result:** 53/53 tests passed.
-
-### Final Audit Summary
-
-- Forecast output contract: PASS
-- Non-financial forecast hierarchy: PASS
-- Revenue baseline hierarchy: PASS
-- Operating margin / operating profit chain: PASS
-- Net profit hierarchy: PASS
-- EPS / share-count contract: PASS
-- ROE forecast: PASS
-- Bank specialized core: PASS
-- Holding specialized core: PASS
-- Stage 4 integration without recalculation: PASS
-- Low-base control: PASS
-- Sign-change handling: PASS
-- Bear / Base / Bull architecture: PASS
-- Operational vs free-market FX separation: PASS
-- Point-in-Time cutoff metadata: PASS
-- Model version / assumptions / audit metadata: PASS
-- Separation from Score / Valuation / Market / Reliability: PASS
-- Downstream contract compatibility: PASS
-- Full CI integration: PASS
-
-**Audit Decision:** PASS → LOCKED
-
-**Notes:** CI reported 92 `DeprecationWarning` messages related to `datetime.utcnow()` in existing code/tests. They are non-blocking and do not invalidate Stage 5. No architectural change was required.
+**Final CI result:** PASS — 113/113 tests
 
 ---
 
-## Stage 6 — Forecast Evaluation & Calibration
+# 2. Stage Status
 
-**Design:** LOCKED
+| Stage | Design | Implementation | Testing | Audit | Overall |
+|---|---|---|---|---|---|
+| Stage 1 — Data Foundation & Data Model | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+| Stage 2 — KPI Specification | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+| Stage 3 — Fundamental Scoring | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+| Stage 4 — Historical, Seasonal & Trend | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+| Stage 5 — Forecast Engine | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+| Stage 6 — Forecast Evaluation & Calibration | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+| Stage 7 — Valuation Engine | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+| Stage 8 — Market Engine | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+| Stage 9 — Decision Engine & Dashboard | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
 
-**Implementation:** COMPLETE
+---
 
-**Testing:** PASS
+# 3. Whole-Project Final Audit
 
-**Independent Review:** PASS
+## 3.1 Architecture
 
-**Architecture Compliance Audit:** PASS
+- Frozen 9-stage architecture preserved: PASS
+- No additional major analytical engine introduced: PASS
+- Fundamental and Market branches remain separate until Stage 9: PASS
+- Stage 9 remains Rule-Based Evidence Integration, not a new analysis engine: PASS
+- Dashboard consumes upstream outputs without recreating upstream calculations: PASS
 
-**Approval:** PASS
+## 3.2 Stage 1 → Downstream Foundation
 
-**Status:** COMPLETE / LOCKED
+- Company / Industry / FinancialPeriod model: PASS
+- Report / ReportVersion separation: PASS
+- Raw vs normalized financial facts: PASS
+- Raw provenance preservation: PASS
+- Point-in-Time report-version selection: PASS
+- Restatement chain preservation: PASS
+- Data Quality states and NULL != 0: PASS
+- Share-count history / corporate actions: PASS
+- OHLC storage and adjusted-close distinction: PASS
+- Free-Market vs Operational FX separation: PASS
+- FLOW / STOCK / MARKET_VALUE FX conversion contracts: PASS
+- Ingestion tracking: PASS
 
-**Final CI:** PASS
+## 3.3 Stage 2 → Stage 3 Contract
 
-**CI Run:** `34941604413`
+- Universal Core KPI inventory preserved: PASS
+- Conditional KPI separation preserved: PASS
+- Industry KPI inventory preserved: PASS
+- KPI periods and TTM treatment preserved: PASS
+- EPS comparability respects share-count / corporate actions: PASS
+- Missing data does not become zero: PASS
+- Data Quality propagates from Stage 1: PASS
+- Industry KPIs map into existing Growth / Profitability / Risk & Quality axes: PASS
+- No valuation or market KPI leaks into Stage 3 scoring: PASS
 
-**CI Job:** `104291333506`
+## 3.4 Stage 3 Fundamental Scoring
 
-**Final CI Result:** PASS
+- 0–100 Fundamental Score: PASS
+- Growth / Profitability / Risk & Quality axes: PASS
+- Locked top-level weights: PASS
+- Industry weighting is redistribution, not bonus scoring: PASS
+- Industry-relative percentile with minimum peer requirement: PASS
+- Historical fallback: PASS
+- KPI direction handling: PASS
+- Missing KPI weight redistribution: PASS
+- Minimum axis coverage: PASS
+- No price / P-E / valuation / market / forecast inputs: PASS
+- P/NAV excluded from Fundamental Score: PASS
 
-### Final Audit Summary
+## 3.5 Stage 4 → Stage 5 Contract
 
-- Forecast → Actual mapping contract: PASS
-- Point-in-Time evaluation: PASS
-- Error / Percentage Error / APE: PASS
-- MAPE handling: PASS
-- Zero-base and sign-change exceptions: PASS
-- Horizon independence: PASS
-- Model-version independence: PASS
-- Observation sufficiency / confidence bands: PASS
+- Historical comparisons: PASS
+- Seasonal baseline and surprise: PASS
+- 3M / 6M / 12M trend framework: PASS
+- Flow vs stock treatment: PASS
+- EPS share-count comparability: PASS
+- Low-base and sign-change controls: PASS
+- Relative trend strength: PASS
+- Trend state contract: PASS
+- Stage 5 consumes Stage 4 evidence without creating a second fundamental score: PASS
+
+## 3.6 Stage 5 → Stage 6 / Stage 7 Contract
+
+- Revenue → Margin → Operating Profit → Net Profit → EPS → ROE chain: PASS
+- Bank specialized forecast chain: PASS
+- Holding specialized forecast chain: PASS
+- Forecast hierarchy and fallbacks: PASS
+- Bear / Base / Bull scenarios: PASS
+- Operational FX used only where supported by company exposure; no silent free-market proxy: PASS
+- PIT cutoff and model-version metadata: PASS
+- Versioned forecasts are preserved: PASS
+- Stage 6 does not generate forecasts: PASS
+- Stage 7 consumes Forecast EPS rather than recreating forecast logic: PASS
+
+## 3.7 Stage 6 → Stage 7 / Stage 9 Contract
+
+- Forecast → Actual PIT matching: PASS
+- Horizon and model-version independence: PASS
+- MAPE / bias / baseline comparison: PASS
 - Seasonal Naive baseline: PASS
-- Relative improvement: PASS
-- Persistent baseline underperformance detection: PASS
-- Accuracy / Bias / Baseline Advantage architecture: PASS
-- Reliability 0–100 architecture: PASS
+- Reliability 0–100: PASS
 - Confidence adjustment: PASS
-- Persistent systematic bias detection: PASS
-- Calibration candidate logic: PASS
-- Holdout-gated model-version creation: PASS
-- No Forecast generation inside Stage 6: PASS
-- No Fundamental Score / KPI / Valuation / Market calculation: PASS
-- No Reliability modification of Forward P/E: PASS
-- No overwrite of previous model versions: PASS
-- No Horizon mixing / TTM double counting: PASS
-- Stage 6 test coverage: PASS
+- Calibration requires persistent evidence and holdout: PASS
+- Reliability does not mathematically modify Forward P/E: PASS
+- Old model versions remain preserved: PASS
+- Stage 7 and Stage 9 consume reliability as confidence/risk evidence: PASS
 
-**Audit Decision:** PASS → LOCKED
+## 3.8 Stage 7 Valuation
 
-**Notes:** The final CI run completed successfully. The earlier failed intermediate run was superseded by the final corrected test run. No architectural change was required.
-
----
-
-## Stage 7 — Valuation Engine
-
-**Design:** LOCKED
-
-**Implementation:** COMPLETE
-
-**Testing:** PASS
-
-**Independent Review:** PASS
-
-**Architecture Compliance Audit:** PASS
-
-**Approval:** PASS
-
-**Status:** COMPLETE / LOCKED
-
-**Final CI:** PASS
-
-**Final CI Run:** `34945721906`
-
-**Final CI Job:** `104304519333`
-
-**Final Commit:** `24fc37776c25938510ecad4b30019210c3120b8f`
-
-**Final CI Result:** 70/70 tests passed.
-
-### Final Audit Summary
-
-- Forward P/E calculation from Stage 5 EPS: PASS
-- Bear / Base / Bull independent Forward P/E: PASS
+- Forward P/E from current price and forecast EPS: PASS
+- Bear / Base / Bull valuation: PASS
 - Negative / zero EPS protection: PASS
-- Scenario sign-change handling: PASS
-- Current price / valuation date / market price date contract: PASS
-- Historical P/E benchmark hierarchy: PASS
-- Industry Forward P/E minimum 8 valid peers: PASS
-- Industry TTM P/E fallback: PASS
-- No Forward/TTM peer population mixing: PASS
-- Fundamental Score does not directly scale Target P/E: PASS
-- Trend does not directly scale Target P/E: PASS
-- Forecast Reliability does not mathematically alter P/E or Fair Value: PASS
-- Scenario Target P/E no longer uses arbitrary fixed 0.9/1.0/1.1 gaps: PASS
-- Neutral benchmark multiple when no economic scenario-multiple evidence exists: PASS
-- Explicit scenario multiple adjustment requires economic rationale: PASS
-- Scenario multiple adjustment is bounded, versioned, and backtestable: PASS
-- Scenario ordering warning without artificial reordering: PASS
-- V1 prior 20/60/20 preserved as model parameter: PASS
-- Probability sum normalization: PASS
-- Four required probability evidence families defined and supported: PASS
-- Family-level equal weighting: PASS
-- Correlated metric double-counting protection through one distribution per family: PASS
-- Direct unstructured probability adjustment rejected: PASS
-- Probability Confidence kept separate from Forecast Reliability: PASS
-- Scenario Dependency kept separate from Probability: PASS
+- Historical PIT P/E benchmark: PASS
+- Industry Forward P/E minimum peer requirement: PASS
+- Historical / Industry fallback hierarchy: PASS
+- Forward and TTM peer populations are not mixed: PASS
+- Scenario multiple policy is neutral unless explicit economic evidence exists: PASS
+- Scenario probabilities use family-level evidence and anti-double-counting: PASS
 - Expected Fair Value / Expected Upside: PASS
-- Valuation Assessment states: PASS
-- Valuation Confidence / Risk: PASS
-- EPS and Target P/E sensitivity ranking: PASS
-- Review Priority = Impact × Uncertainty: PASS
-- Severity-based valuation alerts: PASS
-- Stage 7 output contract and model/version metadata: PASS
-- Point-in-Time architecture preserved at input contract level: PASS
-- No Buy / Sell / Hold signal: PASS
-- No Forecast generation inside Stage 7: PASS
-- No Fundamental Score modification: PASS
-- No Market Engine integration: PASS
-- No Stage 5 / Stage 6 architectural change: PASS
-- Full CI integration: PASS
+- Valuation Risk / Confidence / sensitivity / alerts: PASS
+- No Buy / Sell / Hold output from Stage 7: PASS
 
-**Audit Decision:** PASS → LOCKED
+## 3.9 Stage 8 Market → Stage 9 Contract
 
-### Audit Fixes Applied Before Lock
-
-1. Removed the arbitrary `0.90 / 1.00 / 1.10` scenario multiple mechanism. V1 now uses the benchmark multiple unchanged unless explicit economic scenario evidence is supplied.
-2. Added versioned scenario-multiple policy metadata and required economic rationale for non-neutral scenario multiple adjustments.
-3. Added the four probability evidence families with equal family-level treatment and normalization.
-4. Rejected direct unstructured probability adjustments so probability changes cannot bypass the family-level anti-double-counting contract.
-5. Added dedicated tests for scenario-multiple rationale/bounds, probability-family validation, and correlated-evidence protection.
-
-**Notes:** An intermediate CI run failed on the removed legacy scenario-multiple export and was corrected by restoring the neutral compatibility export. A subsequent intermediate run correctly exposed the obsolete probability-adjustment test and was corrected. The final CI run passed 70/70 tests. Existing `datetime.utcnow()` deprecation warnings remain non-blocking and are outside the Stage 7 architectural scope.
-
----
-
-## Stage 8 — Market Engine
-
-**Design:** LOCKED
-
-**Implementation:** COMPLETE
-
-**Testing:** PASS
-
-**Independent Review:** PASS
-
-**Architecture Compliance Audit:** PASS
-
-**Approval:** PASS
-
-**Status:** COMPLETE / LOCKED
-
-**Final CI:** PASS
-
-**Final CI Run:** `34976472345`
-
-**Final CI Job:** `104405339871`
-
-**Final Commit:** `e308f52640936295b575e97f75b244bd672c803d`
-
-**Final CI Result:** 102/102 tests passed.
-
-### Final Audit Summary
-
-- Adjusted Close as primary price basis: PASS
-- Return horizons 1D/5D/20D/60D/120D/252D: PASS
-- Trading-day horizon handling: PASS
-- Price-position windows: PASS
-- 52-week high distance: PASS
-- MA20/60/120 descriptive context: PASS
-- Multi-horizon trend state: PASS
-- Trend conflict protection: PASS
-- Strong trend requires broad agreement: PASS
-- Momentum separated from trend: PASS
-- Momentum acceleration: PASS
-- Volatility and annualization: PASS
-- Drawdown state and recovery distinction: PASS
-- Liquidity state and trading-value context: PASS
-- Abnormal volume remains direction-neutral: PASS
-- Price-volume confirmation remains contextual: PASS
-- Industry-first relative strength with market fallback context: PASS
-- Missing benchmark produces INSUFFICIENT_DATA; no synthetic benchmark: PASS
-- Market regime remains contextual: PASS
+- Adjusted Close preferred for performance: PASS
+- Required return horizons and trading-day handling: PASS
+- Price position / moving averages / trend / momentum: PASS
+- Volatility and drawdown: PASS
+- Liquidity and volume context: PASS
+- Relative strength with real benchmark requirement: PASS
+- Market regime and alerts remain contextual: PASS
 - Point-in-Time filtering: PASS
-- Missing data / insufficient history handling: PASS
-- Suspension/gap handling does not fabricate future observations: PASS
 - No Market Score: PASS
-- No Buy/Sell/Hold signal: PASS
-- No Fundamental Score modification: PASS
-- No Forecast modification: PASS
-- No Valuation modification: PASS
-- Versioned model/contract metadata: PASS
-- Stage 9 compatibility preserved: PASS
-- Full repository CI integration: PASS
+- No Trading Signal: PASS
+- No Fundamental / Forecast / Valuation modification: PASS
 
-**Audit Decision:** PASS → LOCKED
+## 3.10 Stage 9 Final Integration
 
-### Audit Fixes Applied Before Lock
+- Four evidence families preserved: PASS
+- Rule-Based Evidence Integration: PASS
+- Fundamental dominance over market context: PASS
+- Value Trap control: PASS
+- Strong-but-Expensive control: PASS
+- Negative EPS / Valuation N/A protection: PASS
+- Forecast Reliability constraint: PASS
+- Scenario dispersion control: PASS
+- Decision conflicts are explicit: PASS
+- Holding Status remains separate: PASS
+- Hysteresis is explicit and model-parameterized: PASS
+- Decision History is preserved: PASS
+- Risk-Aware ranking is within-industry and creates no ranking score: PASS
+- Dashboard output contract is complete: PASS
+- No Position Sizing: PASS
+- No Market Score: PASS
+- No technical Buy/Sell signal: PASS
+- No upstream recalculation: PASS
 
-1. Corrected Drawdown recovery classification so a moderate drawdown is not labeled `RECOVERING` merely because the current price is above the recent low.
-2. Recovery now requires both improvement in current drawdown versus the previous observation and a parameterized rebound from the recent low.
-3. Strengthened Stage 8 tests to distinguish stable moderate drawdown, valid recovery, deep drawdown, and new-low states.
-4. Final repository CI passed all 102 tests after the correction.
+## 3.11 FX End-to-End Audit
 
-**Notes:** The first implementation correction produced an expected intermediate CI failure because the existing recovery test did not satisfy the locked `RECOVERY_FROM_LOW = 0.05` parameter. The test was corrected to represent a genuine 5% rebound. The final run passed 102/102 tests. Existing `datetime.utcnow()` deprecation warnings remain non-blocking.
+- Free-Market FX and Operational FX remain distinct: PASS
+- Free-Market FX used for market/USD valuation context: PASS
+- Operational FX used for supported operating/earnings exposure: PASS
+- Operational FX missing is not silently replaced by Free-Market FX: PASS
+- Explicit proxy treatment is supported: PASS
+- FX Gap is contextual only: PASS
+- No independent FX Buy/Sell vote: PASS
+- No hidden FX bonus or double counting: PASS
 
----
+## 3.12 Point-in-Time / Versioning Audit
 
-## Stage 9 — Decision Engine & Dashboard Contract
-
-**Design:** LOCKED
-
-**Implementation:** NOT STARTED
-
-**Testing:** NOT STARTED
-
-**Audit:** NOT STARTED
-
-**Status:** NOT STARTED
-
----
-
-# 4. Current Implementation Target
-
-## Stage 9 — Decision Engine & Dashboard Contract
-
-Stages 1–8 are COMPLETE / LOCKED. Stage 9 is now the current implementation target.
-
-Implementation must follow the locked Stage 9 specification exactly and preserve the locked Stage 1–8 contracts.
-
-Do not modify Stages 1–8 unless a genuine contract defect is discovered.
-
----
-
-# 5. Stage Completion Rule
-
-A stage may be marked COMPLETE only after:
-
-**Implementation**
-→ **Testing**
-→ **Independent Review**
-→ **Architecture Compliance Audit**
-→ **Approval**
-
-Only after approval may implementation proceed to the next stage.
+- Publication/availability date preserved: PASS
+- Historical report versions remain distinguishable: PASS
+- PIT selection is tested: PASS
+- Forecast cutoffs are explicit: PASS
+- Valuation and Market inputs respect PIT contracts: PASS
+- Decision carries cutoff/model/contract metadata: PASS
+- Material analytical logic is versioned: PASS
+- Historical outputs are not silently overwritten: PASS
 
 ---
 
-# 6. Status Vocabulary
+# 4. Cross-Stage Safety Audit
 
-Use the following status values:
+The following prohibited architectural patterns were checked against the final implementation and test suite:
 
-* NOT STARTED
-* IN PROGRESS
-* IMPLEMENTED
-* TESTING
-* REVIEW
-* AUDIT
-* APPROVED
-* BLOCKED
-* REQUIRES ARCHITECTURAL CHANGE
-* COMPLETE
-
----
-
-# 7. Current Status Snapshot
-
-| Stage   | Design | Implementation | Overall |
-| ------- | ------ | -------------- | ------- |
-| Stage 1 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
-| Stage 2 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
-| Stage 3 | LOCKED | IMPLEMENTED    | IMPLEMENTED — AUDIT RECONCILIATION PENDING |
-| Stage 4 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 5 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 6 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 7 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 8 | LOCKED | COMPLETE       | COMPLETE / LOCKED |
-| Stage 9 | LOCKED | NOT STARTED    | NOT STARTED |
+- Simple weighted Decision Score: NOT PRESENT
+- Market Score: NOT PRESENT
+- Technical Buy/Sell signal: NOT PRESENT
+- Position Sizing: NOT PRESENT
+- Hidden FX decision bonus: NOT PRESENT
+- Silent Operational-FX → Free-Market proxy: NOT PRESENT
+- Stage 9 upstream recalculation: NOT PRESENT
+- Fundamental Score modification by valuation/market: NOT PRESENT
+- Reliability modification of Forward P/E: NOT PRESENT
+- Artificial P/E for negative/zero EPS: NOT PRESENT
+- Forward/TTM benchmark mixing: NOT PRESENT
+- Arbitrary scenario multiple 0.90/1.00/1.10 mechanism: REMOVED
+- Arbitrary direct scenario-probability adjustment bypass: REJECTED
+- Raw-data destruction during normalization: NOT PRESENT
+- Future ReportVersion leakage in PIT selection: NOT PRESENT
 
 ---
 
-# 8. Update Rule
+# 5. Final CI Evidence
 
-This document must be updated whenever implementation status materially changes.
+The latest repository push at commit `31d9b8ed278d8e35c64445c6003dcbde9a73eeb0` triggered GitHub Actions workflow **Tests #100**.
 
-Examples:
+Run: `35017310950`
 
-* A schema is completed.
-* A module enters testing.
-* A stage passes audit.
-* A stage is blocked.
-* An implementation issue requires architectural review.
-* A contract version changes.
+Job: `104543883848`
 
-Implementation progress must NOT be recorded as an architectural change unless the architecture itself changes.
+The workflow checked out the exact audited commit and executed:
+
+`pytest src/tests -v`
+
+Result:
+
+**113 passed, 236 warnings in 1.06s**
+
+The warnings are deprecation warnings, primarily related to `datetime.utcnow()`, plus the GitHub Actions Node 20 deprecation warning. They did not fail the test suite and are not architectural defects.
 
 ---
 
-# 9. Current Next Action
+# 6. Final Audit Decision
 
-**Start Stage 9 — Decision Engine & Dashboard Contract implementation, preserving the locked Stage 1–8 contracts.**
+**WHOLE PROJECT FINAL AUDIT: PASS**
 
-Stages 4, 5, 6, 7 and 8 are COMPLETE / LOCKED. No Stage 4–8 architectural change is pending.
+**ARCHITECTURE: LOCKED**
+
+**STAGES 1–9: COMPLETE / LOCKED**
+
+**CI: PASS — 113/113**
+
+No architectural change was required by the whole-project audit.
+
+The Analyzer V1 implementation is now considered complete and locked for the current architecture.
+
+Any future architectural change must be explicitly recorded in `99_Architecture_Change_Log.md` and versioned. Internal implementation changes may proceed only when the existing contracts remain compatible.
+
+---
+
+# 7. Next Phase
+
+Analyzer V1 is complete.
+
+The next task is the separately requested **standard development project template** based on the actual Analyzer development experience. It must not redefine Analyzer V1 architecture; it is a reusable development/process template for future projects.
