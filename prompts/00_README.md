@@ -7,7 +7,7 @@ These are the clean, implementation-oriented prompts for the nine locked stages 
 1. `00_a_Master_Architecture.md`
 2. `01_Stage1_Data_Foundation.md` … `09_Stage9_Decision_Dashboard.md`
 3. Approved contract amendments recorded in `99_Architecture_Change_Log.md`
-4. Database architecture references `11_Database_Architecture_Stage1.md` and `12_Database_Architecture_V1.md`, plus approved database amendments
+4. Database architecture references `11_Database_Architecture_Stage1.md` and `12_Database_Architecture_V1.1.md`, plus approved database amendments
 5. `10_Implementation_Status.md`
 6. The corresponding prompt in this directory is the execution instruction, not a replacement for the locked specification.
 
