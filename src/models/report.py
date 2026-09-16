@@ -1,5 +1,16 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint
 from datetime import datetime
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
+
 from src.core.database import Base
 
 
@@ -32,4 +43,10 @@ class ReportVersion(Base):
 
     __table_args__ = (
         UniqueConstraint("report_id", "version_number", name="uq_report_version"),
+        Index(
+            "uq_report_current_version",
+            "report_id",
+            unique=True,
+            sqlite_where=(is_current_version.is_(True)),
+        ),
     )
