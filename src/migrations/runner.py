@@ -21,6 +21,7 @@ from src.models.normalized import (  # noqa: F401
     NormalizedFinancialFact,
     RawFinancialFact,
 )
+from src.models.normalized_provenance import NormalizedFinancialFactInput  # noqa: F401
 from src.models.period import FinancialPeriod  # noqa: F401
 from src.models.report import Report, ReportVersion  # noqa: F401
 from src.models.share_action import CorporateAction, ShareCountHistory  # noqa: F401
@@ -72,8 +73,6 @@ def _apply_mapping_and_derived_schema(engine: Engine) -> None:
     _add_column_if_missing(engine, "normalized_financial_facts", "raw_fact_id", "INTEGER")
     _add_column_if_missing(engine, "normalized_financial_facts", "mapping_decision_id", "INTEGER")
 
-    # These tables are created from the current declarative contracts. Existing
-    # tables and rows are left untouched.
     Base.metadata.create_all(bind=engine, tables=[
         Base.metadata.tables["mapping_rules"],
         Base.metadata.tables["mapping_decisions"],
@@ -82,10 +81,18 @@ def _apply_mapping_and_derived_schema(engine: Engine) -> None:
     ])
 
 
+def _apply_normalized_provenance_schema(engine: Engine) -> None:
+    # Adds the multi-source provenance bridge without rewriting existing facts.
+    Base.metadata.create_all(bind=engine, tables=[
+        Base.metadata.tables["normalized_financial_fact_inputs"],
+    ])
+
+
 def _migration_list() -> Iterable[Migration]:
     return (
         Migration(1, "baseline_schema", _apply_baseline),
         Migration(2, "mapping_and_derived_schema", _apply_mapping_and_derived_schema),
+        Migration(3, "normalized_fact_multi_source_provenance", _apply_normalized_provenance_schema),
     )
 
 
