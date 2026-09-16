@@ -2,7 +2,7 @@
 
 ## Execution Prompt
 
-You are implementing or auditing Stage 1 of Analyzer V1. Read `00_a_Master_Architecture.md`, `01_Stage1_Data_Foundation.md`, `11_Database_Architecture_Stage1.md`, `12_Database_Architecture_V1.md`, and `10_Implementation_Status.md` before changing code.
+You are implementing or auditing Stage 1 of Analyzer V1. Read `00_a_Master_Architecture.md`, `01_Stage1_Data_Foundation.md`, `11_Database_Architecture_Stage1.md`, `12_Database_Architecture_V1.1.md`, and `10_Implementation_Status.md` before changing code.
 
 Implement only the locked Stage 1/data-foundation contract. Do not implement Stage 2+ analytics.
 
@@ -49,6 +49,7 @@ Support these entities/contracts:
 - Many raw lines may contribute to one standard concept. The normalized concept must retain all contributing raw facts through `NormalizedFinancialFactInput`; aggregate/component lines must not be blindly double-counted.
 - Reported, normalized, and derived values remain distinguishable.
 - Derived facts never overwrite reported/normalized facts and retain formula/version/cutoff/input provenance.
+- A logical report has at most one current `ReportVersion`.
 - TTM is derived, not a raw reporting period.
 
 ### Explicit exclusions
@@ -60,7 +61,7 @@ Do not add KPI scoring, Fundamental Score, forecasting, forecast evaluation, val
 3. Implement the smallest complete contract.
 4. Use versioned migrations for schema changes; `create_all()` is bootstrap-only for an empty database.
 5. Add deterministic validation and database constraints.
-6. Add tests for normal cases, missing/zero values, restatements, PIT selection, mapping ambiguity/unmapped data, multi-source provenance, raw immutability, reported-vs-derived distinction, FX conversion, share-count changes, migrations, and prohibited scope.
+6. Add tests for normal cases, missing/zero values, restatements, PIT selection, mapping ambiguity/unmapped data, multi-source provenance, raw immutability, reported-vs-derived distinction, FX conversion, share-count changes, migrations, single-current-version integrity, and prohibited scope.
 7. Run the full test suite.
 8. Audit implementation against every Stage 1 requirement and the database architecture.
 9. Fix the smallest responsible defect if anything fails.
