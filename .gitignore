@@ -5,7 +5,7 @@ __pycache__/
 
 # Virtual environments
 .venv/
-.venv_
+.venv_/
 venv/
 env/
 pdf/
@@ -29,3 +29,4 @@ Include/
 .idea/
 .DS_Store
 Thumbs.db
+/pdf
