@@ -138,6 +138,32 @@ def ingest_codal_report(
             session.add(report)
             session.flush()
 
+        if codal_tracking_id is not None:
+            existing_version = (
+                session.query(ReportVersion)
+                .filter_by(
+                    report_id=report.report_id,
+                    publication_datetime=publication_datetime,
+                )
+                .order_by(ReportVersion.version_number.desc())
+                .first()
+            )
+            if existing_version is not None:
+                existing_count = session.query(RawFinancialFact).filter_by(
+                    report_version_id=existing_version.report_version_id,
+                ).count()
+                run.status = "COMPLETED"
+                run.records_inserted = 0
+                run.records_updated = existing_count
+                run.finished_at = datetime.utcnow()
+                session.commit()
+                return ReportIngestionResult(
+                    ingestion_id=run.ingestion_id,
+                    report_id=report.report_id,
+                    report_version_id=existing_version.report_version_id,
+                    raw_fact_count=existing_count,
+                )
+
         current_version = (
             session.query(ReportVersion)
             .filter_by(report_id=report.report_id, is_current_version=True)

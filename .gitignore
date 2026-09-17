@@ -5,8 +5,10 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv_
 venv/
 env/
+pdf/
 pyvenv.cfg
 Scripts/
 Lib/

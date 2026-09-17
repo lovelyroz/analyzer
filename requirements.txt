@@ -1,0 +1,4 @@
+SQLAlchemy
+pytest
+openpyxl
+pypdf

@@ -39,7 +39,8 @@ External Sources
   └─ FX data — FREE_MARKET & OPERATIONAL (CSV / XLSX / …)
           ↓
 Format / Extraction Adapters  (CHANGE-007)
-  ├─ CODAL PDF Extraction → RawLineInput[]
+        ├─ CODAL PDF Acquisition → PDF bytes
+        ├─ CODAL PDF Extraction (pypdf text-first) → RawLineInput[]
   ├─ OHLC parser → MarketDaily fields
   └─ FX parser (+ explicit Toman→Rial if needed) → FxRateInput[]
           ↓
@@ -198,6 +199,9 @@ DB foundation tables + IngestionRun
 ### CODAL
 
 - Inputs are PDFs.
+- Acquisition is independent from PDF parsing and database persistence.
+- The current implementation provides deterministic local-file acquisition and retryable HTTP acquisition.
+- Text extraction uses `pypdf`; image-only or no-text PDFs are rejected explicitly. OCR is not silently substituted.
 - Extraction (layout/table/OCR) is **outside** `ingest_codal_report`.
 - Core function receives `RawLineInput` sequence + report metadata (tracking id, URL, publication datetime, restatement flag).
 - Raw facts remain immutable; mapping/normalization are separate later steps.

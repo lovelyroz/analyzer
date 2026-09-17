@@ -150,6 +150,17 @@ Deferred work must integrate with the locked boundary and must not reopen `DATAB
 
 ## Repository status
 
+## Production acquisition phase
+
+- CODAL local/HTTP acquisition adapter: IMPLEMENTED
+- CODAL text-first PDF extraction adapter: IMPLEMENTED
+- CODAL extraction-to-raw persistence facade: IMPLEMENTED
+- CODAL idempotent re-ingestion: TESTED
+- Supplied representative PDFs: 19 extractable, 1 explicitly rejected as no-text
+- `pypdf` dependency: recorded in `requirements.txt` and CI workflow
+- Full local regression after acquisition changes: 143 passed, 1 skipped
+- CI workflow execution for this local change: NOT RUN from this workspace
+
 **IMPLEMENTATION: COMPLETE**  
 **TESTING: PASS**  
 **AUDIT: PASS**  
