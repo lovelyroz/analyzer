@@ -16,9 +16,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Sequence, Union
 
-from src.ingestion.codal.numbers import parse_amount
+from src.ingestion.codal.numbers import normalize_digits, parse_amount
 from src.ingestion.codal.pdf_extract import CodalExtractionError, extract_cell_rows
 from src.ingestion.service import RawLineInput
+
+
+def _ascii_text(value: Optional[str]) -> Optional[str]:
+    """Normalize numeric characters in persisted CODAL text fields to ASCII."""
+    if value is None:
+        return None
+    return normalize_digits(value)
 
 
 @dataclass(frozen=True)
@@ -48,7 +55,11 @@ def extract_raw_lines_from_pdf(
     currency: str = "IRR",
     unit: Optional[str] = None,
 ) -> CodalExtractionResult:
-    """Extract RawLineInput rows from a Codal PDF (local path).
+    """Extract RawLineInput rows from a CODAL PDF (local path).
+
+    All textual fields crossing this boundary use ASCII/English digits.
+    Numeric values are stored as Decimal. Blank/unparseable values remain
+    None and are never forced to zero.
 
     Raises CodalExtractionError on unreadable/unsupported PDFs.
     Acquisition errors must be raised by acquisition.py, not this function.
@@ -60,23 +71,22 @@ def extract_raw_lines_from_pdf(
     warnings: List[str] = []
 
     for cell in cell_rows:
-        name = (cell.item_name or "").strip()
+        name = _ascii_text((cell.item_name or "").strip())
         if not name:
             warnings.append(f"page {cell.page} row {cell.source_row}: empty item name skipped")
             continue
 
         value = parse_amount(cell.value_text)
-        # Explicit blank value_text → None; unparsable also → None (never invent / never force 0)
         raw_lines.append(
             RawLineInput(
                 item_name=name,
                 value=value,
                 item_code=None,
-                unit=unit,
-                currency=currency,
-                source_section=cell.source_section,
+                unit=_ascii_text(unit),
+                currency=_ascii_text(currency),
+                source_section=_ascii_text(cell.source_section),
                 source_row=cell.source_row,
-                source_column=cell.source_column,
+                source_column=_ascii_text(cell.source_column),
             )
         )
 
@@ -91,11 +101,11 @@ def extract_raw_lines_from_pdf(
 
     return CodalExtractionResult(
         raw_lines=tuple(raw_lines),
-        title=title,
-        report_type=report_type,
+        title=_ascii_text(title) or "",
+        report_type=_ascii_text(report_type) or "",
         publication_datetime=publication_datetime,
-        codal_tracking_id=codal_tracking_id,
-        source_url=source_url,
+        codal_tracking_id=_ascii_text(codal_tracking_id),
+        source_url=_ascii_text(source_url),
         is_restated=is_restated,
         extraction_backend=backend,
         warnings=tuple(warnings),
