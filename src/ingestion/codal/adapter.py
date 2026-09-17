@@ -14,10 +14,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Sequence, Union
+from typing import TYPE_CHECKING, List, Optional, Sequence, Union
 
 from src.ingestion.codal.numbers import normalize_digits, parse_amount
 from src.ingestion.codal.pdf_extract import CodalExtractionError, extract_cell_rows
+
+if TYPE_CHECKING:
+    from src.ingestion.service import RawLineInput
 
 
 def _ascii_text(value: Optional[str]) -> Optional[str]:
@@ -31,7 +34,7 @@ def _ascii_text(value: Optional[str]) -> Optional[str]:
 class CodalExtractionResult:
     """Output of the CODAL PDF extraction layer before persistence."""
 
-    raw_lines: Sequence[object]
+    raw_lines: Sequence[RawLineInput]
     title: str
     report_type: str
     publication_datetime: datetime
@@ -63,6 +66,8 @@ def extract_raw_lines_from_pdf(
     Raises CodalExtractionError on unreadable/unsupported PDFs.
     Acquisition errors must be raised by acquisition.py, not this function.
     """
+    # Local import breaks the service ↔ codal package import cycle while
+    # preserving the existing RawLineInput public DTO contract.
     from src.ingestion.service import RawLineInput
 
     path = Path(path)
