@@ -8,14 +8,20 @@ from src.ingestion.service import (
     RawLineInput,
     ReportIngestionResult,
     OhlcIngestionResult,
+    FxRateInput,
+    FxIngestionResult,
     ingest_codal_report,
     ingest_ohlc_csv,
+    ingest_fx_rates,
 )
 
 __all__ = [
     "RawLineInput",
     "ReportIngestionResult",
     "OhlcIngestionResult",
+    "FxRateInput",
+    "FxIngestionResult",
     "ingest_codal_report",
     "ingest_ohlc_csv",
+    "ingest_fx_rates",
 ]
