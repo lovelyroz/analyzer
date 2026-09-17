@@ -377,7 +377,7 @@ def test_codal_ingestion_creates_report_version_and_raw_facts(db_session):
     )
     assert result.report_id is not None
     assert result.report_version_id is not None
-    assert result.raw_facts_created == 2
+    assert result.raw_fact_count == 2
     assert db_session.query(Report).count() == 1
     assert db_session.query(ReportVersion).count() == 1
     assert db_session.query(RawFinancialFact).count() == 2
@@ -418,21 +418,23 @@ def test_codal_ingestion_is_idempotent_for_same_tracking_id(db_session):
     assert db_session.query(RawFinancialFact).count() == 2
 
 
-def test_codal_ingestion_rejects_empty_raw_lines(db_session):
+def test_codal_ingestion_accepts_empty_raw_lines(db_session):
+    """Service allows empty raw_lines (raw layer only); zero facts is valid."""
     company, _ = seed_company(db_session)
     period = seed_period(db_session, company.company_id)
-    with pytest.raises(ValueError):
-        ingest_codal_report(
-            db_session,
-            company_id=company.company_id,
-            period_id=period.period_id,
-            report_type="QUARTERLY",
-            title="Empty",
-            codal_tracking_id="CODAL-EMPTY",
-            publication_datetime=datetime(2024, 4, 15),
-            raw_lines=[],
-        )
-    assert db_session.query(Report).count() == 0
+    result = ingest_codal_report(
+        db_session,
+        company_id=company.company_id,
+        period_id=period.period_id,
+        report_type="QUARTERLY",
+        title="Empty",
+        codal_tracking_id="CODAL-EMPTY",
+        publication_datetime=datetime(2024, 4, 15),
+        raw_lines=[],
+    )
+    assert result.raw_fact_count == 0
+    assert db_session.query(Report).count() == 1
+    assert db_session.query(ReportVersion).count() == 1
     assert db_session.query(RawFinancialFact).count() == 0
 
 
