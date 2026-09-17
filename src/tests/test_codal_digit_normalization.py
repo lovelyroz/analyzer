@@ -9,8 +9,8 @@ def test_normalize_digits_maps_persian_and_arabic_indic_to_ascii():
     assert normalize_digits("۱۲۳۴۵۶۷۸۹۰ ١٢٣٤٥٦٧٨٩٠") == "1234567890 1234567890"
 
 
-def test_parse_amount_accepts_persian_digits_and_returns_decimal():
-    assert parse_amount("(۱۲۳٬۴۵۶٫۷۸۹)".replace("٫", ".")) == Decimal("-123456.789")
+def test_parse_amount_accepts_persian_digits_and_arabic_separators():
+    assert parse_amount("(۱۲۳٬۴۵۶٫۷۸۹)") == Decimal("-123456.789")
 
 
 def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(db_session):
@@ -37,8 +37,7 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(db_sessio
     )
 
     assert result.raw_fact_count == 1
-    fact = db_session.query(type(result)).first() if False else None
-    # Query the persisted raw fact without depending on the result DTO type.
+
     from src.models.normalized import RawFinancialFact
     from src.models.report import Report
 
@@ -48,7 +47,11 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(db_sessio
     assert report.codal_tracking_id == "12345"
     assert report.source_url == "https://example.test/report/12345"
 
-    fact = db_session.query(RawFinancialFact).filter_by(report_version_id=result.report_version_id).one()
+    fact = (
+        db_session.query(RawFinancialFact)
+        .filter_by(report_version_id=result.report_version_id)
+        .one()
+    )
     assert fact.raw_item_name == "محصول 123"
     assert fact.raw_item_code == "کد 456"
     assert fact.unit == "واحد 7"
