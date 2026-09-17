@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING, Optional, Sequence
 from sqlalchemy.orm import Session
 
 from src.ingestion.codal.adapter import extract_raw_lines_from_pdf
+from src.ingestion.codal.pdf_extract import CodalExtractionError
+from src.models.audit import IngestionRun
 
 if TYPE_CHECKING:
-    from decimal import Decimal
     from src.ingestion.service import RawLineInput, ReportIngestionResult
 
 
@@ -56,16 +57,36 @@ def ingest_codal_pdf(
     source_url: Optional[str] = None,
     is_restated: bool = False,
 ) -> "ReportIngestionResult":
-    """Extract a CODAL PDF and persist only its raw facts."""
-    extraction = extract_raw_lines_from_pdf(
-        path,
-        title=title,
-        report_type=report_type,
-        publication_datetime=publication_datetime,
-        codal_tracking_id=codal_tracking_id,
-        source_url=source_url,
-        is_restated=is_restated,
-    )
+    """Extract a CODAL PDF and persist only its raw facts.
+
+    Extraction failures are recorded as FAILED IngestionRun rows before the
+    original exception is re-raised. No Report/RawFinancialFact persistence is
+    attempted until extraction succeeds.
+    """
+    try:
+        extraction = extract_raw_lines_from_pdf(
+            path,
+            title=title,
+            report_type=report_type,
+            publication_datetime=publication_datetime,
+            codal_tracking_id=codal_tracking_id,
+            source_url=source_url,
+            is_restated=is_restated,
+        )
+    except CodalExtractionError as exc:
+        session.rollback()
+        failed_run = IngestionRun(
+            source="CODAL",
+            status="FAILED",
+            records_found=0,
+            records_failed=1,
+            error_log=f"EXTRACTION_FAILED: {exc}",
+            finished_at=datetime.utcnow(),
+        )
+        session.add(failed_run)
+        session.commit()
+        raise
+
     return ingest_codal_report(
         session,
         company_id=company_id,
