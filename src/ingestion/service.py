@@ -51,11 +51,19 @@ class FxRateInput:
     """One FX observation. rate_type must distinguish FREE_MARKET vs OPERATIONAL.
 
     CHANGE-001: free-market and operational FX are never silently substituted.
+    Date policy (same as market_daily / CHANGE-005 / CHANGE-006):
+    - Prefer jalali_year/month/day from source Jalali string (no calendar conversion).
+    - rate_date (Gregorian) is optional and left NULL for Jalali-sourced rows.
+    - Identity for Jalali rows: (jalali_year, jalali_month, jalali_day, currency_from, currency_to, rate_type).
+    - Identity for Gregorian-only rows: (rate_date, currency_from, currency_to, rate_type).
     """
 
-    rate_date: date
     rate: Decimal
-    rate_type: str  # FREE_MARKET | OPERATIONAL | OFFICIAL | ESTIMATED | MANUAL_OPERATOR
+    rate_type: str
+    rate_date: Optional[date] = None
+    jalali_year: Optional[int] = None
+    jalali_month: Optional[int] = None
+    jalali_day: Optional[int] = None
     currency_from: str = "USD"
     currency_to: str = "IRR"
     source: Optional[str] = None
@@ -231,19 +239,7 @@ def ingest_ohlc_csv(
     *,
     source_label: str = "CSV_OHLC",
 ) -> OhlcIngestionResult:
-    """Ingest an OHLC CSV (Iranian market format) into MarketDaily.
-
-    Style mirrors ingest_codal_report: single function, inline IngestionRun.
-
-    Date policy (CHANGE-005):
-    - Source CSV uses Jalali dates (e.g. 1402-01-08).
-    - jalali_year / jalali_month / jalali_day are filled from the source string.
-    - No Jalali→Gregorian calendar conversion is performed.
-    - Same-month comparisons across years use jalali_month (independent of year/day).
-    - trade_date is left NULL for Jalali-sourced rows (backward-compatible Date column).
-    - Identity / idempotency key for Jalali rows: (company_id, jalali_year, jalali_month, jalali_day).
-    - Missing numeric values stay NULL (NULL != 0).
-    """
+    """Ingest an OHLC CSV (Iranian market format) into MarketDaily."""
     import csv
     from pathlib import Path as P
 
@@ -326,7 +322,6 @@ def ingest_ohlc_csv(
                 value = _to_decimal(row.get(colmap.get("value", "")))
                 trade_count = _to_int(row.get(colmap.get("trade_count", "")))
 
-                # Basic OHLC consistency when all four present
                 if all(v is not None for v in (open_p, high_p, low_p, close_p)):
                     if high_p < low_p or high_p < open_p or high_p < close_p or low_p > open_p or low_p > close_p:
                         failed += 1
@@ -413,25 +408,36 @@ def ingest_ohlc_csv(
         )
 
 
+def _find_fx_existing(
+    session: Session,
+    *,
+    rate_type: str,
+    c_from: str,
+    c_to: str,
+    rate_date: Optional[date],
+    jy: Optional[int],
+    jm: Optional[int],
+    jd: Optional[int],
+) -> Optional[FXRate]:
+    q = session.query(FXRate).filter_by(
+        currency_from=c_from,
+        currency_to=c_to,
+        rate_type=rate_type,
+    )
+    if jy is not None and jm is not None and jd is not None:
+        return q.filter_by(jalali_year=jy, jalali_month=jm, jalali_day=jd).one_or_none()
+    if rate_date is not None:
+        return q.filter_by(rate_date=rate_date).one_or_none()
+    return None
+
+
 def ingest_fx_rates(
     session: Session,
     rates: Sequence[FxRateInput],
     *,
     source_label: str = "FX",
 ) -> FxIngestionResult:
-    """Persist FX rate observations into fx_rates (CHANGE-001).
-
-    Style mirrors ingest_codal_report / ingest_ohlc_csv: single function,
-    inline IngestionRun, explicit failures, idempotent upsert.
-
-    Contract:
-    - FREE_MARKET and OPERATIONAL are distinct rate_type values; never
-      substituted for each other.
-    - Unique identity: (rate_date, currency_from, currency_to, rate_type).
-    - rate is required (NOT NULL); missing/invalid rate → records_failed.
-    - Re-ingest of the same key updates rate/source (idempotent).
-    - No analytical conversion logic; Stage 1 only stores the foundation.
-    """
+    """Persist FX rate observations into fx_rates (CHANGE-001 / CHANGE-006)."""
     run = IngestionRun(source="FX", status="STARTED", records_found=len(rates))
     session.add(run)
     session.flush()
@@ -463,25 +469,43 @@ def ingest_fx_rates(
                 errors.append(f"{label}: rate must be positive")
                 continue
 
+            has_jalali = (
+                item.jalali_year is not None
+                and item.jalali_month is not None
+                and item.jalali_day is not None
+            )
+            if not has_jalali and item.rate_date is None:
+                failed += 1
+                errors.append(f"{label}: need jalali components or rate_date")
+                continue
+
             c_from = (item.currency_from or "USD").strip().upper()
             c_to = (item.currency_to or "IRR").strip().upper()
             src = item.source or source_label
 
-            existing = (
-                session.query(FXRate)
-                .filter_by(
-                    rate_date=item.rate_date,
-                    currency_from=c_from,
-                    currency_to=c_to,
-                    rate_type=item.rate_type,
-                )
-                .one_or_none()
+            jy = item.jalali_year if has_jalali else None
+            jm = item.jalali_month if has_jalali else None
+            jd = item.jalali_day if has_jalali else None
+            rdate = None if has_jalali else item.rate_date
+
+            existing = _find_fx_existing(
+                session,
+                rate_type=item.rate_type,
+                c_from=c_from,
+                c_to=c_to,
+                rate_date=rdate,
+                jy=jy,
+                jm=jm,
+                jd=jd,
             )
 
             if existing is None:
                 session.add(
                     FXRate(
-                        rate_date=item.rate_date,
+                        rate_date=rdate,
+                        jalali_year=jy,
+                        jalali_month=jm,
+                        jalali_day=jd,
                         currency_from=c_from,
                         currency_to=c_to,
                         rate=rate_val,
@@ -493,6 +517,11 @@ def ingest_fx_rates(
             else:
                 existing.rate = rate_val
                 existing.source = src
+                if has_jalali:
+                    existing.jalali_year = jy
+                    existing.jalali_month = jm
+                    existing.jalali_day = jd
+                    existing.rate_date = None
                 updated += 1
 
         run.records_inserted = inserted
@@ -531,3 +560,64 @@ def ingest_fx_rates(
             records_failed=len(rates),
             status="FAILED",
         )
+
+
+def ingest_fx_xlsx(
+    session: Session,
+    path: Union[str, Path],
+    *,
+    rate_type: str,
+    rates_in_toman: bool = False,
+    source_label: Optional[str] = None,
+) -> FxIngestionResult:
+    """Ingest a two-column Jalali FX workbook into fx_rates.
+
+    col0 = Jalali date string; col1 = rate.
+    rates_in_toman=True multiplies by 10 (free-market toman → IRR).
+    """
+    from pathlib import Path as P
+
+    try:
+        import openpyxl
+    except ImportError as exc:
+        raise ImportError("openpyxl is required for ingest_fx_xlsx") from exc
+
+    path = P(path)
+    if rate_type not in _VALID_FX_RATE_TYPES:
+        raise ValueError(f"invalid rate_type={rate_type!r}")
+
+    label = source_label or f"XLSX_{rate_type}"
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb.active
+
+    inputs: list = []
+    for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
+        if not row or row[0] is None:
+            continue
+        date_raw = str(row[0]).strip()
+        if row_idx == 1 and any(ch.isalpha() for ch in date_raw.replace("-", "").replace("/", "")):
+            continue
+        if len(row) < 2 or row[1] is None:
+            continue
+        components = _parse_jalali_components(date_raw)
+        if components is None:
+            continue
+        jy, jm, jd = components
+        rate_val = _to_decimal(str(row[1]))
+        if rate_val is None:
+            continue
+        if rates_in_toman:
+            rate_val = rate_val * Decimal(10)
+        inputs.append(
+            FxRateInput(
+                rate=rate_val,
+                rate_type=rate_type,
+                jalali_year=jy,
+                jalali_month=jm,
+                jalali_day=jd,
+                source=label,
+            )
+        )
+    wb.close()
+
+    return ingest_fx_rates(session, inputs, source_label=label)
