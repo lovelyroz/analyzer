@@ -1,13 +1,18 @@
 """Replaceable PDF text/table extraction backends for CODAL.
 
-Primary: pypdf text extraction (always available when installed).
-Optional: pdfplumber table extraction when installed.
+Backends:
+  1. pdfplumber tables (preferred for multi-column Codal forms)
+  2. pypdf text lines (fallback)
 
-OCR is not bundled; scanned PDFs without text layer will yield few/no lines.
+Persian cells extracted from Codal PDFs are often visual-RTL reversed;
+`fix_persian_rtl` restores readable order for storage as raw item names.
+
+OCR is not bundled; scanned PDFs without a text layer yield extraction errors.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple, Union
@@ -27,6 +32,34 @@ class ExtractedCellRow:
     source_row: Optional[int]
     source_column: Optional[str]
     page: int
+
+
+_PERSIAN_CHAR_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
+_DIGIT_RE = re.compile(r"[\d۰-۹٠-٩]")
+
+
+def fix_persian_rtl(text: str) -> str:
+    """Restore readable order for cells that pdfplumber emits reversed.
+
+    Simple full-string reverse works for the Codal table cells observed in
+    monthly production/sales forms (product names, section headers, units).
+    Mixed LTR/RTL tokens may still be imperfect; raw storage preserves truth.
+    """
+    if not text:
+        return text
+    persian = len(_PERSIAN_CHAR_RE.findall(text))
+    if persian == 0:
+        return text
+    # Prefer reverse when Persian dominates or string looks reversed (starts with digit-heavy tail patterns)
+    if persian >= max(1, len(text.replace(" ", "")) // 3):
+        return text[::-1]
+    return text
+
+
+def _looks_numeric(cell: str) -> bool:
+    if not cell or cell in {"-", "—", "–"}:
+        return True  # explicit blank/dash counts as value cell
+    return bool(_DIGIT_RE.search(cell))
 
 
 def _extract_text_pypdf(path: Path) -> List[Tuple[int, str]]:
@@ -52,6 +85,14 @@ def _extract_text_pypdf(path: Path) -> List[Tuple[int, str]]:
     return pages
 
 
+def _header_labels(header_row: Sequence[str]) -> List[str]:
+    labels: List[str] = []
+    for i, h in enumerate(header_row):
+        h = fix_persian_rtl((h or "").strip().replace("\n", " "))
+        labels.append(h if h else f"col_{i}")
+    return labels
+
+
 def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
     try:
         import pdfplumber
@@ -63,47 +104,125 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
         with pdfplumber.open(str(path)) as pdf:
             for page_idx, page in enumerate(pdf.pages, start=1):
                 tables = page.extract_tables() or []
-                for table in tables:
-                    for r_i, row in enumerate(table, start=1):
-                        if not row:
+                for t_i, table in enumerate(tables):
+                    if not table:
+                        continue
+                    # Codal wide forms: last cells often hold product name / unit (RTL)
+                    # Find a header-ish row (contains 'نام' or 'محصول' or 'شرح' after RTL fix)
+                    header_idx = 0
+                    for ri, raw in enumerate(table[:4]):
+                        joined = fix_persian_rtl(" ".join((c or "") for c in raw))
+                        if any(k in joined for k in ("نام محصول", "نام", "شرح", "واحد", "مبلغ فروش")):
+                            header_idx = ri
+                            break
+                    headers = _header_labels([(c or "") for c in table[header_idx]])
+
+                    section = f"page_{page_idx}_table_{t_i}"
+                    current_section_label = section
+
+                    for r_i, raw_row in enumerate(table):
+                        if r_i == header_idx:
                             continue
-                        cells = [(c or "").strip() for c in row]
+                        cells = [(c or "").strip().replace("\n", " ") for c in raw_row]
                         if not any(cells):
                             continue
-                        # Heuristic: first non-empty cell = name, last numeric-looking = value
-                        name = cells[0] if cells else ""
-                        value_text = cells[-1] if len(cells) > 1 else None
-                        if len(cells) > 2 and not cells[-1]:
-                            value_text = cells[-2] if cells[-2] else value_text
+
+                        # Section banner rows (mostly empty numbers, label in last/first cell)
+                        non_empty = [c for c in cells if c]
+                        if len(non_empty) == 1:
+                            label = fix_persian_rtl(non_empty[0])
+                            if label.startswith(":") or label.endswith(":") or any(
+                                k in label for k in ("فروش", "درآمد", "برگشت", "تخفیف", "جمع")
+                            ):
+                                current_section_label = f"{section}:{label.strip(':')}"
+                                rows.append(
+                                    ExtractedCellRow(
+                                        item_name=label.strip(":"),
+                                        value_text=None,
+                                        source_section=current_section_label,
+                                        source_row=r_i + 1,
+                                        source_column="section",
+                                        page=page_idx,
+                                    )
+                                )
+                                continue
+
+                        # Product / entity name: prefer last non-empty (RTL forms) then first
+                        name = ""
+                        name_col = 0
+                        for idx in range(len(cells) - 1, -1, -1):
+                            c = cells[idx]
+                            if c and not _looks_numeric(c):
+                                name = fix_persian_rtl(c)
+                                name_col = idx
+                                break
+                        if not name:
+                            for idx, c in enumerate(cells):
+                                if c and not _looks_numeric(c):
+                                    name = fix_persian_rtl(c)
+                                    name_col = idx
+                                    break
                         if not name:
                             continue
-                        rows.append(
-                            ExtractedCellRow(
-                                item_name=name,
-                                value_text=value_text,
-                                source_section=f"page_{page_idx}_table",
-                                source_row=r_i,
-                                source_column="last",
-                                page=page_idx,
+
+                        # Unit often adjacent to product name in Codal monthly forms
+                        unit = ""
+                        for idx in (name_col - 1, name_col + 1):
+                            if 0 <= idx < len(cells):
+                                cand = fix_persian_rtl(cells[idx])
+                                if cand in {"تن", "کیلوگرم", "عدد", "مترمکعب", "مگاوات ساعت", "کیلووات ساعت"} or (
+                                    cand and not _looks_numeric(cand) and len(cand) <= 12
+                                ):
+                                    if any(ch in cand for ch in "تنمترکیلومگاوات"):
+                                        unit = cand
+                                        break
+
+                        emitted = 0
+                        for c_i, cell in enumerate(cells):
+                            if c_i == name_col:
+                                continue
+                            if not cell:
+                                continue
+                            if not _looks_numeric(cell):
+                                continue
+                            col_label = headers[c_i] if c_i < len(headers) else f"col_{c_i}"
+                            item = name
+                            if unit:
+                                item = f"{name} | {unit}"
+                            if col_label and not col_label.startswith("col_"):
+                                item = f"{item} | {col_label}"
+                            rows.append(
+                                ExtractedCellRow(
+                                    item_name=item,
+                                    value_text=cell if cell not in {""} else None,
+                                    source_section=current_section_label,
+                                    source_row=r_i + 1,
+                                    source_column=col_label,
+                                    page=page_idx,
+                                )
                             )
-                        )
+                            emitted += 1
+
+                        # Label-only data row with no numeric cells — keep as NULL fact
+                        if emitted == 0:
+                            rows.append(
+                                ExtractedCellRow(
+                                    item_name=f"{name} | {unit}".strip(" |") if unit else name,
+                                    value_text=None,
+                                    source_section=current_section_label,
+                                    source_row=r_i + 1,
+                                    source_column="label",
+                                    page=page_idx,
+                                )
+                            )
     except Exception:
         return rows
     return rows
 
 
 def _lines_from_text_pages(pages: Sequence[Tuple[int, str]]) -> List[ExtractedCellRow]:
-    """Split page text into candidate item lines.
-
-    Supports simple patterns:
-      NAME  1,234
-      NAME: 1234
-      NAME\t1234
-    """
-    import re
-
+    """Fallback: split page text into candidate item lines."""
     rows: List[ExtractedCellRow] = []
-    # value at end: optional sign/parens, digits with separators
     value_re = re.compile(
         r"^(?P<name>.+?)[\s:\t]+(?P<value>\(?[-−]?[\d۰-۹٠-٩٬,./\s]+\)?|-)$"
     )
@@ -120,7 +239,7 @@ def _lines_from_text_pages(pages: Sequence[Tuple[int, str]]) -> List[ExtractedCe
             if m:
                 rows.append(
                     ExtractedCellRow(
-                        item_name=m.group("name").strip(),
+                        item_name=fix_persian_rtl(m.group("name").strip()),
                         value_text=m.group("value").strip(),
                         source_section=section,
                         source_row=line_no,
@@ -129,10 +248,9 @@ def _lines_from_text_pages(pages: Sequence[Tuple[int, str]]) -> List[ExtractedCe
                     )
                 )
             else:
-                # Label-only line — preserve as missing value (NULL, not zero)
                 rows.append(
                     ExtractedCellRow(
-                        item_name=line,
+                        item_name=fix_persian_rtl(line),
                         value_text=None,
                         source_section=section,
                         source_row=line_no,
