@@ -18,7 +18,6 @@ from typing import List, Optional, Sequence, Union
 
 from src.ingestion.codal.numbers import normalize_digits, parse_amount
 from src.ingestion.codal.pdf_extract import CodalExtractionError, extract_cell_rows
-from src.ingestion.service import RawLineInput
 
 
 def _ascii_text(value: Optional[str]) -> Optional[str]:
@@ -32,7 +31,7 @@ def _ascii_text(value: Optional[str]) -> Optional[str]:
 class CodalExtractionResult:
     """Output of the CODAL PDF extraction layer before persistence."""
 
-    raw_lines: Sequence[RawLineInput]
+    raw_lines: Sequence[object]
     title: str
     report_type: str
     publication_datetime: datetime
@@ -64,6 +63,8 @@ def extract_raw_lines_from_pdf(
     Raises CodalExtractionError on unreadable/unsupported PDFs.
     Acquisition errors must be raised by acquisition.py, not this function.
     """
+    from src.ingestion.service import RawLineInput
+
     path = Path(path)
     cell_rows = extract_cell_rows(path)
 
@@ -91,9 +92,7 @@ def extract_raw_lines_from_pdf(
         )
 
     if not raw_lines:
-        raise CodalExtractionError(
-            f"PDF produced zero RawLineInput rows: {path}"
-        )
+        raise CodalExtractionError(f"PDF produced zero RawLineInput rows: {path}")
 
     backend = "pdfplumber_tables" if any(
         (r.source_section or "").endswith("_table") for r in cell_rows
