@@ -107,12 +107,23 @@ def _apply_report_current_version_index(engine: Engine) -> None:
         ))
 
 
+def _apply_market_daily_jalali_components(engine: Engine) -> None:
+    """CHANGE-005: additive Jalali components for cross-year same-month analysis."""
+    _add_column_if_missing(engine, "market_daily", "jalali_year", "INTEGER")
+    _add_column_if_missing(engine, "market_daily", "jalali_month", "INTEGER")
+    _add_column_if_missing(engine, "market_daily", "jalali_day", "INTEGER")
+    # trade_date was NOT NULL; SQLite cannot drop NOT NULL easily.
+    # New rows may leave trade_date NULL when only Jalali source is available.
+    # Existing rows keep their trade_date values.
+
+
 def _migration_list() -> Iterable[Migration]:
     return (
         Migration(1, "baseline_schema", _apply_baseline),
         Migration(2, "mapping_and_derived_schema", _apply_mapping_and_derived_schema),
         Migration(3, "normalized_fact_multi_source_provenance", _apply_normalized_provenance_schema),
         Migration(4, "one_current_report_version", _apply_report_current_version_index),
+        Migration(5, "market_daily_jalali_components", _apply_market_daily_jalali_components),
     )
 
 

@@ -219,6 +219,67 @@ Verify moderate drawdown classification, recovery threshold, and downstream cont
 
 ---
 
+### CHANGE-005 — Jalali Date Components on MarketDaily
+
+**Status:** APPROVED
+
+**Version:** DATABASE_CONTRACT_V1.2
+
+**Date:** 2026-09-17
+
+**Affected Stage(s):** Stage 1 (Market foundation); Stage 8 consumers of daily market data
+
+**Previous Rule:**
+
+`market_daily.trade_date` was a single SQLAlchemy `Date` column. Stage 1 tests populated it with Gregorian `date` objects. Source OHLC files from the Iranian market supply Jalali dates (e.g. `1402-01-08`). There was no first-class representation of Jalali year/month/day, so same-month comparisons across years (all month-2 / Ordibehesht, all month-12 / Esfand) could not be expressed correctly without relying on Gregorian month identity, which does not match the Jalali calendar.
+
+**New Rule:**
+
+`market_daily` gains three additive nullable integer columns:
+
+- `jalali_year`
+- `jalali_month` (1–12)
+- `jalali_day`
+
+These store the source Jalali components directly. Same-month analysis across years uses `jalali_month` and is independent of year and day. No silent Jalali→Gregorian calendar conversion is performed by the ingestion layer.
+
+`trade_date` (Date) is retained for backward compatibility with existing Stage 1 tests and any Gregorian-oriented range queries. New Jalali-sourced rows fill the three component fields from the source string (parse of `YYYY-MM-DD` Jalali text only — not a calendar conversion).
+
+**Reason:**
+
+Enable correct seasonal/month-aligned market analysis for Iranian data (compare all Ordibehesht across years, all Esfand across years) without making month identity dependent on the Gregorian calendar.
+
+**Evidence / Trigger:**
+
+Production OHLC ingestion of real Iranian CSV (Jalali dates) plus explicit analytical requirement for cross-year same-month comparison.
+
+**Architecture Impact:**
+
+Compatible additive refinement of Stage 1 market foundation. Nine-stage architecture unchanged. No analytical engine added.
+
+**Contract Impact:**
+
+Database contract advances to `DATABASE_CONTRACT_V1.2`.
+
+**Downstream Impact:**
+
+Stage 8 (and any later consumer) should prefer `jalali_month` / `jalali_year` for month-aligned and year-over-year seasonal analysis of Iranian market data. `trade_date` remains available for ordering when present.
+
+**Migration Required:**
+
+Schema migration version 5: `market_daily_jalali_components`.
+
+**Testing Required:**
+
+- Migration idempotency on fresh and legacy DBs
+- Columns exist and are nullable
+- Ingestion fills jalali_* from source string without Gregorian conversion
+- Existing Stage 1–9 regression suite continues to pass
+
+**Approval:** APPROVED
+
+---
+
 # 7. Pending Proposals
 
 No pending architectural proposals.
@@ -312,9 +373,9 @@ The following MAY require an architecture or contract change:
 
 **Major Stages:** 1–9
 
-**Approved Post-Baseline Compatible Amendments:** CHANGE-003, CHANGE-004
+**Approved Post-Baseline Compatible Amendments:** CHANGE-003, CHANGE-004, CHANGE-005
 
-**Current Database Contract:** DATABASE_CONTRACT_V1.1
+**Current Database Contract:** DATABASE_CONTRACT_V1.2
 
 **Current Stage 8 Market Contract:** MARKET_CONTRACT_V1.1
 
