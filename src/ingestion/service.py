@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional, Sequence, Tuple, Union
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.models.audit import IngestionRun
 from src.models.entity import Company
+from src.models.fx import FXRate
 from src.models.market import MarketDaily
 from src.models.normalized import RawFinancialFact
 from src.models.report import Report, ReportVersion
@@ -43,6 +44,36 @@ class OhlcIngestionResult:
     records_updated: int
     records_failed: int
     status: str
+
+
+@dataclass(frozen=True)
+class FxRateInput:
+    """One FX observation. rate_type must distinguish FREE_MARKET vs OPERATIONAL.
+
+    CHANGE-001: free-market and operational FX are never silently substituted.
+    """
+
+    rate_date: date
+    rate: Decimal
+    rate_type: str  # FREE_MARKET | OPERATIONAL | OFFICIAL | ESTIMATED | MANUAL_OPERATOR
+    currency_from: str = "USD"
+    currency_to: str = "IRR"
+    source: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class FxIngestionResult:
+    ingestion_id: int
+    records_found: int
+    records_inserted: int
+    records_updated: int
+    records_failed: int
+    status: str
+
+
+_VALID_FX_RATE_TYPES = frozenset(
+    {"FREE_MARKET", "OPERATIONAL", "OFFICIAL", "ESTIMATED", "MANUAL_OPERATOR"}
+)
 
 
 def ingest_codal_report(
@@ -378,5 +409,125 @@ def ingest_ohlc_csv(
             records_inserted=0,
             records_updated=0,
             records_failed=0,
+            status="FAILED",
+        )
+
+
+def ingest_fx_rates(
+    session: Session,
+    rates: Sequence[FxRateInput],
+    *,
+    source_label: str = "FX",
+) -> FxIngestionResult:
+    """Persist FX rate observations into fx_rates (CHANGE-001).
+
+    Style mirrors ingest_codal_report / ingest_ohlc_csv: single function,
+    inline IngestionRun, explicit failures, idempotent upsert.
+
+    Contract:
+    - FREE_MARKET and OPERATIONAL are distinct rate_type values; never
+      substituted for each other.
+    - Unique identity: (rate_date, currency_from, currency_to, rate_type).
+    - rate is required (NOT NULL); missing/invalid rate → records_failed.
+    - Re-ingest of the same key updates rate/source (idempotent).
+    - No analytical conversion logic; Stage 1 only stores the foundation.
+    """
+    run = IngestionRun(source="FX", status="STARTED", records_found=len(rates))
+    session.add(run)
+    session.flush()
+
+    inserted = 0
+    updated = 0
+    failed = 0
+    errors: list = []
+
+    try:
+        for idx, item in enumerate(rates):
+            label = f"item {idx}"
+            if item.rate_type not in _VALID_FX_RATE_TYPES:
+                failed += 1
+                errors.append(f"{label}: invalid rate_type={item.rate_type!r}")
+                continue
+            if item.rate is None:
+                failed += 1
+                errors.append(f"{label}: rate is required (NULL not allowed)")
+                continue
+            try:
+                rate_val = Decimal(item.rate)
+            except Exception:
+                failed += 1
+                errors.append(f"{label}: rate not numeric")
+                continue
+            if rate_val <= 0:
+                failed += 1
+                errors.append(f"{label}: rate must be positive")
+                continue
+
+            c_from = (item.currency_from or "USD").strip().upper()
+            c_to = (item.currency_to or "IRR").strip().upper()
+            src = item.source or source_label
+
+            existing = (
+                session.query(FXRate)
+                .filter_by(
+                    rate_date=item.rate_date,
+                    currency_from=c_from,
+                    currency_to=c_to,
+                    rate_type=item.rate_type,
+                )
+                .one_or_none()
+            )
+
+            if existing is None:
+                session.add(
+                    FXRate(
+                        rate_date=item.rate_date,
+                        currency_from=c_from,
+                        currency_to=c_to,
+                        rate=rate_val,
+                        rate_type=item.rate_type,
+                        source=src,
+                    )
+                )
+                inserted += 1
+            else:
+                existing.rate = rate_val
+                existing.source = src
+                updated += 1
+
+        run.records_inserted = inserted
+        run.records_updated = updated
+        run.records_failed = failed
+        run.error_log = "\n".join(errors[:50]) if errors else None
+        run.status = "COMPLETED"
+        run.finished_at = datetime.utcnow()
+        session.commit()
+
+        return FxIngestionResult(
+            ingestion_id=run.ingestion_id,
+            records_found=len(rates),
+            records_inserted=inserted,
+            records_updated=updated,
+            records_failed=failed,
+            status=run.status,
+        )
+    except Exception as exc:
+        session.rollback()
+        failed_run = IngestionRun(
+            source="FX",
+            status="FAILED",
+            records_found=len(rates),
+            records_failed=len(rates),
+            error_log=str(exc),
+            finished_at=datetime.utcnow(),
+        )
+        session.add(failed_run)
+        session.commit()
+        return FxIngestionResult(
+            ingestion_id=failed_run.ingestion_id,
+            records_found=len(rates),
+            records_inserted=0,
+            records_updated=0,
+            records_failed=len(rates),
             status="FAILED",
         )
