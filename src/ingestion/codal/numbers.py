@@ -1,6 +1,7 @@
 """Persian/Arabic digit and amount normalization for CODAL extraction.
 
-NULL stays NULL. Missing is never converted to zero.
+Storage policy: every numeric character that crosses the CODAL ingestion
+boundary is normalized to ASCII/English digits. NULL stays NULL.
 """
 
 from __future__ import annotations
@@ -12,22 +13,22 @@ _PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "012
 
 
 def normalize_digits(text: str) -> str:
-    """Map Persian/Arabic-Indic digits to ASCII digits."""
-    return text.translate(_PERSIAN_DIGITS)
+    """Map Persian and Arabic-Indic digits to ASCII/English digits."""
+    return str(text).translate(_PERSIAN_DIGITS)
 
 
 def parse_amount(raw: Optional[str]) -> Optional[Decimal]:
     """Parse a financial amount from source text.
 
     Rules:
-    - blank / dash / explicit empty → None (NULL ≠ 0)
-    - parentheses → negative
-    - thousand separators (comma, slash variants) stripped
-    - never invent a value when unparsable → None
+    - blank / dash / explicit empty -> None (NULL != 0)
+    - parentheses -> negative
+    - thousand separators are stripped
+    - never invent a value when unparsable -> None
     """
     if raw is None:
         return None
-    s = normalize_digits(str(raw)).strip()
+    s = normalize_digits(raw).strip()
     if not s or s in {"-", "—", "–", ".", "..", "n/a", "N/A", "NA"}:
         return None
 
