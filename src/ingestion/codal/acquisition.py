@@ -26,18 +26,12 @@ class AcquiredSource:
     source_url: Optional[str] = None
     codal_tracking_id: Optional[str] = None
     content_sha256: Optional[str] = None
+    source_identity: Optional[str] = None
 
     @property
     def path(self) -> Path:
         """Backward-compatible destination-path name used by acquisition tests."""
         return self.local_path
-
-    @property
-    def source_identity(self) -> Optional[str]:
-        """Stable local source identity for audit/tests."""
-        if self.local_path is None:
-            return None
-        return str(self.local_path.resolve())
 
 
 def _sha256_file(path: Path) -> str:
@@ -65,6 +59,7 @@ def acquire_local_pdf(
         source_url=source_url or str(p),
         codal_tracking_id=codal_tracking_id,
         content_sha256=_sha256_file(p),
+        source_identity=str(p.resolve()),
     )
 
 
@@ -80,7 +75,8 @@ def acquire_codal_pdf(
     acquisition remains available through acquire_pdf_from_url().
     """
     del retries  # local acquisition has no retryable network operation
-    acquired = acquire_local_pdf(source)
+    source_path = Path(source)
+    acquired = acquire_local_pdf(source_path)
     target = Path(destination)
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -94,6 +90,7 @@ def acquire_codal_pdf(
         source_url=str(source),
         codal_tracking_id=acquired.codal_tracking_id,
         content_sha256=_sha256_file(target),
+        source_identity=str(source_path.resolve()),
     )
 
 
@@ -117,6 +114,7 @@ def acquire_pdf_from_url(
             source_url=url,
             codal_tracking_id=codal_tracking_id,
             content_sha256=_sha256_file(target),
+            source_identity=url,
         )
 
     req = Request(url, headers={"User-Agent": "analyzer-codal-acquisition/1.0"})
@@ -144,6 +142,7 @@ def acquire_pdf_from_url(
         source_url=url,
         codal_tracking_id=codal_tracking_id,
         content_sha256=_sha256_file(target),
+        source_identity=url,
     )
 
 
@@ -159,4 +158,5 @@ def copy_acquired(source: AcquiredSource, dest_dir: Union[str, Path]) -> Acquire
         source_url=source.source_url,
         codal_tracking_id=source.codal_tracking_id,
         content_sha256=_sha256_file(target),
+        source_identity=source.source_identity,
     )
