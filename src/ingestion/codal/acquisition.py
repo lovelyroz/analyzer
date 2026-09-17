@@ -5,11 +5,12 @@ Acquisition failure must be distinguishable from extraction failure.
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
-from urllib.error import URLError, HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
@@ -26,10 +27,20 @@ class AcquiredSource:
     codal_tracking_id: Optional[str] = None
     content_sha256: Optional[str] = None
 
+    @property
+    def path(self) -> Path:
+        """Backward-compatible destination-path name used by acquisition tests."""
+        return self.local_path
+
+    @property
+    def source_identity(self) -> Optional[str]:
+        """Stable local source identity for audit/tests."""
+        if self.local_path is None:
+            return None
+        return str(self.local_path.resolve())
+
 
 def _sha256_file(path: Path) -> str:
-    import hashlib
-
     h = hashlib.sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
@@ -51,9 +62,38 @@ def acquire_local_pdf(
         raise CodalAcquisitionError(f"expected .pdf file, got: {p.suffix!r}")
     return AcquiredSource(
         local_path=p.resolve(),
-        source_url=source_url or p.as_uri(),
+        source_url=source_url or str(p),
         codal_tracking_id=codal_tracking_id,
         content_sha256=_sha256_file(p),
+    )
+
+
+def acquire_codal_pdf(
+    source: Union[str, Path],
+    destination: Union[str, Path],
+    *,
+    retries: int = 2,
+) -> AcquiredSource:
+    """Acquire a local CODAL PDF into an exact destination path.
+
+    This compatibility entry point is intentionally local-only. Network
+    acquisition remains available through acquire_pdf_from_url().
+    """
+    del retries  # local acquisition has no retryable network operation
+    acquired = acquire_local_pdf(source)
+    target = Path(destination)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copy2(acquired.local_path, target)
+    except OSError as exc:
+        raise CodalAcquisitionError(
+            f"failed to copy acquired PDF to {target}: {exc}"
+        ) from exc
+    return AcquiredSource(
+        local_path=target,
+        source_url=str(source),
+        codal_tracking_id=acquired.codal_tracking_id,
+        content_sha256=_sha256_file(target),
     )
 
 
@@ -65,7 +105,7 @@ def acquire_pdf_from_url(
     timeout_sec: int = 60,
     filename: Optional[str] = None,
 ) -> AcquiredSource:
-    """Download PDF to dest_dir. Idempotent on same tracking id + content."""
+    """Download PDF to dest_dir. Idempotent on existing non-empty target."""
     dest = Path(dest_dir)
     dest.mkdir(parents=True, exist_ok=True)
     name = filename or (f"{codal_tracking_id}.pdf" if codal_tracking_id else "codal_download.pdf")
