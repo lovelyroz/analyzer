@@ -57,6 +57,9 @@ def _apply_baseline(engine: Engine) -> None:
 
 
 def _add_column_if_missing(engine: Engine, table_name: str, column_name: str, definition: str) -> None:
+    tables = set(inspect(engine).get_table_names())
+    if table_name not in tables:
+        return
     columns = {column["name"] for column in inspect(engine).get_columns(table_name)}
     if column_name not in columns:
         with engine.begin() as connection:
@@ -108,13 +111,13 @@ def _apply_report_current_version_index(engine: Engine) -> None:
 
 
 def _apply_market_daily_jalali_components(engine: Engine) -> None:
-    """CHANGE-005: additive Jalali components for cross-year same-month analysis."""
+    """CHANGE-005: additive Jalali components for cross-year same-month analysis.
+
+    Safe on legacy DBs that do not yet have market_daily (no-op).
+    """
     _add_column_if_missing(engine, "market_daily", "jalali_year", "INTEGER")
     _add_column_if_missing(engine, "market_daily", "jalali_month", "INTEGER")
     _add_column_if_missing(engine, "market_daily", "jalali_day", "INTEGER")
-    # trade_date was NOT NULL; SQLite cannot drop NOT NULL easily.
-    # New rows may leave trade_date NULL when only Jalali source is available.
-    # Existing rows keep their trade_date values.
 
 
 def _migration_list() -> Iterable[Migration]:
