@@ -23,6 +23,7 @@ from typing import Optional, Sequence, Tuple, Union
 
 from sqlalchemy.orm import Session
 
+from src.ingestion.codal.numbers import normalize_digits
 from src.ingestion.common.identity import find_fx_existing
 from src.ingestion.common.parsing import parse_jalali_components as _parse_jalali_components
 from src.ingestion.common.validation import VALID_FX_RATE_TYPES
@@ -37,7 +38,7 @@ _VALID_FX_RATE_TYPES = VALID_FX_RATE_TYPES
 
 @dataclass(frozen=True)
 class RawLineInput:
-    """One extracted source line; no standardization is performed here."""
+    """One extracted source line; numeric text is ASCII-normalized at CODAL persistence."""
 
     item_name: str
     value: Optional[Decimal] = None
@@ -47,6 +48,13 @@ class RawLineInput:
     source_section: Optional[str] = None
     source_row: Optional[int] = None
     source_column: Optional[str] = None
+
+
+def _ascii_text(value: Optional[str]) -> Optional[str]:
+    """Normalize numeric characters in CODAL text fields before DB persistence."""
+    if value is None:
+        return None
+    return normalize_digits(value)
 
 
 @dataclass(frozen=True)
@@ -113,7 +121,11 @@ def ingest_codal_report(
     source_url: Optional[str] = None,
     is_restated: bool = False,
 ) -> ReportIngestionResult:
-    """Persist one Codal report and its extracted raw lines atomically.
+    """Persist one CODAL report and extracted raw lines atomically.
+
+    All textual CODAL fields persisted here are normalized so Persian/Arabic
+    digits cannot enter the database. Numeric values remain Decimal. The
+    source PDF itself remains the authoritative original source artifact.
 
     PDF extraction is outside this function (CHANGE-007 / codal.adapter).
     """
@@ -122,23 +134,28 @@ def ingest_codal_report(
     session.flush()
 
     try:
+        normalized_report_type = _ascii_text(report_type) or ""
+        normalized_title = _ascii_text(title) or ""
+        normalized_tracking_id = _ascii_text(codal_tracking_id)
+        normalized_source_url = _ascii_text(source_url)
+
         report = None
-        if codal_tracking_id is not None:
-            report = session.query(Report).filter_by(codal_tracking_id=codal_tracking_id).one_or_none()
+        if normalized_tracking_id is not None:
+            report = session.query(Report).filter_by(codal_tracking_id=normalized_tracking_id).one_or_none()
 
         if report is None:
             report = Report(
                 company_id=company_id,
-                report_type=report_type,
-                codal_tracking_id=codal_tracking_id,
-                title=title,
+                report_type=normalized_report_type,
+                codal_tracking_id=normalized_tracking_id,
+                title=normalized_title,
                 financial_period_id=period_id,
-                source_url=source_url,
+                source_url=normalized_source_url,
             )
             session.add(report)
             session.flush()
 
-        if codal_tracking_id is not None:
+        if normalized_tracking_id is not None:
             existing_version = (
                 session.query(ReportVersion)
                 .filter_by(
@@ -195,14 +212,14 @@ def ingest_codal_report(
                 company_id=company_id,
                 report_version_id=version.report_version_id,
                 period_id=period_id,
-                raw_item_name=line.item_name,
-                raw_item_code=line.item_code,
+                raw_item_name=_ascii_text(line.item_name) or "",
+                raw_item_code=_ascii_text(line.item_code),
                 value=line.value,
-                unit=line.unit,
-                currency=line.currency,
-                source_section=line.source_section,
+                unit=_ascii_text(line.unit),
+                currency=_ascii_text(line.currency),
+                source_section=_ascii_text(line.source_section),
                 source_row=line.source_row,
-                source_column=line.source_column,
+                source_column=_ascii_text(line.source_column),
             )
             for line in raw_lines
         ]
