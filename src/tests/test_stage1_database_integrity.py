@@ -26,20 +26,22 @@ from src.models.report import Report, ReportVersion
 from src.models.share_action import CorporateAction, ShareCountHistory  # noqa: F401
 
 
-def test_migration_reaches_version_five_and_is_idempotent():
+def test_migration_reaches_version_six_and_is_idempotent():
     engine = create_engine("sqlite:///:memory:")
     runner = MigrationRunner(engine)
 
-    assert runner.upgrade() == 5
-    assert runner.upgrade() == 5
+    assert runner.upgrade() == 6
+    assert runner.upgrade() == 6
     tables = set(inspect(engine).get_table_names())
     assert "normalized_financial_fact_inputs" in tables
-    cols = {c["name"] for c in inspect(engine).get_columns("market_daily")}
-    assert {"jalali_year", "jalali_month", "jalali_day"}.issubset(cols)
+    market_cols = {c["name"] for c in inspect(engine).get_columns("market_daily")}
+    assert {"jalali_year", "jalali_month", "jalali_day"}.issubset(market_cols)
+    fx_cols = {c["name"] for c in inspect(engine).get_columns("fx_rates")}
+    assert {"jalali_year", "jalali_month", "jalali_day"}.issubset(fx_cols)
 
     with engine.connect() as connection:
         versions = connection.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all()
-    assert versions == [1, 2, 3, 4, 5]
+    assert versions == [1, 2, 3, 4, 5, 6]
 
 
 def test_current_report_version_unique_index_is_present_on_bootstrap():
