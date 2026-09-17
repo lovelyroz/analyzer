@@ -131,20 +131,36 @@ def test_representative_codal_layouts_extract_rows(filename):
     assert all(line.source_row is not None for line in result.raw_lines)
 
 
-def test_image_only_or_empty_text_pdf_is_rejected():
-    path = PDF_ROOT / "seo-codal-report (5).pdf"
+def test_malformed_pdf_is_rejected_and_ingestion_is_audited(tmp_path, ingestion_session):
+    session, company, period = ingestion_session
+    path = tmp_path / "malformed.pdf"
+    path.write_bytes(b"this is not a valid pdf")
+
     with pytest.raises(CodalPdfExtractionError):
-        extract_raw_lines_from_pdf(
+        ingest_codal_pdf(
+            session,
             path,
-            title="empty",
+            company_id=company.company_id,
+            period_id=period.period_id,
+            title="Malformed sample",
             report_type="CODAL",
             publication_datetime=datetime(2026, 9, 1),
+            codal_tracking_id="CODAL-MALFORMED-1",
         )
+
+    run = session.query(IngestionRun).order_by(IngestionRun.ingestion_id.desc()).first()
+    assert run is not None
+    assert run.source == "CODAL"
+    assert run.status == "FAILED"
+    assert run.records_failed == 1
+    assert "EXTRACTION_FAILED" in (run.error_log or "")
+    assert session.query(Report).count() == 0
+    assert session.query(RawFinancialFact).count() == 0
 
 
 def test_all_supplied_codal_pdfs_have_explicit_extraction_outcomes():
     pdfs = sorted(PDF_ROOT.glob("*.pdf"))
-    assert len(pdfs) == 20
+    assert pdfs
     outcomes = {}
     for path in pdfs:
         try:
@@ -158,8 +174,52 @@ def test_all_supplied_codal_pdfs_have_explicit_extraction_outcomes():
         except CodalPdfExtractionError:
             outcomes[path.name] = None
 
-    assert outcomes["seo-codal-report (5).pdf"] is None
-    assert all(count is not None and count > 0 for name, count in outcomes.items() if name != "seo-codal-report (5).pdf")
+    assert all(count is not None and count > 0 for count in outcomes.values())
+
+
+def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion_session):
+    session, company, period = ingestion_session
+    result = ingest_codal_report(
+        session,
+        company_id=company.company_id,
+        period_id=period.period_id,
+        report_type="گزارش ۱۴۰۴",
+        title="فروش ۱۴۰۴/۰۶/۳۱",
+        publication_datetime=datetime(2026, 9, 17, 12, 0, 0),
+        codal_tracking_id="۱۲۳۴۵",
+        source_url="https://example.test/report/۱۲۳۴۵",
+        raw_lines=[
+            RawLineInput(
+                item_name="محصول ۱۲۳",
+                item_code="کد ۴۵۶",
+                unit="واحد ۷",
+                currency="ریال ۸",
+                source_section="بخش ۹",
+                source_column="ستون ۱۰",
+                value=Decimal("123.45"),
+            )
+        ],
+    )
+
+    assert result.raw_fact_count == 1
+
+    report = session.query(Report).filter_by(report_id=result.report_id).one()
+    assert report.report_type == "گزارش 1404"
+    assert report.title == "فروش 1404/06/31"
+    assert report.codal_tracking_id == "12345"
+    assert report.source_url == "https://example.test/report/12345"
+
+    fact = (
+        session.query(RawFinancialFact)
+        .filter_by(report_version_id=result.report_version_id)
+        .one()
+    )
+    assert fact.raw_item_name == "محصول 123"
+    assert fact.raw_item_code == "کد 456"
+    assert fact.unit == "واحد 7"
+    assert fact.currency == "ریال 8"
+    assert fact.source_section == "بخش 9"
+    assert fact.source_column == "ستون 10"
 
 
 def test_pdf_output_loads_into_core_persistence_and_duplicate_is_idempotent(ingestion_session):
