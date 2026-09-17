@@ -1,3 +1,15 @@
+"""Stage 1 core persistence functions (CHANGE-007).
+
+Format-specific adapters live under:
+  src/ingestion/codal/
+  src/ingestion/market/
+  src/ingestion/fx/
+Shared helpers live under:
+  src/ingestion/common/
+
+This module keeps the public core API stable for existing tests and callers.
+"""
+
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -6,12 +18,23 @@ from typing import Optional, Sequence, Tuple, Union
 
 from sqlalchemy.orm import Session
 
+from src.ingestion.common.identity import find_fx_existing, find_market_daily_existing
+from src.ingestion.common.parsing import (
+    normalize_header as _normalize_header,
+    parse_jalali_components as _parse_jalali_components,
+    to_decimal as _to_decimal,
+    to_int as _to_int,
+)
+from src.ingestion.common.validation import VALID_FX_RATE_TYPES, validate_ohlc_consistency
 from src.models.audit import IngestionRun
 from src.models.entity import Company
 from src.models.fx import FXRate
 from src.models.market import MarketDaily
 from src.models.normalized import RawFinancialFact
 from src.models.report import Report, ReportVersion
+
+# Backward-compatible alias used by older tests/imports
+_VALID_FX_RATE_TYPES = VALID_FX_RATE_TYPES
 
 
 @dataclass(frozen=True)
@@ -79,11 +102,6 @@ class FxIngestionResult:
     status: str
 
 
-_VALID_FX_RATE_TYPES = frozenset(
-    {"FREE_MARKET", "OPERATIONAL", "OFFICIAL", "ESTIMATED", "MANUAL_OPERATOR"}
-)
-
-
 def ingest_codal_report(
     session: Session,
     *,
@@ -99,8 +117,7 @@ def ingest_codal_report(
 ) -> ReportIngestionResult:
     """Persist one Codal report and its extracted raw lines atomically.
 
-    This function deliberately stops at the raw layer. Mapping decisions and
-    normalized facts belong to later steps in the ingestion pipeline.
+    PDF extraction is outside this function (CHANGE-007 / codal.adapter).
     """
     run = IngestionRun(source="CODAL", status="STARTED", records_found=len(raw_lines))
     session.add(run)
@@ -192,47 +209,6 @@ def ingest_codal_report(
         raise
 
 
-def _to_decimal(raw: Optional[str]) -> Optional[Decimal]:
-    if raw is None or str(raw).strip() == "":
-        return None
-    try:
-        return Decimal(str(raw).strip().replace(",", ""))
-    except Exception:
-        return None
-
-
-def _to_int(raw: Optional[str]) -> Optional[int]:
-    if raw is None or str(raw).strip() == "":
-        return None
-    try:
-        return int(Decimal(str(raw).strip().replace(",", "")))
-    except Exception:
-        return None
-
-
-def _normalize_header(h: str) -> str:
-    return h.strip().lower().replace("-", "").replace("_", "").replace(" ", "")
-
-
-def _parse_jalali_components(s: str) -> Optional[Tuple[int, int, int]]:
-    """Parse 'YYYY-MM-DD' or 'YYYY/MM/DD' Jalali text into (year, month, day).
-
-    This is string splitting of the source calendar label only.
-    It is NOT a Jalali→Gregorian calendar conversion.
-    """
-    s = s.strip().replace("/", "-")
-    parts = s.split("-")
-    if len(parts) != 3:
-        return None
-    try:
-        y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
-    except ValueError:
-        return None
-    if not (1 <= m <= 12 and 1 <= d <= 31):
-        return None
-    return y, m, d
-
-
 def ingest_ohlc_csv(
     session: Session,
     path: Union[str, Path],
@@ -267,12 +243,21 @@ def ingest_ohlc_csv(
 
             colmap = {}
             header_map = {
-                "jdate": "jdate", "date": "jdate",
-                "open": "open", "high": "high", "low": "low", "close": "close",
-                "final": "final", "adjclose": "final", "adjustedclose": "final",
-                "volume": "volume", "value": "value",
-                "no": "trade_count", "tradecount": "trade_count",
-                "ticker": "ticker", "symbol": "ticker",
+                "jdate": "jdate",
+                "date": "jdate",
+                "open": "open",
+                "high": "high",
+                "low": "low",
+                "close": "close",
+                "final": "final",
+                "adjclose": "final",
+                "adjustedclose": "final",
+                "volume": "volume",
+                "value": "value",
+                "no": "trade_count",
+                "tradecount": "trade_count",
+                "ticker": "ticker",
+                "symbol": "ticker",
             }
             for h in reader.fieldnames:
                 key = _normalize_header(h)
@@ -322,40 +307,34 @@ def ingest_ohlc_csv(
                 value = _to_decimal(row.get(colmap.get("value", "")))
                 trade_count = _to_int(row.get(colmap.get("trade_count", "")))
 
-                if all(v is not None for v in (open_p, high_p, low_p, close_p)):
-                    if high_p < low_p or high_p < open_p or high_p < close_p or low_p > open_p or low_p > close_p:
-                        failed += 1
-                        errors.append(f"line {line_no}: OHLC consistency failed")
-                        continue
+                if not validate_ohlc_consistency(open_p, high_p, low_p, close_p):
+                    failed += 1
+                    errors.append(f"line {line_no}: OHLC consistency failed")
+                    continue
 
-                existing = (
-                    session.query(MarketDaily)
-                    .filter_by(
-                        company_id=company.company_id,
-                        jalali_year=jy,
-                        jalali_month=jm,
-                        jalali_day=jd,
-                    )
-                    .one_or_none()
+                existing = find_market_daily_existing(
+                    session, company_id=company.company_id, jy=jy, jm=jm, jd=jd
                 )
 
                 if existing is None:
-                    session.add(MarketDaily(
-                        company_id=company.company_id,
-                        trade_date=None,
-                        jalali_year=jy,
-                        jalali_month=jm,
-                        jalali_day=jd,
-                        open_price=open_p,
-                        high_price=high_p,
-                        low_price=low_p,
-                        close_price=close_p,
-                        adjusted_close=adjusted,
-                        volume=volume,
-                        value=value,
-                        trade_count=trade_count,
-                        source=source_label,
-                    ))
+                    session.add(
+                        MarketDaily(
+                            company_id=company.company_id,
+                            trade_date=None,
+                            jalali_year=jy,
+                            jalali_month=jm,
+                            jalali_day=jd,
+                            open_price=open_p,
+                            high_price=high_p,
+                            low_price=low_p,
+                            close_price=close_p,
+                            adjusted_close=adjusted,
+                            volume=volume,
+                            value=value,
+                            trade_count=trade_count,
+                            source=source_label,
+                        )
+                    )
                     inserted += 1
                 else:
                     existing.open_price = open_p
@@ -408,29 +387,6 @@ def ingest_ohlc_csv(
         )
 
 
-def _find_fx_existing(
-    session: Session,
-    *,
-    rate_type: str,
-    c_from: str,
-    c_to: str,
-    rate_date: Optional[date],
-    jy: Optional[int],
-    jm: Optional[int],
-    jd: Optional[int],
-) -> Optional[FXRate]:
-    q = session.query(FXRate).filter_by(
-        currency_from=c_from,
-        currency_to=c_to,
-        rate_type=rate_type,
-    )
-    if jy is not None and jm is not None and jd is not None:
-        return q.filter_by(jalali_year=jy, jalali_month=jm, jalali_day=jd).one_or_none()
-    if rate_date is not None:
-        return q.filter_by(rate_date=rate_date).one_or_none()
-    return None
-
-
 def ingest_fx_rates(
     session: Session,
     rates: Sequence[FxRateInput],
@@ -450,7 +406,7 @@ def ingest_fx_rates(
     try:
         for idx, item in enumerate(rates):
             label = f"item {idx}"
-            if item.rate_type not in _VALID_FX_RATE_TYPES:
+            if item.rate_type not in VALID_FX_RATE_TYPES:
                 failed += 1
                 errors.append(f"{label}: invalid rate_type={item.rate_type!r}")
                 continue
@@ -488,7 +444,7 @@ def ingest_fx_rates(
             jd = item.jalali_day if has_jalali else None
             rdate = None if has_jalali else item.rate_date
 
-            existing = _find_fx_existing(
+            existing = find_fx_existing(
                 session,
                 rate_type=item.rate_type,
                 c_from=c_from,
@@ -570,54 +526,19 @@ def ingest_fx_xlsx(
     rates_in_toman: bool = False,
     source_label: Optional[str] = None,
 ) -> FxIngestionResult:
-    """Ingest a two-column Jalali FX workbook into fx_rates.
-
-    col0 = Jalali date string; col1 = rate.
-    rates_in_toman=True multiplies by 10 (free-market toman → IRR).
-    """
-    from pathlib import Path as P
-
-    try:
-        import openpyxl
-    except ImportError as exc:
-        raise ImportError("openpyxl is required for ingest_fx_xlsx") from exc
-
-    path = P(path)
-    if rate_type not in _VALID_FX_RATE_TYPES:
-        raise ValueError(f"invalid rate_type={rate_type!r}")
+    """XLSX adapter + core persistence (delegates to fx.adapter)."""
+    from src.ingestion.fx.adapter import load_fx_xlsx_inputs
 
     label = source_label or f"XLSX_{rate_type}"
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
-
-    inputs: list = []
-    for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
-        if not row or row[0] is None:
-            continue
-        date_raw = str(row[0]).strip()
-        if row_idx == 1 and any(ch.isalpha() for ch in date_raw.replace("-", "").replace("/", "")):
-            continue
-        if len(row) < 2 or row[1] is None:
-            continue
-        components = _parse_jalali_components(date_raw)
-        if components is None:
-            continue
-        jy, jm, jd = components
-        rate_val = _to_decimal(str(row[1]))
-        if rate_val is None:
-            continue
-        if rates_in_toman:
-            rate_val = rate_val * Decimal(10)
-        inputs.append(
-            FxRateInput(
-                rate=rate_val,
-                rate_type=rate_type,
-                jalali_year=jy,
-                jalali_month=jm,
-                jalali_day=jd,
-                source=label,
-            )
-        )
-    wb.close()
-
+    inputs = load_fx_xlsx_inputs(
+        path,
+        rate_type=rate_type,
+        rates_in_toman=rates_in_toman,
+        source_label=label,
+    )
     return ingest_fx_rates(session, inputs, source_label=label)
+
+
+# Re-export parse helper for tests that import it from service
+def parse_jalali_components(s: str) -> Optional[Tuple[int, int, int]]:
+    return _parse_jalali_components(s)
