@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Numeric, UniqueConstraint, CheckConstraint, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Numeric, UniqueConstraint, CheckConstraint
 from src.core.database import Base
 
 
@@ -6,7 +6,12 @@ class FXRate(Base):
     __tablename__ = "fx_rates"
 
     fx_rate_id = Column(Integer, primary_key=True, autoincrement=True)
-    rate_date = Column(Date, nullable=False)
+    # Gregorian Date retained for backward compatibility; NULL for Jalali-sourced rows (same policy as market_daily.trade_date).
+    rate_date = Column(Date, nullable=True)
+    # Jalali components from source string only — no Jalali→Gregorian conversion (same as CHANGE-005 / market_daily).
+    jalali_year = Column(Integer, nullable=True)
+    jalali_month = Column(Integer, nullable=True)  # 1..12
+    jalali_day = Column(Integer, nullable=True)
     currency_from = Column(String(10), nullable=False, default="USD")
     currency_to = Column(String(10), nullable=False, default="IRR")
     rate = Column(Numeric(precision=18, scale=4), nullable=False)
@@ -18,6 +23,14 @@ class FXRate(Base):
         CheckConstraint(
             "rate_type IN ('FREE_MARKET','OPERATIONAL','OFFICIAL','ESTIMATED','MANUAL_OPERATOR')",
             name="chk_fx_rate_type",
+        ),
+        CheckConstraint(
+            "jalali_month IS NULL OR (jalali_month >= 1 AND jalali_month <= 12)",
+            name="chk_fx_jalali_month",
+        ),
+        CheckConstraint(
+            "jalali_day IS NULL OR (jalali_day >= 1 AND jalali_day <= 31)",
+            name="chk_fx_jalali_day",
         ),
     )
 

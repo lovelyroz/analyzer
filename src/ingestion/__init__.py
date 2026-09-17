@@ -13,6 +13,7 @@ from src.ingestion.service import (
     ingest_codal_report,
     ingest_ohlc_csv,
     ingest_fx_rates,
+    ingest_fx_xlsx,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "ingest_codal_report",
     "ingest_ohlc_csv",
     "ingest_fx_rates",
+    "ingest_fx_xlsx",
 ]
