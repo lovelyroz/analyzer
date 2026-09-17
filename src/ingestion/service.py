@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional, Sequence, Union
+from typing import Optional, Sequence, Tuple, Union
 
 from sqlalchemy.orm import Session
 
@@ -175,6 +175,25 @@ def _normalize_header(h: str) -> str:
     return h.strip().lower().replace("-", "").replace("_", "").replace(" ", "")
 
 
+def _parse_jalali_components(s: str) -> Optional[Tuple[int, int, int]]:
+    """Parse 'YYYY-MM-DD' or 'YYYY/MM/DD' Jalali text into (year, month, day).
+
+    This is string splitting of the source calendar label only.
+    It is NOT a Jalali→Gregorian calendar conversion.
+    """
+    s = s.strip().replace("/", "-")
+    parts = s.split("-")
+    if len(parts) != 3:
+        return None
+    try:
+        y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+    if not (1 <= m <= 12 and 1 <= d <= 31):
+        return None
+    return y, m, d
+
+
 def ingest_ohlc_csv(
     session: Session,
     path: Union[str, Path],
@@ -183,20 +202,16 @@ def ingest_ohlc_csv(
 ) -> OhlcIngestionResult:
     """Ingest an OHLC CSV (Iranian market format) into MarketDaily.
 
-    Style mirrors ingest_codal_report: single function, inline IngestionRun,
-    no parallel service layer.
+    Style mirrors ingest_codal_report: single function, inline IngestionRun.
 
-    Date policy (important):
+    Date policy (CHANGE-005):
     - Source CSV uses Jalali dates (e.g. 1402-01-08).
-    - MarketDaily.trade_date is SQLAlchemy Date (existing contract).
-    - No calendar conversion is performed here.
-    - Jalali string is kept as-is in the source field / error log when needed.
-    - Insertion of trade_date currently requires a date object compatible with
-      the existing Date column used by Stage 1 tests. This tension is left
-      explicit for an architectural decision rather than silent conversion.
-
-    Until that decision, rows with only Jalali dates are recorded as failed
-    with a clear message so that no false valid data is created.
+    - jalali_year / jalali_month / jalali_day are filled from the source string.
+    - No Jalali→Gregorian calendar conversion is performed.
+    - Same-month comparisons across years use jalali_month (independent of year/day).
+    - trade_date is left NULL for Jalali-sourced rows (backward-compatible Date column).
+    - Identity / idempotency key for Jalali rows: (company_id, jalali_year, jalali_month, jalali_day).
+    - Missing numeric values stay NULL (NULL != 0).
     """
     import csv
     from pathlib import Path as P
@@ -256,18 +271,77 @@ def ingest_ohlc_csv(
                     errors.append(f"line {line_no}: missing date or ticker")
                     continue
 
-                # Explicit policy: no Jalali→Gregorian conversion.
-                # Existing MarketDaily.trade_date is Date type used with Gregorian
-                # date objects in Stage 1 tests. Until an architectural decision
-                # is made on how to store Jalali dates, we do not invent a date
-                # object and do not write a false valid row.
-                errors.append(
-                    f"line {line_no}: Jalali date {jdate_raw!r} kept as source; "
-                    f"trade_date Date column requires architectural decision "
-                    f"(no silent calendar conversion)"
+                components = _parse_jalali_components(jdate_raw)
+                if components is None:
+                    failed += 1
+                    errors.append(f"line {line_no}: invalid Jalali date {jdate_raw!r}")
+                    continue
+
+                jy, jm, jd = components
+
+                company = session.query(Company).filter_by(ticker=ticker).one_or_none()
+                if company is None:
+                    failed += 1
+                    errors.append(f"line {line_no}: company ticker={ticker!r} not found")
+                    continue
+
+                open_p = _to_decimal(row.get(colmap.get("open", "")))
+                high_p = _to_decimal(row.get(colmap.get("high", "")))
+                low_p = _to_decimal(row.get(colmap.get("low", "")))
+                close_p = _to_decimal(row.get(colmap.get("close", "")))
+                final_p = _to_decimal(row.get(colmap.get("final", "")))
+                adjusted = final_p if final_p is not None else close_p
+                volume = _to_int(row.get(colmap.get("volume", "")))
+                value = _to_decimal(row.get(colmap.get("value", "")))
+                trade_count = _to_int(row.get(colmap.get("trade_count", "")))
+
+                # Basic OHLC consistency when all four present
+                if all(v is not None for v in (open_p, high_p, low_p, close_p)):
+                    if high_p < low_p or high_p < open_p or high_p < close_p or low_p > open_p or low_p > close_p:
+                        failed += 1
+                        errors.append(f"line {line_no}: OHLC consistency failed")
+                        continue
+
+                existing = (
+                    session.query(MarketDaily)
+                    .filter_by(
+                        company_id=company.company_id,
+                        jalali_year=jy,
+                        jalali_month=jm,
+                        jalali_day=jd,
+                    )
+                    .one_or_none()
                 )
-                failed += 1
-                continue
+
+                if existing is None:
+                    session.add(MarketDaily(
+                        company_id=company.company_id,
+                        trade_date=None,
+                        jalali_year=jy,
+                        jalali_month=jm,
+                        jalali_day=jd,
+                        open_price=open_p,
+                        high_price=high_p,
+                        low_price=low_p,
+                        close_price=close_p,
+                        adjusted_close=adjusted,
+                        volume=volume,
+                        value=value,
+                        trade_count=trade_count,
+                        source=source_label,
+                    ))
+                    inserted += 1
+                else:
+                    existing.open_price = open_p
+                    existing.high_price = high_p
+                    existing.low_price = low_p
+                    existing.close_price = close_p
+                    existing.adjusted_close = adjusted
+                    existing.volume = volume
+                    existing.value = value
+                    existing.trade_count = trade_count
+                    existing.source = source_label
+                    updated += 1
 
             run.records_inserted = inserted
             run.records_updated = updated
