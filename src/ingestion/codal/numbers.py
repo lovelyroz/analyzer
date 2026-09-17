@@ -24,6 +24,7 @@ def parse_amount(raw: Optional[str]) -> Optional[Decimal]:
     - blank / dash / explicit empty -> None (NULL != 0)
     - parentheses -> negative
     - thousand separators are stripped
+    - Arabic decimal separator is normalized to '.'.
     - never invent a value when unparsable -> None
     """
     if raw is None:
@@ -43,7 +44,13 @@ def parse_amount(raw: Optional[str]) -> Optional[Decimal]:
         negative = True
         s = s[1:].strip()
 
-    s = s.replace(",", "").replace("٬", "").replace(" ", "").replace("\u200c", "")
+    s = (
+        s.replace(",", "")
+        .replace("٬", "")
+        .replace("٫", ".")
+        .replace(" ", "")
+        .replace("\u200c", "")
+    )
     if not s:
         return None
     try:
