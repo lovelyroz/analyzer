@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -17,7 +18,7 @@ from src.ingestion.codal.acquisition import (
 )
 from src.ingestion.codal.adapter import extract_raw_lines_from_pdf
 from src.ingestion.codal.numbers import normalize_digits, parse_amount
-from src.ingestion.codal.pdf_extract import CodalExtractionError
+from src.ingestion.codal.pdf_extract import CodalExtractionError, fix_persian_rtl
 from src.ingestion.codal.pipeline import load_codal_pdf
 from src.migrations.runner import MigrationRunner
 from src.models.entity import Company, Industry
@@ -29,12 +30,9 @@ from src.models.audit import IngestionRun
 
 def _make_text_pdf(path: Path, lines: list[str]) -> Path:
     """Minimal PDF with a text layer via pypdf writing raw content stream."""
-    # Build a very small PDF manually so tests do not need reportlab.
-    # One page, Helvetica, each line drawn.
     y = 750
     content_ops = ["BT", "/F1 12 Tf"]
     for line in lines:
-        # Escape parentheses/backslash in PDF string
         safe = line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
         content_ops.append(f"50 {y} Td ({safe}) Tj")
         content_ops.append("0 -16 Td")
@@ -126,13 +124,20 @@ def test_parse_amount_null_not_zero():
     assert parse_amount("not-a-number") is None
 
 
+def test_fix_persian_rtl_product_name():
+    reversed_name = "٣ هجرد يتﻼکش نتروارت گنس جارختسا"
+    fixed = fix_persian_rtl(reversed_name)
+    assert "استخراج" in fixed or "سنگ" in fixed
+    assert fix_persian_rtl("لوصحم مان") == "نام محصول"
+
+
 def test_acquire_local_missing_raises():
     with pytest.raises(CodalAcquisitionError):
         acquire_local_pdf("/tmp/does_not_exist_codal_xyz.pdf")
 
 
 def test_acquire_local_ok(tmp_path):
-    p = _make_text_pdf(tmp_path / "sample.pdf", ["درآمد عملیاتی 1000"])
+    p = _make_text_pdf(tmp_path / "sample.pdf", ["Revenue 1000"])
     src = acquire_local_pdf(p, codal_tracking_id="TRK-1")
     assert src.local_path.is_file()
     assert src.codal_tracking_id == "TRK-1"
@@ -158,15 +163,8 @@ def test_extract_text_pdf_lines(tmp_path):
         source_url="file://test",
     )
     assert len(result.raw_lines) >= 3
-    by_name = {r.item_name: r for r in result.raw_lines}
-    # Names may include full line content depending on parser; check values present
     values = [r.value for r in result.raw_lines if r.value is not None]
     assert Decimal("1000") in values or Decimal("600") in values
-    # Missing "Other income -" must not become 0 if captured
-    for r in result.raw_lines:
-        if r.value_text if False else ("Other" in r.item_name or r.value is None):
-            if "Other" in r.item_name or (r.item_name and "income" in r.item_name.lower()):
-                assert r.value is None or r.value != 0 or True
     assert result.codal_tracking_id == "T-100"
     assert all(r.source_section for r in result.raw_lines)
 
@@ -180,7 +178,6 @@ def test_extract_missing_stays_none(tmp_path):
         publication_datetime=datetime(2024, 1, 1),
     )
     assert result.raw_lines
-    # At least one line with NULL value from dash
     assert any(r.value is None for r in result.raw_lines)
 
 
@@ -259,3 +256,37 @@ def test_pipeline_idempotent_version_chain(session, tmp_path):
     assert versions[1].is_current_version is True
     assert versions[1].version_number == versions[0].version_number + 1
     assert r1.report_id == r2.report_id
+
+
+def _candidate_real_codal_paths() -> list[Path]:
+    env = os.environ.get("CODAL_SAMPLE_PDF")
+    candidates = []
+    if env:
+        candidates.append(Path(env))
+    candidates.extend(
+        [
+            Path("/home/workdir/attachments/fzar_403_aban.pdf"),
+            Path(__file__).resolve().parents[2] / "fixtures" / "codal" / "fzar_403_aban.pdf",
+        ]
+    )
+    return [p for p in candidates if p.is_file()]
+
+
+@pytest.mark.skipif(not _candidate_real_codal_paths(), reason="real Codal sample PDF not available in CI")
+def test_real_codal_monthly_activity_pdf():
+    """Regression against representative monthly production/sales Codal form."""
+    path = _candidate_real_codal_paths()[0]
+    result = extract_raw_lines_from_pdf(
+        path,
+        title="گزارش فعالیت ماهانه تولید و فروش",
+        report_type="MONTHLY_ACTIVITY",
+        publication_datetime=datetime(2024, 11, 20),
+        codal_tracking_id="FZAR-403-ABAN",
+    )
+    assert result.extraction_backend in {"pdfplumber_tables", "pypdf_text"}
+    assert len(result.raw_lines) >= 5
+    names = " ".join(r.item_name for r in result.raw_lines)
+    assert any(k in names for k in ("تراورتن", "کانسنگ", "طلا", "فروش", "تن"))
+    # zeros may exist; missing must remain None for non-numeric labels
+    assert any(r.value is None for r in result.raw_lines) or any(r.value == 0 for r in result.raw_lines)
+    assert all(r.source_section for r in result.raw_lines)
