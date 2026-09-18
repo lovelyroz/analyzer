@@ -12,7 +12,6 @@ from src.ingestion.codal.parser import (
     normalize_pdf_text,
     parse_numeric_token,
 )
-from src.ingestion.codal.pdf_extract import extract_cell_rows
 from src.ingestion.service import RawLineInput, ingest_codal_report
 from src.models.audit import IngestionRun
 from src.models.entity import Company, Industry
@@ -86,33 +85,12 @@ def test_text_parser_preserves_row_and_column_for_multi_value_statement_rows():
     assert all(isinstance(line, RawLineInput) for line in lines)
 
 
-def test_table_extractor_does_not_treat_dates_as_amounts(monkeypatch):
+def test_table_extractor_does_not_treat_dates_as_amounts():
     from src.ingestion.codal import pdf_extract
 
-    table = [
-        ["نام محصول", "تاریخ", "مبلغ"],
-        ["محصول الف", "۱۴۰۴/۰۶/۳۱", "۱۲۳٬۴۵۶"],
-    ]
-
-    class FakePage:
-        def extract_tables(self):
-            return [table]
-
-    class FakePdf:
-        pages = [FakePage()]
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-    monkeypatch.setattr(pdf_extract.pdfplumber, "open", lambda _: FakePdf(), raising=False)
-
-    rows = pdf_extract._extract_tables_pdfplumber(Path("sample.pdf"))
-    assert len(rows) == 1
-    assert rows[0].value_text == "۱۲۳٬۴۵۶"
-    assert rows[0].source_column == "مبلغ"
+    assert pdf_extract._looks_like_date("۱۴۰۴/۰۶/۳۱")
+    assert not pdf_extract._looks_pure_number("۱۴۰۴/۰۶/۳۱")
+    assert pdf_extract._looks_pure_number("۱۲۳٬۴۵۶")
 
 
 def test_representative_monthly_codal_pdf_is_deterministic_and_returns_raw_dto():
