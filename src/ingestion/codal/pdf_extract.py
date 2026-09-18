@@ -4,9 +4,9 @@ Backends:
   1. pdfplumber tables (preferred for multi-column Codal forms)
   2. pypdf text lines (fallback)
 
-The extraction layer is deliberately conservative: source text is not
-heuristically reversed, date-like cells are never treated as financial
-amounts, and section/header-only rows are not emitted as raw financial facts.
+The extraction layer is conservative: source text is preserved, date-like
+cells are excluded from financial values, and header/section-only rows are not
+emitted as raw financial facts.
 
 OCR is not bundled; scanned PDFs without a text layer yield extraction errors.
 """
@@ -36,19 +36,24 @@ class ExtractedCellRow:
 
 
 _PERSIAN_CHAR_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
-_DIGIT_RE = re.compile(r"[\d۰-۹٠-٩]")
 _DATE_CELL_RE = re.compile(
-    r"^\s*(?:13|14|15)[۰-۹٠-٩\d]{2}[/-][۰-۹٠-٩\d]{1,2}[/-][۰-۹٠-٩\d]{1,2}\s*$"
+    r"^\s*(?:13|14|15)\d{2}[/-]\d{1,2}[/-]\d{1,2}\s*$"
 )
+
+
+def _normalize_digits_for_detection(text: str) -> str:
+    return (
+        (text or "")
+        .translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
+        .translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+    )
 
 
 def fix_persian_rtl(text: str) -> str:
     """Compatibility helper: preserve extractor text exactly.
 
-    Older versions reversed cells based on Persian-character density. That is
-    unsafe because a correctly ordered cell can be reversed and numeric tokens
-    can be corrupted. Raw extraction must remain source-faithful; any future
-    RTL repair must be driven by explicit extractor evidence, not a heuristic.
+    PDF text extraction can encode visual RTL order. Reversing an entire cell
+    is unsafe, so this function intentionally performs no lexical reversal.
     """
     return text
 
@@ -58,7 +63,8 @@ def _persian_score(cell: str) -> int:
 
 
 def _looks_like_date(cell: str) -> bool:
-    return bool(_DATE_CELL_RE.fullmatch(cell or ""))
+    normalized = _normalize_digits_for_detection(cell).replace("٫", "/")
+    return bool(_DATE_CELL_RE.fullmatch(normalized))
 
 
 def _looks_pure_number(cell: str) -> bool:
@@ -66,11 +72,12 @@ def _looks_pure_number(cell: str) -> bool:
         return True
     if _looks_like_date(cell):
         return False
-    s = cell.replace(",", "").replace("٬", "").replace(" ", "")
+    s = _normalize_digits_for_detection(cell)
+    s = s.replace(",", "").replace("٬", "").replace("،", "").replace(" ", "")
     s = re.sub(r"[()\-−]", "", s)
     if not s:
         return True
-    return bool(re.fullmatch(r"[\d۰-۹٠-٩.]+", s))
+    return bool(re.fullmatch(r"[0-9.]+", s))
 
 
 def _extract_text_pypdf(path: Path) -> List[Tuple[int, str]]:
@@ -105,12 +112,7 @@ def _header_labels(header_row: Sequence[str]) -> List[str]:
 
 
 def _pick_name_cell(cells: Sequence[str]) -> Tuple[int, str]:
-    """Choose a text label cell conservatively.
-
-    Prefer cells containing Persian/Arabic letters. If several such cells are
-    present, choose the longest one. This remains a heuristic and is kept only
-    at the adapter boundary; downstream persistence preserves provenance.
-    """
+    """Choose the strongest text-label cell without reversing its content."""
     best_i, best_score, best_len = -1, 0, 0
     for i, c in enumerate(cells):
         if not c:
@@ -148,7 +150,6 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
                             header_idx = ri
                             break
                     headers = _header_labels([(c or "") for c in table[header_idx]])
-
                     section = f"page_{page_idx}_table_{t_i}"
 
                     for r_i, raw_row in enumerate(table):
@@ -162,26 +163,8 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
                         if not name:
                             continue
 
-                        unit = ""
-                        for idx in (name_col - 1, name_col + 1):
-                            if 0 <= idx < len(cells) and cells[idx]:
-                                cand = cells[idx].strip()
-                                if cand in {
-                                    "تن",
-                                    "کیلوگرم",
-                                    "عدد",
-                                    "مترمکعب",
-                                    "متر مکعب",
-                                    "مگاوات ساعت",
-                                    "کیلووات ساعت",
-                                }:
-                                    unit = cand
-                                    break
-
                         for c_i, cell in enumerate(cells):
                             if c_i == name_col or not cell:
-                                continue
-                            if unit and cell == unit:
                                 continue
                             if _looks_like_date(cell):
                                 continue
@@ -189,15 +172,9 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
                                 continue
 
                             col_label = headers[c_i] if c_i < len(headers) else f"col_{c_i}"
-                            item = name
-                            if unit:
-                                item = f"{item} | {unit}"
-                            if col_label and not col_label.startswith("col_"):
-                                item = f"{item} | {col_label}"
-
                             rows.append(
                                 ExtractedCellRow(
-                                    item_name=item,
+                                    item_name=name,
                                     value_text=cell,
                                     source_section=section,
                                     source_row=r_i + 1,
@@ -206,18 +183,51 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
                                 )
                             )
     except Exception:
-        # Never return a partial table extraction after a backend failure.
-        # Let the caller fall back to the pypdf text backend.
         return []
 
     return rows
 
 
+_NUMBER_TOKEN_RE = re.compile(
+    r"(?<!\w)[(\[]?[−-]?[0-9۰-۹٠-٩][0-9۰-۹٠-٩,٬،.]*[)\]]?(?!\w)"
+)
+
+
+def _extract_numeric_tokens(line: str) -> List[Tuple[str, int, int]]:
+    """Return numeric tokens while excluding date tokens."""
+    result: List[Tuple[str, int, int]] = []
+    for match in _NUMBER_TOKEN_RE.finditer(line or ""):
+        token = match.group()
+        if _looks_like_date(token):
+            continue
+        result.append((token, match.start(), match.end()))
+    return result
+
+
+def _name_from_line_and_tokens(line: str, tokens: Sequence[Tuple[str, int, int]]) -> str:
+    """Extract label from either LTR (name then values) or RTL (values then name).
+
+    CODAL PDFs commonly expose RTL text in visual order. We do not reverse the
+    string; instead, when numeric tokens precede the Persian label, the label is
+    taken from the trailing text. This preserves the actual extracted glyph
+    sequence and avoids corrupting numbers.
+    """
+    if not tokens:
+        return ""
+
+    first_start = tokens[0][1]
+    last_end = tokens[-1][2]
+
+    prefix = line[:first_start].strip(" :-|\t")
+    suffix = line[last_end:].strip(" :-|\t")
+
+    if _persian_score(suffix) >= _persian_score(prefix):
+        return suffix
+    return prefix
+
+
 def _lines_from_text_pages(pages: Sequence[Tuple[int, str]]) -> List[ExtractedCellRow]:
     rows: List[ExtractedCellRow] = []
-    value_re = re.compile(
-        r"^(?P<name>.+?)[\s:\t]+(?P<value>\(?[-−]?[\d۰-۹٠-٩٬,./\s]+\)?|-)$"
-    )
 
     for page_no, text in pages:
         section = f"page_{page_no}"
@@ -227,21 +237,27 @@ def _lines_from_text_pages(pages: Sequence[Tuple[int, str]]) -> List[ExtractedCe
             if not line:
                 continue
             line_no += 1
-            m = value_re.match(line)
-            if m:
-                value = m.group("value").strip()
-                if _looks_like_date(value):
-                    continue
+
+            tokens = _extract_numeric_tokens(line)
+            if not tokens:
+                continue
+
+            name = _name_from_line_and_tokens(line, tokens)
+            if not name:
+                continue
+
+            for column_number, (token, _, _) in enumerate(tokens, start=1):
                 rows.append(
                     ExtractedCellRow(
-                        item_name=m.group("name").strip(),
-                        value_text=value,
+                        item_name=name,
+                        value_text=token,
                         source_section=section,
                         source_row=line_no,
-                        source_column="text",
+                        source_column=str(column_number),
                         page=page_no,
                     )
                 )
+
     return rows
 
 
