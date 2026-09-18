@@ -29,4 +29,4 @@ Include/
 .idea/
 .DS_Store
 Thumbs.db
-/pdf
+pdf/
