@@ -93,6 +93,17 @@ def test_table_extractor_does_not_treat_dates_as_amounts():
     assert pdf_extract._looks_pure_number("۱۲۳٬۴۵۶")
 
 
+def test_rtl_pdf_line_extracts_trailing_label_without_reversing_text():
+    from src.ingestion.codal import pdf_extract
+
+    pages = [(1, "١٨ ١,٢١٨,۶٨٩,٢٣٩ ٢,٢٠۵,٩٨۶,٢٩٩ ﻲﻳﺎﻄﻋا تﻼﯿﮫﺴﺗ دﻣآرد")]
+    rows = pdf_extract._lines_from_text_pages(pages)
+
+    assert len(rows) == 3
+    assert all(row.item_name == "ﻲﻳﺎﻄﻋا تﻼﯿﮫﺴﺗ دﻣآرد" for row in rows)
+    assert [row.source_column for row in rows] == ["1", "2", "3"]
+
+
 def test_representative_monthly_codal_pdf_is_deterministic_and_returns_raw_dto():
     path = PDF_ROOT / "seo-codal-report (1).pdf"
     result_a = extract_raw_lines_from_pdf(
