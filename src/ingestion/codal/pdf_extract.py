@@ -62,6 +62,20 @@ def _persian_score(cell: str) -> int:
     return len(_PERSIAN_CHAR_RE.findall(cell or ""))
 
 
+def _label_score(cell: str) -> int:
+    """Score non-numeric text that can plausibly be a line-item label."""
+    text = (cell or "").strip()
+    if not text:
+        return 0
+    normalized = _normalize_digits_for_detection(text)
+    if _looks_like_date(normalized):
+        return 0
+    score = _persian_score(text) * 3
+    score += len(re.findall(r"[A-Za-z]", text))
+    score += len(re.findall(r"[\u0600-\u06FF]", text))
+    return score
+
+
 def _looks_like_date(cell: str) -> bool:
     normalized = _normalize_digits_for_detection(cell).replace("٫", "/")
     return bool(_DATE_CELL_RE.fullmatch(normalized))
@@ -117,7 +131,7 @@ def _pick_name_cell(cells: Sequence[str]) -> Tuple[int, str]:
     for i, c in enumerate(cells):
         if not c:
             continue
-        score = _persian_score(c)
+        score = _label_score(c)
         if score > best_score or (score == best_score and len(c) > best_len):
             best_i, best_score, best_len = i, score, len(c)
     if best_i < 0 or best_score == 0:
@@ -201,6 +215,15 @@ def _extract_numeric_tokens(line: str) -> List[Tuple[str, int, int]]:
         if _looks_like_date(token):
             continue
         result.append((token, match.start(), match.end()))
+
+    # A trailing dash is a legitimate missing-value marker in CODAL rows.
+    # Only accept it when no numeric token exists, avoiding false rows from
+    # ordinary prose/hyphenated text.
+    if not result:
+        match = re.search(r"[ \t]+([—–-])\s*$", line or "")
+        if match:
+            result.append((match.group(1), match.start(1), match.end(1)))
+
     return result
 
 
@@ -221,9 +244,14 @@ def _name_from_line_and_tokens(line: str, tokens: Sequence[Tuple[str, int, int]]
     prefix = line[:first_start].strip(" :-|\t")
     suffix = line[last_end:].strip(" :-|\t")
 
-    if _persian_score(suffix) >= _persian_score(prefix):
+    suffix_score = _label_score(suffix)
+    prefix_score = _label_score(prefix)
+
+    if suffix_score >= prefix_score and suffix_score:
         return suffix
-    return prefix
+    if prefix_score:
+        return prefix
+    return ""
 
 
 def _lines_from_text_pages(pages: Sequence[Tuple[int, str]]) -> List[ExtractedCellRow]:
