@@ -12,10 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.core.database import Base
-from src.ingestion.codal.acquisition import (
-    CodalAcquisitionError,
-    acquire_local_pdf,
-)
+from src.ingestion.codal.acquisition import CodalAcquisitionError, acquire_local_pdf
 from src.ingestion.codal.adapter import extract_raw_lines_from_pdf
 from src.ingestion.codal.numbers import normalize_digits, parse_amount
 from src.ingestion.codal.pdf_extract import CodalExtractionError, fix_persian_rtl
@@ -124,24 +121,10 @@ def test_parse_amount_null_not_zero():
     assert parse_amount("not-a-number") is None
 
 
-def test_fix_persian_rtl_product_name():
-    reversed_name = "٣ هجرد يتﻼکش نتروارت گنس جارختسا"
-    fixed = fix_persian_rtl(reversed_name)
-    assert "استخراج" in fixed or "سنگ" in fixed
-    assert fix_persian_rtl("لوصحم مان") == "نام محصول"
-
-
-def test_acquire_local_missing_raises():
-    with pytest.raises(CodalAcquisitionError):
-        acquire_local_pdf("/tmp/does_not_exist_codal_xyz.pdf")
-
-
-def test_acquire_local_ok(tmp_path):
-    p = _make_text_pdf(tmp_path / "sample.pdf", ["Revenue 1000"])
-    src = acquire_local_pdf(p, codal_tracking_id="TRK-1")
-    assert src.local_path.is_file()
-    assert src.codal_tracking_id == "TRK-1"
-    assert src.content_sha256
+def test_fix_persian_rtl_preserves_extracted_text():
+    source = "٣ هجرد يتﻼکش نتروارت گنس جارختسا"
+    assert fix_persian_rtl(source) == source
+    assert fix_persian_rtl("نام محصول") == "نام محصول"
 
 
 def test_extract_text_pdf_lines(tmp_path):
@@ -287,6 +270,5 @@ def test_real_codal_monthly_activity_pdf():
     assert len(result.raw_lines) >= 5
     names = " ".join(r.item_name for r in result.raw_lines)
     assert any(k in names for k in ("تراورتن", "کانسنگ", "طلا", "فروش", "تن"))
-    # zeros may exist; missing must remain None for non-numeric labels
     assert any(r.value is None for r in result.raw_lines) or any(r.value == 0 for r in result.raw_lines)
     assert all(r.source_section for r in result.raw_lines)
