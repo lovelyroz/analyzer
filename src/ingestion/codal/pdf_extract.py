@@ -4,8 +4,9 @@ Backends:
   1. pdfplumber tables (preferred for multi-column Codal forms)
   2. pypdf text lines (fallback)
 
-Persian cells extracted from Codal PDFs are often visual-RTL reversed;
-`fix_persian_rtl` restores readable order for storage as raw item names.
+The extraction layer is deliberately conservative: source text is not
+heuristically reversed, date-like cells are never treated as financial
+amounts, and section/header-only rows are not emitted as raw financial facts.
 
 OCR is not bundled; scanned PDFs without a text layer yield extraction errors.
 """
@@ -36,17 +37,19 @@ class ExtractedCellRow:
 
 _PERSIAN_CHAR_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
 _DIGIT_RE = re.compile(r"[\d۰-۹٠-٩]")
+_DATE_CELL_RE = re.compile(
+    r"^\s*(?:13|14|15)[۰-۹٠-٩\d]{2}[/-][۰-۹٠-٩\d]{1,2}[/-][۰-۹٠-٩\d]{1,2}\s*$"
+)
 
 
 def fix_persian_rtl(text: str) -> str:
-    """Restore readable order for cells that pdfplumber emits reversed."""
-    if not text:
-        return text
-    persian = len(_PERSIAN_CHAR_RE.findall(text))
-    if persian == 0:
-        return text
-    if persian >= max(1, len(text.replace(" ", "")) // 3):
-        return text[::-1]
+    """Compatibility helper: preserve extractor text exactly.
+
+    Older versions reversed cells based on Persian-character density. That is
+    unsafe because a correctly ordered cell can be reversed and numeric tokens
+    can be corrupted. Raw extraction must remain source-faithful; any future
+    RTL repair must be driven by explicit extractor evidence, not a heuristic.
+    """
     return text
 
 
@@ -54,14 +57,19 @@ def _persian_score(cell: str) -> int:
     return len(_PERSIAN_CHAR_RE.findall(cell or ""))
 
 
+def _looks_like_date(cell: str) -> bool:
+    return bool(_DATE_CELL_RE.fullmatch(cell or ""))
+
+
 def _looks_pure_number(cell: str) -> bool:
     if not cell or cell in {"-", "—", "–"}:
         return True
-    s = cell.replace(",", "").replace("٬", "").replace(" ", "").replace("/", "")
+    if _looks_like_date(cell):
+        return False
+    s = cell.replace(",", "").replace("٬", "").replace(" ", "")
     s = re.sub(r"[()\-−]", "", s)
     if not s:
         return True
-    # pure numeric / decimal — not a label that happens to contain a grade digit
     return bool(re.fullmatch(r"[\d۰-۹٠-٩.]+", s))
 
 
@@ -91,13 +99,18 @@ def _extract_text_pypdf(path: Path) -> List[Tuple[int, str]]:
 def _header_labels(header_row: Sequence[str]) -> List[str]:
     labels: List[str] = []
     for i, h in enumerate(header_row):
-        h = fix_persian_rtl((h or "").strip().replace("\n", " "))
+        h = (h or "").strip().replace("\n", " ")
         labels.append(h if h else f"col_{i}")
     return labels
 
 
 def _pick_name_cell(cells: Sequence[str]) -> Tuple[int, str]:
-    """Choose product/label cell by highest Persian-letter density."""
+    """Choose a text label cell conservatively.
+
+    Prefer cells containing Persian/Arabic letters. If several such cells are
+    present, choose the longest one. This remains a heuristic and is kept only
+    at the adapter boundary; downstream persistence preserves provenance.
+    """
     best_i, best_score, best_len = -1, 0, 0
     for i, c in enumerate(cells):
         if not c:
@@ -107,7 +120,7 @@ def _pick_name_cell(cells: Sequence[str]) -> Tuple[int, str]:
             best_i, best_score, best_len = i, score, len(c)
     if best_i < 0 or best_score == 0:
         return -1, ""
-    return best_i, fix_persian_rtl(cells[best_i])
+    return best_i, cells[best_i].strip()
 
 
 def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
@@ -127,14 +140,16 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
 
                     header_idx = 0
                     for ri, raw in enumerate(table[:5]):
-                        joined = fix_persian_rtl(" ".join((c or "") for c in raw))
-                        if any(k in joined for k in ("نام محصول", "نام", "شرح", "واحد", "مبلغ فروش", "مقدار مصرف")):
+                        joined = " ".join((c or "") for c in raw)
+                        if any(
+                            k in joined
+                            for k in ("نام محصول", "نام", "شرح", "واحد", "مبلغ فروش", "مقدار مصرف")
+                        ):
                             header_idx = ri
                             break
                     headers = _header_labels([(c or "") for c in table[header_idx]])
 
                     section = f"page_{page_idx}_table_{t_i}"
-                    current_section_label = section
 
                     for r_i, raw_row in enumerate(table):
                         if r_i == header_idx:
@@ -143,25 +158,6 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
                         if not any(cells):
                             continue
 
-                        non_empty = [c for c in cells if c]
-                        if len(non_empty) == 1:
-                            label = fix_persian_rtl(non_empty[0])
-                            if label.startswith(":") or label.endswith(":") or any(
-                                k in label for k in ("فروش", "درآمد", "برگشت", "تخفیف", "تخفيف", "جمع")
-                            ):
-                                current_section_label = f"{section}:{label.strip(':')}"
-                                rows.append(
-                                    ExtractedCellRow(
-                                        item_name=label.strip(":"),
-                                        value_text=None,
-                                        source_section=current_section_label,
-                                        source_row=r_i + 1,
-                                        source_column="section",
-                                        page=page_idx,
-                                    )
-                                )
-                                continue
-
                         name_col, name = _pick_name_cell(cells)
                         if not name:
                             continue
@@ -169,7 +165,7 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
                         unit = ""
                         for idx in (name_col - 1, name_col + 1):
                             if 0 <= idx < len(cells) and cells[idx]:
-                                cand = fix_persian_rtl(cells[idx])
+                                cand = cells[idx].strip()
                                 if cand in {
                                     "تن",
                                     "کیلوگرم",
@@ -182,52 +178,38 @@ def _extract_tables_pdfplumber(path: Path) -> List[ExtractedCellRow]:
                                     unit = cand
                                     break
 
-                        emitted = 0
                         for c_i, cell in enumerate(cells):
-                            if c_i == name_col:
+                            if c_i == name_col or not cell:
                                 continue
-                            if unit and fix_persian_rtl(cell) == unit:
+                            if unit and cell == unit:
                                 continue
-                            if not cell:
+                            if _looks_like_date(cell):
                                 continue
-                            if not _looks_pure_number(cell) and _persian_score(cell) > 0:
+                            if not _looks_pure_number(cell):
                                 continue
-                            if not _looks_pure_number(cell) and not _DIGIT_RE.search(cell):
-                                continue
-                            # value cells: pure numbers or dash
-                            if not (_looks_pure_number(cell) or _DIGIT_RE.search(cell)):
-                                continue
+
                             col_label = headers[c_i] if c_i < len(headers) else f"col_{c_i}"
                             item = name
                             if unit:
-                                item = f"{name} | {unit}"
+                                item = f"{item} | {unit}"
                             if col_label and not col_label.startswith("col_"):
                                 item = f"{item} | {col_label}"
+
                             rows.append(
                                 ExtractedCellRow(
                                     item_name=item,
                                     value_text=cell,
-                                    source_section=current_section_label,
+                                    source_section=section,
                                     source_row=r_i + 1,
                                     source_column=col_label,
                                     page=page_idx,
                                 )
                             )
-                            emitted += 1
-
-                        if emitted == 0:
-                            rows.append(
-                                ExtractedCellRow(
-                                    item_name=f"{name} | {unit}".strip(" |") if unit else name,
-                                    value_text=None,
-                                    source_section=current_section_label,
-                                    source_row=r_i + 1,
-                                    source_column="label",
-                                    page=page_idx,
-                                )
-                            )
     except Exception:
-        return rows
+        # Never return a partial table extraction after a backend failure.
+        # Let the caller fall back to the pypdf text backend.
+        return []
+
     return rows
 
 
@@ -247,21 +229,13 @@ def _lines_from_text_pages(pages: Sequence[Tuple[int, str]]) -> List[ExtractedCe
             line_no += 1
             m = value_re.match(line)
             if m:
+                value = m.group("value").strip()
+                if _looks_like_date(value):
+                    continue
                 rows.append(
                     ExtractedCellRow(
-                        item_name=fix_persian_rtl(m.group("name").strip()),
-                        value_text=m.group("value").strip(),
-                        source_section=section,
-                        source_row=line_no,
-                        source_column="text",
-                        page=page_no,
-                    )
-                )
-            else:
-                rows.append(
-                    ExtractedCellRow(
-                        item_name=fix_persian_rtl(line),
-                        value_text=None,
+                        item_name=m.group("name").strip(),
+                        value_text=value,
                         source_section=section,
                         source_row=line_no,
                         source_column="text",
@@ -286,4 +260,9 @@ def extract_cell_rows(path: Union[str, Path]) -> List[ExtractedCellRow]:
         raise CodalExtractionError(
             f"no extractable text layer in PDF (scanned/image-only?): {path}"
         )
-    return _lines_from_text_pages(pages)
+    rows = _lines_from_text_pages(pages)
+    if not rows:
+        raise CodalExtractionError(
+            f"PDF has text but no extractable financial value rows: {path}"
+        )
+    return rows
