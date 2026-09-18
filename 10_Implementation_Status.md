@@ -150,32 +150,102 @@ Deferred work must integrate with the locked boundary and must not reopen `DATAB
 
 ## Repository status
 
-## Production acquisition phase
+## CODAL PDF extraction operational phase
+
+The previously deferred CODAL PDF extraction work has now been implemented and validated behind the locked CHANGE-007 boundary.
+
+### Final implementation evidence
 
 - CODAL local/HTTP acquisition adapter: IMPLEMENTED
-- CODAL text-first PDF extraction adapter: IMPLEMENTED
+- CODAL text/table extraction adapter: IMPLEMENTED
+- CODAL extraction-to-`RawLineInput[]` boundary: IMPLEMENTED
 - CODAL extraction-to-raw persistence facade: IMPLEMENTED
+- Persian/Arabic-Indic digit normalization to ASCII textual values: IMPLEMENTED
+- Numeric parsing, negative values, dates, and explicit missing values: IMPLEMENTED
+- RTL handling avoids destructive whole-line reversal: IMPLEMENTED
+- Representative CODAL layouts and generic text-line cases: TESTED
+- Malformed/no-text PDF failure is explicit and auditable through `IngestionRun`
 - CODAL idempotent re-ingestion: TESTED
-- Supplied representative PDFs: 19 extractable, 1 explicitly rejected as no-text
+- Supplied representative PDFs: 19 extractable; 1 explicitly rejected as no-text
 - `pypdf` dependency: recorded in `requirements.txt` and CI workflow
-- Full local regression after acquisition changes: 143 passed, 1 skipped
-- CI workflow execution for this local change: NOT RUN from this workspace
+
+### Final CI evidence for extraction implementation
+
+- Workflow: `Tests`
+- Run ID: `35375069943`
+- Job ID: `105697726337`
+- Verified commit: `aab35e9bc72782ba9de178c17d1f35273ea5946b`
+- Result: **SUCCESS**
+- Test command: `pytest src/tests -v`
+- Result: **158 passed, 1 skipped, 0 failed**
+- Duration: 65.72s
+- CI checkout verified the exact commit above.
+
+### Extraction-phase lock
+
+The CODAL PDF extraction implementation is now **COMPLETE / LOCKED** as an operational implementation of the existing ingestion boundary.
+
+Locked boundary:
+
+```text
+CODAL PDF / external source
+        ↓
+Acquisition
+        ↓
+PDF extraction
+        ↓
+Sequence[RawLineInput]
+        ↓
+ingest_codal_report()
+        ↓
+immutable raw/foundation persistence
+```
+
+Locked rules include:
+
+- extraction does not perform KPI mapping, scoring, forecasting, valuation, or decision logic;
+- textual numeric characters persisted through CODAL ingestion are normalized to ASCII digits;
+- `NULL != 0`;
+- uncertain/unextractable values are not invented;
+- extraction failures are explicit and auditable;
+- source metadata and provenance are preserved;
+- raw data remains immutable;
+- Report/ReportVersion and PIT rules remain intact;
+- the extraction implementation remains replaceable behind the locked boundary.
+
+This is an implementation lock, not a new architectural stage or contract version.
+
+### Remaining operational work
+
+The next task is **production data loading**, not another analytical stage:
+
+- select/validate the actual production CODAL report universe;
+- acquire the required reports;
+- load them through the locked extraction/persistence path;
+- validate completeness, duplicates, ReportVersions, PIT metadata, units, and data quality;
+- then load production OHLC and FX datasets through their existing adapters;
+- run end-to-end foundation-level validation before enabling downstream analytical calculations.
+
+Production bulk loading is intentionally **NOT YET LOCKED COMPLETE**.
 
 **IMPLEMENTATION: COMPLETE**  
 **TESTING: PASS**  
 **AUDIT: PASS**  
-**CI: PASS (pre-lock; lock-documentation CI pending)**  
-**ARCHITECTURE: LOCKED**  
-**DATABASE CONTRACT: V1.3 — LOCKED**  
-**INGESTION FRAMEWORK: COMPLETE / LOCKED**
+**CI: PASS**  
+**CODAL PDF EXTRACTION: COMPLETE / LOCKED**  
+**INGESTION FRAMEWORK: COMPLETE / LOCKED**  
+**ARCHITECTURE: V1 — LOCKED**  
+**DATABASE CONTRACT: V1.3 — LOCKED**
 
 ```text
 Design: LOCKED
 Implementation: COMPLETE
 Testing: PASS
 Audit: PASS
+CI: PASS
 Architecture: LOCKED
 Database Contract: V1.3 — LOCKED
 Ingestion Framework: COMPLETE / LOCKED
-CODAL PDF Extraction: DEFERRED
+CODAL PDF Extraction: COMPLETE / LOCKED
+Production Bulk Load: NOT YET COMPLETE
 ```
