@@ -212,19 +212,17 @@ def _canonical_source_text(value):
     text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
     text = text.replace("٬", ",").replace("،", ",")
     text = text.replace("ھ", "ه").replace("ي", "ی").replace("ى", "ی").replace("ك", "ک")
-    tokens = []
-    for token in text.split():
-        tokens.append(token if any(ch.isdigit() for ch in token) else "".join(sorted(token)))
-    return " ".join(tokens)
+    return " ".join(text.split())
 
 
 def _source_name_signature(value):
+    """Create an order-independent alphabetic signature for RTL PDF text."""
     canonical = _canonical_source_text(value)
-    return Counter(token for token in canonical.split() if any(ch.isalpha() for ch in token))
+    return Counter(ch for ch in canonical if ch.isalpha())
 
 
 def _name_traceable_to_source(name, line):
-    """Require every source-name word signature to occur in the same source line."""
+    """Require all name characters to occur in the same source line."""
     name_sig = _source_name_signature(name)
     line_sig = _source_name_signature(line)
     return bool(name_sig) and not name_sig - line_sig
