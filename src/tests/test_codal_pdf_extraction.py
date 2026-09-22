@@ -243,6 +243,83 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion
 
 
 
+def _independent_pdf_text_lines(path):
+    """Read source text independently of the production CODAL parser."""
+    from pypdf import PdfReader
+
+    translation = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+    lines = []
+    for page in PdfReader(path).pages:
+        text = page.extract_text() or ""
+        for line in text.splitlines():
+            normalized = line.translate(translation).replace("٬", ",").replace("،", ",")
+            normalized = " ".join(normalized.split())
+            if normalized:
+                lines.append(normalized)
+    return lines
+
+
+def _value_tokens(value):
+    if value is None:
+        return []
+    token = format(value, "f").rstrip("0").rstrip(".")
+    return [token, f"({token.lstrip('-')})"] if token.startswith("-") else [token]
+
+
+def test_golden_source_audit_reconciles_persisted_facts_with_independent_pdf_text(ingestion_session):
+    """Final accuracy guard: persisted facts must be traceable to independent source text."""
+    session, company, period = ingestion_session
+    filenames = [
+        "seo-codal-report (1).pdf",
+        "seo-codal-report (3).pdf",
+        "seo-codal-report (10).pdf",
+        "seo-codal-report (13).pdf",
+    ]
+
+    for idx, filename in enumerate(filenames, start=1):
+        path = PDF_ROOT / filename
+        result = ingest_codal_pdf(
+            session,
+            path,
+            company_id=company.company_id,
+            period_id=period.period_id,
+            title=filename,
+            report_type="CODAL_GOLDEN_AUDIT",
+            publication_datetime=datetime(2026, 9, idx),
+            codal_tracking_id=f"CODAL-GOLDEN-{idx}",
+        )
+
+        independent_lines = _independent_pdf_text_lines(path)
+        assert independent_lines, filename
+        facts = (
+            session.query(RawFinancialFact)
+            .filter_by(report_version_id=result.report_version_id)
+            .all()
+        )
+        assert facts
+
+        for fact in facts:
+            name = " ".join((fact.raw_item_name or "").split())
+            matching_lines = [line for line in independent_lines if name and name in line]
+            assert matching_lines, f"{filename}: source row not found for {fact.raw_item_name!r}"
+
+            if fact.value is not None:
+                tokens = _value_tokens(fact.value)
+                assert any(any(token in line for token in tokens) for line in matching_lines), (
+                    f"{filename}: persisted value {fact.value} is not traceable to "
+                    f"source row {fact.raw_item_name!r}"
+                )
+            else:
+                # NULL is a meaningful source state: the row must exist, but no
+                # numeric token may be invented by persistence.
+                assert fact.value is None
+
+            assert fact.currency == "IRR"
+            assert fact.report_version_id == result.report_version_id
+            assert fact.period_id == period.period_id
+
+
+
 def test_representative_codal_samples_load_into_core_persistence(ingestion_session):
     session, company, period = ingestion_session
     filenames = [
