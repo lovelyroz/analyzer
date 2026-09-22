@@ -392,6 +392,78 @@ def test_pdf_output_loads_into_core_persistence_and_duplicate_is_idempotent(inge
     assert runs[1].records_updated == first.raw_fact_count
 
 
+def test_golden_sample_rerun_is_byte_stable_and_does_not_create_new_version(ingestion_session):
+    session, company, period = ingestion_session
+    path = PDF_ROOT / "seo-codal-report (1).pdf"
+    kwargs = dict(
+        company_id=company.company_id,
+        period_id=period.period_id,
+        title="Golden monthly sample",
+        report_type="MONTHLY_ACTIVITY",
+        publication_datetime=datetime(2026, 9, 5, 12, 0),
+        codal_tracking_id="CODAL-GOLDEN-IDEMPOTENT-1",
+        source_url="local://seo-codal-report-1.pdf",
+    )
+
+    first = ingest_codal_pdf(session, path, **kwargs)
+    first_facts = [
+        (
+            fact.raw_item_name,
+            fact.raw_item_code,
+            fact.value,
+            fact.unit,
+            fact.currency,
+            fact.source_section,
+            fact.source_row,
+            fact.source_column,
+            fact.period_id,
+            fact.report_version_id,
+        )
+        for fact in (
+            session.query(RawFinancialFact)
+            .filter_by(report_version_id=first.report_version_id)
+            .order_by(RawFinancialFact.raw_fact_id)
+            .all()
+        )
+    ]
+
+    second = ingest_codal_pdf(session, path, **kwargs)
+    second_facts = [
+        (
+            fact.raw_item_name,
+            fact.raw_item_code,
+            fact.value,
+            fact.unit,
+            fact.currency,
+            fact.source_section,
+            fact.source_row,
+            fact.source_column,
+            fact.period_id,
+            fact.report_version_id,
+        )
+        for fact in (
+            session.query(RawFinancialFact)
+            .filter_by(report_version_id=second.report_version_id)
+            .order_by(RawFinancialFact.raw_fact_id)
+            .all()
+        )
+    ]
+
+    assert second.report_id == first.report_id
+    assert second.report_version_id == first.report_version_id
+    assert session.query(ReportVersion).count() == 1
+    assert session.query(RawFinancialFact).count() == first.raw_fact_count
+    assert first_facts == second_facts
+
+    runs = session.query(IngestionRun).order_by(IngestionRun.ingestion_id).all()
+    assert len(runs) == 2
+    assert runs[0].status == "COMPLETED"
+    assert runs[1].status == "COMPLETED"
+    assert runs[1].records_inserted == 0
+    assert runs[1].records_updated == first.raw_fact_count
+
+
+
 def test_codal_pdf_facade_connects_extraction_to_raw_persistence(ingestion_session):
     session, company, period = ingestion_session
     result = ingest_codal_pdf(
