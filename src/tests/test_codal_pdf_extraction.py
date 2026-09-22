@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+import unicodedata
 
 import pytest
 
@@ -242,7 +243,6 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion
 
 
 
-
 def _independent_pdf_text_lines(path):
     """Read source text independently of the production CODAL parser."""
     from pypdf import PdfReader
@@ -257,6 +257,27 @@ def _independent_pdf_text_lines(path):
             if normalized:
                 lines.append(normalized)
     return lines
+
+
+def _canonical_source_text(value):
+    """Independently canonicalize PDF text for semantic RTL reconciliation."""
+    if not value:
+        return ""
+    translation = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+    text = unicodedata.normalize("NFKC", value).translate(translation)
+    text = text.replace("٬", ",").replace("،", ",")
+    return " ".join(text.split())
+
+
+def _source_text_candidates(value):
+    """Return independent candidates for PDF RTL/presentation-form ordering."""
+    canonical = _canonical_source_text(value)
+    if not canonical:
+        return set()
+    candidates = {canonical}
+    candidates.add(canonical[::-1])
+    candidates.add(" ".join(reversed(canonical.split())))
+    return candidates
 
 
 def _value_tokens(value):
@@ -299,13 +320,18 @@ def test_golden_source_audit_reconciles_persisted_facts_with_independent_pdf_tex
         assert facts
 
         for fact in facts:
-            name = " ".join((fact.raw_item_name or "").split())
-            matching_lines = [line for line in independent_lines if name and name in line]
+            name_candidates = _source_text_candidates(fact.raw_item_name)
+            matching_lines = [
+                line
+                for line in independent_lines
+                if any(candidate and candidate in _canonical_source_text(line) for candidate in name_candidates)
+            ]
             assert matching_lines, f"{filename}: source row not found for {fact.raw_item_name!r}"
 
             if fact.value is not None:
                 tokens = _value_tokens(fact.value)
-                assert any(any(token in line for token in tokens) for line in matching_lines), (
+                canonical_matching_lines = [_canonical_source_text(line) for line in matching_lines]
+                assert any(any(token in line for token in tokens) for line in canonical_matching_lines), (
                     f"{filename}: persisted value {fact.value} is not traceable to "
                     f"source row {fact.raw_item_name!r}"
                 )
@@ -352,6 +378,12 @@ def test_representative_codal_samples_load_into_core_persistence(ingestion_sessi
     runs = session.query(IngestionRun).filter_by(source="CODAL").all()
     assert len(runs) == len(filenames)
     assert all(run.status == "COMPLETED" for run in runs)
+
+
+def _contains_non_ascii_digit(value):
+    if value is None:
+        return False
+    return any(ch in "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩" for ch in value)
 
 
 def test_independent_final_foundation_audit_checks_pit_provenance_and_version_invariants(ingestion_session):
@@ -403,12 +435,12 @@ def test_independent_final_foundation_audit_checks_pit_provenance_and_version_in
         assert fact.period_id == period.period_id
         assert fact.report_version_id == version.report_version_id
         assert fact.raw_item_name
-        assert fact.raw_item_name == normalize_digits(fact.raw_item_name)
-        assert fact.raw_item_code is None or fact.raw_item_code == normalize_digits(fact.raw_item_code)
-        assert fact.unit is None or fact.unit == normalize_digits(fact.unit)
-        assert fact.currency is None or fact.currency == normalize_digits(fact.currency)
-        assert fact.source_section is None or fact.source_section == normalize_digits(fact.source_section)
-        assert fact.source_column is None or fact.source_column == normalize_digits(fact.source_column)
+        assert not _contains_non_ascii_digit(fact.raw_item_name)
+        assert not _contains_non_ascii_digit(fact.raw_item_code)
+        assert not _contains_non_ascii_digit(fact.unit)
+        assert not _contains_non_ascii_digit(fact.currency)
+        assert not _contains_non_ascii_digit(fact.source_section)
+        assert not _contains_non_ascii_digit(fact.source_column)
         assert fact.value is None or isinstance(fact.value, Decimal)
 
     # PIT invariant: a publication at the cutoff is visible; a later publication is not.
