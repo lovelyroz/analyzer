@@ -191,6 +191,23 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion
 
 
 def _independent_pdf_text_lines(path):
+    """Extract source lines independently of the production CODAL parser.
+
+    pdfplumber uses a separate text extraction path from the production
+    pypdf fallback, while the returned lines remain raw source material.
+    """
+    try:
+        import pdfplumber
+        with pdfplumber.open(str(path)) as pdf:
+            lines = []
+            for page in pdf.pages:
+                text = page.extract_text() or ""
+                lines.extend(line for line in text.splitlines() if line.strip())
+            if lines:
+                return lines
+    except Exception:
+        pass
+
     from pypdf import PdfReader
     translation = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
     lines = []
@@ -204,7 +221,7 @@ def _independent_pdf_text_lines(path):
 
 
 def _canonical_source_text(value):
-    """Independent Unicode/RTL canonicalization; does not call production helpers."""
+    """Canonicalize source text independently of production helpers."""
     if not value:
         return ""
     translation = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
@@ -216,16 +233,34 @@ def _canonical_source_text(value):
 
 
 def _source_name_signature(value):
-    """Create an order-independent alphabetic signature for RTL PDF text."""
     canonical = _canonical_source_text(value)
     return Counter(ch for ch in canonical if ch.isalpha())
 
 
+def _name_forms(value):
+    """Generate bounded RTL/LTR forms without using production parsing logic."""
+    canonical = _canonical_source_text(value)
+    if not canonical:
+        return set()
+    words = canonical.split()
+    forms = {
+        canonical,
+        " ".join(reversed(words)),
+        " ".join(word[::-1] for word in words),
+        " ".join(word[::-1] for word in reversed(words)),
+    }
+    return {form for form in forms if form}
+
+
 def _name_traceable_to_source(name, line):
-    """Require all name characters to occur in the same source line."""
-    name_sig = _source_name_signature(name)
-    line_sig = _source_name_signature(line)
-    return bool(name_sig) and not name_sig - line_sig
+    """Require the row label to be represented by the same source line."""
+    name_forms = _name_forms(name)
+    line_forms = _name_forms(line)
+    if not name_forms or not line_forms:
+        return False
+    if any(form in candidate or candidate in form for form in name_forms for candidate in line_forms):
+        return True
+    return bool(_source_name_signature(name) and not _source_name_signature(name) - _source_name_signature(line))
 
 
 def _value_tokens(value):
