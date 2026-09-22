@@ -241,6 +241,42 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion
     assert fact.source_column == "ستون 10"
 
 
+
+
+def test_representative_codal_samples_load_into_core_persistence(ingestion_session):
+    session, company, period = ingestion_session
+    filenames = [
+        "seo-codal-report (1).pdf",
+        "seo-codal-report (3).pdf",
+        "seo-codal-report (10).pdf",
+        "seo-codal-report (13).pdf",
+    ]
+
+    results = []
+    for idx, filename in enumerate(filenames, start=1):
+        result = ingest_codal_pdf(
+            session,
+            PDF_ROOT / filename,
+            company_id=company.company_id,
+            period_id=period.period_id,
+            title=filename,
+            report_type="CODAL_SAMPLE",
+            publication_datetime=datetime(2026, 9, idx),
+            codal_tracking_id=f"CODAL-PRODUCTION-SAMPLE-{idx}",
+            source_url=f"local://{filename}",
+        )
+        results.append(result)
+
+    assert all(result.raw_fact_count > 0 for result in results)
+    assert session.query(Report).count() == len(filenames)
+    assert session.query(ReportVersion).count() == len(filenames)
+    assert session.query(RawFinancialFact).count() == sum(r.raw_fact_count for r in results)
+
+    runs = session.query(IngestionRun).filter_by(source="CODAL").all()
+    assert len(runs) == len(filenames)
+    assert all(run.status == "COMPLETED" for run in runs)
+
+
 def test_pdf_output_loads_into_core_persistence_and_duplicate_is_idempotent(ingestion_session):
     session, company, period = ingestion_session
     extraction = extract_raw_lines_from_pdf(
