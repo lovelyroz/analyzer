@@ -442,6 +442,78 @@ None beyond CHANGE-006.
 
 ---
 
+# 7. CODAL PDF Extraction Phase Lock
+
+### CHANGE-008 — CODAL PDF Extraction Operational Implementation Lock
+
+**Status:** APPROVED
+
+**Version:** DATABASE_CONTRACT_V1.3 (no contract change)
+
+**Date:** 2026-09-18
+
+**Affected Stage(s):** Stage 1 ingestion boundary only
+
+**Previous Rule:**
+
+CHANGE-007 established the CODAL PDF extraction boundary as a pre-ingestion responsibility producing `Sequence[RawLineInput]`, while the concrete PDF acquisition/extraction implementation remained deferred.
+
+**New Rule:**
+
+The real CODAL PDF acquisition and extraction implementation is now implemented and validated behind the existing boundary.
+
+The locked operational flow is:
+
+```text
+PDF
+ ↓
+RawLineInput
+ ↓
+Persistence
+```
+
+The extraction layer normalizes numeric characters to English/ASCII digits. PDF extraction failures are recorded explicitly through the ingestion audit path, and incomplete or unextractable data is not inserted into the database.
+
+**Evidence / Trigger:**
+
+Final implementation CI for commit `aab35e9bc72782ba9de178c17d1f35273ea5946b`:
+
+- Workflow: `Tests`
+- Run ID: `35375069943`
+- Result: **158 passed / 1 skipped / 0 failed**
+
+The implementation was validated against representative CODAL PDFs, including explicit handling of no-text/malformed extraction failures.
+
+**Architecture Impact:**
+
+No change to the nine-stage V1 architecture. The existing Stage 1 ingestion boundary remains authoritative.
+
+**Contract Impact:**
+
+No change to `DATABASE_CONTRACT_V1.3`. The extraction implementation is an operational implementation behind the already-approved CHANGE-007 boundary.
+
+**Downstream Impact:**
+
+None to Stages 2–9. Downstream consumers continue to receive persisted foundation data through the existing contracts.
+
+**Migration Required:**
+
+None.
+
+**Testing Required:**
+
+The implementation CI listed above is the final validation evidence for this phase.
+
+**Approval:** APPROVED
+
+**Lock Status:**
+
+**CODAL PDF EXTRACTION: COMPLETE / LOCKED**
+
+The lock is an implementation lock. Future extraction-tool replacement is permitted only if it preserves the same `PDF → RawLineInput → Persistence` boundary and locked data/provenance rules.
+
+---
+
 # 7. Pending Proposals
 
 No pending architectural proposals.
