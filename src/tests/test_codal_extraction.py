@@ -204,6 +204,55 @@ def test_pipeline_persists_report_version_and_raw(session, tmp_path):
     assert run.status == "COMPLETED"
 
 
+
+
+def test_pipeline_acquisition_failure_is_audited_without_partial_writes(session, tmp_path):
+    from src.ingestion.codal.pipeline import load_codal_pdf
+
+    with pytest.raises(CodalAcquisitionError):
+        load_codal_pdf(
+            session,
+            tmp_path / "missing.pdf",
+            company_id=session._test_company_id,
+            period_id=session._test_period_id,
+            title="Missing",
+            report_type="CODAL",
+            publication_datetime=datetime(2024, 5, 1),
+            codal_tracking_id="CODAL-ACQ-FAIL",
+        )
+
+    run = session.query(IngestionRun).order_by(IngestionRun.ingestion_id.desc()).first()
+    assert run.status == "FAILED"
+    assert "ACQUISITION_FAILED" in (run.error_log or "")
+    assert session.query(Report).count() == 0
+    assert session.query(RawFinancialFact).count() == 0
+
+
+def test_pipeline_extraction_failure_is_audited_without_partial_writes(session, tmp_path):
+    from src.ingestion.codal.pipeline import load_codal_pdf
+
+    bad = tmp_path / "bad.pdf"
+    bad.write_bytes(b"not a valid pdf")
+
+    with pytest.raises(CodalExtractionError):
+        load_codal_pdf(
+            session,
+            bad,
+            company_id=session._test_company_id,
+            period_id=session._test_period_id,
+            title="Bad",
+            report_type="CODAL",
+            publication_datetime=datetime(2024, 5, 1),
+            codal_tracking_id="CODAL-EXT-FAIL",
+        )
+
+    run = session.query(IngestionRun).order_by(IngestionRun.ingestion_id.desc()).first()
+    assert run.status == "FAILED"
+    assert "EXTRACTION_FAILED" in (run.error_log or "")
+    assert session.query(Report).count() == 0
+    assert session.query(RawFinancialFact).count() == 0
+
+
 def test_pipeline_idempotent_version_chain(session, tmp_path):
     p = _make_text_pdf(tmp_path / "v.pdf", ["Item A 10"])
     r1 = load_codal_pdf(
