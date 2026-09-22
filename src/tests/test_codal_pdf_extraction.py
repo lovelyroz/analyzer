@@ -354,6 +354,84 @@ def test_representative_codal_samples_load_into_core_persistence(ingestion_sessi
     assert all(run.status == "COMPLETED" for run in runs)
 
 
+def test_independent_final_foundation_audit_checks_pit_provenance_and_version_invariants(ingestion_session):
+    """Final end-to-end audit over persisted foundation state, independent of ingestion result counts."""
+    session, company, period = ingestion_session
+    publication = datetime(2026, 9, 6, 12, 0)
+    result = ingest_codal_pdf(
+        session,
+        PDF_ROOT / "seo-codal-report (3).pdf",
+        company_id=company.company_id,
+        period_id=period.period_id,
+        title="Final audit sample",
+        report_type="CODAL_FINAL_AUDIT",
+        publication_datetime=publication,
+        codal_tracking_id="CODAL-FINAL-AUDIT-1",
+        source_url="local://seo-codal-report-3.pdf",
+    )
+
+    report = session.get(Report, result.report_id)
+    assert report is not None
+    assert report.company_id == company.company_id
+    assert report.financial_period_id == period.period_id
+    assert report.codal_tracking_id == "CODAL-FINAL-AUDIT-1"
+    assert report.source_url == "local://seo-codal-report-3.pdf"
+
+    versions = (
+        session.query(ReportVersion)
+        .filter_by(report_id=report.report_id)
+        .order_by(ReportVersion.version_number)
+        .all()
+    )
+    assert len(versions) == 1
+    version = versions[0]
+    assert version.publication_datetime == publication
+    assert version.is_current_version is True
+    assert version.version_number == 1
+
+    facts = (
+        session.query(RawFinancialFact)
+        .filter_by(report_version_id=version.report_version_id)
+        .order_by(RawFinancialFact.raw_fact_id)
+        .all()
+    )
+    assert facts
+    assert len(facts) == result.raw_fact_count
+
+    for fact in facts:
+        assert fact.company_id == company.company_id
+        assert fact.period_id == period.period_id
+        assert fact.report_version_id == version.report_version_id
+        assert fact.raw_item_name
+        assert fact.raw_item_name == normalize_digits(fact.raw_item_name)
+        assert fact.raw_item_code is None or fact.raw_item_code == normalize_digits(fact.raw_item_code)
+        assert fact.unit is None or fact.unit == normalize_digits(fact.unit)
+        assert fact.currency is None or fact.currency == normalize_digits(fact.currency)
+        assert fact.source_section is None or fact.source_section == normalize_digits(fact.source_section)
+        assert fact.source_column is None or fact.source_column == normalize_digits(fact.source_column)
+        assert fact.value is None or isinstance(fact.value, Decimal)
+
+    # PIT invariant: a publication at the cutoff is visible; a later publication is not.
+    assert version.publication_datetime <= publication
+    later_cutoff = datetime(2026, 9, 5, 11, 59, 59)
+    assert not (version.publication_datetime <= later_cutoff)
+
+    current_count = (
+        session.query(ReportVersion)
+        .filter_by(report_id=report.report_id, is_current_version=True)
+        .count()
+    )
+    assert current_count == 1
+
+    run = session.get(IngestionRun, result.ingestion_id)
+    assert run is not None
+    assert run.source == "CODAL"
+    assert run.status == "COMPLETED"
+    assert run.records_inserted == len(facts)
+    assert run.records_failed == 0
+
+
+
 def test_pdf_output_loads_into_core_persistence_and_duplicate_is_idempotent(ingestion_session):
     session, company, period = ingestion_session
     extraction = extract_raw_lines_from_pdf(
