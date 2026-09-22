@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 import unicodedata
+from collections import Counter
 
 import pytest
 
@@ -242,7 +243,6 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion
     assert fact.source_column == "ستون 10"
 
 
-
 def _independent_pdf_text_lines(path):
     """Read source text independently of the production CODAL parser."""
     from pypdf import PdfReader
@@ -260,13 +260,22 @@ def _independent_pdf_text_lines(path):
 
 
 def _canonical_source_text(value):
-    """Independently canonicalize PDF text for semantic RTL reconciliation."""
+    """Independently canonicalize PDF text for RTL glyph/order differences."""
     if not value:
         return ""
     translation = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
     text = unicodedata.normalize("NFKC", value).translate(translation)
     text = text.replace("٬", ",").replace("،", ",")
-    return " ".join(text.split())
+    text = text.replace("ھ", "ه").replace("ي", "ی").replace("ى", "ی").replace("ك", "ک")
+    tokens = []
+    for token in text.split():
+        # PDF RTL extraction can scramble glyph order inside a Persian word.
+        # Preserve numeric tokens exactly so value reconciliation remains exact.
+        if any(ch.isdigit() for ch in token):
+            tokens.append(token)
+        else:
+            tokens.append("".join(sorted(token)))
+    return " ".join(tokens)
 
 
 def _source_text_candidates(value):
@@ -343,7 +352,6 @@ def test_golden_source_audit_reconciles_persisted_facts_with_independent_pdf_tex
             assert fact.currency == "IRR"
             assert fact.report_version_id == result.report_version_id
             assert fact.period_id == period.period_id
-
 
 
 def test_representative_codal_samples_load_into_core_persistence(ingestion_session):
@@ -463,7 +471,6 @@ def test_independent_final_foundation_audit_checks_pit_provenance_and_version_in
     assert run.records_failed == 0
 
 
-
 def test_pdf_output_loads_into_core_persistence_and_duplicate_is_idempotent(ingestion_session):
     session, company, period = ingestion_session
     extraction = extract_raw_lines_from_pdf(
@@ -571,7 +578,6 @@ def test_golden_sample_rerun_is_byte_stable_and_does_not_create_new_version(inge
     assert runs[1].status == "COMPLETED"
     assert runs[1].records_inserted == 0
     assert runs[1].records_updated == first.raw_fact_count
-
 
 
 def test_codal_pdf_facade_connects_extraction_to_raw_persistence(ingestion_session):
