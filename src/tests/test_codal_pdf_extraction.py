@@ -2,6 +2,7 @@ from collections import Counter
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+import re
 import unicodedata
 
 import pytest
@@ -191,33 +192,20 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion
 
 
 def _independent_pdf_text_lines(path):
-    """Extract source lines independently of the production CODAL parser.
-
-    pdfplumber uses a separate text extraction path from the production
-    pypdf fallback, while the returned lines remain raw source material.
-    """
-    try:
-        import pdfplumber
-        with pdfplumber.open(str(path)) as pdf:
-            lines = []
-            for page in pdf.pages:
-                text = page.extract_text() or ""
-                lines.extend(line for line in text.splitlines() if line.strip())
-            if lines:
-                return lines
-    except Exception:
-        pass
-
+    """Extract source text with pypdf, independent of the production table backend."""
     from pypdf import PdfReader
+
     translation = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
-    lines = []
-    for page in PdfReader(path).pages:
+    pages = []
+    for page_no, page in enumerate(PdfReader(path).pages, start=1):
+        lines = []
         for line in (page.extract_text() or "").splitlines():
             normalized = line.translate(translation).replace("٬", ",").replace("،", ",")
             normalized = " ".join(normalized.split())
             if normalized:
                 lines.append(normalized)
-    return lines
+        pages.append((page_no, lines))
+    return pages
 
 
 def _canonical_source_text(value):
@@ -270,6 +258,13 @@ def _value_tokens(value):
     return [token, f"({token.lstrip('-')})"] if token.startswith("-") else [token]
 
 
+def _source_page_number(source_section):
+    if not source_section:
+        return None
+    match = re.match(r"page_(\d+)(?:_|$)", source_section)
+    return int(match.group(1)) if match else None
+
+
 def test_golden_source_audit_reconciles_persisted_facts_with_independent_pdf_text(ingestion_session):
     """Persisted facts must be independently traceable to the PDF source text."""
     session, company, period = ingestion_session
@@ -283,18 +278,22 @@ def test_golden_source_audit_reconciles_persisted_facts_with_independent_pdf_tex
             title=filename, report_type="CODAL_GOLDEN_AUDIT",
             publication_datetime=datetime(2026, 9, idx), codal_tracking_id=f"CODAL-GOLDEN-{idx}",
         )
-        independent_lines = _independent_pdf_text_lines(PDF_ROOT / filename)
-        assert independent_lines
+        independent_pages = _independent_pdf_text_lines(PDF_ROOT / filename)
+        assert independent_pages
+        source_by_page = {page_no: lines for page_no, lines in independent_pages}
         facts = session.query(RawFinancialFact).filter_by(report_version_id=result.report_version_id).all()
         assert facts
         for fact in facts:
-            matching_lines = [line for line in independent_lines if _name_traceable_to_source(fact.raw_item_name, line)]
-            assert matching_lines, f"{filename}: source row not found for {fact.raw_item_name!r}"
+            page_no = _source_page_number(fact.source_section)
+            assert page_no in source_by_page, f"{filename}: source page unavailable for {fact.raw_item_name!r}"
+            page_lines = source_by_page[page_no]
+            matching_lines = [line for line in page_lines if _name_traceable_to_source(fact.raw_item_name, line)]
+            assert matching_lines, f"{filename}: source row not found for {fact.raw_item_name!r} on page {page_no}"
             if fact.value is not None:
                 tokens = _value_tokens(fact.value)
-                canonical_lines = [_canonical_source_text(line) for line in matching_lines]
-                assert any(any(token in line for token in tokens) for line in canonical_lines), (
-                    f"{filename}: persisted value {fact.value} is not traceable to source row {fact.raw_item_name!r}"
+                canonical_page = " ".join(_canonical_source_text(line) for line in page_lines)
+                assert any(token in canonical_page for token in tokens), (
+                    f"{filename}: persisted value {fact.value} is not traceable to independent PDF page {page_no}"
                 )
             else:
                 assert fact.value is None
