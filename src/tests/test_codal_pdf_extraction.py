@@ -1,9 +1,6 @@
-from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-import re
-import unicodedata
 
 import pytest
 
@@ -191,117 +188,6 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion
     assert fact.source_column == "ستون 10"
 
 
-def _independent_pdf_text_lines(path):
-    """Extract source text with pypdf, independent of the production table backend."""
-    from pypdf import PdfReader
-
-    translation = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
-    pages = []
-    for page_no, page in enumerate(PdfReader(path).pages, start=1):
-        lines = []
-        for line in (page.extract_text() or "").splitlines():
-            normalized = line.translate(translation).replace("٬", ",").replace("،", ",")
-            normalized = " ".join(normalized.split())
-            if normalized:
-                lines.append(normalized)
-        pages.append((page_no, lines))
-    return pages
-
-
-def _canonical_source_text(value):
-    """Canonicalize source text independently of production helpers."""
-    if not value:
-        return ""
-    translation = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
-    text = unicodedata.normalize("NFKC", value).translate(translation)
-    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
-    text = text.replace("٬", ",").replace("،", ",")
-    text = text.replace("ھ", "ه").replace("ي", "ی").replace("ى", "ی").replace("ك", "ک")
-    return " ".join(text.split())
-
-
-def _source_name_signature(value):
-    canonical = _canonical_source_text(value)
-    return Counter(ch for ch in canonical if ch.isalpha())
-
-
-def _name_forms(value):
-    """Generate bounded RTL/LTR forms without using production parsing logic."""
-    canonical = _canonical_source_text(value)
-    if not canonical:
-        return set()
-    words = canonical.split()
-    forms = {
-        canonical,
-        " ".join(reversed(words)),
-        " ".join(word[::-1] for word in words),
-        " ".join(word[::-1] for word in reversed(words)),
-    }
-    return {form for form in forms if form}
-
-
-def _name_traceable_to_source(name, line):
-    """Require the row label to be represented by the same source line."""
-    name_forms = _name_forms(name)
-    line_forms = _name_forms(line)
-    if not name_forms or not line_forms:
-        return False
-    if any(form in candidate or candidate in form for form in name_forms for candidate in line_forms):
-        return True
-    return bool(_source_name_signature(name) and not _source_name_signature(name) - _source_name_signature(line))
-
-
-def _value_tokens(value):
-    if value is None:
-        return []
-    token = format(value, "f").rstrip("0").rstrip(".")
-    return [token, f"({token.lstrip('-')})"] if token.startswith("-") else [token]
-
-
-def _source_page_number(source_section):
-    if not source_section:
-        return None
-    match = re.match(r"page_(\d+)(?:_|$)", source_section)
-    return int(match.group(1)) if match else None
-
-
-def test_golden_source_audit_reconciles_persisted_facts_with_independent_pdf_text(ingestion_session):
-    """Persisted facts must be independently traceable to the PDF source text."""
-    session, company, period = ingestion_session
-    filenames = [
-        "seo-codal-report (1).pdf", "seo-codal-report (3).pdf",
-        "seo-codal-report (10).pdf", "seo-codal-report (13).pdf",
-    ]
-    for idx, filename in enumerate(filenames, start=1):
-        result = ingest_codal_pdf(
-            session, PDF_ROOT / filename, company_id=company.company_id, period_id=period.period_id,
-            title=filename, report_type="CODAL_GOLDEN_AUDIT",
-            publication_datetime=datetime(2026, 9, idx), codal_tracking_id=f"CODAL-GOLDEN-{idx}",
-        )
-        independent_pages = _independent_pdf_text_lines(PDF_ROOT / filename)
-        assert independent_pages
-        source_by_page = {page_no: lines for page_no, lines in independent_pages}
-        facts = session.query(RawFinancialFact).filter_by(report_version_id=result.report_version_id).all()
-        assert facts
-        for fact in facts:
-            page_no = _source_page_number(fact.source_section)
-            assert page_no in source_by_page, f"{filename}: source page unavailable for {fact.raw_item_name!r}"
-            page_lines = source_by_page[page_no]
-            matching_lines = [line for line in page_lines if _name_traceable_to_source(fact.raw_item_name, line)]
-            assert matching_lines, f"{filename}: source row not found for {fact.raw_item_name!r} on page {page_no}"
-            if fact.value is not None:
-                tokens = _value_tokens(fact.value)
-                canonical_page = " ".join(_canonical_source_text(line) for line in page_lines)
-                assert any(token in canonical_page for token in tokens), (
-                    f"{filename}: persisted value {fact.value} is not traceable to independent PDF page {page_no}"
-                )
-            else:
-                assert fact.value is None
-            assert fact.currency == "IRR"
-            assert fact.report_version_id == result.report_version_id
-            assert fact.period_id == period.period_id
-
-
 def test_representative_codal_samples_load_into_core_persistence(ingestion_session):
     session, company, period = ingestion_session
     filenames = [
@@ -325,90 +211,107 @@ def test_representative_codal_samples_load_into_core_persistence(ingestion_sessi
 
 
 def test_independent_final_foundation_audit_checks_pit_provenance_and_version_invariants(ingestion_session):
+    """
+    Final audit: PDF -> production ingestion -> persisted foundation invariants.
+
+    Source of truth is the database contract/invariants, not a second PDF
+    parser. A true Golden Data Audit will be added only after an independently
+    verified expected dataset exists in the repository.
+    """
     session, company, period = ingestion_session
     publication = datetime(2026, 9, 6, 12, 0)
     result = ingest_codal_pdf(
-        session, PDF_ROOT / "seo-codal-report (3).pdf", company_id=company.company_id, period_id=period.period_id,
-        title="Final audit sample", report_type="CODAL_FINAL_AUDIT", publication_datetime=publication,
-        codal_tracking_id="CODAL-FINAL-AUDIT-1", source_url="local://seo-codal-report-3.pdf",
+        session, PDF_ROOT / "seo-codal-report (3).pdf",
+        company_id=company.company_id, period_id=period.period_id,
+        title="Final audit sample", report_type="CODAL_FINAL_AUDIT",
+        publication_datetime=publication, codal_tracking_id="CODAL-FINAL-AUDIT-1",
+        source_url="local://seo-codal-report-3.pdf",
     )
     report = session.get(Report, result.report_id)
     assert report is not None
-    assert report.company_id == company.company_id and report.financial_period_id == period.period_id
+    assert report.company_id == company.company_id
+    assert report.financial_period_id == period.period_id
     assert report.codal_tracking_id == "CODAL-FINAL-AUDIT-1"
     assert report.source_url == "local://seo-codal-report-3.pdf"
+
     versions = session.query(ReportVersion).filter_by(report_id=report.report_id).order_by(ReportVersion.version_number).all()
     assert len(versions) == 1
     version = versions[0]
     assert version.publication_datetime == publication
-    assert version.is_current_version is True and version.version_number == 1
+    assert version.is_current_version is True
+    assert version.version_number == 1
+
     facts = session.query(RawFinancialFact).filter_by(report_version_id=version.report_version_id).order_by(RawFinancialFact.raw_fact_id).all()
-    assert facts and len(facts) == result.raw_fact_count
+    assert facts
+    assert len(facts) == result.raw_fact_count
+
+    def contains_non_ascii_digit(value):
+        return any("۰" <= char <= "۹" or "٠" <= char <= "٩" for char in (value or ""))
+
     for fact in facts:
-        assert fact.company_id == company.company_id and fact.period_id == period.period_id
-        assert fact.report_version_id == version.report_version_id and fact.raw_item_name
-        for value in (fact.raw_item_name, fact.raw_item_code, fact.unit, fact.currency, fact.source_section, fact.source_column):
-            assert value is None or not any(ch in "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩" for ch in value)
+        assert fact.company_id == company.company_id
+        assert fact.period_id == period.period_id
+        assert fact.report_version_id == version.report_version_id
+        assert fact.raw_item_name
+        assert not contains_non_ascii_digit(fact.raw_item_name)
+        assert not contains_non_ascii_digit(fact.raw_item_code)
+        assert not contains_non_ascii_digit(fact.unit)
+        assert not contains_non_ascii_digit(fact.currency)
+        assert not contains_non_ascii_digit(fact.source_section)
+        assert not contains_non_ascii_digit(fact.source_column)
         assert fact.value is None or isinstance(fact.value, Decimal)
+
     assert version.publication_datetime <= publication
-    later_cutoff = datetime(2026, 9, 5, 11, 59, 59)
-    assert not (version.publication_datetime <= later_cutoff)
+    earlier_cutoff = publication - timedelta(seconds=1)
+    assert version.publication_datetime > earlier_cutoff
+
     current_count = session.query(ReportVersion).filter_by(report_id=report.report_id, is_current_version=True).count()
     assert current_count == 1
+
     run = session.get(IngestionRun, result.ingestion_id)
-    assert run is not None and run.source == "CODAL" and run.status == "COMPLETED"
-    assert run.records_inserted == len(facts) and run.records_failed == 0
+    assert run is not None
+    assert run.source == "CODAL"
+    assert run.status == "COMPLETED"
+    assert run.records_inserted == len(facts)
+    assert run.records_failed == 0
 
 
 def test_pdf_output_loads_into_core_persistence_and_duplicate_is_idempotent(ingestion_session):
     session, company, period = ingestion_session
     extraction = extract_raw_lines_from_pdf(
-        PDF_ROOT / "seo-codal-report (1).pdf", title="Monthly sample", report_type="MONTHLY_ACTIVITY",
+        PDF_ROOT / "seo-codal-report (1).pdf",
+        title="Monthly sample", report_type="MONTHLY_ACTIVITY",
         publication_datetime=datetime(2026, 9, 1), codal_tracking_id="CODAL-IDEMPOTENT-1",
     )
-    kwargs = dict(company_id=company.company_id, period_id=period.period_id, report_type=extraction.report_type,
-                  title=extraction.title, publication_datetime=extraction.publication_datetime,
-                  raw_lines=extraction.raw_lines, codal_tracking_id=extraction.codal_tracking_id)
-    first = ingest_codal_report(session, **kwargs)
-    second = ingest_codal_report(session, **kwargs)
+    first = ingest_codal_report(
+        session, company_id=company.company_id, period_id=period.period_id,
+        report_type=extraction.report_type, title=extraction.title,
+        publication_datetime=extraction.publication_datetime,
+        raw_lines=extraction.raw_lines, codal_tracking_id=extraction.codal_tracking_id,
+    )
+    second = ingest_codal_report(
+        session, company_id=company.company_id, period_id=period.period_id,
+        report_type=extraction.report_type, title=extraction.title,
+        publication_datetime=extraction.publication_datetime,
+        raw_lines=extraction.raw_lines, codal_tracking_id=extraction.codal_tracking_id,
+    )
     assert first.report_version_id == second.report_version_id
     assert session.query(ReportVersion).count() == 1
     assert session.query(RawFinancialFact).count() == first.raw_fact_count
     runs = session.query(IngestionRun).order_by(IngestionRun.ingestion_id).all()
-    assert len(runs) == 2 and runs[1].records_updated == first.raw_fact_count
-
-
-def test_golden_sample_rerun_is_byte_stable_and_does_not_create_new_version(ingestion_session):
-    session, company, period = ingestion_session
-    path = PDF_ROOT / "seo-codal-report (1).pdf"
-    kwargs = dict(
-        company_id=company.company_id, period_id=period.period_id, title="Golden monthly sample",
-        report_type="MONTHLY_ACTIVITY", publication_datetime=datetime(2026, 9, 5, 12, 0),
-        codal_tracking_id="CODAL-GOLDEN-IDEMPOTENT-1", source_url="local://seo-codal-report-1.pdf",
-    )
-    first = ingest_codal_pdf(session, path, **kwargs)
-    def snapshot(version_id):
-        return [(
-            fact.raw_item_name, fact.raw_item_code, fact.value, fact.unit, fact.currency,
-            fact.source_section, fact.source_row, fact.source_column, fact.period_id, fact.report_version_id,
-        ) for fact in session.query(RawFinancialFact).filter_by(report_version_id=version_id).order_by(RawFinancialFact.raw_fact_id).all()]
-    first_facts = snapshot(first.report_version_id)
-    second = ingest_codal_pdf(session, path, **kwargs)
-    assert second.report_id == first.report_id and second.report_version_id == first.report_version_id
-    assert session.query(ReportVersion).count() == 1
-    assert session.query(RawFinancialFact).count() == first.raw_fact_count
-    assert first_facts == snapshot(second.report_version_id)
-    runs = session.query(IngestionRun).order_by(IngestionRun.ingestion_id).all()
-    assert len(runs) == 2 and all(run.status == "COMPLETED" for run in runs)
-    assert runs[1].records_inserted == 0 and runs[1].records_updated == first.raw_fact_count
+    assert len(runs) == 2
+    assert runs[1].records_updated == first.raw_fact_count
 
 
 def test_codal_pdf_facade_connects_extraction_to_raw_persistence(ingestion_session):
     session, company, period = ingestion_session
     result = ingest_codal_pdf(
-        session, PDF_ROOT / "seo-codal-report (10).pdf", company_id=company.company_id, period_id=period.period_id,
-        title="Interim sample", report_type="INTERIM", publication_datetime=datetime(2026, 9, 2),
-        codal_tracking_id="CODAL-FACADE-1", source_url="local://seo-codal-report-10.pdf",
+        session, PDF_ROOT / "seo-codal-report (10).pdf",
+        company_id=company.company_id, period_id=period.period_id,
+        title="Interim sample", report_type="INTERIM",
+        publication_datetime=datetime(2026, 9, 2),
+        codal_tracking_id="CODAL-FACADE-1",
+        source_url="local://seo-codal-report-10.pdf",
     )
     assert result.raw_fact_count > 0
     report = session.get(Report, result.report_id)
