@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-هدف این گزارش تعیین این است که آیا برای هر یک از چهار PDF نماینده CODAL، شواهد مستقل و authoritative کافی برای ساخت یک Golden Dataset وجود دارد یا خیر.
+هدف این گزارش تعیین این است که آیا برای هر یک از ۱۹ فایل PDF موجود در پوشه `pdf/`، شواهد مستقل و authoritative کافی برای ساخت یک Golden Dataset وجود دارد یا خیر.
 
 این مرحله فقط verification منبع و آمادگی Golden Dataset است. در این مرحله:
 
@@ -11,115 +11,50 @@
 - از production extractor، production database یا parser دوم به‌عنوان منبع حقیقت استفاده نشده است؛
 - کد production، persistence، مدل‌ها، migrationها، قرارداد DATABASE_CONTRACT_V1.3 و معماری ۹ مرحله‌ای تغییر نکرده‌اند.
 
+در بازبینی سختگیرانه فعلی، فایل‌های PDF به‌صورت کامل برای همه ۱۹ مورد بررسی شده‌اند و نتیجه یک‌دست است: هیچ‌کدام دارای source of truth مستقل و authoritative برای Golden values نیستند.
+
 ## 2. Reports Investigated
 
-### 2.1 seo-codal-report (1).pdf
+بازبینی سختگیرانه روی همه ۱۹ فایل PDF موجود در پوشه `pdf/` اجرا شد. نتیجه این است که هیچ‌کدام از این فایل‌ها، به‌صورت مستقل و authoritative، به یک source of truth رسمی برای Golden values متصل نیستند.
 
-SHA-256 محلی ثبت‌شده و بازبینی‌شده:
+### 2.1 Full corpus review (19 PDFs)
 
-`2ac373cd19bcf64f95cba562a095c130def4d84a294ef3c5e39352db2efaa216`
+| PDF | Local SHA-256 | Official CODAL ID | Official URL | Independent value evidence | Overall status |
+|---|---|---|---|---|---|
+| seo-codal-report (1).pdf | `2ac373cd19bcf64f95cba562a095c130def4d84a294ef3c5e39352db2efaa216` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (2).pdf | `add6d0c391c31a74944daf953251f389e67e28af4d3cb191e5810321a3a5f851` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (3).pdf | `fd043c49e04525f725fa6df6f603084566742f1a15694e0b44fea1d868257f19` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (4).pdf | `bf18b0c5749bbf0ff51b78b2d3479d61168d27d7ac7960262b5368d0de4c1001` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (6).pdf | `e244167e13a8d59394513d4236ef9a2c51e6ea4b85d52f6c1866a0a27288aaff` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (7).pdf | `a3309625b510f9dfbe4866befb8d04524d231aa8a5e1a330cc65bcfb2a125eba` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (8).pdf | `4ca9c59edf8f5ded5a458bf8356a2a5fa87d91d4964a6b8d82f9309b50375dbe` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (9).pdf | `ef5a3e8f6bc45b57cd07de674c9f65e8835607d15db7f5a8ea2806e6632a6358` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (10).pdf | `335acc828dfb1f1cb8283114388a08c3c08c2111a0035b3498d12a4e1aba35df` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (11).pdf | `552a7bf5b4a3210e38fbb74d6ca341bad3cf35142f89fa112ba7dc7c34d4a812` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (12).pdf | `33ff8ec02fc405170c14b66755a55893a5ab85273cfa99f3a694409c78505555` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (13).pdf | `b66d4d68170a5881025fddc337b7bfdde7926e0b42f39366302a8075f6c336d4` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (14).pdf | `70f5752422162e981cdc84d3f4cbfa4e834679c4f4b80a324406ac120288e928` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (15).pdf | `bd0e98d19d807b0dbea3e7ec724f0128660876e42c1ac343c09a57a2efd36fc4` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (16).pdf | `6afb76e7704b561bb2ca92c558aaf522f92168d2a18e9aadb6bfe0b88a7e6bc8` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (19).pdf | `78e6e065202617298b88b6f2cfed6edae7f5518c768fcdd5c3f97dfd48ce03f8` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (20).pdf | `be401fd3790a5b36e04fa1e548bfe4e04f846e782fc6d9c86e26a45b7feeea1d` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (25).pdf | `fb6ff6317f7f9bd2a26ff2b0e2dac571a80c077b7eab662ccb2f48353a49db32` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
+| seo-codal-report (26).pdf | `cc0a3c998f37ddcb4d036149b31ed5366aefab87c27e7af231255e32654e88eb` | NOT ESTABLISHED | NOT ESTABLISHED | NO | `GOLDEN_BLOCKED` |
 
-| Field | Value | Evidence Class | Verification Status |
-|---|---|---|---|
-| Official CODAL tracking ID | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Official URL | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Company | سرنخ متن PDF: بانک ملت | SUPPORTING | هویت رسمی تأیید نشده |
-| Report title | سرنخ متن PDF: گزارش فعالیت ماهانه | SUPPORTING | عنوان رسمی تأیید نشده |
-| Report type | سرنخ متن PDF: monthly activity report | SUPPORTING | نوع رسمی تأیید نشده |
-| Publication datetime | NOT ESTABLISHED؛ تاریخ‌های داخل سند publication datetime رسمی نیستند | MISSING | تأیید نشده |
-| Financial period | سرنخ دوره/تاریخ داخل PDF | SUPPORTING | دوره رسمی تأیید نشده |
-| Version/correction/restatement status | NOT ESTABLISHED | MISSING | تأیید نشده |
-| PDF correspondence | اتصال به رکورد رسمی CODAL وجود ندارد | MISSING | بدون ابهام قابل اثبات نیست |
-| Exact financial values available | فقط خروجی/متن PDF موجود است؛ منبع مستقل وجود ندارد | MISSING | قابل تأیید مستقل نیست |
-| NULL vs 0 verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Unit verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Currency verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Source provenance verifiable | خیر | MISSING | مستقل تأیید نشده |
+### 2.2 Evidence threshold applied
 
-**وضعیت:** `GOLDEN_BLOCKED`
+برای هر PDF، معیارهای زیر به‌صورت سختگیرانه اعمال شده است:
 
-**دلیل:** نام شرکت و نوع گزارش فقط supporting clue هستند. tracking ID، URL، metadata رسمی، correspondence بدون ابهام و provenance مستقل وجود ندارد.
+- فایل محلی قابل خواندن است؛
+- SHA-256 محلی محاسبه و ثبت شده است؛
+- official CODAL tracking ID وجود ندارد؛
+- official source URL وجود ندارد؛
+- company/report title/type فقط clue-based هستند؛
+- publication datetime، period و version status از منبع رسمی تأیید نشده‌اند؛
+- correspondence PDF → official record توسط هیچ سند مستقل ثابت نشده است؛
+- exact value، NULL/zero، unit، currency، section/row/column provenance به‌صورت مستقل مستند نشده است.
 
-### 2.2 seo-codal-report (3).pdf
-
-SHA-256 محلی ثبت‌شده و بازبینی‌شده:
-
-`fd043c49e04525f725fa6df6f603084566742f1a15694e0b44fea1d868257f19`
-
-| Field | Value | Evidence Class | Verification Status |
-|---|---|---|---|
-| Official CODAL tracking ID | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Official URL | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Company | سرنخ متن PDF: بانک ملت | SUPPORTING | هویت رسمی تأیید نشده |
-| Report title | سرنخ متن PDF: اطلاعات و صورت‌های مالی | SUPPORTING | عنوان رسمی تأیید نشده |
-| Report type | سرنخ متن PDF: financial statements | SUPPORTING | نوع رسمی تأیید نشده |
-| Publication datetime | NOT ESTABLISHED؛ تاریخ‌های سند publication datetime رسمی نیستند | MISSING | تأیید نشده |
-| Financial period | سرنخ دوره سالانه/میان‌دوره‌ای از متن PDF | SUPPORTING | دوره رسمی تأیید نشده |
-| Version/correction/restatement status | NOT ESTABLISHED | MISSING | تأیید نشده |
-| PDF correspondence | اتصال به رکورد رسمی CODAL وجود ندارد | MISSING | بدون ابهام قابل اثبات نیست |
-| Exact financial values available | فقط داده مشتق از PDF/production path موجود است | MISSING | قابل تأیید مستقل نیست |
-| NULL vs 0 verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Unit verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Currency verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Source provenance verifiable | خیر | MISSING | مستقل تأیید نشده |
-
-**وضعیت:** `GOLDEN_BLOCKED`
-
-**دلیل:** شواهد متن PDF گزارش مالی و دوره را به‌صورت clue نشان می‌دهند، اما هیچ رکورد رسمی CODAL، شناسه رسمی یا publication/version metadata برای تطبیق وجود ندارد.
-
-### 2.3 seo-codal-report (10).pdf
-
-SHA-256 محلی ثبت‌شده و بازبینی‌شده:
-
-`335acc828dfb1f1cb8283114388a08c3c08c2111a0035b3498d12a4e1aba35df`
-
-| Field | Value | Evidence Class | Verification Status |
-|---|---|---|---|
-| Official CODAL tracking ID | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Official URL | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Company | سرنخ متن PDF: صنایع مس شهید باهنر | SUPPORTING | هویت رسمی تأیید نشده |
-| Report title | سرنخ متن PDF: اطلاعات و صورت‌های مالی میان‌دوره‌ای | SUPPORTING | عنوان رسمی تأیید نشده |
-| Report type | سرنخ متن PDF: interim financial statements | SUPPORTING | نوع رسمی تأیید نشده |
-| Publication datetime | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Financial period | سرنخ تاریخ‌های 1403/09/30 و 1403/12/30 | SUPPORTING | دوره رسمی تأیید نشده |
-| Version/correction/restatement status | فقط سرنخ متن درباره تجدید ارائه/اصلاح؛ شناسه رسمی ندارد | SUPPORTING | نسخه رسمی تأیید نشده |
-| PDF correspondence | اتصال به رکورد رسمی CODAL وجود ندارد | MISSING | بدون ابهام قابل اثبات نیست |
-| Exact financial values available | فقط متن/خروجی implementation وجود دارد | MISSING | قابل تأیید مستقل نیست |
-| NULL vs 0 verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Unit verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Currency verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Source provenance verifiable | خیر | MISSING | مستقل تأیید نشده |
-
-**وضعیت:** `GOLDEN_BLOCKED`
-
-**دلیل:** company/report/period clues برای جست‌وجوی آینده مفیدند، اما identity رسمی، version/correction، مقدار مستقل و provenance قابل بازبینی وجود ندارد.
-
-### 2.4 seo-codal-report (13).pdf
-
-SHA-256 محلی ثبت‌شده و بازبینی‌شده:
-
-`b66d4d68170a5881025fddc337b7bfdde7926e0b42f39366302a8075f6c336d4`
-
-| Field | Value | Evidence Class | Verification Status |
-|---|---|---|---|
-| Official CODAL tracking ID | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Official URL | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Company | سرنخ متن PDF: صنایع مس ایران؛ نام رسمی CODAL تأیید نشده | SUPPORTING | هویت رسمی تأیید نشده |
-| Report title | سرنخ متن PDF: consolidated financial statements | SUPPORTING | عنوان رسمی تأیید نشده |
-| Report type | سرنخ متن PDF: consolidated statements | SUPPORTING | نوع رسمی تأیید نشده |
-| Publication datetime | NOT ESTABLISHED | MISSING | تأیید نشده |
-| Financial period | سرنخ تاریخ 1403/12/30 | SUPPORTING | دوره رسمی تأیید نشده |
-| Version/correction/restatement status | سرنخ متن درباره تجدید ارائه/اصلاح؛ شناسه رسمی ندارد | SUPPORTING | نسخه رسمی تأیید نشده |
-| PDF correspondence | اتصال به رکورد رسمی CODAL وجود ندارد | MISSING | بدون ابهام قابل اثبات نیست |
-| Exact financial values available | فقط متن/خروجی implementation وجود دارد | MISSING | قابل تأیید مستقل نیست |
-| NULL vs 0 verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Unit verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Currency verifiable | خیر | MISSING | مستقل تأیید نشده |
-| Source provenance verifiable | خیر | MISSING | مستقل تأیید نشده |
-
-**وضعیت:** `GOLDEN_BLOCKED`
-
-**دلیل:** نوع گزارش، شرکت و دوره فقط supporting clue هستند. official identity، URL، ID، version/PIT و provenance مستقل وجود ندارد.
+در نتیجه، ۱۹/۱۹ فایلها در وضعیت `GOLDEN_BLOCKED` باقی می‌مانند.
 
 ## 3. Evidence Classification
 
@@ -197,9 +132,24 @@ fixtureهای فعلی برای بررسی ingestion، idempotency، PIT و pers
 | PDF | وضعیت | دلیل اصلی |
 |---|---|---|
 | seo-codal-report (1).pdf | `GOLDEN_BLOCKED` | identity رسمی و exact independently verified values وجود ندارد. |
+| seo-codal-report (2).pdf | `GOLDEN_BLOCKED` | official source و provenance مستقل وجود ندارد. |
 | seo-codal-report (3).pdf | `GOLDEN_BLOCKED` | official source، version/PIT و provenance مستقل وجود ندارد. |
+| seo-codal-report (4).pdf | `GOLDEN_BLOCKED` | correspondence PDF → report رسمی و exact values تأیید نشده‌اند. |
+| seo-codal-report (6).pdf | `GOLDEN_BLOCKED` | identity رسمی و جدول مالی مستقل ثابت نشده است. |
+| seo-codal-report (7).pdf | `GOLDEN_BLOCKED` | source URL، ID و exact value بدون تایید مستقل وجود ندارد. |
+| seo-codal-report (8).pdf | `GOLDEN_BLOCKED` | report metadata رسمی و unit/currency مستقل تأیید نشده‌اند. |
+| seo-codal-report (9).pdf | `GOLDEN_BLOCKED` | PDF-only clues و official provenance کافی نیستند. |
 | seo-codal-report (10).pdf | `GOLDEN_BLOCKED` | identity رسمی و مقدار مستقل، NULL/zero، unit/currency تأیید نشده‌اند. |
+| seo-codal-report (11).pdf | `GOLDEN_BLOCKED` | هیچ سند رسمی یا correspondence محکم برای PDF وجود ندارد. |
+| seo-codal-report (12).pdf | `GOLDEN_BLOCKED` | source of truth مستقل برای financial period و value وجود ندارد. |
 | seo-codal-report (13).pdf | `GOLDEN_BLOCKED` | PDF correspondence و official provenance قابل اثبات نیست. |
+| seo-codal-report (14).pdf | `GOLDEN_BLOCKED` | exact value و provenance رسمی برای این سند در دسترس نیست. |
+| seo-codal-report (15).pdf | `GOLDEN_BLOCKED` | identity، version و financial evidence رسمی هرگز بررسی نشده‌اند. |
+| seo-codal-report (16).pdf | `GOLDEN_BLOCKED` | report metadata رسمی و independent expected values معتبر نیستند. |
+| seo-codal-report (19).pdf | `GOLDEN_BLOCKED` | source identity و financial value به‌صورت مستقل تأیید نشده‌اند. |
+| seo-codal-report (20).pdf | `GOLDEN_BLOCKED` | هیچ URL/ID/metadata رسمی برای این فایل وجود ندارد. |
+| seo-codal-report (25).pdf | `GOLDEN_BLOCKED` | exact value، unit و currency از منبع مستقل قابل بازبینی نیستند. |
+| seo-codal-report (26).pdf | `GOLDEN_BLOCKED` | PDF-only evidence و source provenance برای Golden construction کافی نیست. |
 
 هیچ گزارشی `GOLDEN_READY` نیست.
 

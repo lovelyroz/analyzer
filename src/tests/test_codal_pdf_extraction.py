@@ -114,12 +114,10 @@ def test_representative_monthly_codal_pdf_is_deterministic_and_returns_raw_dto()
     assert all(line.item_name for line in result_a.raw_lines)
 
 
-@pytest.mark.parametrize("filename", [
-    "seo-codal-report (1).pdf",
-    "seo-codal-report (3).pdf",
-    "seo-codal-report (10).pdf",
-    "seo-codal-report (13).pdf",
-])
+@pytest.mark.parametrize(
+    "filename",
+    [path.name for path in sorted(PDF_ROOT.glob("*.pdf"))],
+)
 def test_representative_codal_layouts_extract_rows(filename):
     result = extract_raw_lines_from_pdf(
         PDF_ROOT / filename,
@@ -190,10 +188,7 @@ def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion
 
 def test_representative_codal_samples_load_into_core_persistence(ingestion_session):
     session, company, period = ingestion_session
-    filenames = [
-        "seo-codal-report (1).pdf", "seo-codal-report (3).pdf",
-        "seo-codal-report (10).pdf", "seo-codal-report (13).pdf",
-    ]
+    filenames = [path.name for path in sorted(PDF_ROOT.glob("*.pdf"))]
     results = []
     for idx, filename in enumerate(filenames, start=1):
         results.append(ingest_codal_pdf(

@@ -69,7 +69,7 @@ Candidate source:
 - 11_Database_Architecture_Stage1.md
 - 12_Database_Architecture_V1.1.md
 - 99_Architecture_Change_Log.md
-- 10_Implementation_Status.md
+- prompts/10_Implementation_Status.md
 - 10_Production_Codal_Extraction_and_Data_Load.md
 - src/tests/golden_audit_blocked_spec.md
 
@@ -237,7 +237,7 @@ There is therefore no valid Golden dataset that can be created without inventing
 
 ## 6. Minimum external evidence required to unblock Golden Accuracy
 
-A valid Golden source must provide, for at least a representative subset of facts, the following evidence:
+A valid Golden source must provide the following evidence for every fact included in a limited Golden Dataset subset. A subset may support only a limited-scope audit; it must not be used to claim complete financial correctness for the full PDF or report:
 
 - exact PDF identity or official report identifier;
 - CODAL tracking ID;
