@@ -133,24 +133,66 @@ def test_rtl_pdf_line_extracts_trailing_label_without_reversing_text():
     assert [row.source_column for row in rows] == ["1", "2", "3"]
 
 
-def test_representative_monthly_codal_pdf_is_deterministic_and_returns_raw_dto():
+def _normalized_raw_line_snapshot(raw_lines):
+    """Comparable, field-stable view of extraction output for determinism checks."""
+    return tuple(
+        (
+            line.item_name,
+            line.value,
+            line.item_code,
+            line.unit,
+            line.currency,
+            line.source_section,
+            line.source_row,
+            line.source_column,
+        )
+        for line in raw_lines
+    )
+
+
+def test_representative_monthly_codal_pdf_returns_raw_dto_contract():
+    """DTO/metadata contract for one monthly sample; corpus determinism is separate."""
     path = PDF_ROOT / "seo-codal-report (1).pdf"
-    kwargs = dict(
+    result = extract_raw_lines_from_pdf(
+        path,
         title="sample",
         report_type="MONTHLY_ACTIVITY",
         publication_datetime=datetime(2026, 9, 1),
         codal_tracking_id="CODAL-SAMPLE-1",
         source_url="https://example.invalid/codal/sample-1",
     )
+    assert result.raw_lines
+    assert all(isinstance(line, RawLineInput) for line in result.raw_lines)
+    assert result.codal_tracking_id == "CODAL-SAMPLE-1"
+    assert result.source_url.endswith("sample-1")
+    assert result.publication_datetime == datetime(2026, 9, 1)
+    assert all(line.item_name for line in result.raw_lines)
+
+
+@pytest.mark.parametrize("filename", sorted(LOCKED_CODAL_VALIDATION_CORPUS))
+def test_locked_codal_corpus_extraction_is_deterministic_across_three_independent_runs(
+    filename,
+):
+    """Layer F: three independent extractions per locked PDF must yield A == B == C."""
+    path = PDF_ROOT / filename
+    kwargs = dict(
+        title=filename,
+        report_type="CODAL",
+        publication_datetime=datetime(2026, 9, 1),
+        codal_tracking_id=f"CODAL-DET-{filename}",
+        source_url=f"local://determinism/{filename}",
+    )
     result_a = extract_raw_lines_from_pdf(path, **kwargs)
     result_b = extract_raw_lines_from_pdf(path, **kwargs)
-    assert result_a.raw_lines
-    assert result_a.raw_lines == result_b.raw_lines
-    assert all(isinstance(line, RawLineInput) for line in result_a.raw_lines)
-    assert result_a.codal_tracking_id == "CODAL-SAMPLE-1"
-    assert result_a.source_url.endswith("sample-1")
-    assert result_a.publication_datetime == datetime(2026, 9, 1)
-    assert all(line.item_name for line in result_a.raw_lines)
+    result_c = extract_raw_lines_from_pdf(path, **kwargs)
+    snap_a = _normalized_raw_line_snapshot(result_a.raw_lines)
+    snap_b = _normalized_raw_line_snapshot(result_b.raw_lines)
+    snap_c = _normalized_raw_line_snapshot(result_c.raw_lines)
+    assert snap_a, f"empty extraction for {filename}"
+    assert snap_a == snap_b == snap_c, (
+        f"NONDETERMINISTIC_EXTRACTION: independent runs A/B/C diverge for {filename}. "
+        f"len_a={len(snap_a)} len_b={len(snap_b)} len_c={len(snap_c)}"
+    )
 
 
 @pytest.mark.parametrize(
