@@ -23,6 +23,45 @@ from src.models.report import Report, ReportVersion
 
 PDF_ROOT = Path(__file__).parents[2] / "pdf"
 
+# Locked validation corpus from codal_19_pdf_validation_plan.md / matrix.md.
+# Inventory must fail with SCOPE_ERROR if this set drifts.
+LOCKED_CODAL_VALIDATION_CORPUS = frozenset(
+    {
+        "seo-codal-report (1).pdf",
+        "seo-codal-report (2).pdf",
+        "seo-codal-report (3).pdf",
+        "seo-codal-report (4).pdf",
+        "seo-codal-report (6).pdf",
+        "seo-codal-report (7).pdf",
+        "seo-codal-report (8).pdf",
+        "seo-codal-report (9).pdf",
+        "seo-codal-report (10).pdf",
+        "seo-codal-report (11).pdf",
+        "seo-codal-report (12).pdf",
+        "seo-codal-report (13).pdf",
+        "seo-codal-report (14).pdf",
+        "seo-codal-report (15).pdf",
+        "seo-codal-report (16).pdf",
+        "seo-codal-report (19).pdf",
+        "seo-codal-report (20).pdf",
+        "seo-codal-report (25).pdf",
+        "seo-codal-report (26).pdf",
+    }
+)
+
+
+def test_codal_validation_corpus_inventory_is_exactly_locked_19_pdfs():
+    """SCOPE gate: validation corpus must be exactly the locked 19-PDF set."""
+    assert PDF_ROOT.is_dir(), f"SCOPE_ERROR: PDF root missing: {PDF_ROOT}"
+    present = {path.name for path in PDF_ROOT.glob("*.pdf")}
+    missing = LOCKED_CODAL_VALIDATION_CORPUS - present
+    unexpected = present - LOCKED_CODAL_VALIDATION_CORPUS
+    assert not missing and not unexpected and len(present) == 19, (
+        "SCOPE_ERROR: CODAL validation corpus drifted from the locked 19-PDF set. "
+        f"expected_count=19 actual_count={len(present)} "
+        f"missing={sorted(missing)} unexpected={sorted(unexpected)}"
+    )
+
 
 @pytest.fixture
 def ingestion_session():
