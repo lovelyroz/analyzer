@@ -16,7 +16,9 @@ The repository does not contain a valid independent source of truth for CODAL va
 
 ## Input
 
-Representative production PDFs already used in the repository:
+The full locked validation corpus of 19 real CODAL PDFs in the repository (see `codal_19_pdf_validation_matrix.md`). Golden status is evaluated for the corpus as a whole: at present no member PDF has an independent authoritative source, so the corpus remains blocked.
+
+Blocked status is not limited to four earlier integration samples. The four PDFs named below are the ones previously referenced as integration samples and are a subset of the 19:
 
 - seo-codal-report (1).pdf
 - seo-codal-report (3).pdf

@@ -25,20 +25,46 @@ Golden Dataset باید یک مرجع مستقل برای بررسی صحت دا
 
 این سند به Golden Accuracy test، persistence، mapping، KPI، scoring، forecast، valuation یا decision logic تعلق ندارد.
 
-## 2. وضعیت شواهد فعلی چهار PDF
+## 2. وضعیت شواهد فعلی کل corpus (۱۹ PDF)
 
-در زمان تهیه این schema، هیچ‌یک از چهار PDF دارای هویت رسمی CODAL، tracking/report ID رسمی، URL رسمی، یا منبع مستقل کافی برای ساخت expected values نیستند.
+در زمان تهیه این schema، هیچ‌یک از ۱۹ PDF موجود در corpus دارای هویت رسمی CODAL، tracking/report ID رسمی، URL رسمی، یا منبع مستقل کافی برای ساخت expected values نیستند. چهار PDF زیر قبلاً به‌عنوان integration sample استفاده می‌شدند و زیرمجموعه‌ای از همین ۱۹ PDF هستند.
 
-| PDF | SHA-256 محلی | هویت رسمی CODAL | ID رسمی | URL رسمی | وضعیت identity | امکان تأیید مستقل مقدار مالی |
-|---|---|---|---|---|---|---|
-| seo-codal-report (1).pdf | `2ac373cd19bcf64f95cba562a095c130def4d84a294ef3c5e39352db2efaa216` | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
-| seo-codal-report (3).pdf | `fd043c49e04525f725fa6df6f603084566742f1a15694e0b44fea1d868257f19` | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
-| seo-codal-report (10).pdf | `335acc828dfb1f1cb8283114388a08c3c08c2111a0035b3498d12a4e1aba35df` | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
-| seo-codal-report (13).pdf | `b66d4d68170a5881025fddc337b7bfdde7926e0b42f39366302a8075f6c336d4` | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+### 2.1 جدول کامل corpus (۱۹ PDF)
+
+| PDF | هویت رسمی CODAL | ID رسمی | URL رسمی | وضعیت identity | امکان تأیید مستقل مقدار مالی |
+|---|---|---|---|---|---|
+| seo-codal-report (1).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (2).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (3).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (4).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (6).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (7).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (8).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (9).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (10).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (11).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (12).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (13).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (14).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (15).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (16).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (19).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (20).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (25).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+| seo-codal-report (26).pdf | ثبت نشده | ثبت نشده | ثبت نشده | `UNVERIFIED` | خیر |
+
+### 2.2 SHA-256 چهار integration sample
+
+| PDF | SHA-256 محلی | وضعیت identity |
+|---|---|---|
+| seo-codal-report (1).pdf | `2ac373cd19bcf64f95cba562a095c130def4d84a294ef3c5e39352db2efaa216` | `UNVERIFIED` |
+| seo-codal-report (3).pdf | `fd043c49e04525f725fa6df6f603084566742f1a15694e0b44fea1d868257f19` | `UNVERIFIED` |
+| seo-codal-report (10).pdf | `335acc828dfb1f1cb8283114388a08c3c08c2111a0035b3498d12a4e1aba35df` | `UNVERIFIED` |
+| seo-codal-report (13).pdf | `b66d4d68170a5881025fddc337b7bfdde7926e0b42f39366302a8075f6c336d4` | `UNVERIFIED` |
 
 ### نتیجه فعلی برای هر PDF
 
-برای هر چهار فایل، موارد زیر هنوز تأیید نشده است:
+برای هر ۱۹ فایل corpus، موارد زیر هنوز تأیید نشده است:
 
 1. هویت دقیق گزارش رسمی CODAL؛
 2. CODAL tracking/report ID؛

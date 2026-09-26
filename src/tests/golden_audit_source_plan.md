@@ -24,9 +24,15 @@ GOLDEN ACCURACY AUDIT: BLOCKED — INDEPENDENT SOURCE OF TRUTH REQUIRED
 
 ---
 
-## 2. Representative PDFs and currently known metadata
+## 2. Validation corpus and currently known metadata
 
-The repository uses four representative PDFs:
+The Golden investigation applies to the full locked validation corpus of 19 real CODAL PDFs in the repository (see `codal_19_pdf_validation_matrix.md`). Four of these were previously used as integration samples and are called out individually below because they carry the most repository metadata; the Golden conclusion in Section 5 applies to all 19, not only to these four.
+
+Full corpus (19):
+
+- seo-codal-report (1).pdf, (2), (3), (4), (6), (7), (8), (9), (10), (11), (12), (13), (14), (15), (16), (19), (20), (25), (26)
+
+Previously-used integration samples (subset of the 19):
 
 - seo-codal-report (1).pdf
 - seo-codal-report (3).pdf
@@ -47,6 +53,8 @@ This metadata is not evidence of an authoritative CODAL record. It is internal t
 
 ### Status by PDF
 
+Applies to every member of the 19-PDF corpus; the four integration samples are shown as the concrete examples:
+
 | PDF | Current repo metadata | Independence status | Evidence |
 |---|---|---|---|
 | seo-codal-report (1).pdf | filename only, synthetic title, synthetic sample metadata | NOT_VERIFIABLE | Used in tests as a sample artifact; no official CODAL metadata is attached |
@@ -54,7 +62,7 @@ This metadata is not evidence of an authoritative CODAL record. It is internal t
 | seo-codal-report (10).pdf | filename only, synthetic title, synthetic metadata | NOT_VERIFIABLE | Same as above |
 | seo-codal-report (13).pdf | filename only, synthetic title, synthetic metadata | NOT_VERIFIABLE | Same as above |
 
-Conclusion: the repository knows these are representative production samples, but it does not know the underlying authoritative CODAL identifiers or values for them.
+Conclusion: the repository knows these are representative production samples, but it does not know the underlying authoritative CODAL identifiers or values for any of the 19 corpus PDFs.
 
 ---
 
@@ -160,7 +168,7 @@ Classification:
 Evidence:
 - This is the only realistic independent source type that could become valid.
 - However, at present, the repository does not contain the authoritative URL, report ID, or official metadata for these PDFs.
-- The project has not yet obtained a verifiable official CODAL record for the representative PDFs.
+- The project has not yet obtained a verifiable official CODAL record for the 19 corpus PDFs.
 
 This source would become VALID_INDEPENDENT_SOURCE only if:
 - the exact CODAL report URL or official record is identified;
@@ -223,9 +231,9 @@ No.
 
 ### Why not
 
-The repository does not currently contain the required independent source material for the representative PDFs. Specifically, it lacks:
+The repository does not currently contain the required independent source material for the corpus PDFs. Specifically, it lacks:
 
-- exact official CODAL identifiers for the four PDFs;
+- exact official CODAL identifiers for the 19 corpus PDFs;
 - authoritative report URLs or canonical report records;
 - report metadata from official CODAL publication;
 - a verified values dataset independently maintained outside the extractor pipeline;

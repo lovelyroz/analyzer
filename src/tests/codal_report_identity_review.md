@@ -223,7 +223,7 @@ These clues do not uniquely identify the official CODAL publication.
 
 ## 6. Unsupported or overstated manifest claims
 
-The manifest is conservative in its central conclusion: it does not claim any identity is verified, and it correctly records the official URL and tracking ID as not established for all four PDFs.
+The manifest is conservative in its central conclusion: it does not claim any identity is verified, and it correctly records the official URL and tracking ID as not established for all four audited PDFs. Note on scope: the validation corpus has since been locked to 19 PDFs, of which the four audited here are a subset. No member of the 19-PDF corpus has an official CODAL identity established anywhere in the repository, so the corpus-wide conclusion (NO_IDENTITIES_VERIFIED) holds for the full set; this review's per-PDF detail covers the four audited samples.
 
 Two descriptive statements should nevertheless be treated as unsupported or overstated:
 

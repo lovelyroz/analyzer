@@ -2,7 +2,7 @@
 
 ## 1. Purpose and scope
 
-This document records the investigation for the locked Stage 1 objective of establishing the exact authoritative CODAL identity of the four representative production PDFs used in this repository.
+This document records the investigation for the locked Stage 1 objective of establishing the exact authoritative CODAL identity of the production PDFs used in this repository. The validation corpus has since been locked to 19 PDFs; this identity audit examined the four integration samples listed in Section 2 (a subset of the 19). No corpus member has an established official CODAL identity.
 
 This stage is limited to identity discovery and provenance. It does not create Golden financial expected values, does not implement Golden Accuracy tests, and does not modify production extraction, persistence, database contracts, models, migrations, or the 9-stage architecture.
 
@@ -147,8 +147,8 @@ Accepted only as clues, not as authoritative evidence.
 The official CODAL site was considered as the authoritative source for direct verification.
 
 Current status:
-- no exact CODAL record match was established for the four representative PDFs within the repository and this investigation environment
-- no authoritative CODAL URL or report ID was confirmed for any of the four files
+- no exact CODAL record match was established for the corpus PDFs within the repository and this investigation environment
+- no authoritative CODAL URL or report ID was confirmed for any of the corpus files
 
 Therefore, the official-source path remains unresolved and the identity for each sample remains UNVERIFIED.
 
@@ -251,9 +251,9 @@ Status: required for verification; none established for these four files in this
 Overall conclusion: NO_IDENTITIES_VERIFIED
 
 Reason:
-- the repository contains four representative PDFs but not their exact authoritative CODAL report identities
+- the repository now contains a 19-PDF validation corpus; this identity audit examined the four integration samples listed in Section 2, and none of them has an established authoritative CODAL report identity. The remaining corpus members were not separately audited here, but no member of the corpus has an official CODAL identity recorded anywhere in the repository, so none can be treated as verified.
 - the local PDF metadata and visible text provide only clues, not official record identity
-- no official CODAL tracking/report ID or URL was established for any sample
+- no official CODAL tracking/report ID or URL was established for any audited sample
 - no independent official record mapping was found in this environment
 
 The stage is therefore:
