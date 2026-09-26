@@ -106,6 +106,24 @@ These are only allowed when an independent authoritative source exists. They mus
 - Independent Golden validation: blocked until an authoritative external dataset exists
 - Golden status: BLOCKED
 
+## CI configuration
+
+The repository defines a GitHub Actions workflow at `.github/workflows/tests.yml` (job `test`, `ubuntu-latest`, Python 3.12). It installs `pytest`, `SQLAlchemy`, `openpyxl`, `pypdf`, `pdfplumber` and runs:
+
+```text
+PYTHONPATH=. pytest src/tests -v
+```
+
+on every push to `master` and every pull request targeting `master`. This is the authoritative CI gate for the regression layer (Layer I). The workflow triggers on the same commits validated locally here, so CI evidence corresponds to the audited commits rather than a stale branch.
+
+CI status terminology used when reporting:
+
+- **CI VERIFIED** — the workflow ran on the final audited commit and the suite passed.
+- **CI NOT RUN** — the workflow exists but has not run on the final audited commit (e.g. commits not yet pushed, or runner not executed).
+- **CI FAILED** — the workflow ran and at least one test failed; no completion claim is valid until fixed.
+
+The 19-PDF corpus is committed to the repository (see the inventory gate), so CI can execute the corpus-wide layers without downloading fixtures.
+
 ## Golden status rule
 
 The current repository does not contain an authoritative expected dataset for the 19 real PDF samples. Therefore:
