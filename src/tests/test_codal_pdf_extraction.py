@@ -222,6 +222,44 @@ def test_representative_codal_layouts_extract_rows(filename):
     )
     assert result.raw_lines
     assert all(line.source_row is not None for line in result.raw_lines)
+    # Hard rule: NULL != 0. Every extracted value must be either an explicit
+    # Decimal (including an explicit zero) or None for an absent value, but
+    # never a float, a string, or a silently-invented number. The distinct
+    # NULL-vs-zero pass-through is enforced separately by the controlled
+    # route-through test below, which is the meaningful place to catch a
+    # silent NULL->0 coercion (a single PDF cannot reveal which values were
+    # blank in its source table).
+    for line in result.raw_lines:
+        assert line.value is None or isinstance(line.value, Decimal), (
+            f"INVALID_VALUE_TYPE in {filename}: {line.value!r}"
+        )
+
+
+@pytest.mark.parametrize(
+    "blank,zero",
+    [
+        ("", "0"),
+        ("-", "0"),
+        ("—", "(0)"),
+    ],
+)
+def test_extraction_keeps_blank_and_explicit_zero_distinct(blank, zero):
+    """NULL != 0: a blank source cell must stay None; an explicit zero must
+    become Decimal("0"). A silent NULL->0 coercion would collapse these two
+    distinct source tokens onto the same value, which is exactly the silent
+    financial-data corruption this rule exists to prevent.
+    """
+    from src.ingestion.codal.parser import parse_numeric_token
+
+    blank_value = parse_numeric_token(blank)
+    zero_value = parse_numeric_token(zero)
+    assert blank_value is None, (
+        f"NULL_ZERO_CONVERSION: blank token {blank!r} became {blank_value!r} instead of None"
+    )
+    assert zero_value == Decimal("0"), f"explicit zero {zero!r} did not parse to Decimal(0)"
+    assert blank_value != zero_value, "NULL and explicit zero collapsed to the same value"
+    assert blank_value is None and zero_value is not None
+
 
 
 def test_malformed_pdf_is_rejected_and_ingestion_is_audited(tmp_path, ingestion_session):
@@ -252,6 +290,47 @@ def test_all_supplied_codal_pdfs_have_explicit_extraction_outcomes():
         except CodalPdfExtractionError:
             outcomes[path.name] = None
     assert all(count is not None and count > 0 for count in outcomes.values())
+
+
+def test_null_and_explicit_zero_persist_as_distinct_values(ingestion_session):
+    """Hard rule NULL != 0, enforced through the real persistence path.
+
+    A report carrying one absent line (value=None) and one explicit zero
+    (value=Decimal("0")) must persist both exactly: None stays SQL NULL,
+    Decimal("0") stays exact zero. A silent NULL->0 coercion in the ingestion
+    path would make both rows read back as zero and collapse the distinction,
+    which is the exact silent financial-data corruption this rule prevents.
+    """
+    session, company, period = ingestion_session
+    result = ingest_codal_report(
+        session,
+        company_id=company.company_id,
+        period_id=period.period_id,
+        report_type="CODAL_NULL_TEST",
+        title="NULL vs zero",
+        publication_datetime=datetime(2026, 9, 17, 12, 0, 0),
+        codal_tracking_id="CODAL-NULL-ZERO-1",
+        raw_lines=[
+            RawLineInput(item_name="absent amount", value=None, source_column="1"),
+            RawLineInput(item_name="explicit zero", value=Decimal("0"), source_column="2"),
+        ],
+    )
+    facts = (
+        session.query(RawFinancialFact)
+        .filter_by(report_version_id=result.report_version_id)
+        .all()
+    )
+    by_name = {fact.raw_item_name: fact for fact in facts}
+    absent = by_name["absent amount"]
+    zero = by_name["explicit zero"]
+
+    # Distinctness is asserted on the persisted objects, not on the inputs.
+    assert absent.value is None, "NULL was coerced to a value on persistence"
+    assert zero.value == Decimal("0"), "explicit zero was altered on persistence"
+    assert absent.value != zero.value or (absent.value is None and zero.value is not None)
+    assert absent.value is None and zero.value is not None, (
+        "NULL and explicit zero collapsed to the same persisted value"
+    )
 
 
 def test_codal_raw_text_fields_are_ascii_normalized_before_persistence(ingestion_session):
