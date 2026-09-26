@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from src.core.database import Base
+from src.core.point_in_time import select_report_version
 from src.ingestion.codal.adapter import extract_raw_lines_from_pdf
 from src.ingestion.codal.ingestion import ingest_codal_pdf
 from src.ingestion.codal.parser import (
@@ -691,6 +692,193 @@ def test_locked_codal_corpus_persistence_satisfies_hard_invariants(
     assert run.status == "COMPLETED"
     assert run.records_inserted == len(facts)
     assert run.records_failed == 0
+
+
+@pytest.mark.parametrize("filename", sorted(LOCKED_CODAL_VALIDATION_CORPUS))
+def test_locked_codal_corpus_pit_and_version_invariants(filename, ingestion_session):
+    """Layer H: PIT, version linkage and cutoff semantics over the full corpus.
+
+    Each of the 19 locked PDFs is ingested through the real production path
+    and its persisted PIT/version state is asserted, rather than a synthetic
+    fixture. This closes the corpus-wide Layer H gap where deep PIT assertions
+    previously ran on a single PDF.
+    """
+    session, company, period = ingestion_session
+    publication = datetime(2026, 9, 15, 9, 30, 0)
+    tracking_id = f"CODAL-PIT-{filename}"
+
+    result = ingest_codal_pdf(
+        session,
+        PDF_ROOT / filename,
+        company_id=company.company_id,
+        period_id=period.period_id,
+        title=filename,
+        report_type="CODAL_PIT",
+        publication_datetime=publication,
+        codal_tracking_id=tracking_id,
+        source_url=f"local://pit/{filename}",
+    )
+    assert result.raw_fact_count > 0, f"no facts persisted for {filename}"
+
+    # The persisted ReportVersion is linked to the correct Report, and the
+    # publication_datetime is preserved exactly (not re-derived or truncated).
+    report = session.get(Report, result.report_id)
+    assert report is not None
+    assert report.company_id == company.company_id
+    assert report.financial_period_id == period.period_id
+    assert report.codal_tracking_id == tracking_id
+
+    versions = (
+        session.query(ReportVersion)
+        .filter_by(report_id=report.report_id)
+        .order_by(ReportVersion.version_number)
+        .all()
+    )
+    assert len(versions) == 1, f"unexpected version count for {filename}"
+    version = versions[0]
+    assert version.report_id == report.report_id
+    assert version.publication_datetime == publication
+    assert version.version_number == 1
+
+    # FinancialPeriod linkage remains correct end to end.
+    persisted_period = session.get(FinancialPeriod, report.financial_period_id)
+    assert persisted_period is not None
+    assert persisted_period.period_id == period.period_id
+    assert persisted_period.company_id == company.company_id
+
+    # Exactly one current ReportVersion after initial ingestion.
+    current_count = (
+        session.query(ReportVersion)
+        .filter_by(report_id=report.report_id, is_current_version=True)
+        .count()
+    )
+    assert current_count == 1, f"more than one current version for {filename}"
+
+    # PIT cutoff semantics against the ACTUAL persisted state, using the real
+    # select_report_version service. A cutoff after publication must expose the
+    # version; a cutoff strictly before publication must not.
+    after = select_report_version(session, report.report_id, publication + timedelta(hours=1))
+    assert after is not None and after.report_version_id == version.report_version_id
+
+    before = select_report_version(session, report.report_id, publication - timedelta(seconds=1))
+    assert before is None, (
+        f"PIT_FAILURE: version visible before its own publication_datetime for {filename}"
+    )
+
+    # Exact boundary: publication_datetime == cutoff is inclusive.
+    at_boundary = select_report_version(session, report.report_id, publication)
+    assert at_boundary is not None and at_boundary.report_version_id == version.report_version_id
+
+
+@pytest.mark.parametrize("filename", sorted(LOCKED_CODAL_VALIDATION_CORPUS))
+def test_locked_codal_corpus_version_chain_preserves_history(filename, ingestion_session):
+    """Layer H: a later publication creates a new current version while the
+    historical version and its raw facts remain preserved and attached.
+
+    Uses the real ingestion path. The first ingestion publishes version 1; a
+    second ingestion of the same logical report (same codal_tracking_id) with a
+    LATER publication_datetime must create version 2, make it current, demote
+    version 1, and keep version 1's raw facts bound to version 1 (they are not
+    moved, overwritten or dropped).
+    """
+    session, company, period = ingestion_session
+    first_publication = datetime(2026, 9, 15, 9, 30, 0)
+    second_publication = datetime(2026, 10, 2, 14, 0, 0)
+    tracking_id = f"CODAL-CHAIN-{filename}"
+
+    common_kwargs = dict(
+        company_id=company.company_id,
+        period_id=period.period_id,
+        report_type="CODAL_CHAIN",
+        title=filename,
+        codal_tracking_id=tracking_id,
+        source_url=f"local://chain/{filename}",
+    )
+    first = ingest_codal_pdf(
+        session,
+        PDF_ROOT / filename,
+        publication_datetime=first_publication,
+        **common_kwargs,
+    )
+    first_fact_count = first.raw_fact_count
+    assert first_fact_count > 0, f"no facts persisted for {filename}"
+
+    # Same logical report, later publication, flagged as a restatement.
+    second = ingest_codal_pdf(
+        session,
+        PDF_ROOT / filename,
+        publication_datetime=second_publication,
+        is_restated=True,
+        **common_kwargs,
+    )
+
+    # Same logical Report (identity by codal_tracking_id), not a new one.
+    assert first.report_id == second.report_id
+    assert session.query(Report).filter_by(codal_tracking_id=tracking_id).count() == 1
+
+    versions = (
+        session.query(ReportVersion)
+        .filter_by(report_id=second.report_id)
+        .order_by(ReportVersion.version_number)
+        .all()
+    )
+    assert len(versions) == 2, f"expected a version chain of 2 for {filename}"
+    v1, v2 = versions
+
+    # version_number sequencing: 1 then 2.
+    assert v1.version_number == 1
+    assert v2.version_number == 2
+    assert v2.version_number == v1.version_number + 1
+
+    # The newer version becomes current; the older version is preserved but
+    # is no longer current (not overwritten/deleted).
+    assert v2.is_current_version is True
+    assert v1.is_current_version is False
+
+    # publication_datetime of each version is preserved exactly.
+    assert v1.publication_datetime == first_publication
+    assert v2.publication_datetime == second_publication
+
+    # current-version uniqueness: exactly one current version for the report.
+    current_count = (
+        session.query(ReportVersion)
+        .filter_by(report_id=second.report_id, is_current_version=True)
+        .count()
+    )
+    assert current_count == 1
+
+    # Raw facts belonging to the historical version stay attached to it and
+    # were not migrated to the new version or lost.
+    v1_facts = (
+        session.query(RawFinancialFact)
+        .filter_by(report_version_id=v1.report_version_id)
+        .count()
+    )
+    v2_facts = (
+        session.query(RawFinancialFact)
+        .filter_by(report_version_id=v2.report_version_id)
+        .count()
+    )
+    assert v1_facts == first_fact_count, (
+        f"HISTORICAL_OVERWRITE: version 1 facts not preserved for {filename}"
+    )
+    assert v2_facts > 0
+
+    # The restatement flag and supersession lineage are recorded by the
+    # production path on the new version.
+    assert v2.is_restated is True
+    assert v2.supersedes_version_id == v1.report_version_id
+
+    # PIT: at a cutoff between the two publications only version 1 is visible;
+    # after the second publication version 2 is selected.
+    cutoff_between = select_report_version(
+        session, second.report_id, first_publication + timedelta(days=1)
+    )
+    assert cutoff_between is not None
+    assert cutoff_between.report_version_id == v1.report_version_id
+    cutoff_after = select_report_version(session, second.report_id, second_publication)
+    assert cutoff_after is not None
+    assert cutoff_after.report_version_id == v2.report_version_id
 
 
 def test_codal_pdf_facade_connects_extraction_to_raw_persistence(ingestion_session):

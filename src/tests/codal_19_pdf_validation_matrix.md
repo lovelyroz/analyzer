@@ -70,12 +70,27 @@ All test functions live in `src/tests/test_codal_pdf_extraction.py` unless noted
 | E. Idempotency | `test_locked_codal_corpus_ingestion_is_idempotent_across_three_cycles` | All 19 | 3 ingestion cycles per PDF | EXECUTED / PASSED |
 | F. Determinism | `test_locked_codal_corpus_extraction_is_deterministic_across_three_independent_runs` | All 19 | 3 extraction executions per PDF (A == B == C) | EXECUTED / PASSED |
 | G. Failure / recovery | `test_malformed_pdf_is_rejected_and_ingestion_is_audited` (EXTRACTION_FAILED, no partial writes); `test_pipeline_acquisition_failure_is_audited_without_partial_writes` and `test_pipeline_extraction_failure_is_audited_without_partial_writes` in `src/tests/test_codal_extraction.py` (ACQUISITION_FAILED / EXTRACTION_FAILED) | Representative failure classes | per class | EXECUTED / PASSED |
-| H. PIT / version / restatement | `test_independent_final_foundation_audit_checks_pit_provenance_and_version_invariants` (single-PDF deep PIT) + `test_pipeline_idempotent_version_chain` in `src/tests/test_codal_extraction.py` (version sequencing, supersession) | single deep + version-chain | 1 | IMPLEMENTED / EXECUTED (single-PDF deep; corpus-wide PIT already covered indirectly by Layer B/C per-PDF version assertions) |
-| I. Regression | full repository `pytest src/tests` | full repo | after each change + final gate | EXECUTED / PASSED (215 passed, 2 skipped) |
+| H. PIT / version / restatement | `test_locked_codal_corpus_pit_and_version_invariants` (per-PDF PIT linkage + real-cutoff semantics over the corpus) + `test_locked_codal_corpus_version_chain_preserves_history` (per-PDF version sequencing, historical preservation, restatement lineage over the corpus); plus the single-PDF deep `test_independent_final_foundation_audit_checks_pit_provenance_and_version_invariants` and `test_pipeline_idempotent_version_chain` in `src/tests/test_codal_extraction.py` | All 19 (corpus-wide, real ingestion path) | 1 per PDF per test | EXECUTED / PASSED |
+| I. Regression | full repository `pytest src/tests` | full repo | after each change + final gate | EXECUTED / PASSED (see final audit) |
 
 ### Notes on scope honesty
 
-- Layer H deep PIT is executed on one PDF, not all 19. Per-PDF `publication_datetime`, single-current-`ReportVersion` and FK bookkeeping are asserted corpus-wide by Layer B/C; the standalone PIT-specific assertions (cutoff ordering) are exercised on a single representative PDF. Corpus-wide cutoff-ordering assertions are a candidate future strengthening, not a current claim.
+- Layer H is now corpus-wide over the real ingestion path: PIT linkage, exact
+  `publication_datetime` preservation, single-current-version, FinancialPeriod
+  linkage and real-cutoff semantics (`publication_datetime <= cutoff`
+  inclusive) are asserted for all 19 PDFs, as is version sequencing, historical
+  version/fact preservation, restatement lineage and current-version
+  uniqueness. The cutoff semantics are exercised against the actual persisted
+  state through the real `select_report_version` service, not by restating
+  fixture input.
+- Layer H restatement vs correction: the locked contract carries two distinct
+  revision mechanisms. `ReportVersion.is_restated` + `supersedes_version_id`
+  ARE set by the production ingestion path and are asserted corpus-wide. In
+  contrast, `Report.is_correction` + `Report.original_report_id` exist on the
+  schema but are never populated by the production path, so a correction
+  relationship between two separate `Report` rows cannot be exercised without
+  adding production features. No schema or production change was made to
+  satisfy this audit; this is a documented capability limit, not a test gap.
 - Layer D (Golden) is BLOCKED by design. This is a required safety rule, not a gap to close by fabricating expected values. See "Golden status rule" below and `golden_source_verification_report.md`.
 - A single aggregate load test (`test_representative_codal_samples_load_into_core_persistence`) alone cannot isolate a per-PDF invariant failure; that is why Layer B/C also runs a parametrized per-PDF deep test.
 
