@@ -8,7 +8,6 @@ __pycache__/
 .venv_/
 venv/
 env/
-pdf/
 pyvenv.cfg
 Scripts/
 Lib/
@@ -29,4 +28,3 @@ Include/
 .idea/
 .DS_Store
 Thumbs.db
-pdf/
