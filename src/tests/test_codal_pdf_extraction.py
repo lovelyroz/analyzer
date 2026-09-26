@@ -489,6 +489,117 @@ def test_locked_codal_corpus_ingestion_is_idempotent_across_three_cycles(
     assert session.query(RawFinancialFact).count() == expected_fact_count
 
 
+def _assert_facts_satisfy_hard_invariants(facts, company, period, version):
+    """The hard financial-data invariants, applied to a single PDF's facts.
+
+    Returns the set of distinct (item_name, unit, currency) tuples so callers
+    can assert corpus-level uniqueness properties when they hold.
+    """
+    seen_identity_tuples = set()
+    for fact in facts:
+        # FK / provenance integrity: every fact belongs to the right chain.
+        assert fact.company_id == company.company_id
+        assert fact.period_id == period.period_id
+        assert fact.report_version_id == version.report_version_id
+
+        # ASCII normalization: Persian/Arabic digits must not persist.
+        assert fact.raw_item_name, "empty raw_item_name"
+        for field in (
+            fact.raw_item_name,
+            fact.raw_item_code,
+            fact.unit,
+            fact.currency,
+            fact.source_section,
+            fact.source_column,
+        ):
+            assert not any(
+                "۰" <= char <= "۹" or "٠" <= char <= "٩" for char in (field or "")
+            ), f"non-ASCII digit persisted in {field!r}"
+
+        # NULL != 0: value is either an explicit Decimal or absent, never
+        # a silent coercion. (None is allowed; a Decimal("0") is explicit.)
+        assert fact.value is None or isinstance(fact.value, Decimal)
+
+        # Provenance position is preserved where the extractor recorded it.
+        assert fact.source_row is None or isinstance(fact.source_row, int)
+
+        seen_identity_tuples.add((fact.raw_item_name, fact.unit, fact.currency))
+    return seen_identity_tuples
+
+
+@pytest.mark.parametrize("filename", sorted(LOCKED_CODAL_VALIDATION_CORPUS))
+def test_locked_codal_corpus_persistence_satisfies_hard_invariants(
+    filename, ingestion_session
+):
+    """Layer B/C: deep per-PDF persistence invariants over the full corpus.
+
+    The existing final-audit test checks these invariants for exactly one PDF
+    (seo-codal-report (3).pdf), while the aggregate load test only counts rows
+    for all 19. A single PDF with broken provenance, a non-ASCII field or a
+    NULL->zero coercion would pass the aggregate count check silently. This
+    parametrized test applies the hard invariants to each PDF independently.
+    """
+    session, company, period = ingestion_session
+    publication = datetime(2026, 9, 1, 12, 0)
+    result = ingest_codal_pdf(
+        session,
+        PDF_ROOT / filename,
+        company_id=company.company_id,
+        period_id=period.period_id,
+        title=filename,
+        report_type="CODAL_PERSIST",
+        publication_datetime=publication,
+        codal_tracking_id=f"CODAL-PERSIST-{filename}",
+        source_url=f"local://persistence/{filename}",
+    )
+    assert result.raw_fact_count > 0, f"no facts persisted for {filename}"
+
+    # Report identity and provenance are preserved per PDF.
+    report = session.get(Report, result.report_id)
+    assert report is not None
+    assert report.company_id == company.company_id
+    assert report.financial_period_id == period.period_id
+    assert report.codal_tracking_id == f"CODAL-PERSIST-{filename}"
+    assert report.source_url == f"local://persistence/{filename}"
+
+    # Exactly one current ReportVersion; PIT bookkeeping is intact.
+    versions = (
+        session.query(ReportVersion)
+        .filter_by(report_id=report.report_id)
+        .order_by(ReportVersion.version_number)
+        .all()
+    )
+    assert len(versions) == 1, f"unexpected version count for {filename}"
+    version = versions[0]
+    assert version.publication_datetime == publication
+    assert version.is_current_version is True
+    assert version.version_number == 1
+    current_count = (
+        session.query(ReportVersion)
+        .filter_by(report_id=report.report_id, is_current_version=True)
+        .count()
+    )
+    assert current_count == 1
+
+    # Facts satisfy the hard invariants for this PDF.
+    facts = (
+        session.query(RawFinancialFact)
+        .filter_by(report_version_id=version.report_version_id)
+        .order_by(RawFinancialFact.raw_fact_id)
+        .all()
+    )
+    assert len(facts) == result.raw_fact_count
+    _assert_facts_satisfy_hard_invariants(facts, company, period, version)
+
+    # The ingestion run is complete and fully accounts for the facts.
+    run = session.get(IngestionRun, result.ingestion_id)
+    assert run is not None
+    assert run.source == "CODAL"
+    assert run.status == "COMPLETED"
+    assert run.records_inserted == len(facts)
+    assert run.records_failed == 0
+
+
 def test_codal_pdf_facade_connects_extraction_to_raw_persistence(ingestion_session):
     session, company, period = ingestion_session
     result = ingest_codal_pdf(
