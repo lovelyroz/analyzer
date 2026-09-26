@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.database import Base, SessionLocal
+from src.core.database import Base
 from src.ingestion.codal.adapter import extract_raw_lines_from_pdf
 from src.ingestion.codal.ingestion import ingest_codal_pdf
 from src.ingestion.codal.parser import (
@@ -65,8 +65,22 @@ def test_codal_validation_corpus_inventory_is_exactly_locked_19_pdfs():
 
 @pytest.fixture
 def ingestion_session():
-    Base.metadata.create_all(bind=SessionLocal.kw["bind"])
-    session = SessionLocal()
+    # Isolated in-memory database. Do NOT bind this fixture to the production
+    # SessionLocal engine (tehran_stock.db on disk): doing so both pollutes the
+    # production database with test rows and makes the suite non-hermetic and
+    # order-dependent (create_all/drop_all on a shared file engine collides
+    # with other test modules and causes "database is locked" / "no such
+    # table" / UNIQUE-industry failures under the full suite).
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from src.migrations.runner import MigrationRunner
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    MigrationRunner(engine).upgrade()
+    Session = sessionmaker(bind=engine)
+    session = Session()
     industry = Industry(industry_code="CODAL_TEST", industry_name="Codal test")
     session.add(industry)
     session.flush()
@@ -89,7 +103,7 @@ def ingestion_session():
         yield session, company, period
     finally:
         session.close()
-        Base.metadata.drop_all(bind=SessionLocal.kw["bind"])
+        engine.dispose()
 
 
 def test_persian_numeric_normalization_preserves_missing_and_negative_values():
