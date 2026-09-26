@@ -379,6 +379,116 @@ def test_pdf_output_loads_into_core_persistence_and_duplicate_is_idempotent(inge
     assert runs[1].records_updated == first.raw_fact_count
 
 
+def _persisted_fact_snapshot(session):
+    """Full logical-state snapshot of RawFinancialFact for drift detection.
+
+    Captures the actual persisted values (not just row counts) so that value
+    drift, provenance drift and duplicate facts are all detectable across
+    repeated ingestion cycles. Ordering by raw_fact_id makes the tuple stable.
+    """
+    facts = session.query(RawFinancialFact).order_by(RawFinancialFact.raw_fact_id).all()
+    return tuple(
+        (
+            fact.report_version_id,
+            fact.raw_item_name,
+            fact.raw_item_code,
+            fact.value,
+            fact.unit,
+            fact.currency,
+            fact.source_section,
+            fact.source_row,
+            fact.source_column,
+        )
+        for fact in facts
+    )
+
+
+@pytest.mark.parametrize("filename", sorted(LOCKED_CODAL_VALIDATION_CORPUS))
+def test_locked_codal_corpus_ingestion_is_idempotent_across_three_cycles(
+    filename, ingestion_session
+):
+    """Layer E: three ingestion cycles per locked PDF must leave logical state unchanged.
+
+    The idempotency key in ingest_codal_report() is (codal_tracking_id,
+    publication_datetime). After the first successful ingestion, cycles 2 and 3
+    must reuse the same ReportVersion and must not duplicate RawFinancialFact
+    rows or drift values/provenance. This is corpus-wide (all 19 locked PDFs),
+    unlike the single-sample idempotency test above.
+    """
+    session, company, period = ingestion_session
+    path = PDF_ROOT / filename
+    tracking_id = f"CODAL-IDEM-{filename}"
+
+    extraction = extract_raw_lines_from_pdf(
+        path,
+        title=filename,
+        report_type="CODAL",
+        publication_datetime=datetime(2026, 9, 1),
+        codal_tracking_id=tracking_id,
+        source_url=f"local://idempotency/{filename}",
+    )
+    assert extraction.raw_lines, f"empty extraction for {filename}"
+
+    ingest_kwargs = dict(
+        session=session,
+        company_id=company.company_id,
+        period_id=period.period_id,
+        report_type=extraction.report_type,
+        title=extraction.title,
+        publication_datetime=extraction.publication_datetime,
+        raw_lines=extraction.raw_lines,
+        codal_tracking_id=extraction.codal_tracking_id,
+        source_url=extraction.source_url,
+    )
+
+    # Cycle 1: creates the Report, one current ReportVersion and the raw facts.
+    first = ingest_codal_report(**ingest_kwargs)
+    expected_version_id = first.report_version_id
+    expected_fact_count = first.raw_fact_count
+    assert expected_fact_count > 0, f"no facts persisted for {filename}"
+
+    snapshot_after_cycle_1 = _persisted_fact_snapshot(session)
+    assert len(snapshot_after_cycle_1) == expected_fact_count
+
+    # Cycles 2 and 3 must reuse the same version (no new ReportVersion).
+    second = ingest_codal_report(**ingest_kwargs)
+    third = ingest_codal_report(**ingest_kwargs)
+    assert second.report_version_id == expected_version_id
+    assert third.report_version_id == expected_version_id
+
+    # No unintended ReportVersions and still exactly one current version.
+    assert session.query(ReportVersion).count() == 1, (
+        f"DUPLICATE_REPORT_VERSION: repeated ingestion created extra versions for {filename}"
+    )
+    assert (
+        session.query(ReportVersion)
+        .filter_by(report_id=first.report_id, is_current_version=True)
+        .count()
+        == 1
+    )
+
+    # No duplicate RawFinancialFact rows and no value/provenance drift.
+    # The snapshot is keyed by raw_fact_id (physical insertion order), so an
+    # exact snapshot equality proves both that no rows were appended and that
+    # no persisted field (value, unit, currency, provenance) drifted. A
+    # natural key of (row, column, name) is deliberately NOT used: real CODAL
+    # statements legitimately repeat the same label in the same column across
+    # sections, so it is not a uniqueness key for this corpus.
+    snapshot_after_cycle_3 = _persisted_fact_snapshot(session)
+    assert len(snapshot_after_cycle_3) == expected_fact_count, (
+        f"DUPLICATE_FACT: fact count changed after repeated ingestion of {filename}: "
+        f"cycle1={expected_fact_count} cycle3={len(snapshot_after_cycle_3)}"
+    )
+    assert snapshot_after_cycle_3 == snapshot_after_cycle_1, (
+        f"IDEMPOTENCY_FAILURE: persisted fact state drifted after repeated "
+        f"ingestion of {filename}"
+    )
+
+    # Exactly one Report for the tracking id; the version and facts are reused.
+    assert session.query(Report).count() == 1
+    assert session.query(RawFinancialFact).count() == expected_fact_count
+
+
 def test_codal_pdf_facade_connects_extraction_to_raw_persistence(ingestion_session):
     session, company, period = ingestion_session
     result = ingest_codal_pdf(
