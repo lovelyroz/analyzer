@@ -11,7 +11,7 @@ LOCKED_V1_INDUSTRIES = [
     {"industry_code": "METALS", "industry_name": "فلزات اساسی و استخراج کانی‌های فلزی"},
     {"industry_code": "CEMENT", "industry_name": "سیمان، آهک و گچ"},
     {"industry_code": "FOOD", "industry_name": "محصولات غذایی و آشامیدنی"},
-    {"industry_code": "PHARMA", "industry_name": "مواد و محصولات دارویی"},
+    {"industry_code": "PHARMACEUTICAL", "industry_name": "مواد و محصولات دارویی"},
 ]
 
 # متریک‌های پایه مالی (پایه ریالی IRR)

@@ -57,7 +57,7 @@ class IndustryKPIEngine:
                 financial_data.get("nav"), financial_data.get("nav_growth"),
                 financial_data.get("p_nav"), company_id, period_id,
             )
-        if industry_code in {"CEMENT", "FOOD", "PHARMACEUTICAL", "PHARMA"}:
+        if industry_code in {"CEMENT", "FOOD", "PHARMACEUTICAL"}:
             return [IndustryKPIEngine.calc_sales_volume_kpi(
                 financial_data.get("sales_volume"), company_id, period_id, industry_code,
             )]

@@ -125,7 +125,7 @@ def test_industry_zero_kpis():
 
 
 def test_optional_sales_volume_missing_is_not_zero():
-    for industry in ("CEMENT", "FOOD", "PHARMACEUTICAL", "PHARMA"):
+    for industry in ("CEMENT", "FOOD", "PHARMACEUTICAL"):
         kpis = IndustryKPIEngine.get_industry_kpis(industry, {}, company_id=1, period_id=10)
         assert len(kpis) == 1
         assert kpis[0].value is None
