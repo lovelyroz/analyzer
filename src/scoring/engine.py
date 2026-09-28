@@ -149,6 +149,9 @@ class FundamentalScoringEngine:
         else:
             quality_values = [k.quality_status for k in kpi_scores if k.score is not None]
             score_quality = "VALID" if quality_values and all(v == "VALID" for v in quality_values) else "LIMITED"
+            # RESTATED/ESTIMATED inputs stay scoreable but must not be reported as fully valid.
+            if score_quality == "VALID" and any(v in {"RESTATED", "ESTIMATED"} for v in quality_values):
+                score_quality = "LIMITED"
 
         return FundamentalScoreResult(
             company_id=company_id,

@@ -177,3 +177,64 @@ def test_output_contract_contains_traceability_and_version():
     assert item.axis == "GROWTH"
     assert item.direction == "HIGHER_IS_BETTER"
     assert item.benchmark_method == "HISTORICAL_FALLBACK"
+
+
+def _full_growth_set(status="VALID"):
+    return [
+        kpi("REVENUE_GROWTH", 50, status),
+        kpi("OP_PROFIT_GROWTH", 50, status),
+        kpi("NET_PROFIT_GROWTH", 50, status),
+        kpi("EPS_GROWTH", 50, status),
+    ]
+
+
+_GROWTH_HISTORY = {code: [50] for code in ["REVENUE_GROWTH", "OP_PROFIT_GROWTH", "NET_PROFIT_GROWTH", "EPS_GROWTH"]}
+
+
+def test_restated_input_remains_scoreable_but_marks_quality_limited():
+    engine = FundamentalScoringEngine()
+    result = engine.calculate_score(
+        1, 10, "GENERAL", _full_growth_set("RESTATED"),
+        historical_values=_GROWTH_HISTORY,
+    )
+    growth_items = [x for x in result.kpi_scores if x.axis == "GROWTH"]
+    assert len(growth_items) == 4
+    assert all(x.score is not None for x in growth_items)
+    assert result.category_scores["GROWTH"].score == 50.0
+    assert result.score_data_quality == "LIMITED"
+
+
+def test_estimated_input_remains_scoreable_but_marks_quality_limited():
+    engine = FundamentalScoringEngine()
+    result = engine.calculate_score(
+        1, 10, "GENERAL", _full_growth_set("ESTIMATED"),
+        historical_values=_GROWTH_HISTORY,
+    )
+    growth_items = [x for x in result.kpi_scores if x.axis == "GROWTH"]
+    assert all(x.score is not None for x in growth_items)
+    assert result.score_data_quality == "LIMITED"
+
+
+def test_suspicious_input_produces_no_kpi_score():
+    engine = FundamentalScoringEngine()
+    result = engine.calculate_score(
+        1, 10, "GENERAL", _full_growth_set("SUSPICIOUS"),
+        historical_values=_GROWTH_HISTORY,
+    )
+    assert all(x.score is None for x in result.kpi_scores)
+    assert result.category_scores["GROWTH"].score is None
+    assert result.overall_score is None
+    assert result.score_data_quality == "INSUFFICIENT_DATA"
+
+
+def test_identical_inputs_produce_identical_scoring_output():
+    engine = FundamentalScoringEngine()
+    kpis = _full_growth_set("VALID")
+    history = _GROWTH_HISTORY
+    first = engine.calculate_score(1, 10, "GENERAL", [k for k in kpis], historical_values=history)
+    second = engine.calculate_score(1, 10, "GENERAL", [k for k in kpis], historical_values=history)
+    assert first.overall_score == second.overall_score
+    assert first.score_data_quality == second.score_data_quality
+    assert [x.score for x in first.kpi_scores] == [x.score for x in second.kpi_scores]
+    assert [x.effective_weight for x in first.kpi_scores] == [x.effective_weight for x in second.kpi_scores]
+    assert first.scoring_method_version == second.scoring_method_version
