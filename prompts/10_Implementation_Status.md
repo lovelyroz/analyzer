@@ -24,6 +24,26 @@ This document tracks implementation status. It does not redefine the architectur
 |---|---|---|---|---|---|
 | 1 — Data Foundation & Data Model | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
 | 2 — KPI Specification | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
+
+### Stage 2 KPI Specification — final audit record
+
+The Stage 2 final audit is complete. Established facts:
+
+| Finding | Classification |
+|---|---|
+| Universal KPI inventory (11), Conditional KPI (1), Industry KPI inventory (11) | COMPLIANT |
+| Missing ≠ zero preserved across all KPI paths | COMPLIANT |
+| EPS comparability and data-quality propagation | COMPLIANT |
+| `PHARMA` corrected to the canonical industry name `PHARMACEUTICAL` (implementation commit `da050ed`) | COMPLIANT — closed |
+| Earnings Quality is intentionally DEFERRED as a composite framework | COMPLIANT (intentional, not a gap) |
+| Period Dimensions beyond the implemented TTM/YoY behavior | FUTURE STAGE — Stage 4, not a Stage 2 gap |
+| Stage 1 → Stage 2 production wiring | OUT OF SCOPE — integration gap that must not be implemented as part of the Stage 2 freeze |
+| Database contract, Stage 1, KPI architecture, or Stage 2 source-code changes required | NONE |
+
+The `PHARMA` correction was an implementation correction and requires no architecture change-log entry.
+
+**Stage 2 final status: READY TO FREEZE — FROZEN / COMPLETE.**
+
 | 3 — Fundamental Scoring | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
 | 4 — Historical, Seasonal & Trend | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
 | 5 — Forecast Engine | LOCKED | COMPLETE | PASS | PASS | COMPLETE / LOCKED |
