@@ -204,7 +204,7 @@ def test_mom_via_engine():
 
 def test_qoq_via_engine():
     res = _run(val_qoq=(90.0, 200.0))
-    assert res.historical.qoq == -55.0
+    assert res.historical.qoq == pytest_approx(-55.0)
 
 
 def test_yoy_via_engine():
@@ -704,12 +704,30 @@ def test_engine_is_deterministic():
     assert _snapshot(first) == _snapshot(second)
 
 
+class _FrozenClock:
+    """Minimal stand-in exposing only the `utcnow` the engine calls."""
+
+    def __init__(self, frozen):
+        self._frozen = frozen
+
+    def utcnow(self):
+        return self._frozen
+
+
 def test_engine_has_no_randomness_or_clock_dependency(monkeypatch):
-    # Neutralising the clock must not change any analytical value.
+    # Neutralising the clock must not change any analytical value. The engine
+    # resolves `datetime.utcnow` through the datetime module object bound in
+    # its own namespace, which is the only patchable target: on Python 3.12
+    # the `datetime.datetime` class is immutable, and the datetime *module*
+    # has never carried a `utcnow` attribute at all - which is why the former
+    # module-level patch raised AttributeError. No analytical calculation
+    # reads the clock, so freezing it can only affect the audit timestamp.
     import datetime as _datetime
 
+    import src.trend.engine as _engine_module
+
     frozen = _datetime.datetime(2026, 1, 1, 12, 0, 0)
-    monkeypatch.setattr(_datetime, "utcnow", lambda: frozen)
+    monkeypatch.setattr(_engine_module, "datetime", _FrozenClock(frozen))
     res = _run(val_3m_curr=115.0, val_3m_prev=100.0)
     assert res.calculation_timestamp == frozen
     assert res.trend_state == "Improving"
@@ -828,15 +846,26 @@ def test_one_off_detection_is_conservative():
 # --------------------------------------------------------------------------
 
 def test_flow_momentum_sums_windows():
-    # Quarterly flow: 3M = 1 quarter, so Q(t)/Q(t-1) - 1.
+    # Quarterly flow 3M: the documented semantics of section 6.1 are
+    # current-window-sum / previous-window-sum - 1, where a 3M window on a
+    # quarterly series is a single quarter. That is Q(last)/Q(prior) - 1 =
+    # 130/120 - 1. The previous expectation, 130/100 - 1, compared the last
+    # quarter against the *first* quarter of the series instead of against the
+    # immediately preceding window, so it contradicted section 6.1.
     series = [100.0, 110.0, 120.0, 130.0]
-    assert flow_momentum(series, 3) == 30.0
+    assert flow_momentum(series, 3) == pytest_approx(8.333333333333332)
+    # A genuine multi-period window on a monthly series proves the summing:
+    # 6M = sum(last 6) / sum(prior 6) - 1 = 57/21 - 1.
+    monthly = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+    assert flow_momentum(monthly, 6, 1) == pytest_approx(171.42857142857142)
 
 
 def test_stock_momentum_never_sums():
-    # Quarterly stock: 12M = 4 periods apart.
+    # Quarterly stock: 12M = 4 periods apart, period-end ratio (section 7).
+    # 56.00000000000001 is the same 56% value with float rounding in the last
+    # ulp, not a different number, so a tolerance is the correct assertion.
     series = [100.0, 110.0, 120.0, 130.0, 156.0]
-    assert stock_momentum(series, 12) == 56.0
+    assert stock_momentum(series, 12) == pytest_approx(56.0)
 
 
 def test_flow_and_stock_12m_differ():
@@ -858,8 +887,14 @@ def test_trend_12m_is_current_ttm_vs_ttm_twelve_months_earlier():
 def test_engine_flow_series_end_to_end():
     series = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
     res = _run(flow_series=series)
+    # 3M: one quarter window -> 170/160 - 1.
     assert res.momentum["3M"].pct_change == pytest_approx(6.25)
-    assert res.momentum["6M"].pct_change == pytest_approx(13.636363636363635)
+    # 6M: two-quarter windows, sum(160,170)/sum(140,150) - 1 = 330/290 - 1.
+    # The previous 13.636% expectation did not correspond to any valid pair of
+    # consecutive two-quarter windows under the documented current-window-sum
+    # / previous-window-sum semantics of section 6.1.
+    assert res.momentum["6M"].pct_change == pytest_approx(13.793103448275861)
+    # 12M: TTM(140..170) vs TTM(100..130) = 620/460 - 1.
     assert res.momentum["12M"].pct_change == pytest_approx(34.78260869565217)
     assert res.context.data_quality == "OK"
 
@@ -868,7 +903,89 @@ def test_engine_stock_series_end_to_end():
     series = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
     res = _run(stock_series=series)
     assert res.momentum["3M"].pct_change == pytest_approx(6.25)
+    # Stock 12M is a period-end ratio (section 7): 170 vs the observation 12
+    # months earlier, i.e. index 3 = 130. Before the B1 fix the engine applied
+    # TTM/flow-style aggregation to the stock series here and produced the
+    # flow reading 34.78% instead of the stock reading 30.77%.
     assert res.momentum["12M"].pct_change == pytest_approx(30.76923076923077)
+
+
+# --------------------------------------------------------------------------
+# B1: FLOW vs STOCK 12M semantics must stay explicitly distinct (section 7)
+# --------------------------------------------------------------------------
+def test_stock_12m_uses_period_end_ratio_semantics():
+    # The two classes must give different 12M answers on identical input.
+    series = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
+    assert stock_momentum(series, 12) == pytest_approx(30.76923076923077)
+    assert trend_12m(series) == pytest_approx(34.78260869565217)
+    assert stock_momentum(series, 12) != trend_12m(series)
+
+    # A single-value shift isolates the period-end rule: only the last
+    # observation and the one 12 months earlier can influence the result.
+    shifted = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 171.0]
+    assert stock_momentum(shifted, 12) == pytest_approx(31.538461538461537)
+    # An interior quarter that no period-end reading touches must not move it.
+    interior = [100.0, 115.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
+    assert stock_momentum(interior, 12) == pytest_approx(30.76923076923077)
+
+
+def test_flow_12m_retains_ttm_window_semantics():
+    # Section 6.1: 12M Trend = Current TTM / TTM ending 12 months earlier - 1,
+    # never the prior-quarter TTM.
+    series = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
+    assert trend_12m(series) == pytest_approx(34.78260869565217)
+    assert flow_momentum(series, 12) == pytest_approx(34.78260869565217)
+    # A prior-quarter TTM reading would have been 170/160 - 1.
+    assert trend_12m(series) != pytest_approx(6.25)
+
+    # The TTM window is four quarters. The current TTM covers indices 4-7 and
+    # the prior TTM covers 0-3, so no observation is left outside either
+    # window on an 8-point series. Lengthening the series instead isolates the
+    # rule: the last four and the four ending 12 months earlier are all that
+    # can influence the reading.
+    extended = [1.0, 1.0, 1.0, 1.0, 100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
+    assert trend_12m(extended) == pytest_approx(34.78260869565217)
+
+
+def test_engine_12m_horizon_splits_by_variable_class():
+    # The same observation series must produce a different 12M momentum
+    # depending on whether it is a flow or a stock variable.
+    series = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
+    flow = _run(flow_series=series)
+    stock = _run(stock_series=series)
+    assert flow.momentum["12M"].pct_change == pytest_approx(34.78260869565217)
+    assert stock.momentum["12M"].pct_change == pytest_approx(30.76923076923077)
+    assert (
+        flow.momentum["12M"].pct_change
+        != stock.momentum["12M"].pct_change
+    )
+    # 3M coincides for both classes: on a quarterly series a 3M window is a
+    # single quarter, so window-sum and period-end are the same observation.
+    assert (
+        flow.momentum["3M"].pct_change
+        == pytest_approx(stock.momentum["3M"].pct_change)
+    )
+    # 6M does not: a flow sums two quarters (330/290 - 1), a stock compares
+    # only the two period-end values (170/150 - 1).
+    assert (
+        flow.momentum["6M"].pct_change
+        != pytest_approx(stock.momentum["6M"].pct_change)
+    )
+
+
+def test_stock_12m_preserves_missing_zero_and_sign_change_protections():
+    # MISSING != 0: a gap at either period-end endpoint yields no percentage,
+    # never 0%. (index 1 is neither endpoint, so a gap there must not matter).
+    assert stock_momentum([100.0, 110.0, 120.0, 130.0, None], 12) is None
+    assert stock_momentum([None, 110.0, 120.0, 130.0, 140.0], 12) is None
+    # Zero base is never turned into a fabricated percentage.
+    assert stock_momentum([0.0, 110.0, 120.0, 130.0, 140.0], 12) is None
+    # Sign change between the two period-end readings is not a growth number.
+    assert stock_momentum([-100.0, 110.0, 120.0, 130.0, 140.0], 12) is None
+    # Same-sign negatives are a real decline, not a misleading gain.
+    assert stock_momentum([-100.0, 110.0, 120.0, 130.0, -120.0], 12) == -20.0
+    # Not enough history to look 12 months back.
+    assert stock_momentum([100.0, 110.0], 12) is None
 
 
 def test_missing_observation_never_becomes_zero():

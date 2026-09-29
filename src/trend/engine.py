@@ -107,15 +107,22 @@ class TrendEngine:
 
         for horizon, months in (("3M", 3), ("6M", 6), ("12M", 12)):
             if flow is not None:
-                change = (
-                    trend_12m(flow, period_months)
-                    if horizon == "12M"
-                    else (
+                if horizon == "12M":
+                    # The 12M horizon splits by variable class: FLOW 12M is the
+                    # TTM-vs-TTM reading (section 6.1), while STOCK 12M is a
+                    # plain period-end ratio and must never be aggregated like
+                    # a flow (section 7).
+                    change = (
+                        trend_12m(flow, period_months)
+                        if is_flow
+                        else stock_momentum(flow, months, period_months)
+                    )
+                else:
+                    change = (
                         flow_momentum(flow, months, period_months)
                         if is_flow
                         else stock_momentum(flow, months, period_months)
                     )
-                )
             else:
                 curr, prev = explicit[horizon]
                 change = calculate_pct_change(curr, prev)
