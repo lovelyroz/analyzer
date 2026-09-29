@@ -462,6 +462,120 @@ def test_relative_strength_not_formal_below_eight_history_observations():
 
 
 # --------------------------------------------------------------------------
+# B3: the current observation is never part of its own historical momentum
+# distribution (PIT / no-lookahead; minimum-8 counts *historical* obs only)
+# --------------------------------------------------------------------------
+
+def test_momentum_history_excludes_final_observation_stock():
+    # stock 12M quarterly: start = 4 + 1 = 5, so positions 5..len-1 are the
+    # only legitimate historical evaluations. Position len (=8) is the one
+    # that reads the current observation, and before the B3 fix the loop
+    # included it: the current 30.77% reading appeared in its own population.
+    series = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
+    hist = momentum_history(series, 12, flow=False)
+    assert stock_momentum(series, 12) not in hist
+    # Three historical readings remain: 140/100, 150/110, 160/120.
+    assert len(hist) == 3
+    assert hist[0] == pytest_approx(40.0)
+    assert hist[1] == pytest_approx(36.36363636363636)
+    assert hist[2] == pytest_approx(33.33333333333333)
+
+
+def test_momentum_history_excludes_final_observation_flow():
+    # flow 12M quarterly: start = 2 * 4 = 8. Every position >= 8 needs the
+    # current observation (current TTM covers indices 4-7), so once the final
+    # observation is excluded there is no *historical* 12M flow reading at all
+    # on an 8-point series. Before the fix this returned exactly one entry:
+    # the current reading itself.
+    series = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
+    hist = momentum_history(series, 12, flow=True)
+    assert hist == []
+    assert flow_momentum(series, 12) not in hist
+
+
+def test_minimum_eight_counts_historical_observations_only():
+    # A 9-observation series yields exactly 7 *historical* stock 3M readings
+    # (positions 2..8); the 8th would-be entry is the current observation.
+    series = [10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0]
+    hist = momentum_history(series, 3, flow=False)
+    assert len(hist) == 7
+    assert stock_momentum(series, 3) not in hist
+    assert relative_strength(stock_momentum(series, 3), hist) is None
+    assert historical_percentile_abs(stock_momentum(series, 3), hist) is None
+
+
+def test_seven_historical_observations_stay_insufficient():
+    hist = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    assert relative_strength(10.0, hist) is None
+    assert historical_percentile_abs(10.0, hist) is None
+
+
+def test_current_observation_cannot_be_counted_as_the_eighth():
+    # Adding the current reading to a 7-entry history must not clear the
+    # minimum-8 bar: only *historical* observations count, so the 8-value
+    # population below is 7 historical + the current, which is illegitimate.
+    seven_historical = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    current = 15.0
+    assert relative_strength(current, seven_historical) is None
+    # The same eight values supplied as a genuine *historical* distribution
+    # are sufficient - the requirement is not satisfied by self-counting.
+    assert relative_strength(current, seven_historical + [8.0]) is not None
+    assert relative_strength(current, seven_historical + [8.0]) == "Strong"
+
+
+def test_eight_genuine_historical_observations_give_valid_strength():
+    hist = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    assert 15.0 not in hist
+    # 6/8 = 75th percentile -> the top band starts at 75, so 6.0 is "Strong".
+    # A value strictly inside the Normal band (50 <= pct < 75): 4/8 = 50.
+    assert relative_strength(15.0, hist) == "Strong"
+    assert historical_percentile_abs(15.0, hist) == 100.0
+    assert relative_strength(1.5, hist) == "Weak"
+    assert relative_strength(4.0, hist) == "Normal"
+    assert relative_strength(6.0, hist) == "Strong"
+
+
+def test_current_observation_cannot_shift_own_percentile():
+    # Percentile convention is #values <= current. For a current reading of
+    # 5.5 the historical population gives 5/8 = 62.5. Folding the current
+    # value into the population would give 6/9 = 66.67 - the current
+    # observation must not be able to inflate its own rank.
+    hist = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    current = 5.5
+    assert historical_percentile_abs(current, hist) == pytest_approx(62.5)
+    contaminated = historical_percentile_abs(current, hist + [current])
+    assert contaminated == pytest_approx(66.66666666666667)
+    assert relative_strength(current, hist) == "Normal"
+    assert contaminated > 62.5
+
+
+def test_engine_relative_strength_unchanged_for_valid_history():
+    # Explicit histories are passed through untouched, so existing behaviour
+    # for valid historical data is unchanged.
+    res = _run(historical_3m=[1, 2, 3, 4, 5, 6, 7, 8])
+    assert res.momentum["3M"].relative_strength == "Strong"
+    assert res.momentum["3M"].percentile == 100.0
+    assert res.momentum["3M"].direction == "Positive"
+
+    res = _run(historical_3m=[1, 2, 3, 4, 5, 6, 7])
+    assert res.momentum["3M"].relative_strength is None
+    assert res.momentum["3M"].percentile is None
+    assert res.trend_state == "Improving"
+
+
+def test_engine_derived_history_excludes_current_observation():
+    # With no explicit historical_3m the engine derives the distribution from
+    # the series. The current 3M reading (170/160 - 1 = 6.25%) must not be a
+    # member of the distribution that ranks it.
+    series = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0]
+    res = _run(flow_series=series)
+    current = res.momentum["3M"].pct_change
+    assert current == pytest_approx(6.25)
+    derived = momentum_history(series, 3, flow=True)
+    assert current not in derived
+
+
+# --------------------------------------------------------------------------
 # 13. Trend direction exposure
 # --------------------------------------------------------------------------
 

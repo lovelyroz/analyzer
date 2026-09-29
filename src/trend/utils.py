@@ -477,11 +477,14 @@ def momentum_history(
     results: List[Optional[float]] = []
     if flow:
         start = 2 * _periods(months, period_months)
-        for pos in range(start, len(values) + 1):
+        # range end is len(values), not len(values) + 1: the position that
+        # reads the final (current) observation is excluded so the current
+        # reading is never part of its own comparison population (PIT).
+        for pos in range(start, len(values)):
             results.append(flow_momentum(values, months, period_months, pos))
     else:
         start = _periods(months, period_months) + 1
-        for pos in range(start, len(values) + 1):
+        for pos in range(start, len(values)):
             results.append(stock_momentum(values, months, period_months, pos))
     return [r for r in results if r is not None]
 
