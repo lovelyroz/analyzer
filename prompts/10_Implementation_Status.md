@@ -293,3 +293,45 @@ Ingestion Framework: COMPLETE / LOCKED
 CODAL PDF Extraction: COMPLETE / LOCKED
 Production Bulk Load: NOT YET COMPLETE
 ```
+
+
+---
+
+## Stage 4 — Final Freeze Record
+
+Stage 4 Historical, Seasonal & Trend Engine has completed implementation, targeted verification, final audit, and repository-wide regression verification.
+
+### Final Stage 4 verification
+
+- Stage 4 targeted test suite: **102 passed, 0 failed, 0 skipped, 0 errors**
+- Full repository regression: **371 passed, 0 failed, 2 skipped, 0 errors**
+- Stage 4 tests within full regression: **0 failures, 0 skips**
+- B1 — STOCK 12M period-end semantics: **RESOLVED**
+- B2 — FLOW/STOCK momentum semantics: **RESOLVED**
+- B3 — Relative-strength self-counting / PIT issue: **RESOLVED**
+- Historical layer: **PASS**
+- Seasonal layer: **PASS**
+- Momentum/trend layer: **PASS**
+- Output contract: **PASS**
+- PIT / no-lookahead: **PASS**
+- Determinism: **PASS**
+- Stage 3 boundary: **PASS**
+- Stage 5 boundary: **PASS**
+
+### Final verified GitHub CI
+
+- Workflow: Tests
+- Run ID: **36632664614**
+- Verified commit: **b288a0631cfb2bf9efc6d1112aa9b11b10e4f81e**
+- Result: **SUCCESS**
+- Trigger: push to `master`
+
+### Freeze decision
+
+**STAGE 4 — HISTORICAL, SEASONAL & TREND ENGINE: FROZEN / COMPLETE**
+
+The Stage 4 implementation is now frozen.
+
+No Stage 4 implementation, schema, analytical rule, threshold, or output-contract change should be made without an explicitly approved architectural or specification change.
+
+Future work belongs to later stages or integration work and must not reopen the frozen Stage 4 implementation without documented justification.
