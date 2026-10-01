@@ -244,16 +244,16 @@ def test_migration_runner_upgrades_empty_database_and_is_idempotent():
     migration_engine = create_engine("sqlite:///:memory:")
     runner = MigrationRunner(migration_engine)
     assert runner.current_version() == 0
-    assert runner.upgrade() == 6
-    assert runner.current_version() == 6
+    assert runner.upgrade() == 7
+    assert runner.current_version() == 7
     tables = set(inspect(migration_engine).get_table_names())
     assert {"schema_migrations", "mapping_rules", "derived_financial_facts", "normalized_financial_fact_inputs"}.issubset(tables)
-    assert runner.upgrade() == 6
+    assert runner.upgrade() == 7
     with migration_engine.connect() as connection:
         migration_rows = connection.execute(text("SELECT COUNT(*) FROM schema_migrations")).scalar_one()
         versions = connection.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all()
-    assert migration_rows == 6
-    assert versions == [1, 2, 3, 4, 5, 6]
+    assert migration_rows == 7
+    assert versions == [1, 2, 3, 4, 5, 6, 7]
 
 
 def test_migration_runner_upgrades_legacy_stage1_schema():
@@ -263,7 +263,7 @@ def test_migration_runner_upgrades_legacy_stage1_schema():
         connection.execute(text("CREATE TABLE normalized_financial_facts (fact_id INTEGER PRIMARY KEY, company_id INTEGER NOT NULL, period_id INTEGER NOT NULL, metric_id INTEGER NOT NULL, value_irr NUMERIC, source_report_version_id INTEGER NOT NULL, normalization_rule_id INTEGER, quality_status VARCHAR(20) NOT NULL)"))
         connection.execute(text("CREATE TABLE report_versions (report_version_id INTEGER PRIMARY KEY, report_id INTEGER NOT NULL, version_number INTEGER NOT NULL, publication_datetime DATETIME NOT NULL, is_current_version BOOLEAN NOT NULL DEFAULT 1, is_restated BOOLEAN NOT NULL DEFAULT 0, supersedes_version_id INTEGER, created_at DATETIME)"))
     runner = MigrationRunner(migration_engine)
-    assert runner.upgrade() == 6
+    assert runner.upgrade() == 7
     columns = {column["name"] for column in inspect(migration_engine).get_columns("financial_metrics")}
     normalized_columns = {column["name"] for column in inspect(migration_engine).get_columns("normalized_financial_facts")}
     assert {"statement_type", "parent_metric_id", "sign_convention", "is_derived"}.issubset(columns)

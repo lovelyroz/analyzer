@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -920,3 +920,208 @@ def test_stage4_adapter_is_deterministic():
     second = adapt_stage4(result)
     assert first == second
     assert first.to_dict() == second.to_dict()
+
+
+# ==========================================================================
+# 13. Persistent repository (ForecastEngine -> ForecastRecord -> repository
+#     -> persistent storage; spec sections 24, 25, 28, 29)
+# ==========================================================================
+
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+from src.forecast.repo import ForecastRecordRepository  # noqa: E402
+from src.migrations.runner import MigrationRunner  # noqa: E402
+
+
+@pytest.fixture
+def repo():
+    """Fresh in-memory schema, isolated from the on-disk production database."""
+    engine = create_engine("sqlite:///:memory:")
+    MigrationRunner(engine).upgrade()
+    session = sessionmaker(bind=engine)()
+    yield ForecastRecordRepository(session)
+    session.close()
+
+
+def _series_records(eps_values, repo, scenario="base", **overrides):
+    """Save one record per eps value and return the persisted history."""
+    for index, eps in enumerate(eps_values):
+        result = _forecast(**{key: value for key, value in overrides.items()
+                              if key in CONTEXT_KEYS})
+        engine_kwargs = {
+            key: value for key, value in overrides.items()
+            if key not in CONTEXT_KEYS
+        }
+        engine_kwargs.setdefault("company_id", 1)
+        engine_kwargs.setdefault("forecast_period_id", 101)
+        engine_kwargs.setdefault("industry_code", "PETROCHEMICAL")
+        engine_kwargs.setdefault(
+            "data_cutoff_datetime", datetime(2026, 1 + index, 1, tzinfo=timezone.utc))
+        engine_kwargs["financial_context"] = _context()
+        record = ForecastEngine().generate_forecast(**engine_kwargs).to_record(
+            scenario, forecast_id=index + 1)
+        record = replace(record, eps=eps)
+        repo.save(record)
+    return repo.history(1, 101, "12M", scenario.upper())
+
+
+def test_repo_first_forecast_persists(repo):
+    record = _forecast().to_record("base", forecast_id=1)
+    saved = repo.save(record)
+
+    assert saved.forecast_version == 1
+    assert repo.count() == 1
+    reloaded = repo.latest(1, 101, "12M", "BASE")
+    assert reloaded is not None
+    # A missing metric round-trips as None, never as 0 (spec section 27).
+    assert reloaded.eps is not None
+    assert reloaded.company_id == 1
+    assert reloaded.forecast_period_id == 101
+    assert reloaded.scenario == "BASE"
+    assert reloaded.forecast_horizon == "12M"
+
+
+def test_repo_second_save_creates_a_new_version(repo):
+    repo.save(_forecast().to_record("base", forecast_id=1))
+    second = repo.save(_forecast().to_record("base", forecast_id=2))
+
+    assert second.forecast_version == 2
+    assert repo.count() == 2
+    assert len(repo.history(1, 101, "12M", "BASE")) == 2
+
+
+def test_repo_old_version_remains_readable(repo):
+    first = repo.save(_forecast().to_record("base", forecast_id=1))
+    repo.save(_forecast().to_record("base", forecast_id=2))
+
+    history = repo.history(1, 101, "12M", "BASE")
+    assert [r.forecast_version for r in history] == [1, 2]
+    # The August forecast is still there after September overwrote nothing.
+    assert repo.latest(1, 101, "12M", "BASE").forecast_version == 2
+    assert history[0].eps == first.eps
+    assert history[0].forecast_timestamp == first.forecast_timestamp
+
+
+def test_repo_does_not_overwrite_the_previous_forecast(repo):
+    original = repo.save(_forecast().to_record("base", forecast_id=1))
+    different = replace(_forecast().to_record("base", forecast_id=2), eps=999.0)
+    repo.save(different)
+
+    history = repo.history(1, 101, "12M", "BASE")
+    assert len(history) == 2
+    assert history[0].eps == original.eps
+    assert history[0].eps != 999.0
+    assert history[1].eps == 999.0
+
+
+def test_repo_identical_resave_is_idempotent(repo):
+    record = _forecast().to_record("base", forecast_id=1)
+    repo.save(record)
+    again = repo.save(record)
+
+    assert again.forecast_version == 1
+    assert repo.count() == 1
+    assert repo.latest(1, 101, "12M", "BASE").forecast_version == 1
+
+
+def test_repo_conflicting_version_is_rejected(repo):
+    repo.save(_forecast().to_record("base", forecast_id=1))
+    # The caller asserts this is version 1, but version 1 already exists with
+    # different contents: a silent overwrite must not happen.
+    conflicting = replace(_forecast().to_record("base", forecast_id=2),
+                          eps=5.0, forecast_version=1)
+
+    with pytest.raises(ForecastVersionExistsError):
+        repo.save(conflicting)
+    # The rejected write left nothing behind.
+    assert repo.count() == 1
+    assert repo.latest(1, 101, "12M", "BASE").eps != 5.0
+
+
+def test_repo_scenarios_are_separate_series(repo):
+    for scenario in ("bear", "base", "bull"):
+        repo.save(_forecast().to_record(scenario, forecast_id=1))
+
+    assert repo.count() == 3
+    assert len(repo.history(1, 101, "12M", "BEAR")) == 1
+    assert len(repo.history(1, 101, "12M", "BASE")) == 1
+    assert len(repo.history(1, 101, "12M", "BULL")) == 1
+
+
+def test_repo_horizons_are_separate_series(repo):
+    for horizon in ("6M", "12M"):
+        repo.save(_forecast(horizon=horizon).to_record("base", forecast_id=1))
+
+    assert repo.count() == 2
+    assert len(repo.history(1, 101, "6M", "BASE")) == 1
+    assert len(repo.history(1, 101, "12M", "BASE")) == 1
+
+
+def test_repo_preserves_pit_fields(repo):
+    record = _forecast(
+        data_cutoff_datetime=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        calculation_timestamp=datetime(2026, 4, 1, tzinfo=timezone.utc),
+    ).to_record("base", forecast_id=1)
+    record = replace(record, model_version="V2.3")
+    saved = repo.save(record)
+
+    assert saved.model_version == "V2.3"
+    reloaded = repo.latest(1, 101, "12M", "BASE")
+    assert reloaded.data_cutoff_datetime == datetime(2026, 3, 1, tzinfo=timezone.utc)
+    assert reloaded.forecast_timestamp == datetime(2026, 4, 1, tzinfo=timezone.utc)
+    assert reloaded.model_version == "V2.3"
+    assert reloaded.scenario == "BASE"
+    assert reloaded.forecast_method == record.forecast_method
+    assert reloaded.data_quality == record.data_quality
+    assert reloaded.assumptions == record.assumptions
+
+
+def test_repo_preserves_input_provenance(repo):
+    record = _forecast(input_refs=[
+        ForecastInputRef("q4_revenue", report_version_id=99,
+                         available_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+                         source="codal"),
+    ]).to_record("base", forecast_id=1)
+    repo.save(record)
+
+    reloaded = repo.latest(1, 101, "12M", "BASE")
+    assert len(reloaded.input_refs) == 1
+    ref = reloaded.input_refs[0]
+    assert ref.fact_key == "q4_revenue"
+    assert ref.report_version_id == 99
+    assert ref.available_at == datetime(2025, 6, 1, tzinfo=timezone.utc)
+    assert ref.source == "codal"
+
+
+def test_repo_revision_trend_built_from_stored_versions(repo):
+    history = _series_records((1100.0, 1180.0, 1270.0), repo)
+    assert [r.eps for r in history] == [1100.0, 1180.0, 1270.0]
+    assert repo.revision_trend(1, 101, "12M", "BASE") == "UPWARD"
+
+
+def test_repo_revision_trend_mixed_is_reported(repo):
+    _series_records((1100.0, 900.0, 1270.0), repo)
+    assert repo.revision_trend(1, 101, "12M", "BASE") == "MIXED"
+
+
+def test_repo_read_at_cutoff_hides_forecasts_built_on_later_data(repo):
+    repo.save(_forecast(
+        input_refs=[ForecastInputRef("base_report",
+                                     available_at=datetime(2025, 6, 1, tzinfo=timezone.utc))],
+    ).to_record("base", forecast_id=1))
+
+    late = _forecast(
+        data_cutoff_datetime=datetime(2026, 9, 1, tzinfo=timezone.utc),
+        input_refs=[ForecastInputRef("october_report",
+                                     available_at=datetime(2026, 10, 5, tzinfo=timezone.utc))],
+    )
+    repo.save(late.to_record("base", forecast_id=2))
+
+    visible = repo.read_at_cutoff(
+        1, 101, "12M", "BASE", datetime(2026, 9, 15, tzinfo=timezone.utc))
+    assert visible is not None
+    # Never the version built from the October report.
+    assert visible.forecast_version == 1
+    assert [r.fact_key for r in visible.input_refs] == ["base_report"]
+    assert repo.pit_violations(datetime(2026, 9, 1, tzinfo=timezone.utc)) != []
