@@ -1,3 +1,227 @@
+PROMPT 1 — Stage 5 Preflight
+TASK: Stage 5 — PREFLIGHT / DISCOVERY ONLY
+
+Repository: analyzer
+
+Stage 1, Stage 2, Stage 3, and Stage 4 are frozen.
+Stage 4 is now frozen after final audit and full regression.
+
+Stage 5 is the Forecast Engine.
+
+IMPORTANT:
+The Stage 5 specification currently says LOCKED, but implementation status must NOT be trusted blindly.
+Audit the implementation against the specification before making any changes.
+
+==================================================
+LOCAL-ONLY / READ-ONLY
+==================================================
+
+Work ONLY on the local working tree.
+
+DO NOT:
+- access GitHub
+- use GitHub API/CLI
+- inspect remotes
+- fetch/pull/push/clone
+- create commits
+- modify any file
+- run broad repository tests
+- perform implementation
+- refactor anything
+
+This is READ-ONLY discovery.
+
+==================================================
+READ ONLY THESE FILES
+==================================================
+
+1. 05_Stage5_Forecast_Engine.md
+2. prompts/05_Stage5_Implementation_Prompt.md
+3. src/forecast/schema.py
+4. src/forecast/engine.py
+5. src/forecast/drivers.py
+6. src/tests/test_stage5_forecast.py
+
+Do not inspect unrelated modules unless absolutely necessary to identify a direct Stage 5 boundary dependency.
+
+==================================================
+AUDIT ONLY THESE AREAS
+==================================================
+
+1. Forecast output schema
+2. Forecast versioning
+3. PIT / data_cutoff_datetime
+4. Baseline hierarchy
+5. Revenue forecast
+6. Operating margin / operating profit
+7. Net profit hierarchy
+8. EPS / share-count handling
+9. ROE
+10. Bank forecast
+11. Holding forecast
+12. FX separation
+13. Bear/Base/Bull scenarios
+14. Low Base / Sign Change controls
+15. Stage 4 integration boundary
+16. Stage 3 isolation
+17. Stage 6 isolation
+18. Missing != 0
+19. Current tests and their actual coverage
+
+==================================================
+IMPORTANT
+==================================================
+
+Do NOT fix anything.
+
+Do NOT redesign anything.
+
+Do NOT assume the specification is correct merely because it says LOCKED.
+
+Identify actual implementation gaps.
+
+Classify findings:
+
+- COMPLIANT
+- PARTIAL
+- REAL GAP
+- BLOCKER
+- NON-BLOCKER
+- OUT OF SCOPE
+
+==================================================
+FINAL REPORT
+==================================================
+
+Return:
+
+1. Current implementation summary
+2. What is actually implemented
+3. What is missing
+4. What is incorrect
+5. BLOCKERS
+6. NON-BLOCKERS
+7. Exact files that need modification
+8. Recommended implementation order
+9. Existing Stage 5 test count and coverage
+10. Maximum 10-line implementation plan
+
+Do NOT modify anything.
+
+Do NOT declare Stage 5 frozen.
+
+STOP immediately after the report.
+====================================================================================================
+
+PROMPT 2 — Stage 5 Data Model / PIT / Versioning
+TASK: Stage 5 — DATA MODEL / PIT / VERSIONING ONLY
+
+Repository: analyzer
+
+Stage 1–4 are frozen.
+Stage 5 is NOT frozen.
+
+Use the Stage 5 specification as the authority.
+
+==================================================
+LOCAL-ONLY
+==================================================
+
+Work ONLY on the local working tree.
+
+No GitHub.
+No remote access.
+No GitHub CLI/API.
+No push/pull/fetch/clone.
+No commits.
+
+Do NOT modify documentation or status files.
+
+==================================================
+ALLOWED FILES
+==================================================
+
+Prefer ONLY:
+
+- src/forecast/schema.py
+- src/forecast/engine.py
+- src/tests/test_stage5_forecast.py
+
+Do not modify other files unless absolutely required by this specific task.
+
+==================================================
+SCOPE
+==================================================
+
+Implement/fix ONLY:
+
+1. ForecastRecord / output schema
+2. forecast_horizon
+3. forecast_timestamp
+4. data_cutoff_datetime
+5. model_version
+6. scenario
+7. forecast_method
+8. data_quality
+9. assumptions
+10. Forecast version preservation
+11. No-overwrite semantics
+12. Point-in-Time protection
+13. Auditability of forecast inputs
+14. Missing != 0
+
+A historical forecast must never see information published after its cutoff.
+
+A newer forecast must create a new version, not overwrite an older forecast.
+
+==================================================
+DO NOT TOUCH
+==================================================
+
+- revenue algorithms
+- margin algorithms
+- net profit algorithms
+- EPS calculations
+- ROE
+- Bank
+- Holding
+- scenarios
+- Stage 4 calculations
+- Stage 3
+- Stage 6
+- Stage 7
+- valuation
+- market data
+
+==================================================
+TEST
+==================================================
+
+Run ONLY:
+
+pytest src/tests/test_stage5_forecast.py -v
+
+Do NOT run full regression.
+
+==================================================
+STOP
+==================================================
+
+After implementation and targeted tests, STOP.
+
+Final report:
+
+1. Files changed
+2. Exact changes
+3. PIT behavior
+4. Versioning behavior
+5. Tests
+6. Remaining failures
+7. Explicitly state:
+
+"Stage 5 is NOT declared frozen."
+====================================================================================================
+
 PROMPT 3 — Non-Financial Forecast Core:
 TASK: Stage 5 — NON-FINANCIAL FORECAST CORE ONLY
 
