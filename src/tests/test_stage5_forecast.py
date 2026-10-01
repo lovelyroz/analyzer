@@ -1,4 +1,6 @@
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
+from typing import Optional
 
 import pytest
 
@@ -518,3 +520,403 @@ def test_normalize_datetime_contracts():
     naive = normalize_datetime(datetime(2026, 1, 1))
     assert naive == datetime(2026, 1, 1, tzinfo=timezone.utc)
     assert naive.tzinfo is not None
+
+
+# ==========================================================================
+# Stage 4 adapter and weighted average shares (Prompt 3)
+# ==========================================================================
+
+from src.forecast.adapter import (  # noqa: E402
+    Stage4Context,
+    adapt_stage4,
+    build_financial_context,
+)
+from src.forecast.builder import (  # noqa: E402
+    WeightedAverageShares,
+    build_weighted_average_shares,
+)
+from src.trend.schema import (  # noqa: E402
+    ContextFlags,
+    HistoricalResult,
+    MomentumResult,
+    PeriodComparison,
+    SeasonalResult,
+    TrendResult,
+)
+
+
+@dataclass
+class _ShareRecord:
+    effective_date: "date"
+    shares_outstanding: int
+
+
+@dataclass
+class _CorporateAction:
+    action_type: str
+    effective_date: "date"
+    announcement_date: Optional["date"] = None
+    old_share_count: Optional[int] = None
+    new_share_count: Optional[int] = None
+    ratio: Optional[float] = None
+
+
+def _stage4(
+    *,
+    trend_state: str = "Stable",
+    coverage: str = "FULL",
+    seasonal_baseline: Optional[float] = 12000.0,
+    seasonal_sufficiency: str = "FULL",
+    seasonal_observations: int = 5,
+    momentum_pct: Optional[float] = 0.08,
+    momentum_direction: Optional[str] = "Positive",
+    low_base: Optional[bool] = False,
+    sign_change: Optional[str] = None,
+    data_sufficiency: str = "FULL",
+    trend_confidence: Optional[str] = "HIGH",
+    same_period_flags: tuple = (),
+) -> TrendResult:
+    return TrendResult(
+        company_id=1,
+        period_id=101,
+        metric_code="REVENUE",
+        trend_state=trend_state,
+        coverage=coverage,
+        low_base_flag=low_base,
+        sign_change_flag=bool(sign_change),
+        comparisons={},
+        calculation_timestamp=datetime(2025, 12, 1, tzinfo=timezone.utc),
+        historical=HistoricalResult(
+            same_period_detail=[
+                PeriodComparison(label=f"Y{i}", pct_change=None, flag=flag)
+                for i, flag in enumerate(same_period_flags)
+            ],
+            sufficiency=data_sufficiency,
+        ),
+        seasonal=SeasonalResult(
+            baseline=seasonal_baseline,
+            data_sufficiency=seasonal_sufficiency,
+            observation_count=seasonal_observations,
+        ),
+        momentum={
+            "12M": MomentumResult(
+                pct_change=momentum_pct,
+                direction=momentum_direction,
+                relative_strength="Normal",
+                status="VALID",
+            ),
+        },
+        context=ContextFlags(
+            low_base=low_base,
+            sign_change=sign_change,
+            data_sufficiency=data_sufficiency,
+        ),
+        trend_coverage=coverage,
+        trend_confidence=trend_confidence,
+    )
+
+
+# --- 1. Stage 4 output -> Stage 5 context mapping --------------------------
+
+def test_stage4_adapter_maps_core_fields_without_recalculating():
+    result = _stage4()
+    context = adapt_stage4(
+        result,
+        seasonal_baseline_revenue=12000.0,
+        seasonal_naive_revenue=11800.0,
+        recent_run_rate_revenue=11500.0,
+    )
+    assert context.trend_state == "Stable"
+    assert context.coverage == "FULL"
+    assert context.seasonality_valid is True
+    assert context.seasonal_baseline_revenue == 12000.0
+    assert context.seasonal_naive_revenue == 11800.0
+    assert context.recent_run_rate_revenue == 11500.0
+    # Provenance carries the Stage 4 coordinates so the forecast stays auditable.
+    assert context.provenance["stage"] == "STAGE_4"
+    assert context.provenance["metric_code"] == "REVENUE"
+    assert context.provenance["seasonal_observations"] == 5
+
+
+def test_stage4_adapter_output_drives_the_engine():
+    result = _stage4(trend_state="Improving")
+    context = build_financial_context(
+        result,
+        {
+            "historical_operating_margin": 0.20,
+            "historical_net_margin": 0.10,
+            "share_count": 1000.0,
+            "baseline_revenue_growth": 0.10,
+            "model_parameters": {
+                "trend_adjustments": {"Improving": 0.02},
+                "scenario_revenue_growth_spread": 0.05,
+            },
+        },
+        seasonal_baseline_revenue=12000.0,
+        seasonal_naive_revenue=11800.0,
+        recent_run_rate_revenue=11500.0,
+    )
+    forecast = ForecastEngine().generate_forecast(
+        1, 101, "PETROCHEMICAL", context,
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    # Seasonality is valid, so the seasonal baseline wins over the run rate.
+    assert forecast.baseline_method == "SEASONAL_BASELINE"
+    assert forecast.scenario_forecasts.base.revenue == pytest.approx(13440.0)
+    assert forecast.scenario_forecasts.base.method == "MARGIN"
+
+
+# --- 2. seasonal baseline mapping -----------------------------------------
+
+def test_seasonal_baseline_requires_stage4_sufficiency():
+    # Stage 4 says there are not enough same-period observations, so the
+    # seasonal baseline must not outrank the run rate.
+    result = _stage4(seasonal_sufficiency="INSUFFICIENT_DATA", seasonal_observations=1)
+    context = adapt_stage4(result)
+    assert context.seasonality_valid is False
+    assert context.seasonal_data_sufficiency == "INSUFFICIENT_DATA"
+
+
+def test_seasonal_baseline_surprise_is_not_converted_to_growth():
+    result = _stage4(momentum_pct=0.25)
+    context = adapt_stage4(result)
+    # Momentum is carried as evidence only; nothing in the context is a growth rate.
+    assert context.momentum_12m_pct == 0.25
+    assert "growth" not in str(context.to_dict()).lower().replace("growth_spread", "")
+
+
+# --- 3. recent run-rate mapping -------------------------------------------
+
+def test_run_rate_is_carried_verbatim():
+    result = _stage4(seasonal_sufficiency="INSUFFICIENT_DATA", seasonal_observations=1)
+    context = adapt_stage4(result, recent_run_rate_revenue=9000.0)
+    assert context.recent_run_rate_revenue == 9000.0
+    built = build_financial_context(result, {"share_count": 1000.0},
+                                    recent_run_rate_revenue=9000.0)
+    built["historical_operating_margin"] = 0.20
+    built["historical_net_margin"] = 0.10
+    forecast = ForecastEngine().generate_forecast(1, 101, "FOOD", built)
+    assert forecast.baseline_method == "RUN_RATE"
+    assert forecast.scenario_forecasts.base.revenue == pytest.approx(9000.0)
+
+
+# --- 4. Low Base propagation ----------------------------------------------
+
+def test_low_base_propagates_and_disables_trend_adjustment():
+    result = _stage4(trend_state="Strong Improvement", low_base=True)
+    context = adapt_stage4(result)
+    assert context.low_base is True
+    built = build_financial_context(result, {
+        "historical_operating_margin": 0.20,
+        "historical_net_margin": 0.10,
+        "share_count": 100.0,
+        "seasonal_baseline_revenue": 1000.0,
+        "baseline_revenue_growth": 0.10,
+        "model_parameters": {
+            "trend_adjustments": {"Strong Improvement": 0.50},
+            "scenario_revenue_growth_spread": 0.05,
+        },
+    })
+    forecast = ForecastEngine().generate_forecast(1, 101, "CEMENT", built)
+    # The huge trend adjustment is suppressed; only the declared growth applies.
+    assert forecast.scenario_forecasts.base.revenue == pytest.approx(1100.0)
+    assert forecast.assumptions["low_base"] is True
+
+
+# --- 5. Sign Change propagation -------------------------------------------
+
+def test_sign_change_propagates_from_stage4_context():
+    result = _stage4(sign_change="LOSS_TO_PROFIT", momentum_pct=4.0)
+    context = adapt_stage4(result)
+    assert context.sign_change == "LOSS_TO_PROFIT"
+    built = build_financial_context(result, {"share_count": 100.0})
+    forecast = ForecastEngine().generate_forecast(1, 101, "FOOD", built)
+    assert forecast.assumptions["sign_change"] == "LOSS_TO_PROFIT"
+
+
+def test_sign_change_propagates_from_layer_flags_without_context():
+    # No Layer-4 context block: the adapter falls back to Layer 1/2 flags.
+    result = _stage4(sign_change=None, same_period_flags=("SIGN_CHANGE",))
+    result.context = None
+    context = adapt_stage4(result)
+    assert context.sign_change == "SIGN_CHANGE"
+
+
+# --- 6. no Stage 4 recalculation ------------------------------------------
+
+def test_adapter_does_not_recompute_stage4_quantities():
+    result = _stage4(momentum_pct=0.08)
+    context = adapt_stage4(result)
+    # The adapter must preserve Stage 4's own numbers, never recompute them.
+    assert context.momentum_12m_pct == 0.08
+    assert context.trend_direction == "Positive"
+    assert context.trend_state == result.trend_state
+    # Stage 4's momentum percentage is never turned into a forecast growth rate.
+    built = build_financial_context(
+        result, {"historical_operating_margin": 0.20, "historical_net_margin": 0.10,
+                 "share_count": 1000.0, "seasonal_baseline_revenue": 10000.0},
+    )
+    forecast = ForecastEngine().generate_forecast(1, 101, "PETROCHEMICAL", built)
+    assert forecast.scenario_forecasts.base.revenue == pytest.approx(10000.0)
+
+
+# --- 7. unchanged share count ---------------------------------------------
+
+def test_weighted_shares_unchanged_single_observation():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    result = build_weighted_average_shares(history, cutoff=date(2026, 1, 1))
+    assert result.shares == pytest.approx(1_000_000)
+    assert result.basis == "UNADJUSTED"
+    assert result.applied_actions == []
+
+
+def test_weighted_shares_unchanged_across_observation_history():
+    history = [
+        _ShareRecord(date(2025, 1, 1), 1_000_000),
+        _ShareRecord(date(2025, 7, 1), 1_000_000),
+    ]
+    result = build_weighted_average_shares(history, cutoff=date(2026, 1, 1))
+    assert result.shares == pytest.approx(1_000_000)
+
+
+# --- 8. capital increase ---------------------------------------------------
+
+def test_weighted_shares_capital_increase_extends_series():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2025, 7, 1),
+                         old_share_count=1_000_000, new_share_count=1_500_000,
+                         ratio=0.5),
+    ]
+    result = build_weighted_average_shares(history, actions, cutoff=date(2026, 1, 1))
+    assert result.shares is not None
+    # 1M for 181 days, 1.5M for 184 days -> about 1.252M
+    assert 1_240_000 < result.shares < 1_262_000
+    assert result.basis == "WEIGHTED_AVERAGE"
+    assert result.applied_actions == ["CAPITAL_INCREASE@2025-07-01"]
+
+
+# --- 9. corporate action / split ------------------------------------------
+
+def test_weighted_shares_stock_split_uses_ratio_when_counts_absent():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [_CorporateAction("STOCK_SPLIT", date(2025, 7, 1), ratio=2.0)]
+    result = build_weighted_average_shares(history, actions, cutoff=date(2026, 1, 1))
+    assert result.shares is not None
+    assert 1_490_000 < result.shares < 1_510_000
+    assert result.applied_actions == ["STOCK_SPLIT@2025-07-01"]
+
+
+def test_weighted_shares_capital_decrease_uses_new_count():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_DECREASE", date(2025, 7, 1),
+                         new_share_count=800_000),
+    ]
+    result = build_weighted_average_shares(history, actions, cutoff=date(2026, 1, 1))
+    assert result.shares is not None
+    assert 890_000 < result.shares < 910_000
+
+
+# --- 10. cutoff-aware share calculation ------------------------------------
+
+def test_action_after_cutoff_does_not_affect_the_forecast():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2026, 6, 1),
+                         new_share_count=2_000_000),
+    ]
+    result = build_weighted_average_shares(history, actions, cutoff=date(2026, 1, 1))
+    assert result.shares == pytest.approx(1_000_000)
+    assert result.applied_actions == []
+
+
+def test_action_effective_before_cutoff_but_announced_after_is_ignored():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2025, 7, 1),
+                         announcement_date=date(2026, 3, 1),
+                         new_share_count=1_500_000),
+    ]
+    result = build_weighted_average_shares(history, actions, cutoff=date(2026, 1, 1))
+    assert result.shares == pytest.approx(1_000_000)
+    assert result.applied_actions == []
+    assert "after the cutoff" in result.notes[0]
+
+
+def test_share_history_after_cutoff_is_invisible():
+    history = [
+        _ShareRecord(date(2025, 1, 1), 1_000_000),
+        _ShareRecord(date(2026, 6, 1), 5_000_000),
+    ]
+    result = build_weighted_average_shares(history, cutoff=date(2026, 1, 1))
+    assert result.shares == pytest.approx(1_000_000)
+
+
+# --- 11. missing share data ------------------------------------------------
+
+def test_weighted_shares_missing_history_is_none_not_invented():
+    result = build_weighted_average_shares([], cutoff=date(2026, 1, 1))
+    assert result.shares is None
+    assert result.basis == "NO_SHARE_HISTORY"
+
+
+def test_weighted_shares_no_observation_at_cutoff_is_none():
+    history = [_ShareRecord(date(2026, 6, 1), 1_000_000)]
+    result = build_weighted_average_shares(history, cutoff=date(2026, 1, 1))
+    assert result.shares is None
+    assert result.basis == "NO_OBSERVATION_AT_OR_BEFORE_CUTOFF"
+
+
+def test_weighted_shares_unresolvable_action_is_reported_not_guessed():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [_CorporateAction("CAPITAL_INCREASE", date(2025, 7, 1))]
+    result = build_weighted_average_shares(history, actions, cutoff=date(2026, 1, 1))
+    assert result.shares == pytest.approx(1_000_000)
+    assert result.notes == ["unusable CAPITAL_INCREASE at 2025-07-01: no "
+                            "new_share_count and no resolvable ratio"]
+
+
+def test_engine_accepts_builder_output_for_eps():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2025, 7, 1),
+                         old_share_count=1_000_000, new_share_count=1_500_000,
+                         ratio=0.5),
+    ]
+    shares = build_weighted_average_shares(history, actions, cutoff=date(2026, 1, 1))
+    context = _context()
+    context.pop("share_count")
+    context["forecast_weighted_average_shares"] = shares
+    forecast = ForecastEngine().generate_forecast(
+        1, 101, "PETROCHEMICAL", context,
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    base = forecast.scenario_forecasts.base
+    assert base.eps is not None
+    # Net profit 10000 * 1.10 * 0.10 = 1100 over ~1.252M shares.
+    assert base.eps < 1100.0 / 1_240_000
+    assert base.eps > 1100.0 / 1_262_000
+
+
+# --- 12. determinism -------------------------------------------------------
+
+def test_weighted_shares_are_deterministic_across_calls():
+    history = [
+        _ShareRecord(date(2025, 1, 1), 1_000_000),
+        _ShareRecord(date(2025, 10, 1), 1_200_000),
+    ]
+    actions = [_CorporateAction("STOCK_SPLIT", date(2025, 7, 1), ratio=2.0)]
+    first = build_weighted_average_shares(history, actions, cutoff=date(2026, 1, 1))
+    second = build_weighted_average_shares(list(reversed(history)), actions,
+                                           cutoff=date(2026, 1, 1))
+    assert first.shares == second.shares
+    assert first.applied_actions == second.applied_actions
+
+
+def test_stage4_adapter_is_deterministic():
+    result = _stage4()
+    first = adapt_stage4(result)
+    second = adapt_stage4(result)
+    assert first == second
+    assert first.to_dict() == second.to_dict()

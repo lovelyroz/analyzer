@@ -63,6 +63,25 @@ class ForecastEngine:
         return None, "INSUFFICIENT_DATA"
 
     @staticmethod
+    def _share_count(context: Dict[str, Any]) -> Optional[float]:
+        """Weighted average shares built from Stage 1 share data (spec §9).
+
+        Accepts the figure the builder produces, or a plain number supplied
+        directly. Missing shares stay missing: net profit without a
+        denominator yields no EPS rather than an invented one.
+        """
+        shares = context.get("forecast_weighted_average_shares")
+        if hasattr(shares, "get"):
+            shares = shares.get()
+        value = float(shares) if isinstance(shares, (int, float)) else None
+        if value is not None:
+            return value
+        fallback = context.get("share_count")
+        if hasattr(fallback, "get"):
+            fallback = fallback.get()
+        return float(fallback) if isinstance(fallback, (int, float)) else None
+
+    @staticmethod
     def _baseline_value(context: Dict[str, Any], *keys: str) -> Optional[float]:
         for key in keys:
             value = ForecastEngine._number(context, key)
@@ -155,8 +174,7 @@ class ForecastEngine:
         return ForecastDriver.build_non_financial_chain(
             revenue=revenue,
             operating_margin=op_margin,
-            share_count=self._number(context, "forecast_weighted_average_shares")
-            or self._number(context, "share_count"),
+            share_count=self._share_count(context),
             non_operating_items=self._number(context, "forecast_non_operating_items"),
             financial_costs=self._number(context, "forecast_financial_costs"),
             tax=self._number(context, "forecast_tax"),
@@ -279,13 +297,13 @@ class ForecastEngine:
             nii_growth += trend_adj
             bear_g, base_g, bull_g = nii_growth - financial_spread, nii_growth, nii_growth + financial_spread
             scenarios = ScenarioForecastResult(
-                ForecastDriver.build_bank_chain(base_nii, bear_g, self._number(financial_context, "forecast_weighted_average_shares") or self._number(financial_context, "share_count"),
+                ForecastDriver.build_bank_chain(base_nii, bear_g, self._share_count(financial_context),
                                                 net_profit_conversion=self._number(financial_context, "bank_net_profit_nii_conversion"),
                                                 beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BEAR"}),
-                ForecastDriver.build_bank_chain(base_nii, base_g, self._number(financial_context, "forecast_weighted_average_shares") or self._number(financial_context, "share_count"),
+                ForecastDriver.build_bank_chain(base_nii, base_g, self._share_count(financial_context),
                                                 net_profit_conversion=self._number(financial_context, "bank_net_profit_nii_conversion"),
                                                 beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BASE"}),
-                ForecastDriver.build_bank_chain(base_nii, bull_g, self._number(financial_context, "forecast_weighted_average_shares") or self._number(financial_context, "share_count"),
+                ForecastDriver.build_bank_chain(base_nii, bull_g, self._share_count(financial_context),
                                                 net_profit_conversion=self._number(financial_context, "bank_net_profit_nii_conversion"),
                                                 beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BULL"}),
             )
@@ -295,10 +313,10 @@ class ForecastEngine:
             base_nav = self._number(financial_context, "base_nav")
             nav_growth = self._number(financial_context, "baseline_nav_growth")
             if nav_growth is None:
-                nav_growth = 0.0
+                nav_growth = 0.00
             nav_growth += trend_adj
             bear_g, base_g, bull_g = nav_growth - financial_spread, nav_growth, nav_growth + financial_spread
-            shares = self._number(financial_context, "forecast_weighted_average_shares") or self._number(financial_context, "share_count")
+            shares = self._share_count(financial_context)
             conversion = self._number(financial_context, "holding_net_profit_nav_conversion")
             scenarios = ScenarioForecastResult(
                 ForecastDriver.build_holding_chain(base_nav, bear_g, shares, net_profit_conversion=conversion,
