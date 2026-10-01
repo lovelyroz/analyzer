@@ -1,14 +1,18 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+from dataclasses import replace
 
 from src.forecast.drivers import ForecastDriver
 from src.forecast.schema import (
     CompanyForecastResult,
+    ForecastInputRef,
     ScenarioForecastResult,
     SingleForecastChain,
     SUPPORTED_HORIZONS,
     SUPPORTED_INDUSTRIES,
     NON_FINANCIAL_INDUSTRIES,
+    normalize_datetime,
 )
 
 
@@ -65,6 +69,49 @@ class ForecastEngine:
             if value is not None:
                 return value
         return None
+
+    # ------------------------------------------------------------------
+    # Point-in-Time protection (spec §25) and input auditability (§29)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _raw_input_refs(context: Dict[str, Any]) -> List[ForecastInputRef]:
+        """Normalize the caller's provenance declarations.
+
+        Stage 5 does not own the report layer, so provenance is an opt-in
+        contract: whoever assembles ``financial_context`` declares which facts
+        came from which report version. Undeclared inputs are recorded without
+        a publication date and are therefore never rejected as look-ahead.
+        """
+        declared = context.get("input_refs") or context.get("forecast_input_refs") or []
+        refs: List[ForecastInputRef] = []
+        for item in declared:
+            if isinstance(item, ForecastInputRef):
+                refs.append(item)
+            elif isinstance(item, dict):
+                try:
+                    refs.append(ForecastInputRef.from_mapping(item))
+                except KeyError:
+                    raise ValueError("input_refs entries require a 'fact_key'")
+            else:
+                raise ValueError(
+                    "input_refs entries must be ForecastInputRef or mapping with 'fact_key'"
+                )
+        return refs
+
+    @staticmethod
+    def _pit_safe(context: Dict[str, Any], refs: List[ForecastInputRef],
+                  cutoff: datetime) -> tuple[bool, List[ForecastInputRef], Optional[ForecastInputRef]]:
+        """Split inputs by availability and report the first violation (if any)."""
+        dropped = [ref for ref in refs
+                   if ref.available_at is not None
+                   and normalize_datetime(ref.available_at) > normalize_datetime(cutoff)]
+        if not dropped:
+            return True, refs, None
+        first_violation = min(
+            dropped, key=lambda ref: normalize_datetime(ref.available_at)
+        )
+        return False, [ref for ref in refs if ref not in dropped], first_violation
 
     def _non_financial_scenario(
         self,
@@ -139,9 +186,23 @@ class ForecastEngine:
         if horizon not in SUPPORTED_HORIZONS:
             raise ValueError(f"Unsupported Stage 5 horizon: {horizon}")
 
-        cutoff = data_cutoff_datetime or datetime.now(timezone.utc)
+        cutoff = normalize_datetime(data_cutoff_datetime) or datetime.now(timezone.utc)
         params = self._merge_parameters(financial_context)
         trend_adj = self._trend_adjustment(financial_context, trend_state, params)
+
+        # Point-in-Time: a forecast may only use inputs published at or before
+        # its cutoff (spec §25). Late inputs are dropped, never silently kept.
+        raw_refs = self._raw_input_refs(financial_context)
+        pit_ok, input_refs, violation = self._pit_safe(financial_context, raw_refs, cutoff)
+
+        calculation_at = normalize_datetime(
+            financial_context.get("calculation_timestamp")
+        ) or datetime.now(timezone.utc)
+        if calculation_at < cutoff:
+            raise ValueError(
+                "calculation_timestamp precedes data_cutoff_datetime: the forecast "
+                "would be dated before the information it claims to see"
+            )
 
         scenario_spread = float(params.get("scenario_revenue_growth_spread", 0.05))
         financial_spread = float(params.get("scenario_financial_growth_spread", scenario_spread))
@@ -156,7 +217,22 @@ class ForecastEngine:
             "low_base": bool(financial_context.get("low_base") or financial_context.get("LOW_BASE")),
             "operational_fx": financial_context.get("operational_fx"),
             "operational_fx_source": financial_context.get("operational_fx_source"),
+            "data_cutoff_datetime": cutoff.isoformat(),
+            "pit_valid": pit_ok,
+            "input_refs": [
+                {"fact_key": ref.fact_key, "report_version_id": ref.report_version_id,
+                 "available_at": ref.available_at.isoformat() if ref.available_at else None,
+                 "source": ref.source}
+                for ref in input_refs
+            ],
         }
+        if violation is not None:
+            assumptions["pit_violation"] = {
+                "fact_key": violation.fact_key,
+                "available_at": violation.available_at.isoformat(),
+                "cutoff": cutoff.isoformat(),
+                "action": "input_dropped",
+            }
 
         if industry_code in NON_FINANCIAL_INDUSTRIES:
             baseline_revenue, baseline_method = self._baseline_revenue(financial_context)
@@ -165,7 +241,12 @@ class ForecastEngine:
                 benchmark = SingleForecastChain(revenue=round(seasonal_naive_revenue, 6), method="SEASONAL_NAIVE", quality="BENCHMARK")
 
             if baseline_revenue is None:
-                empty = SingleForecastChain(method="INSUFFICIENT_DATA", assumptions={"reason": "missing_revenue_baseline"})
+                empty = SingleForecastChain(
+                    method="INSUFFICIENT_DATA",
+                    assumptions={"reason": "missing_revenue_baseline"},
+                    scenario="MISSING",
+                    forecast_horizon=horizon,
+                )
                 scenarios = ScenarioForecastResult(empty, empty, empty)
                 quality = "INSUFFICIENT_DATA"
             else:
@@ -182,7 +263,11 @@ class ForecastEngine:
                                                     0.0, 0.0, "BASE", trend_adj)
                 bull = self._non_financial_scenario(financial_context, baseline_revenue, baseline_method, bull_growth,
                                                     margin_spread, net_margin_spread, "BULL", trend_adj)
-                scenarios = ScenarioForecastResult(bear, base, bull)
+                scenarios = ScenarioForecastResult(
+                    replace(bear, scenario="BEAR", forecast_horizon=horizon),
+                    replace(base, scenario="BASE", forecast_horizon=horizon),
+                    replace(bull, scenario="BULL", forecast_horizon=horizon),
+                )
                 quality = "HIGH" if base.quality == "HIGH" else ("MEDIUM" if base.quality != "INSUFFICIENT_DATA" else "INSUFFICIENT_DATA")
 
         elif industry_code == "BANK":
@@ -224,6 +309,20 @@ class ForecastEngine:
                                                    beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BULL"}),
             )
 
+        # Scenario identity and horizon are recorded on every chain so a frozen
+        # record can state which scenario it belongs to without external state.
+        scenarios = ScenarioForecastResult(
+            replace(scenarios.bear, scenario="BEAR", forecast_horizon=horizon),
+            replace(scenarios.base, scenario="BASE", forecast_horizon=horizon),
+            replace(scenarios.bull, scenario="BULL", forecast_horizon=horizon),
+        )
+
+        # Audit handle read by ``CompanyForecastResult.to_record``. ALL declared
+        # refs are frozen here, including ones rejected by the PIT guard: the
+        # record must be able to testify that a late input was seen and dropped,
+        # not silently forgotten (spec §29).
+        assumptions["__input_refs"] = tuple(raw_refs)
+
         forecast_method = scenarios.base.method
         return CompanyForecastResult(
             company_id=company_id,
@@ -235,7 +334,7 @@ class ForecastEngine:
             baseline_method=baseline_method,
             forecast_method=forecast_method,
             model_version=model_version,
-            calculation_timestamp=datetime.now(timezone.utc),
+            calculation_timestamp=calculation_at,
             data_quality=quality if industry_code in NON_FINANCIAL_INDUSTRIES else (
                 "MEDIUM" if scenarios.base.quality != "INSUFFICIENT_DATA" else "INSUFFICIENT_DATA"
             ),
