@@ -7,6 +7,7 @@ from src.forecast.drivers import ForecastDriver
 from src.forecast.schema import (
     CompanyForecastResult,
     ForecastInputRef,
+    OperationalFx,
     ScenarioForecastResult,
     SingleForecastChain,
     SUPPORTED_HORIZONS,
@@ -147,6 +148,100 @@ class ForecastEngine:
         return None
 
     # ------------------------------------------------------------------
+    # Operational FX (spec §30)
+    # ------------------------------------------------------------------
+
+    # The proxy ladder is explicit and approved one rung at a time. Each lower
+    # rung is a *declared* substitute for the missing operational rate, never an
+    # invented one, so the forecast can always say which currency price it used.
+    _OPERATIONAL_FX_KEYS = ("operational_fx_rate", "operational_fx")
+
+    @staticmethod
+    def _operational_fx(context: Dict[str, Any]) -> Optional[OperationalFx]:
+        """Resolve the operational / company FX rate.
+
+        FREE_MARKET FX is a different concept from OPERATIONAL FX and is never
+        read here. When no operational rate exists, an *explicitly declared*
+        proxy may stand in — but only if the caller names it and only as an
+        estimate. An undeclared gap resolves to ``None``: missing is not zero
+        and is not the free-market rate.
+        """
+        for key in ForecastEngine._OPERATIONAL_FX_KEYS:
+            value = context.get(key)
+            if isinstance(value, OperationalFx):
+                return value
+            number = ForecastEngine._number(context, key)
+            if number is not None:
+                return OperationalFx(
+                    rate=number,
+                    source=context.get("operational_fx_source") or "DECLARED_OPERATIONAL",
+                    estimated=False,
+                    confidence="HIGH",
+                )
+
+        # Explicit proxy ladder. Each rung must be declared by the caller; none
+        # of these is ever read on the engine's own initiative.
+        proxy = context.get("operational_fx_proxy")
+        if isinstance(proxy, OperationalFx):
+            return proxy
+        for key, basis, confidence in (
+            ("operational_fx_proxy_rate", "DECLARED_PROXY", "LOW"),
+            ("operational_fx_reference_rate", "DECLARED_REFERENCE_RATE", "LOW"),
+        ):
+            number = ForecastEngine._number(context, key)
+            if number is not None:
+                return OperationalFx(
+                    rate=number,
+                    source=context.get("operational_fx_proxy_source")
+                    or "DECLARED_PROXY",
+                    estimated=True,
+                    proxy_basis=basis,
+                    confidence=confidence,
+                )
+        return None
+
+    @staticmethod
+    def _free_market_fx_is_never_used(
+        context: Dict[str, Any], resolved: Optional[OperationalFx]
+    ) -> None:
+        """Assert the free-market rate never slipped into the operational slot.
+
+        ``free_market_fx_rate`` is a separate Stage 9 input. Reaching for it
+        here would be the silent substitution the spec forbids, so the engine
+        refuses to run rather than price the FX-linked part of the chain at the
+        wrong currency.
+        """
+        if resolved is None and context.get("free_market_fx_rate") is not None:
+            raise ValueError(
+                "operational FX is missing and a FREE_MARKET rate is present: "
+                "the operational rate must not be silently substituted"
+            )
+
+    @staticmethod
+    def _fx_ladder_snapshot(
+        context: Dict[str, Any], resolved: Optional[OperationalFx]
+    ) -> List[str]:
+        """Which FX rungs were available, and which one was used.
+
+        Names only what was declared: it reports the free-market rate's
+        presence as an explicitly-unused input, never as a candidate.
+        """
+        ladder: List[str] = []
+        for key in ForecastEngine._OPERATIONAL_FX_KEYS:
+            if context.get(key) is not None:
+                ladder.append(f"{key}:DECLARED")
+        if context.get("operational_fx_proxy") is not None:
+            ladder.append("operational_fx_proxy:DECLARED")
+        for key in ("operational_fx_proxy_rate", "operational_fx_reference_rate"):
+            if context.get(key) is not None:
+                ladder.append(f"{key}:DECLARED")
+        if context.get("free_market_fx_rate") is not None:
+            ladder.append("free_market_fx_rate:PRESENT_UNUSED")
+        if resolved is not None:
+            ladder.append(f"resolved:{resolved.source}")
+        return ladder
+
+    # ------------------------------------------------------------------
     # Point-in-Time protection (spec §25) and input auditability (§29)
     # ------------------------------------------------------------------
 
@@ -243,6 +338,24 @@ class ForecastEngine:
             scenario_assumptions["driver_revenue_adjustment"] = explicit_driver_adjustment
 
         revenue = baseline_revenue * (1.0 + growth)
+
+        # Operating earnings that are genuinely FX-linked are repriced on the
+        # operational rate only (spec §30). Only the caller-declared exposed
+        # share of revenue moves, and a genuinely missing operational rate
+        # leaves the whole FX effect unapplied rather than priced at the
+        # free-market rate.
+        exposure = self._fx_exposure_share(context)
+        fx = self._operational_fx(context)
+        if fx is not None and exposure is not None and fx.rate is not None:
+            if exposure > 0.0:
+                fx_move = self._fx_move(context, fx)
+                if fx_move is not None:
+                    revenue, fx_applied = self._apply_fx_to_revenue(
+                        revenue, exposure, fx_move
+                    )
+                    scenario_assumptions["fx"] = fx_applied
+                    scenario_assumptions["operational_fx_provenance"] = fx.provenance()
+
         return ForecastDriver.build_non_financial_chain(
             revenue=revenue,
             operating_margin=op_margin,
@@ -259,6 +372,50 @@ class ForecastEngine:
             method_hint=baseline_method,
             assumptions=scenario_assumptions,
         )
+
+    @staticmethod
+    def _fx_exposure_share(context: Dict[str, Any]) -> Optional[float]:
+        """Share of revenue genuinely exposed to the operational FX rate."""
+        for key in ("fx_exposed_revenue_share", "fx_revenue_share"):
+            value = ForecastEngine._number(context, key)
+            if value is not None:
+                return value
+        return None
+
+    @staticmethod
+    def _fx_base_rate(context: Dict[str, Any]) -> Optional[float]:
+        return ForecastEngine._number(context, "operational_fx_base_rate")
+
+    @staticmethod
+    def _fx_move(context: Dict[str, Any], fx: OperationalFx) -> Optional[float]:
+        """FX move as a decimal revenue effect.
+
+        Declared as ``fx_revenue_sensitivity``, which is how much revenue moves
+        for a 1% move in the rate. The engine never assumes a pass-through.
+        """
+        sensitivity = ForecastEngine._number(context, "fx_revenue_sensitivity")
+        if sensitivity is None:
+            return None
+        base_rate = ForecastEngine._fx_base_rate(context)
+        if base_rate is None or base_rate == 0 or fx.rate is None:
+            return None
+        pct_move = (fx.rate - base_rate) / abs(base_rate)
+        return pct_move * sensitivity
+
+    @staticmethod
+    def _apply_fx_to_revenue(
+        revenue: float, exposure: float, fx_move: Optional[float]
+    ) -> tuple[float, Optional[Dict[str, Any]]]:
+        if fx_move is None:
+            return revenue, None
+        exposed = revenue * exposure
+        adjusted = revenue + exposed * fx_move
+        return adjusted, {
+            "exposure_share": round(float(exposure), 6),
+            "fx_move": round(float(fx_move), 6),
+            "exposed_revenue": ForecastDriver._round(exposed),
+            "operational_fx_source": "OPERATIONAL",
+        }
 
     @staticmethod
     def _net_profit_components(context: Dict[str, Any]) -> Dict[str, Optional[float]]:
@@ -318,13 +475,26 @@ class ForecastEngine:
         margin_adjustment = float(params.get("operating_margin_adjustment", 0.0))
 
         benchmark = None
+        resolved_fx = self._operational_fx(financial_context)
+        # FREE_MARKET and OPERATIONAL FX are separate concepts: the operational
+        # rate is the one that may reach the forecast, and the free-market rate
+        # is never read as a stand-in for it.
+        self._free_market_fx_is_never_used(financial_context, resolved_fx)
         assumptions: Dict[str, Any] = {
             "model_parameters": params,
             "trend_evidence": trend_state or financial_context.get("trend_state"),
             "sign_change": financial_context.get("sign_change"),
             "low_base": bool(financial_context.get("low_base") or financial_context.get("LOW_BASE")),
-            "operational_fx": financial_context.get("operational_fx"),
-            "operational_fx_source": financial_context.get("operational_fx_source"),
+            "operational_fx": resolved_fx.rate if resolved_fx is not None else None,
+            "operational_fx_source": resolved_fx.source if resolved_fx is not None else None,
+            "operational_fx_estimated": (
+                resolved_fx.estimated if resolved_fx is not None else None
+            ),
+            "operational_fx_confidence": (
+                resolved_fx.confidence if resolved_fx is not None else None
+            ),
+            "operational_fx_available": resolved_fx is not None,
+            "fx_ladder": self._fx_ladder_snapshot(financial_context, resolved_fx),
             "data_cutoff_datetime": cutoff.isoformat(),
             "pit_valid": pit_ok,
             "input_refs": [
@@ -334,6 +504,8 @@ class ForecastEngine:
                 for ref in input_refs
             ],
         }
+        if resolved_fx is not None and resolved_fx.is_proxy():
+            assumptions["operational_fx_proxy"] = resolved_fx.provenance()
         if violation is not None:
             assumptions["pit_violation"] = {
                 "fact_key": violation.fact_key,
@@ -381,22 +553,31 @@ class ForecastEngine:
 
         elif industry_code == "BANK":
             baseline_method = "BANK_SPECIALIZED"
+            # The bank never enters the non-financial revenue model. NII is its
+            # own baseline; loans/deposits and credit quality ride along as
+            # context and never as profit multipliers.
             base_nii = self._number(financial_context, "base_nii")
             nii_growth = self._number(financial_context, "baseline_nii_growth")
             if nii_growth is None:
                 nii_growth = 0.0
             nii_growth += trend_adj
             bear_g, base_g, bull_g = nii_growth - financial_spread, nii_growth, nii_growth + financial_spread
+            bank_kwargs = {
+                "net_profit_conversion": self._number(financial_context, "bank_net_profit_nii_conversion"),
+                "beginning_equity": self._number(financial_context, "beginning_equity"),
+                "ending_equity": self._number(financial_context, "forecast_ending_equity"),
+                "npl_ratio": self._number(financial_context, "npl_ratio"),
+                "nim": self._number(financial_context, "nim"),
+                "loan_growth": self._number(financial_context, "loan_growth"),
+                "deposit_growth": self._number(financial_context, "deposit_growth"),
+            }
             scenarios = ScenarioForecastResult(
                 ForecastDriver.build_bank_chain(base_nii, bear_g, self._share_count(financial_context),
-                                                net_profit_conversion=self._number(financial_context, "bank_net_profit_nii_conversion"),
-                                                beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BEAR"}),
+                                                assumptions={"scenario": "BEAR"}, **bank_kwargs),
                 ForecastDriver.build_bank_chain(base_nii, base_g, self._share_count(financial_context),
-                                                net_profit_conversion=self._number(financial_context, "bank_net_profit_nii_conversion"),
-                                                beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BASE"}),
+                                                assumptions={"scenario": "BASE"}, **bank_kwargs),
                 ForecastDriver.build_bank_chain(base_nii, bull_g, self._share_count(financial_context),
-                                                net_profit_conversion=self._number(financial_context, "bank_net_profit_nii_conversion"),
-                                                beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BULL"}),
+                                                assumptions={"scenario": "BULL"}, **bank_kwargs),
             )
 
         else:
@@ -409,13 +590,17 @@ class ForecastEngine:
             bear_g, base_g, bull_g = nav_growth - financial_spread, nav_growth, nav_growth + financial_spread
             shares = self._share_count(financial_context)
             conversion = self._number(financial_context, "holding_net_profit_nav_conversion")
+            holding_kwargs = {
+                "beginning_equity": self._number(financial_context, "beginning_equity"),
+                "ending_equity": self._number(financial_context, "forecast_ending_equity"),
+            }
             scenarios = ScenarioForecastResult(
                 ForecastDriver.build_holding_chain(base_nav, bear_g, shares, net_profit_conversion=conversion,
-                                                   beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BEAR"}),
+                                                   assumptions={"scenario": "BEAR"}, **holding_kwargs),
                 ForecastDriver.build_holding_chain(base_nav, base_g, shares, net_profit_conversion=conversion,
-                                                   beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BASE"}),
+                                                   assumptions={"scenario": "BASE"}, **holding_kwargs),
                 ForecastDriver.build_holding_chain(base_nav, bull_g, shares, net_profit_conversion=conversion,
-                                                   beginning_equity=self._number(financial_context, "beginning_equity"), ending_equity=self._number(financial_context, "forecast_ending_equity"), assumptions={"scenario": "BULL"}),
+                                                   assumptions={"scenario": "BULL"}, **holding_kwargs),
             )
 
         # Scenario identity and horizon are recorded on every chain so a frozen

@@ -114,14 +114,32 @@ class ForecastDriver:
         forecast_net_profit: Optional[float] = None,
         beginning_equity: Optional[float] = None,
         ending_equity: Optional[float] = None,
+        npl_ratio: Optional[float] = None,
+        nim: Optional[float] = None,
+        loan_growth: Optional[float] = None,
+        deposit_growth: Optional[float] = None,
         assumptions: Optional[Dict[str, Any]] = None,
     ) -> SingleForecastChain:
-        """Loans/Deposits -> NII/NIM -> Net Profit -> EPS -> ROE."""
+        """Loans/Deposits -> NII/NIM -> Net Profit -> EPS -> ROE.
+
+        Banking drivers are never routed through the non-financial revenue
+        model. NPL and NIM are credit/margin *context*: they describe the
+        quality of the loan book, and no unvalidated NPL->profit relationship
+        exists here, so an NPL ratio never multiplies or scales net profit. It
+        is carried into the assumptions as evidence for a later reader, and a
+        missing NPL leaves the chain unchanged — missing stays missing.
+        """
         nii = forecast_nii
         if nii is None and base_nii is not None and nii_growth is not None:
             nii = base_nii * (1.0 + nii_growth)
         if nii is None:
-            return SingleForecastChain(method="INSUFFICIENT_DATA", assumptions=assumptions or {})
+            return SingleForecastChain(
+                method="INSUFFICIENT_DATA",
+                assumptions=ForecastDriver._with_bank_context(
+                    assumptions, npl_ratio, nim, loan_growth, deposit_growth,
+                    reason="missing_nii_driver",
+                ),
+            )
 
         if forecast_net_profit is not None:
             np = forecast_net_profit
@@ -133,7 +151,11 @@ class ForecastDriver:
             return SingleForecastChain(
                 method="INSUFFICIENT_DATA",
                 quality="INSUFFICIENT_DATA",
-                assumptions=assumptions or {},
+                assumptions=ForecastDriver._with_bank_context(
+                    assumptions, npl_ratio, nim, loan_growth, deposit_growth,
+                    reason="missing_net_profit_conversion",
+                    nii=nii,
+                ),
             )
 
         eps = np / share_count if share_count is not None and share_count > 0 else None
@@ -143,6 +165,11 @@ class ForecastDriver:
             if avg_equity != 0:
                 roe = np / avg_equity
 
+        # Context only: recorded, and never converted into a profit factor.
+        bank_context = ForecastDriver._bank_context(
+            npl_ratio, nim, loan_growth, deposit_growth
+        )
+
         return SingleForecastChain(
             operating_profit=ForecastDriver._round(nii),
             net_profit=ForecastDriver._round(np),
@@ -150,8 +177,52 @@ class ForecastDriver:
             roe=ForecastDriver._round(roe),
             method=method,
             quality=ForecastDriver._quality(method),
-            assumptions=assumptions or {},
+            assumptions=ForecastDriver._with_bank_context(
+                assumptions, npl_ratio, nim, loan_growth, deposit_growth,
+                bank_context=bank_context,
+            ),
         )
+
+    @staticmethod
+    def _bank_context(
+        npl_ratio: Optional[float],
+        nim: Optional[float],
+        loan_growth: Optional[float],
+        deposit_growth: Optional[float],
+    ) -> Dict[str, Any]:
+        """Credit and margin evidence, carried verbatim and never priced.
+
+        NPL describes the loan book; it has no calibrated profit multiplier in
+        this model, so it stays a reported observation.
+        """
+        return {
+            "npl_ratio": ForecastDriver._round(npl_ratio),
+            "npl_role": "CONTEXT_ONLY",
+            "nim": ForecastDriver._round(nim),
+            "loan_growth": ForecastDriver._round(loan_growth),
+            "deposit_growth": ForecastDriver._round(deposit_growth),
+        }
+
+    @staticmethod
+    def _with_bank_context(
+        assumptions: Optional[Dict[str, Any]],
+        npl_ratio: Optional[float],
+        nim: Optional[float],
+        loan_growth: Optional[float],
+        deposit_growth: Optional[float],
+        *,
+        reason: Optional[str] = None,
+        bank_context: Optional[Dict[str, Any]] = None,
+        nii: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        merged = dict(assumptions or {})
+        if reason is not None:
+            merged["reason"] = reason
+        if nii is not None:
+            merged["resolved_nii"] = ForecastDriver._round(nii)
+        merged["bank_context"] = bank_context if bank_context is not None \
+            else ForecastDriver._bank_context(npl_ratio, nim, loan_growth, deposit_growth)
+        return merged
 
     @staticmethod
     def build_holding_chain(
@@ -183,13 +254,25 @@ class ForecastDriver:
             if avg_equity != 0:
                 roe = np / avg_equity
 
+        # The forecast NAV and its growth are the chain's own drivers, so they
+        # are recorded as evidence. Valuation is Stage 7: P/NAV is not an input
+        # to this chain and is named as excluded for the audit trail.
+        resolved_nav = None
+        if base_nav is not None and nav_growth_rate is not None:
+            resolved_nav = base_nav * (1.0 + nav_growth_rate)
+
+        merged = dict(assumptions or {})
+        merged["forecast_nav"] = ForecastDriver._round(resolved_nav)
+        merged["nav_growth_rate"] = ForecastDriver._round(nav_growth_rate)
+        merged["excluded_inputs"] = ["p_nav", "price_to_nav"]
+
         return SingleForecastChain(
             net_profit=ForecastDriver._round(np),
             eps=ForecastDriver._round(eps),
             roe=ForecastDriver._round(roe),
             method=method,
             quality=ForecastDriver._quality(method),
-            assumptions=assumptions or {},
+            assumptions=merged,
         )
 
     # Compatibility wrappers retained for existing callers; they no longer

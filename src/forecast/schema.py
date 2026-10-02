@@ -118,6 +118,41 @@ class ForecastInput:
 
 
 @dataclass(frozen=True)
+class OperationalFx:
+    """A resolved operational / company FX rate (spec §30).
+
+    FREE_MARKET FX and OPERATIONAL FX are separate concepts that must never be
+    silently substituted for one another. This type is the only way an
+    operational rate reaches the forecast, and it always says where it came
+    from and whether it had to be estimated.
+
+    ``rate`` is ``None`` when no operational rate and no approved proxy could be
+    found. A genuinely missing rate is not zero and is not a FREE_MARKET rate,
+    so the FX-linked part of the chain stays missing rather than being priced
+    at the wrong currency.
+    """
+
+    rate: Optional[float]
+    source: str
+    estimated: bool = False
+    proxy_basis: Optional[str] = None
+    reference_date: Optional[str] = None
+    confidence: Optional[str] = None
+
+    def is_proxy(self) -> bool:
+        return self.estimated and self.proxy_basis is not None
+
+    def provenance(self) -> Dict[str, Any]:
+        return {
+            "source": self.source,
+            "estimated": self.estimated,
+            "proxy_basis": self.proxy_basis,
+            "reference_date": self.reference_date,
+            "confidence": self.confidence,
+        }
+
+
+@dataclass(frozen=True)
 class ForecastInputRef:
     """Pointer from a forecast back to the fact that fed it (spec §29).
 
