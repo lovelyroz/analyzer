@@ -1532,3 +1532,328 @@ def test_production_path_is_deterministic():
     assert [r.eps for r in first_records] == [r.eps for r in second_records]
     assert [r.revenue for r in first_records] == [r.revenue for r in second_records]
     assert first_records[1].eps == second_records[1].eps
+
+
+# ==========================================================================
+# 15. Non-financial forecast core (Prompt 6): one common chain for
+#     PETROCHEMICAL / CHEMICAL / METALS / MINING / CEMENT / FOOD /
+#     PHARMACEUTICAL.  Revenue -> Operating Margin -> Operating Profit ->
+#     Net Profit -> EPS -> ROE.
+# ==========================================================================
+
+from src.forecast.schema import NON_FINANCIAL_INDUSTRIES  # noqa: E402
+
+
+def _core_context(**overrides):
+    """One non-financial context: seasonal baseline, margins, shares, equity."""
+    context = {
+        "seasonality_valid": True,
+        "seasonal_baseline_revenue": 10000.0,
+        "recent_run_rate_revenue": 9000.0,
+        "baseline_revenue_growth": 0.10,
+        "historical_operating_margin": 0.20,
+        "historical_net_margin": 0.10,
+        "share_count": 1000.0,
+        "beginning_equity": 9000.0,
+        "forecast_ending_equity": 11000.0,
+    }
+    context.update(overrides)
+    return context
+
+
+def _core_forecast(context, industry="PETROCHEMICAL"):
+    return ForecastEngine().generate_forecast(
+        1, 101, industry, context,
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+
+# --- 1. Revenue baseline hierarchy -----------------------------------------
+
+def test_seasonal_baseline_outranks_the_run_rate():
+    # Tier 1: a seasonal/historical baseline Stage 4 validated as sufficient.
+    result = _core_forecast(_core_context())
+    assert result.baseline_method == "SEASONAL_BASELINE"
+    # The seasonal figure is used, not the 9000 run rate.
+    assert result.scenario_forecasts.base.revenue == 11000.0
+
+
+def test_recent_run_rate_is_the_fallback_baseline():
+    # Tier 2: seasonality is not valid, so the run rate carries the forecast.
+    result = _core_forecast(_core_context(
+        seasonality_valid=False, seasonal_baseline_revenue=None))
+    assert result.baseline_method == "RUN_RATE"
+    assert result.scenario_forecasts.base.revenue == 9900.0
+
+
+def test_driver_based_baseline_is_the_third_tier():
+    # Tier 3: neither history nor run rate exists, so an explicit driver
+    # decomposition declared by the caller supplies the level.
+    result = _core_forecast(_core_context(
+        seasonality_valid=False, seasonal_baseline_revenue=None,
+        recent_run_rate_revenue=None, driver_volume=2000.0, driver_price=5.0))
+    assert result.baseline_method == "DRIVER_BASED"
+    assert result.scenario_forecasts.base.revenue == 11000.0
+
+
+def test_explicit_driver_based_level_beats_the_volume_price_split():
+    result = _core_forecast(_core_context(
+        seasonality_valid=False, seasonal_baseline_revenue=None,
+        recent_run_rate_revenue=None,
+        driver_based_revenue=8000.0, driver_volume=2000.0, driver_price=5.0))
+    assert result.baseline_method == "DRIVER_BASED"
+    assert result.scenario_forecasts.base.revenue == 8800.0
+
+
+def test_non_positive_driver_level_is_refused_not_treated_as_zero():
+    result = _core_forecast(_core_context(
+        seasonality_valid=False, seasonal_baseline_revenue=None,
+        recent_run_rate_revenue=None, driver_based_revenue=0.0))
+    assert result.baseline_method == "INSUFFICIENT_DATA"
+    assert result.scenario_forecasts.base.revenue is None
+
+
+def test_insufficient_baseline_reports_missing_rather_than_zero():
+    result = _core_forecast(_core_context(
+        seasonality_valid=False, seasonal_baseline_revenue=None,
+        recent_run_rate_revenue=None))
+    assert result.baseline_method == "INSUFFICIENT_DATA"
+    assert result.data_quality == "INSUFFICIENT_DATA"
+    for scenario in ("bear", "base", "bull"):
+        chain = getattr(result.scenario_forecasts, scenario)
+        assert chain.method == "INSUFFICIENT_DATA"
+        assert chain.revenue is None
+        assert chain.operating_profit is None
+    # The missing baseline is carried through to the record, never as 0.
+    record = result.to_record("base", forecast_id=1)
+    assert record.is_missing("revenue")
+    assert record.is_missing("operating_profit")
+
+
+# --- 2. Revenue growth ------------------------------------------------------
+
+def test_revenue_growth_applies_to_the_baseline():
+    result = _core_forecast(_core_context(baseline_revenue_growth=0.25))
+    chains = result.scenario_forecasts
+    assert chains.base.revenue == 12500.0
+    # Bear/base/bull are the growth spread around the declared rate.
+    assert chains.bear.revenue == pytest.approx(10000.0 * (0.25 - 0.05) + 10000.0)
+    assert chains.bull.revenue == pytest.approx(10000.0 * (0.25 + 0.05) + 10000.0)
+
+
+def test_missing_revenue_growth_defaults_to_flat_not_invented():
+    context = _core_context()
+    del context["baseline_revenue_growth"]
+    result = _core_forecast(context)
+    assert result.scenario_forecasts.base.revenue == 10000.0
+
+
+# --- 3. Operating margin is independent of revenue --------------------------
+
+def test_operating_margin_method_is_recorded_separately():
+    result = _core_forecast(_core_context())
+    base = result.scenario_forecasts.base
+    assert base.operating_margin == 0.20
+    assert base.assumptions["operating_margin_method"] == "HISTORICAL_OPERATING_MARGIN"
+    assert base.assumptions["baseline_method"] == "SEASONAL_BASELINE"
+
+
+def test_revenue_can_rise_while_margin_falls():
+    context = _core_context(baseline_revenue_growth=0.20)
+    context["model_parameters"] = {"operating_margin_adjustment": -0.05}
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert base.revenue == 12000.0
+    assert base.operating_margin == 0.15
+    # Operating profit falls even though revenue rose 20%.
+    assert base.operating_profit == 1800.0
+    flat = _core_forecast(_core_context())  # growth 0.10, margin 0.20
+    assert flat.scenario_forecasts.base.operating_profit == 2200.0
+    assert base.operating_profit < flat.scenario_forecasts.base.operating_profit
+
+
+def test_revenue_can_fall_while_margin_rises():
+    context = _core_context(baseline_revenue_growth=-0.10)
+    context["model_parameters"] = {"operating_margin_adjustment": 0.05}
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert base.revenue == 9000.0
+    assert base.operating_margin == 0.25
+    assert base.operating_profit == 2250.0
+    flat = _core_forecast(_core_context())
+    assert base.operating_profit > flat.scenario_forecasts.base.operating_profit
+
+
+def test_revenue_can_rise_while_operating_profit_decreases():
+    context = _core_context(baseline_revenue_growth=0.05)
+    context["model_parameters"] = {"operating_margin_adjustment": -0.10}
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert base.revenue == 10500.0
+    assert base.operating_margin == 0.10
+    assert base.operating_profit == 1050.0
+    flat = _core_forecast(_core_context())
+    assert base.operating_profit < flat.scenario_forecasts.base.operating_profit
+
+
+def test_changing_revenue_growth_does_not_move_the_margin():
+    # The margin hierarchy is resolved on its own evidence: widening the growth
+    # spread leaves the BASE margin untouched.
+    narrow = _core_forecast(_core_context(baseline_revenue_growth=0.02))
+    wide = _core_forecast(_core_context(baseline_revenue_growth=0.40))
+    assert narrow.scenario_forecasts.base.operating_margin == \
+        wide.scenario_forecasts.base.operating_margin == 0.20
+
+
+def test_forecast_margin_outranks_the_historical_margin():
+    result = _core_forecast(_core_context(
+        forecast_operating_margin=0.30, recent_operating_margin=0.25))
+    assert result.scenario_forecasts.base.operating_margin == 0.30
+    assert result.scenario_forecasts.base.assumptions["operating_margin_method"] == \
+        "FORECAST_OPERATING_MARGIN"
+
+
+def test_missing_operating_margin_halts_the_chain():
+    context = _core_context()
+    del context["historical_operating_margin"]
+    result = _core_forecast(context)
+    # The margin is unknown, so no operating profit is derived from revenue.
+    assert result.scenario_forecasts.base.method == "INSUFFICIENT_DATA"
+    assert result.scenario_forecasts.base.assumptions["reason"] == "missing_operating_margin"
+
+
+# --- 4. Operating profit ----------------------------------------------------
+
+def test_operating_profit_is_revenue_times_margin():
+    result = _core_forecast(_core_context())
+    base = result.scenario_forecasts.base
+    assert base.revenue == 11000.0
+    assert base.operating_margin == 0.20
+    assert base.operating_profit == pytest.approx(base.revenue * base.operating_margin)
+    assert base.operating_profit == 2200.0
+
+
+def test_full_chain_is_resolved_in_order():
+    # Revenue -> Operating Margin -> Operating Profit -> Net Profit -> EPS -> ROE.
+    result = _core_forecast(_core_context())
+    base = result.scenario_forecasts.base
+    assert base.revenue == 11000.0
+    assert base.operating_margin == 0.20
+    assert base.operating_profit == 2200.0
+    assert base.net_profit == 1100.0
+    assert base.eps == 1.1
+    assert base.roe == pytest.approx(1100.0 / 10000.0)
+    assert base.method == "MARGIN"
+
+
+# --- 5. Net profit hierarchy ------------------------------------------------
+
+def test_component_based_net_profit_wins_through_the_engine():
+    result = _core_forecast(_core_context(
+        forecast_non_operating_items=100.0,
+        forecast_financial_costs=50.0,
+        forecast_tax=40.0))
+    base = result.scenario_forecasts.base
+    assert base.method == "COMPONENT_BASED"
+    # 2200 operating profit + 100 other income - 50 financial costs - 40 tax.
+    assert base.net_profit == 2210.0
+    assert base.eps == 2.21
+    assert base.assumptions["net_profit_method_hierarchy"] == [
+        "COMPONENT_BASED", "HISTORICAL_CONVERSION", "NET_MARGIN", "INSUFFICIENT_DATA"]
+
+
+def test_partial_components_do_not_get_fabricated():
+    # Only the tax is supplied: the component path needs all three, so the
+    # historical conversion is used and no financial cost is invented.
+    context = _core_context(forecast_tax=40.0, historical_net_operating_conversion=0.9)
+    del context["historical_net_margin"]
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert base.method == "HISTORICAL_CONVERSION"
+    assert base.net_profit == pytest.approx(2200.0 * 0.9)
+
+
+def test_historical_conversion_falls_back_from_components():
+    context = _core_context(historical_net_operating_conversion=0.9)
+    del context["historical_net_margin"]
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert base.method == "HISTORICAL_CONVERSION"
+    assert base.net_profit == pytest.approx(2200.0 * 0.9)
+    assert base.eps == pytest.approx(2200.0 * 0.9 / 1000.0)
+
+
+def test_net_margin_is_the_third_tier():
+    result = _core_forecast(_core_context())
+    base = result.scenario_forecasts.base
+    assert base.method == "MARGIN"
+    assert base.net_profit == pytest.approx(11000.0 * 0.10)
+
+
+def test_missing_net_profit_evidence_leaves_net_profit_unknown():
+    context = _core_context()
+    del context["historical_net_margin"]
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    # Revenue, margin and operating profit are known; net profit is not.
+    assert base.revenue == 11000.0
+    assert base.operating_profit == 2200.0
+    assert base.net_profit is None
+    assert base.eps is None
+    assert base.method == "INSUFFICIENT_DATA"
+    record = result.to_record("base", forecast_id=1)
+    assert record.is_missing("net_profit")
+    assert record.is_missing("eps")
+    assert not record.is_missing("operating_profit")
+
+
+def test_missing_share_count_leaves_eps_none_not_zero():
+    context = _core_context()
+    del context["share_count"]
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert base.net_profit == 1100.0
+    assert base.eps is None
+    assert result.to_record("base", forecast_id=1).is_missing("eps")
+
+
+# --- 6. One common core for every non-financial industry --------------------
+
+@pytest.mark.parametrize("industry", sorted(NON_FINANCIAL_INDUSTRIES))
+def test_all_non_financial_industries_share_one_core(industry):
+    result = _core_forecast(_core_context(), industry=industry)
+    base = result.scenario_forecasts.base
+    assert result.baseline_method == "SEASONAL_BASELINE"
+    # Identical inputs yield the identical chain in all seven industries: there
+    # is no per-industry engine.
+    assert base.revenue == 11000.0
+    assert base.operating_margin == 0.20
+    assert base.operating_profit == 2200.0
+    assert base.net_profit == 1100.0
+    assert base.eps == 1.1
+    assert base.roe == pytest.approx(0.11)
+    assert base.method == "MARGIN"
+
+
+@pytest.mark.parametrize("industry", sorted(NON_FINANCIAL_INDUSTRIES))
+def test_every_industry_reports_insufficient_data_identically(industry):
+    result = _core_forecast(
+        {"share_count": 1000.0, "historical_operating_margin": 0.20}, industry)
+    assert result.baseline_method == "INSUFFICIENT_DATA"
+    assert result.scenario_forecasts.base.method == "INSUFFICIENT_DATA"
+
+
+# --- 7. Determinism ---------------------------------------------------------
+
+def test_repeated_execution_is_deterministic():
+    context = _core_context(
+        forecast_non_operating_items=100.0,
+        forecast_financial_costs=50.0,
+        forecast_tax=40.0)
+    first = _core_forecast(context).records(forecast_id_start=1)
+    second = _core_forecast(context).records(forecast_id_start=1)
+    assert len(first) == len(second) == 3
+    for left, right in zip(first, second):
+        assert left == right
+    assert [r.eps for r in first] == [r.eps for r in second]
+    assert [r.roe for r in first] == [r.roe for r in second]

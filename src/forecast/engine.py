@@ -15,6 +15,16 @@ from src.forecast.schema import (
     normalize_datetime,
 )
 
+# The single net-profit hierarchy every non-financial industry uses. Declared
+# once so a stored record can state which path it took and in what order the
+# others would have applied.
+NET_PROFIT_HIERARCHY = (
+    "COMPONENT_BASED",
+    "HISTORICAL_CONVERSION",
+    "NET_MARGIN",
+    "INSUFFICIENT_DATA",
+)
+
 
 DEFAULT_MODEL_PARAMETERS = {
     "trend_adjustments": {},
@@ -22,6 +32,10 @@ DEFAULT_MODEL_PARAMETERS = {
     "scenario_operating_margin_spread": 0.02,
     "scenario_net_margin_spread": 0.01,
     "scenario_financial_growth_spread": 0.05,
+    # Operating margin moves on its own evidence, not on revenue growth. The
+    # base level is read from the margin hierarchy; this is the scenario spread
+    # around it.
+    "operating_margin_adjustment": 0.0,
 }
 
 
@@ -55,11 +69,54 @@ class ForecastEngine:
         return float(value) if isinstance(value, (int, float)) else 0.0
 
     @staticmethod
+    def _driver_based_revenue(context: Dict[str, Any]) -> Optional[float]:
+        """Tier-3 baseline: an explicit driver decomposition declared by the caller.
+
+        Stage 5 never invents the decomposition. Either the caller hands over the
+        revenue level its drivers imply (``driver_based_revenue``), or the two
+        driver facts themselves (``driver_volume`` x ``driver_price``), which is
+        the volume/price split these industries actually forecast against. A
+        non-positive level is not a baseline, and is refused rather than being
+        carried forward as a silent zero (spec section 27).
+        """
+        explicit = ForecastEngine._number(context, "driver_based_revenue")
+        if explicit is not None:
+            return explicit if explicit > 0 else None
+        volume = ForecastEngine._number(context, "driver_volume")
+        price = ForecastEngine._number(context, "driver_price")
+        if volume is not None and price is not None and volume > 0 and price > 0:
+            return volume * price
+        return None
+
+    @staticmethod
     def _baseline_revenue(context: Dict[str, Any]) -> tuple[Optional[float], str]:
+        # Tier 1: a seasonal/historical baseline Stage 4 validated as sufficient.
         if context.get("seasonality_valid") and ForecastEngine._number(context, "seasonal_baseline_revenue") is not None:
             return ForecastEngine._number(context, "seasonal_baseline_revenue"), "SEASONAL_BASELINE"
+        # Tier 2: the recent run rate.
         if ForecastEngine._number(context, "recent_run_rate_revenue") is not None:
             return ForecastEngine._number(context, "recent_run_rate_revenue"), "RUN_RATE"
+        # Tier 3: an explicit driver-based level, when neither history nor run
+        # rate is available.
+        driver_based = ForecastEngine._driver_based_revenue(context)
+        if driver_based is not None:
+            return driver_based, "DRIVER_BASED"
+        return None, "INSUFFICIENT_DATA"
+
+    # Operating margin is forecast on its own evidence, never derived from
+    # revenue growth (spec section 22): the two may move in opposite directions.
+    _OPERATING_MARGIN_KEYS = (
+        ("forecast_operating_margin", "FORECAST_OPERATING_MARGIN"),
+        ("recent_operating_margin", "RECENT_OPERATING_MARGIN"),
+        ("historical_operating_margin", "HISTORICAL_OPERATING_MARGIN"),
+    )
+
+    @classmethod
+    def _baseline_operating_margin(cls, context: Dict[str, Any]) -> tuple[Optional[float], str]:
+        for key, method in cls._OPERATING_MARGIN_KEYS:
+            value = ForecastEngine._number(context, key)
+            if value is not None:
+                return value, method
         return None, "INSUFFICIENT_DATA"
 
     @staticmethod
@@ -142,25 +199,40 @@ class ForecastEngine:
         net_margin_adjustment: float,
         scenario_name: str,
         trend_adjustment: float,
+        margin_adjustment_base: float = 0.0,
     ) -> SingleForecastChain:
-        base_op_margin = self._baseline_value(
-            context, "forecast_operating_margin", "historical_operating_margin", "recent_operating_margin"
-        )
+        """One non-financial scenario of the common chain.
+
+        Revenue and operating margin are resolved from two independent evidence
+        hierarchies (spec section 22): the margin is never read off revenue
+        growth, so revenue may rise while margin falls — and operating profit
+        may fall while revenue rises.
+
+        ``margin_adjustment_base`` shifts the whole margin hierarchy. It is the
+        caller's declared view of margin direction, distinct from the scenario
+        ``margin_adjustment`` spread, so a margin move is expressible without
+        having to pretend it is a revenue effect.
+        """
+        base_op_margin, margin_method = self._baseline_operating_margin(context)
         if base_op_margin is None:
-            return SingleForecastChain(method="INSUFFICIENT_DATA", assumptions={"reason": "missing_operating_margin"})
+            return SingleForecastChain(method="INSUFFICIENT_DATA",
+                                       assumptions={"reason": "missing_operating_margin"})
 
         # Margins are stored as decimal ratios in the Stage 5 input contract.
-        op_margin = base_op_margin + margin_adjustment
+        op_margin = base_op_margin + margin_adjustment + margin_adjustment_base
         net_margin = self._baseline_value(
             context, "forecast_net_margin", "historical_net_margin", "recent_net_margin"
         )
         conversion = self._number(context, "historical_net_operating_conversion")
+        components = self._net_profit_components(context)
 
         scenario_assumptions = {
             "scenario": scenario_name,
             "baseline_method": baseline_method,
+            "operating_margin_method": margin_method,
             "trend_adjustment": trend_adjustment,
             "low_base_control": bool(context.get("low_base") or context.get("LOW_BASE")),
+            "net_profit_method_hierarchy": list(NET_PROFIT_HIERARCHY),
         }
 
         # Explicit, traceable driver adjustments may be supplied by the caller.
@@ -175,18 +247,35 @@ class ForecastEngine:
             revenue=revenue,
             operating_margin=op_margin,
             share_count=self._share_count(context),
-            non_operating_items=self._number(context, "forecast_non_operating_items"),
-            financial_costs=self._number(context, "forecast_financial_costs"),
-            tax=self._number(context, "forecast_tax"),
+            non_operating_items=components["non_operating_items"],
+            financial_costs=components["financial_costs"],
+            tax=components["tax"],
             net_operating_conversion=conversion,
             net_margin=None if conversion is not None else (
-                None if net_margin is None else net_margin
+                None if net_margin is None else net_margin + net_margin_adjustment
             ),
             beginning_equity=self._number(context, "beginning_equity"),
             ending_equity=self._number(context, "forecast_ending_equity"),
             method_hint=baseline_method,
             assumptions=scenario_assumptions,
         )
+
+    @staticmethod
+    def _net_profit_components(context: Dict[str, Any]) -> Dict[str, Optional[float]]:
+        """Component-based net profit inputs, as declared and never invented.
+
+        The component path is only taken when every component is present, so a
+        partially-supplied set degrades to the historical conversion instead of
+        silently filling the gap with a fabricated tax or financial cost.
+        """
+        return {
+            name: ForecastEngine._number(context, key)
+            for name, key in (
+                ("non_operating_items", "forecast_non_operating_items"),
+                ("financial_costs", "forecast_financial_costs"),
+                ("tax", "forecast_tax"),
+            )
+        }
 
     def generate_forecast(
         self,
@@ -226,6 +315,7 @@ class ForecastEngine:
         financial_spread = float(params.get("scenario_financial_growth_spread", scenario_spread))
         margin_spread = float(params.get("scenario_operating_margin_spread", 0.02))
         net_margin_spread = float(params.get("scenario_net_margin_spread", 0.01))
+        margin_adjustment = float(params.get("operating_margin_adjustment", 0.0))
 
         benchmark = None
         assumptions: Dict[str, Any] = {
@@ -278,7 +368,8 @@ class ForecastEngine:
                 bear = self._non_financial_scenario(financial_context, baseline_revenue, baseline_method, bear_growth,
                                                     -margin_spread, -net_margin_spread, "BEAR", trend_adj)
                 base = self._non_financial_scenario(financial_context, baseline_revenue, baseline_method, base_growth,
-                                                    0.0, 0.0, "BASE", trend_adj)
+                                                    0.0, 0.0, "BASE", trend_adj,
+                                                    margin_adjustment_base=margin_adjustment)
                 bull = self._non_financial_scenario(financial_context, baseline_revenue, baseline_method, bull_growth,
                                                     margin_spread, net_margin_spread, "BULL", trend_adj)
                 scenarios = ScenarioForecastResult(
