@@ -1857,3 +1857,337 @@ def test_repeated_execution_is_deterministic():
         assert left == right
     assert [r.eps for r in first] == [r.eps for r in second]
     assert [r.roe for r in first] == [r.roe for r in second]
+
+
+# ==========================================================================
+# 16. EPS / ROE / share-count integration (Prompt 7):
+#     Net Profit -> Weighted Average Shares -> EPS, and
+#     Net Profit + Beginning Equity + Forecast Ending Equity -> ROE.
+#     EPS and ROE are only ever derived from the forecast chain; the share base
+#     comes from build_weighted_average_shares and is never reimplemented here.
+# ==========================================================================
+
+_BASE_NET_PROFIT = 1100.0  # 11000 revenue x 0.10 net margin, BASE scenario
+
+# The drivers round every chain metric to 6 decimals, so an expected EPS is
+# compared after the same rounding.
+_EPS_SCALE = 6
+
+
+def _expected_eps(net_profit: float, shares: float) -> float:
+    return round(net_profit / shares, _EPS_SCALE)
+
+
+def _shares_context(history, actions=None, **overrides):
+    """Engine context whose share base is the builder's own output.
+
+    ``share_count`` is removed so the weighted average is the only denominator;
+    the engine's ``_share_count`` prefers it anyway, but keeping the plain
+    number out makes the chain unambiguous.
+    """
+    cutoff = overrides.pop("cutoff", date(2026, 1, 1))
+    context = _core_context()
+    context.pop("share_count")
+    context["forecast_weighted_average_shares"] = build_weighted_average_shares(
+        history, actions, cutoff=cutoff)
+    context.update(overrides)
+    return context
+
+
+def _shares_forecast(history, actions=None, **overrides):
+    return _core_forecast(_shares_context(history, actions, **overrides))
+
+
+# --- 1. unchanged shares ----------------------------------------------------
+
+def test_eps_with_unchanged_shares_is_net_profit_over_the_base():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    base = _shares_forecast(history).scenario_forecasts.base
+    # No corporate action, so the whole window sits at 1,000,000 shares.
+    assert base.net_profit == _BASE_NET_PROFIT
+    assert base.eps == pytest.approx(_expected_eps(_BASE_NET_PROFIT, 1_000_000))
+
+
+def test_unchanged_shares_across_a_multi_observation_history():
+    history = [
+        _ShareRecord(date(2025, 1, 1), 1_000_000),
+        _ShareRecord(date(2025, 7, 1), 1_000_000),
+    ]
+    base = _shares_forecast(history).scenario_forecasts.base
+    assert base.eps == pytest.approx(_BASE_NET_PROFIT / 1_000_000)
+
+
+# --- 2. capital increase ------------------------------------------------------
+
+def test_eps_with_capital_increase_uses_the_weighted_average():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2025, 7, 1),
+                         old_share_count=1_000_000, new_share_count=1_500_000),
+    ]
+    base = _shares_forecast(history, actions).scenario_forecasts.base
+    shares = build_weighted_average_shares(
+        history, actions, cutoff=date(2026, 1, 1)).shares
+    # EPS falls strictly between the diluted and undiluted extremes, which is
+    # only true when the weighting actually ran.
+    assert _BASE_NET_PROFIT / 1_500_000 < base.eps < _BASE_NET_PROFIT / 1_000_000
+    assert base.eps == pytest.approx(_expected_eps(_BASE_NET_PROFIT, shares))
+
+
+# --- 3. capital decrease ------------------------------------------------------
+
+def test_eps_with_capital_increase_from_a_lower_base_is_still_weighted():
+    # The decrease takes effect after the increase, so the window spans three
+    # share levels and EPS reflects all of them.
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2025, 4, 1),
+                         old_share_count=1_000_000, new_share_count=1_600_000),
+        _CorporateAction("CAPITAL_DECREASE", date(2025, 10, 1),
+                         new_share_count=1_200_000),
+    ]
+    base = _shares_forecast(history, actions).scenario_forecasts.base
+    assert _BASE_NET_PROFIT / 1_600_000 < base.eps < _BASE_NET_PROFIT / 1_000_000
+    assert base.eps < _BASE_NET_PROFIT / 1_200_000
+
+
+# --- 4. split / consolidation -------------------------------------------------
+
+@pytest.mark.parametrize("action_type", ["STOCK_SPLIT", "SPLIT"])
+def test_eps_with_a_stock_split_doubles_the_share_base(action_type):
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [_CorporateAction(action_type, date(2025, 7, 1), ratio=2.0)]
+    base = _shares_forecast(history, actions).scenario_forecasts.base
+    # 181 days at 1M then 184 at 2M, so the average sits just above 1.5M.
+    assert base.eps == pytest.approx(_expected_eps(_BASE_NET_PROFIT, 1_504_109.589), abs=1e-9)
+
+
+@pytest.mark.parametrize("action_type", ["REVERSE_SPLIT", "SHARE_CONSOLIDATION"])
+def test_eps_with_a_reverse_split_halves_the_share_base(action_type):
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [_CorporateAction(action_type, date(2025, 7, 1), ratio=0.5)]
+    base = _shares_forecast(history, actions).scenario_forecasts.base
+    # 181 days at 1M then 184 at 500k, so the average sits just below 750k.
+    assert base.eps == pytest.approx(_expected_eps(_BASE_NET_PROFIT, 747_945.205), abs=1e-9)
+
+
+def test_eps_with_a_consolidation_declared_as_counts():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("SHARE_CONSOLIDATION", date(2025, 7, 1),
+                         old_share_count=1_000_000, new_share_count=500_000),
+    ]
+    base = _shares_forecast(history, actions).scenario_forecasts.base
+    assert base.eps == pytest.approx(_expected_eps(_BASE_NET_PROFIT, 747_945.205), abs=1e-9)
+
+
+# --- 5. corporate actions stay point-in-time -----------------------------------
+
+def test_an_action_after_the_cutoff_leaves_eps_at_the_observed_base():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2026, 6, 1),
+                         new_share_count=2_000_000),
+    ]
+    base = _shares_forecast(history, actions).scenario_forecasts.base
+    assert base.eps == pytest.approx(_expected_eps(_BASE_NET_PROFIT, 1_000_000))
+
+
+def test_an_action_announced_after_the_cutoff_leaves_eps_undiluted():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2025, 7, 1),
+                         announcement_date=date(2026, 3, 1),
+                         new_share_count=1_500_000),
+    ]
+    base = _shares_forecast(history, actions).scenario_forecasts.base
+    # Effective before the cutoff but only knowable after it: unusable at the
+    # cutoff, so the observed count stands.
+    assert base.eps == pytest.approx(_BASE_NET_PROFIT / 1_000_000)
+
+
+def test_a_late_announced_action_is_reported_not_silently_dropped():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    actions = [
+        _CorporateAction("STOCK_SPLIT", date(2025, 7, 1),
+                         announcement_date=date(2026, 3, 1), ratio=2.0),
+    ]
+    shares = build_weighted_average_shares(
+        history, actions, cutoff=date(2026, 1, 1))
+    assert shares.shares == pytest.approx(1_000_000)
+    assert any("after the cutoff" in note for note in shares.notes)
+
+
+# --- 6. missing shares ---------------------------------------------------------
+
+def test_missing_share_history_leaves_eps_none_not_zero():
+    context = _core_context()
+    context.pop("share_count")
+    context["forecast_weighted_average_shares"] = build_weighted_average_shares(
+        [], cutoff=date(2026, 1, 1))
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.net_profit == _BASE_NET_PROFIT
+    assert base.eps is None
+    # Net profit is real; only the denominator is missing.
+    record = _core_forecast(context).to_record("base", forecast_id=1)
+    assert record.is_missing("eps")
+    assert not record.is_missing("net_profit")
+
+
+def test_no_observation_at_the_cutoff_leaves_eps_none():
+    history = [_ShareRecord(date(2026, 6, 1), 1_000_000)]
+    base = _shares_forecast(history).scenario_forecasts.base
+    assert base.net_profit == _BASE_NET_PROFIT
+    assert base.eps is None
+
+
+def test_eps_is_never_zero_as_a_substitute_for_a_missing_share_base():
+    history = [_ShareRecord(date(2025, 1, 1), 0)]
+    base = _shares_forecast(history).scenario_forecasts.base
+    # A zero share count is not a denominator: EPS stays unknown.
+    assert base.eps is None
+
+
+# --- 7. EPS is derived, never independently forecast ---------------------------
+
+def test_eps_tracks_net_profit_across_scenarios():
+    history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
+    chains = _shares_forecast(history).scenario_forecasts
+    # EPS is a pure function of the forecast chain: it orders with net profit
+    # and divides it by the same share base in every scenario.
+    assert chains.bear.net_profit < chains.base.net_profit < chains.bull.net_profit
+    assert chains.bear.eps < chains.base.eps < chains.bull.eps
+    for chain in (chains.bear, chains.base, chains.bull):
+        assert chain.eps == pytest.approx(_expected_eps(chain.net_profit, 1_000_000))
+
+
+def test_eps_moves_with_the_share_base_and_not_with_net_profit():
+    # Same forecast chain, a doubled share base: EPS halves exactly.
+    history = [_ShareRecord(date(2025, 1, 1), 2_000_000)]
+    base = _shares_forecast(history).scenario_forecasts.base
+    undiluted = _shares_forecast([_ShareRecord(date(2025, 1, 1), 1_000_000)]
+                                 ).scenario_forecasts.base
+    assert base.net_profit == undiluted.net_profit == _BASE_NET_PROFIT
+    assert base.eps == pytest.approx(round(undiluted.eps / 2.0, _EPS_SCALE))
+
+
+# --- 8. beginning / ending equity and ROE --------------------------------------
+
+def test_roe_is_net_profit_over_average_equity():
+    context = _core_context(beginning_equity=9000.0, forecast_ending_equity=11000.0)
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.net_profit == _BASE_NET_PROFIT
+    assert base.roe == pytest.approx(_BASE_NET_PROFIT / ((9000.0 + 11000.0) / 2.0))
+
+
+def test_roe_uses_both_ends_not_the_closing_balance_alone():
+    # Average equity (10000) differs from closing equity (15000), so the choice
+    # of denominator is visible in the result.
+    context = _core_context(beginning_equity=5000.0, forecast_ending_equity=15000.0)
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.roe == pytest.approx(_BASE_NET_PROFIT / 10000.0)
+    assert base.roe != pytest.approx(_BASE_NET_PROFIT / 15000.0)
+
+
+def test_average_equity_of_zero_is_not_a_divisor():
+    # Both ends are present but they cancel: ROE is undefined, not zero.
+    context = _core_context(beginning_equity=10000.0, forecast_ending_equity=-10000.0)
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.roe is None
+
+
+# --- 9. missing ROE ------------------------------------------------------------
+
+def test_missing_both_equity_balances_leaves_roe_none():
+    context = _core_context()
+    context.pop("beginning_equity")
+    context.pop("forecast_ending_equity")
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.net_profit == _BASE_NET_PROFIT
+    assert base.eps is not None
+    assert base.roe is None
+    record = _core_forecast(context).to_record("base", forecast_id=1)
+    assert record.is_missing("roe")
+    assert not record.is_missing("eps")
+
+
+@pytest.mark.parametrize("present", ["beginning_equity", "forecast_ending_equity"])
+def test_one_missing_equity_end_leaves_roe_none(present):
+    # Average equity needs both ends. A single declared balance is not
+    # substituted for the average and is never fabricated into one.
+    context = _core_context()
+    context.pop("beginning_equity" if present == "forecast_ending_equity"
+                else "forecast_ending_equity")
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.net_profit == _BASE_NET_PROFIT
+    assert base.roe is None
+    assert _core_forecast(context).to_record("base", forecast_id=1).is_missing("roe")
+
+
+def test_no_equity_and_no_shares_leaves_eps_and_roe_none():
+    context = _core_context()
+    context.pop("share_count")
+    context.pop("beginning_equity")
+    context.pop("forecast_ending_equity")
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.net_profit == _BASE_NET_PROFIT
+    assert base.eps is None
+    assert base.roe is None
+
+
+# --- 10. ROE is derived, never independently forecast --------------------------
+
+def test_roe_tracks_net_profit_across_scenarios():
+    context = _core_context(beginning_equity=9000.0, forecast_ending_equity=11000.0)
+    chains = _core_forecast(context).scenario_forecasts
+    assert chains.bear.roe < chains.base.roe < chains.bull.roe
+    for chain in (chains.bear, chains.base, chains.bull):
+        assert chain.roe == pytest.approx(
+            chain.net_profit / ((9000.0 + 11000.0) / 2.0))
+
+
+def test_roe_is_unaffected_by_the_share_base():
+    # EPS halves when shares double; ROE does not move, because equity is a
+    # separate input to a separate derivation.
+    context = _core_context(beginning_equity=9000.0, forecast_ending_equity=11000.0)
+    diluted = dict(context, share_count=2000.0)
+    assert _core_forecast(diluted).scenario_forecasts.base.roe == pytest.approx(
+        _core_forecast(context).scenario_forecasts.base.roe)
+    assert _core_forecast(diluted).scenario_forecasts.base.eps == pytest.approx(
+        _core_forecast(context).scenario_forecasts.base.eps / 2.0)
+
+
+# --- 11. determinism -----------------------------------------------------------
+
+def test_eps_and_roe_are_deterministic_across_calls():
+    history = [
+        _ShareRecord(date(2025, 1, 1), 1_000_000),
+        _ShareRecord(date(2025, 10, 1), 1_200_000),
+    ]
+    actions = [
+        _CorporateAction("CAPITAL_INCREASE", date(2025, 4, 1),
+                         old_share_count=1_000_000, new_share_count=1_600_000),
+        _CorporateAction("STOCK_SPLIT", date(2025, 7, 1), ratio=2.0),
+    ]
+    context = _shares_context(
+        history, actions, beginning_equity=9000.0, forecast_ending_equity=11000.0)
+    first = _core_forecast(context).records(forecast_id_start=1)
+    second = _core_forecast(context).records(forecast_id_start=1)
+    assert len(first) == len(second) == 3
+    for left, right in zip(first, second):
+        assert left == right
+    assert [r.eps for r in first] == [r.eps for r in second]
+    assert [r.roe for r in first] == [r.roe for r in second]
+
+
+def test_deterministic_across_reordered_share_history():
+    history = [
+        _ShareRecord(date(2025, 1, 1), 1_000_000),
+        _ShareRecord(date(2025, 10, 1), 1_200_000),
+    ]
+    actions = [_CorporateAction("STOCK_SPLIT", date(2025, 7, 1), ratio=2.0)]
+    first = _shares_forecast(history, actions).scenario_forecasts.base
+    second = _shares_forecast(list(reversed(history)), actions
+                              ).scenario_forecasts.base
+    assert first.eps == second.eps
+    assert first.roe == second.roe

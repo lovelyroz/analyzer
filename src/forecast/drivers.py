@@ -81,16 +81,15 @@ class ForecastDriver:
         if share_count is not None and share_count > 0:
             eps = forecast_np / share_count
 
-        # ROE uses the average of opening and closing equity. Closing alone is a
-        # weaker proxy, but it is still evidence the caller declared, so it is
-        # used only when no opening balance exists — never dropped to zero.
+        # ROE is net profit over the average of opening and closing equity.
+        # Both ends are required: closing equity alone is not the specified
+        # denominator, and a missing opening balance is never fabricated and
+        # never substituted with the closing balance.
         roe = None
         if beginning_equity is not None and ending_equity is not None:
             equity_base = (beginning_equity + ending_equity) / 2.0
-        else:
-            equity_base = ending_equity
-        if equity_base is not None and equity_base != 0:
-            roe = forecast_np / equity_base
+            if equity_base != 0:
+                roe = forecast_np / equity_base
 
         return SingleForecastChain(
             revenue=ForecastDriver._round(revenue),
