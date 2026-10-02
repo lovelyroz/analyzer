@@ -55,16 +55,21 @@ class CompanyForecastResult:
                   ) -> "ForecastRecord":
         """Freeze one scenario chain into an immutable, versionable record.
 
-        ``input_refs`` defaults to the references captured while generating the
-        forecast, so the audit trail survives even when a caller passes none.
-        A missing metric is carried through as ``None`` and is never coerced
-        to zero (spec §27).
+        ``input_refs`` defaults to the references the caller declared while
+        generating the forecast, so the audit trail survives even when a caller
+        passes none. A missing metric is carried through as ``None`` and is
+        never coerced to zero (spec §27).
         """
         chain = getattr(self.scenario_forecasts, scenario.lower())
         if input_refs is None:
-            # Audit handle written by the engine so typed refs survive record
-            # freezing without adding a public field.
-            input_refs = self.assumptions.get("__input_refs", ())
+            # Audit handles written by the engine: the caller's declared refs
+            # are the audit trail, with the engine's own raw ref capture as the
+            # last resort so a record always carries something traceable.
+            input_refs = (
+                self.assumptions.get("__declared_input_refs")
+                or self.assumptions.get("__input_refs")
+                or ()
+            )
         return ForecastRecord(
             forecast_id=forecast_id,
             forecast_version=0,
@@ -87,6 +92,7 @@ class CompanyForecastResult:
             roe=chain.roe,
             assumptions=dict(chain.assumptions),
             input_refs=tuple(input_refs),
+            stage4_provenance=self.assumptions.get("__stage4_provenance"),
         )
 
     def records(self, forecast_id_start: int = 1,
@@ -167,6 +173,7 @@ class ForecastRecord:
     roe: Optional[float]
     assumptions: Dict[str, Any] = field(default_factory=dict)
     input_refs: Tuple[ForecastInputRef, ...] = ()
+    stage4_provenance: Optional[Dict[str, Any]] = None
 
     def key(self) -> Tuple[Any, ...]:
         """Natural identity of the forecast series this record belongs to."""

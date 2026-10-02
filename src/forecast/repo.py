@@ -36,9 +36,9 @@ def _json_dumps(payload: Optional[Dict[str, Any]]) -> Optional[str]:
     return json.dumps(payload, ensure_ascii=False, default=str, sort_keys=True)
 
 
-def _json_loads(payload: Optional[str]) -> Dict[str, Any]:
+def _json_loads(payload: Optional[str], default: Any = None) -> Any:
     if not payload:
-        return {}
+        return default
     return json.loads(payload)
 
 
@@ -99,6 +99,7 @@ class ForecastRecordRepository:
             eps=record.eps,
             roe=record.roe,
             assumptions=_json_dumps(record.assumptions),
+            stage4_provenance=_json_dumps(record.stage4_provenance),
         )
         self.session.add(row)
         self.session.flush()
@@ -217,8 +218,9 @@ class ForecastRecordRepository:
             net_profit=_number(row.net_profit),
             eps=_number(row.eps),
             roe=_number(row.roe),
-            assumptions=_json_loads(row.assumptions),
+            assumptions=_json_loads(row.assumptions, default={}),
             input_refs=tuple(refs),
+            stage4_provenance=_json_loads(row.stage4_provenance, default=None),
         )
 
     # ------------------------------------------------------------------
@@ -244,13 +246,22 @@ class ForecastRecordRepository:
         ).scalars().first()
 
     def _records_equal(self, row: ForecastVersion, record: ForecastRecord) -> bool:
-        """Same series state, ignoring the surrogate id and version assignment."""
+        """Same series state, ignoring the surrogate id and version assignment.
+
+        The stored metrics carry only the column's own precision, so a fresh
+        record is compared after rounding it back to what the column keeps.
+        Without that, a record whose 6-digit metric lands in a 4-digit column
+        could never be recognized as the same series state and the identical
+        re-save would append a version instead of being a no-op.
+        """
         candidate = replace(
             self._to_record(row),
             forecast_id=record.forecast_id,
             forecast_version=record.forecast_version,
         )
-        return candidate == record
+        if candidate != record:
+            return _metrics_equal_at_column_precision(candidate, record)
+        return True
 
     @staticmethod
     def _late_inputs(record: ForecastRecord, cutoff: datetime) -> List[ForecastInputRef]:
@@ -278,3 +289,42 @@ def _number(value: Any) -> Optional[float]:
     if isinstance(value, Decimal):
         return float(value)
     return float(value)
+
+
+# Metrics and the scale their columns keep. A stored value is only ever as
+# precise as this, so equality against a fresh record is measured here.
+_METRIC_SCALES = {
+    "revenue": 4,
+    "operating_profit": 4,
+    "operating_margin": 10,
+    "net_profit": 4,
+    "eps": 4,
+    "roe": 10,
+}
+
+
+def _metrics_equal_at_column_precision(
+    stored: ForecastRecord, other: ForecastRecord
+) -> bool:
+    """Compare only the stored metrics, after rounding the fresh ones.
+
+    Non-metric fields are not rounded: they are compared exactly so a genuinely
+    different series state is still detected.
+    """
+    for field in ("company_id", "forecast_period_id", "industry_code",
+                  "forecast_horizon", "scenario", "forecast_timestamp",
+                  "data_cutoff_datetime", "model_version", "forecast_method",
+                  "data_quality", "baseline_method", "assumptions",
+                  "input_refs", "stage4_provenance"):
+        if getattr(stored, field) != getattr(other, field):
+            return False
+    for field, scale in _METRIC_SCALES.items():
+        stored_value = getattr(stored, field)
+        other_value = getattr(other, field)
+        if stored_value is None or other_value is None:
+            if stored_value is not other_value:
+                return False
+            continue
+        if float(f"{stored_value:.{scale}f}") != float(f"{other_value:.{scale}f}"):
+            return False
+    return True

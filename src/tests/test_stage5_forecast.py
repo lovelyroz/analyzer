@@ -1125,3 +1125,410 @@ def test_repo_read_at_cutoff_hides_forecasts_built_on_later_data(repo):
     assert visible.forecast_version == 1
     assert [r.fact_key for r in visible.input_refs] == ["base_report"]
     assert repo.pit_violations(datetime(2026, 9, 1, tzinfo=timezone.utc)) != []
+
+
+# ==========================================================================
+# 14. Production path: Stage 1 facts + Stage 4 evidence -> engine ->
+#     ForecastRecord -> ForecastRecordRepository (spec sections 9, 15-16,
+#     24, 25, 29)
+# ==========================================================================
+
+from src.forecast.service import generate_and_persist_forecast  # noqa: E402
+from src.migrations.runner import MigrationRunner  # noqa: E402
+
+from src.models.entity import Company, Industry  # noqa: E402
+from src.models.normalized import (  # noqa: E402
+    FinancialMetric,
+    NormalizedFinancialFact,
+)
+from src.models.period import FinancialPeriod  # noqa: E402
+from src.models.report import Report, ReportVersion  # noqa: E402
+from src.models.share_action import CorporateAction, ShareCountHistory  # noqa: E402
+
+
+COMPANY_ID = 1
+PERIOD_ID = 101
+CUTOFF = datetime(2026, 1, 1, tzinfo=timezone.utc)
+CALCULATED_AT = datetime(2026, 1, 2, tzinfo=timezone.utc)
+PUBLISHED = datetime(2025, 12, 15, tzinfo=timezone.utc)
+LATE_PUBLISHED = datetime(2026, 6, 1, tzinfo=timezone.utc)
+
+# Seeded facts, in IRR millions. The production path must reach these.
+SEEDED_REVENUE = 12_000_000.0
+SEEDED_NET_PROFIT = 1_100_000.0
+SEEDED_EQUITY = 25_000_000.0
+
+# The engine's own BASE net profit for the seeded facts: revenue x net margin,
+# which is the chain the production path exercises (Stage 1 supplies the
+# revenue and the caller supplies the margins).
+FORECAST_NET_PROFIT = 1_200_000.0
+
+# The forecast horizon share base, built by the weighted-average builder. The
+# later observation is dated on the cutoff, so it is in force for only one day
+# of the window and the weighted average stays close to the earlier count.
+SEEDED_SHARES = 1_000_000
+INCREASED_SHARES = 1_500_000
+
+_STAGE4_METRIC = "REVENUE"
+
+# The builder's own answer for the seeded history: 1M shares for 181 days then
+# 1.5M for 185, over the 2025-01-01..2026-01-01 window.
+_WEIGHTED_SHARES = 1_252_054.7945205478
+
+
+def _production_stage4(**overrides):
+    """Stage 4 output as the production path receives it: already evaluated."""
+    result = _stage4(**overrides)
+    return replace(result, metric_code=_STAGE4_METRIC)
+
+
+@pytest.fixture
+def production_db():
+    """Fresh in-memory schema holding real Stage 1 rows for one company."""
+    engine = create_engine("sqlite:///:memory:")
+    MigrationRunner(engine).upgrade()
+    session = sessionmaker(bind=engine)()
+    _seed_stage1(session)
+    yield session
+    session.close()
+
+
+@pytest.fixture
+def empty_share_db(production_db):
+    """The same company, but with no share-count history at all."""
+    session = production_db
+    session.query(ShareCountHistory).delete()
+    session.query(CorporateAction).delete()
+    session.flush()
+    return session
+
+
+def _seed_stage1(session):
+    industry = Industry(industry_code="PETROCHEMICAL", industry_name="Petrochemical")
+    session.add(industry)
+    session.flush()
+
+    session.add(Company(
+        company_id=COMPANY_ID,
+        ticker="PETRO",
+        company_name="Petro",
+        industry_id=industry.industry_id,
+    ))
+    session.flush()
+
+    session.add(FinancialPeriod(
+        period_id=PERIOD_ID,
+        company_id=COMPANY_ID,
+        period_type="QUARTER",
+        start_date=date(2025, 10, 1),
+        end_date=date(2025, 12, 31),
+        fiscal_year=2025,
+        fiscal_quarter=3,
+        months_length=3,
+    ))
+    session.flush()
+
+    metrics = {
+        code: FinancialMetric(
+            metric_code=code,
+            metric_name=code.title(),
+            category="INCOME_STATEMENT",
+            flow_or_stock="FLOW",
+            value_type="CURRENCY_IRR",
+        )
+        for code in ("REVENUE", "NET_PROFIT", "TOTAL_EQUITY", "EPS")
+    }
+    session.add_all(metrics.values())
+    session.flush()
+
+    report = Report(
+        company_id=COMPANY_ID,
+        report_type="QUARTERLY",
+        title="Q3 1404",
+        financial_period_id=PERIOD_ID,
+    )
+    session.add(report)
+    session.flush()
+
+    version = ReportVersion(
+        report_id=report.report_id,
+        version_number=1,
+        publication_datetime=PUBLISHED,
+        is_current_version=True,
+    )
+    session.add(version)
+    session.flush()
+
+    # A second version of the same report, published after the cutoff. It must
+    # be invisible to a forecast dated at the cutoff.
+    restated = ReportVersion(
+        report_id=report.report_id,
+        version_number=2,
+        publication_datetime=LATE_PUBLISHED,
+        is_current_version=False,
+        is_restated=True,
+        supersedes_version_id=version.report_version_id,
+    )
+    session.add(restated)
+    session.flush()
+
+    for code, value in (
+        ("REVENUE", SEEDED_REVENUE),
+        ("NET_PROFIT", SEEDED_NET_PROFIT),
+        ("TOTAL_EQUITY", SEEDED_EQUITY),
+    ):
+        session.add(NormalizedFinancialFact(
+            company_id=COMPANY_ID,
+            period_id=PERIOD_ID,
+            metric_id=metrics[code].metric_id,
+            value_irr=value,
+            source_report_version_id=version.report_version_id,
+        ))
+    session.add(NormalizedFinancialFact(
+        company_id=COMPANY_ID,
+        period_id=PERIOD_ID,
+        metric_id=metrics["EPS"].metric_id,
+        value_irr=None,
+        source_report_version_id=version.report_version_id,
+        quality_status="MISSING",
+    ))
+    # The restatement is a look-ahead trap: published after the cutoff.
+    session.add(NormalizedFinancialFact(
+        company_id=COMPANY_ID,
+        period_id=PERIOD_ID,
+        metric_id=metrics["REVENUE"].metric_id,
+        value_irr=99_999_999.0,
+        source_report_version_id=restated.report_version_id,
+        quality_status="RESTATED",
+    ))
+
+    session.add(ShareCountHistory(
+        company_id=COMPANY_ID,
+        effective_date=date(2025, 1, 1),
+        shares_outstanding=SEEDED_SHARES,
+        capital=10_000_000,
+    ))
+    session.add(ShareCountHistory(
+        company_id=COMPANY_ID,
+        effective_date=date(2025, 7, 1),
+        shares_outstanding=INCREASED_SHARES,
+        capital=15_000_000,
+    ))
+    session.add(CorporateAction(
+        company_id=COMPANY_ID,
+        announcement_date=date(2025, 6, 1),
+        effective_date=date(2025, 7, 1),
+        action_type="CAPITAL_INCREASE",
+        old_share_count=SEEDED_SHARES,
+        new_share_count=INCREASED_SHARES,
+    ))
+    session.flush()
+
+
+def _production_kwargs(**overrides):
+    kwargs = {
+        "trend_result": _production_stage4(),
+        "data_cutoff_datetime": CUTOFF,
+        "calculation_timestamp": CALCULATED_AT,
+        "model_parameters": {"trend_adjustments": {"Stable": 0.0}},
+        "extra_facts": {
+            "historical_operating_margin": 0.20,
+            "historical_net_margin": 0.10,
+        },
+    }
+    kwargs.update(overrides)
+    return kwargs
+
+
+# --- 1. Stage 1 facts reach build_financial_context -------------------------
+
+def test_production_path_builds_forecast_from_stage1_facts(production_db):
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+
+    base = forecast.scenario_forecasts.base
+    # The seeded revenue is what drives the forecast, not a test fixture.
+    assert base.revenue is not None
+    assert base.revenue > 0.0
+    # No seasonal baseline was declared, so the run rate from Stage 1 wins.
+    assert forecast.baseline_method == "RUN_RATE"
+    assert base.revenue == pytest.approx(SEEDED_REVENUE, rel=1e-6)
+
+
+# --- 2. Stage 4 output reaches the engine without recalculation -------------
+
+def test_production_path_uses_stage4_without_recalculation(production_db):
+    trend = _production_stage4(trend_state="Improving")
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID,
+        **_production_kwargs(trend_result=trend))
+
+    # Stage 4 is carried through as evidence; the engine never recomputes it.
+    assert forecast.assumptions["trend_evidence"] == "Improving"
+    assert forecast.assumptions["low_base"] is False
+    assert forecast.assumptions["sign_change"] is None
+
+    persisted = ForecastRecordRepository(production_db).latest(
+        COMPANY_ID, PERIOD_ID, "12M", "BASE")
+    assert persisted is not None
+    # Stage 4's own coordinates survive the whole path on the record, not in
+    # the scenario assumptions.
+    assert persisted.stage4_provenance["metric_code"] == _STAGE4_METRIC
+    assert persisted.stage4_provenance["stage"] == "STAGE_4"
+    # Stage 4 evidence is frozen on the record, and the engine did not
+    # recompute it: the stored record carries the same direction the caller
+    # supplied.
+    assert persisted.assumptions["baseline_method"] == "RUN_RATE"
+
+
+# --- 3. Real ShareCountHistory reaches the weighted-share calculation -------
+
+def test_production_path_weights_real_share_history(production_db):
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    base = forecast.scenario_forecasts.base
+
+    assert base.eps is not None
+    # The weighted average over the real history sits strictly between the two
+    # recorded share counts, so the builder's weighting actually ran.
+    assert FORECAST_NET_PROFIT / INCREASED_SHARES < base.eps < FORECAST_NET_PROFIT / SEEDED_SHARES
+    assert base.eps == pytest.approx(FORECAST_NET_PROFIT / _WEIGHTED_SHARES, rel=1e-6)
+
+
+# --- 4. ForecastEngine output becomes ForecastRecord ------------------------
+
+def test_production_path_produces_forecast_records(production_db):
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    records = forecast.records()
+
+    assert [r.scenario for r in records] == ["BEAR", "BASE", "BULL"]
+    assert all(isinstance(r, ForecastRecord) for r in records)
+    assert all(r.company_id == COMPANY_ID for r in records)
+    assert all(r.data_cutoff_datetime == CUTOFF for r in records)
+
+
+# --- 5. ForecastRecord reaches the persistent repository --------------------
+
+def test_production_path_persists_all_scenarios(production_db):
+    generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+
+    repository = ForecastRecordRepository(production_db)
+    assert repository.count() == 3
+    for scenario in ("BEAR", "BASE", "BULL"):
+        latest = repository.latest(COMPANY_ID, PERIOD_ID, "12M", scenario)
+        assert latest is not None
+        assert latest.scenario == scenario
+        assert latest.forecast_version == 1
+
+
+# --- 6. The persisted forecast can be read back -----------------------------
+
+def test_production_path_reads_forecast_back(production_db):
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+
+    reloaded = ForecastRecordRepository(production_db).latest(
+        COMPANY_ID, PERIOD_ID, "12M", "BASE")
+    assert reloaded is not None
+    base = forecast.scenario_forecasts.base
+    assert reloaded.revenue == base.revenue
+    assert reloaded.net_profit == base.net_profit
+    # The store keeps 4 decimal places, so a 6-digit EPS is stored coarsely and
+    # read back within the column's own precision, not bit-for-bit.
+    assert reloaded.eps == pytest.approx(base.eps, abs=1e-4)
+    assert reloaded.forecast_method == base.method
+    # Stage 1 provenance survived the round trip.
+    assert {r.fact_key for r in reloaded.input_refs} >= {
+        "REVENUE", "NET_PROFIT", "TOTAL_EQUITY"}
+
+
+# --- 7. PIT metadata survives the complete path -----------------------------
+
+def test_production_path_preserves_pit_metadata(production_db):
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+
+    reloaded = ForecastRecordRepository(production_db).latest(
+        COMPANY_ID, PERIOD_ID, "12M", "BASE")
+    assert reloaded is not None
+    assert reloaded.data_cutoff_datetime == CUTOFF
+    assert reloaded.forecast_timestamp == forecast.calculation_timestamp
+
+    revenue_ref = next(r for r in reloaded.input_refs if r.fact_key == "REVENUE")
+    assert revenue_ref.available_at == PUBLISHED
+    assert revenue_ref.report_version_id is not None
+    assert revenue_ref.source == "normalized_financial_facts"
+
+    # Every input the forecast saw was published at or before the cutoff, so a
+    # reader at the cutoff can still trust the record.
+    assert reloaded.data_cutoff_datetime >= max(
+        ref.available_at for ref in reloaded.input_refs
+        if ref.available_at is not None)
+    # The restated version published after the cutoff never entered.
+    assert reloaded.revenue != 99_999_999.0
+
+
+# --- 8. Duplicate persistence stays idempotent ------------------------------
+
+def test_production_path_duplicate_save_is_idempotent(production_db):
+    repository = ForecastRecordRepository(production_db)
+    generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    first = repository.latest(COMPANY_ID, PERIOD_ID, "12M", "BASE")
+
+    # Re-running the path with the same inputs is a no-op, not a new version.
+    generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+
+    assert repository.count() == 3
+    again = repository.latest(COMPANY_ID, PERIOD_ID, "12M", "BASE")
+    assert again.forecast_version == first.forecast_version == 1
+    assert again.eps == first.eps
+    # Nothing else changed: the re-run produced the same series state, so the
+    # repository found its own latest record and returned it as-is.
+    assert replace(again, forecast_id=first.forecast_id) == replace(
+        first, forecast_id=again.forecast_id)
+
+
+# --- 9. Missing share history stays None ------------------------------------
+
+def test_production_path_missing_share_history_keeps_eps_none(empty_share_db):
+    forecast = generate_and_persist_forecast(
+        empty_share_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    base = forecast.scenario_forecasts.base
+
+    # No share base could be established, so no EPS is invented.
+    assert base.eps is None
+    assert base.net_profit is not None
+
+    reloaded = ForecastRecordRepository(empty_share_db).latest(
+        COMPANY_ID, PERIOD_ID, "12M", "BASE")
+    assert reloaded is not None
+    assert reloaded.eps is None
+    assert reloaded.is_missing("eps")
+
+
+# --- 10. Deterministic repeated execution -----------------------------------
+
+def test_production_path_is_deterministic():
+    def _run():
+        engine = create_engine("sqlite:///:memory:")
+        MigrationRunner(engine).upgrade()
+        session = sessionmaker(bind=engine)()
+        try:
+            _seed_stage1(session)
+            return generate_and_persist_forecast(
+                session, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+        finally:
+            session.close()
+
+    first = _run()
+    second = _run()
+
+    first_records = first.records()
+    second_records = second.records()
+    assert [r.eps for r in first_records] == [r.eps for r in second_records]
+    assert [r.revenue for r in first_records] == [r.revenue for r in second_records]
+    assert first_records[1].eps == second_records[1].eps

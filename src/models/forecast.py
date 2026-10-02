@@ -56,6 +56,7 @@ class ForecastVersion(Base):
     roe = Column(Numeric(precision=18, scale=10), nullable=True)
 
     assumptions = Column(Text, nullable=True)
+    stage4_provenance = Column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(

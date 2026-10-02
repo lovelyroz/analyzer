@@ -341,6 +341,21 @@ class ForecastEngine:
         # not silently forgotten (spec §29).
         assumptions["__input_refs"] = tuple(raw_refs)
 
+        # Provenance Stage 5 does not own: the caller's declarations are stored
+        # verbatim so a stored record can still name its inputs. Kept under a
+        # leading underscore to keep it out of the round-tripped assumptions
+        # payload, where it belongs to the stored input_refs instead.
+        provenance = financial_context.get("stage4_provenance")
+        if provenance:
+            assumptions["__stage4_provenance"] = dict(provenance)
+        declared_refs = financial_context.get("input_refs")
+        if declared_refs:
+            assumptions["__declared_input_refs"] = tuple(
+                ref if isinstance(ref, ForecastInputRef)
+                else ForecastInputRef.from_mapping(ref)
+                for ref in declared_refs
+            )
+
         forecast_method = scenarios.base.method
         return CompanyForecastResult(
             company_id=company_id,
