@@ -372,6 +372,52 @@ def test_identical_resave_is_idempotent():
     assert store.latest(1, 101, "12M", "BASE").forecast_version == 1
 
 
+def _identical_pair_with_different_surrogate_ids():
+    """Two records with identical forecast state but different surrogate ids.
+
+    ``forecast_id`` is a surrogate the caller mints for its own bookkeeping; it
+    is not forecast content. This is the precondition the idempotency contract
+    must hold for, and it is not exercised by saving one object twice.
+    """
+    pinned = {"calculation_timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc)}
+    record_a = _forecast(**pinned).to_record("base", forecast_id=101)
+    record_b = _forecast(**pinned).to_record("base", forecast_id=202)
+    return record_a, record_b
+
+
+def _assert_different_ids_collapse_onto_one_version(store, record_a, record_b):
+    """The two identical records must be stored as one version.
+
+    Returns the stored history so a caller can pin what was actually kept.
+    """
+    # The precondition itself: identical state, different surrogate identity.
+    assert record_a != record_b
+    assert replace(record_a, forecast_id=record_b.forecast_id) == record_b
+
+    saved_a = store.save(record_a)
+    saved_b = store.save(record_b)
+
+    history = store.history(1, 101, "12M", "BASE")
+    assert len(history) == 1  # only one version exists
+    assert saved_b.forecast_version == saved_a.forecast_version == 1
+    # The returned record is the existing stored version, not the second
+    # submission: it is the stored history entry itself, and it is the submitted
+    # state with only the surrogate identity and the version assignment put to
+    # one side.
+    assert saved_b == history[0]
+    assert replace(saved_b, forecast_id=record_a.forecast_id,
+                   forecast_version=record_a.forecast_version) == record_a
+    return history
+
+
+def test_identical_resave_with_a_different_surrogate_id_is_idempotent():
+    record_a, record_b = _identical_pair_with_different_surrogate_ids()
+    store = ForecastVersionStore()
+    _assert_different_ids_collapse_onto_one_version(store, record_a, record_b)
+    # Nothing was appended behind the one surviving version.
+    assert store.count() == 1
+
+
 def test_explicit_version_collision_is_rejected():
     store = ForecastVersionStore()
     store.save(_forecast().to_record("base", forecast_id=1))
@@ -1025,6 +1071,17 @@ def test_repo_identical_resave_is_idempotent(repo):
     assert repo.latest(1, 101, "12M", "BASE").forecast_version == 1
 
 
+def test_repo_identical_resave_with_a_different_surrogate_id_is_idempotent(repo):
+    # Regression: the persistent repository compared records with the caller's
+    # surrogate forecast_id injected into the candidate, so an identical record
+    # carrying a different id was stored as a second version instead of being a
+    # no-op. The surrogate is not forecast content, so it must not affect
+    # idempotency (spec section 24).
+    record_a, record_b = _identical_pair_with_different_surrogate_ids()
+    _assert_different_ids_collapse_onto_one_version(repo, record_a, record_b)
+    assert repo.count() == 1
+
+
 def test_repo_conflicting_version_is_rejected(repo):
     repo.save(_forecast().to_record("base", forecast_id=1))
     # The caller asserts this is version 1, but version 1 already exists with
@@ -1037,6 +1094,30 @@ def test_repo_conflicting_version_is_rejected(repo):
     # The rejected write left nothing behind.
     assert repo.count() == 1
     assert repo.latest(1, 101, "12M", "BASE").eps != 5.0
+
+
+def test_repo_same_version_with_different_content_still_conflicts(repo):
+    # Excluding the surrogate from idempotency must not weaken version conflict
+    # protection: the same forecast_version carrying genuinely different
+    # forecast content is still an attempted overwrite (spec section 24).
+    record_a, record_b = _identical_pair_with_different_surrogate_ids()
+    stored = repo.save(record_a)
+
+    # Same state under a different surrogate: a no-op, so still one version.
+    assert repo.save(record_b).forecast_version == stored.forecast_version
+    assert repo.count() == 1
+
+    # Same forecast_version, genuinely different forecast content: still
+    # rejected. Only truly identical content is idempotent.
+    different_content = replace(record_b, eps=999.0, forecast_version=1)
+    with pytest.raises(ForecastVersionExistsError):
+        repo.save(different_content)
+
+    assert repo.count() == 1
+    history = repo.history(1, 101, "12M", "BASE")
+    assert len(history) == 1
+    assert history[0].eps != 999.0
+    assert history[0].eps == stored.eps
 
 
 def test_repo_scenarios_are_separate_series(repo):

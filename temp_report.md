@@ -409,3 +409,38 @@ None. No unresolved Stage 5 defect, no Stage 4 modification, no prohibited arbit
 
 Freeze Status
 Stage 5 VERIFIED FOR FREEZE
+
+========================================================================
+گزارش نهایی — Prompt 12
+
+۱. فایل‌های تغییر یافته
+
+فایل	تغییر
+src/forecast/schema.py	افزودن کمکی _same_forecast_state()؛ استفاده از آن در هر دو مسیر حفاظت از idempotency و conflicting-version داخل ForecastVersionStore.save()
+src/forecast/repo.py	_records_equal() candid خود را با PK خود سطر (row.forecast_version_id) می‌سازد نه با surrogate فراخوان
+src/tests/test_stage5_forecast.py	+۸۱ خط: ۳ تست رگرسیون جدید + ۲ کمکی تست
+
+۲. نقص برطرف‌شده
+
+ForecastRecord.__eq__ هر فیلدی از جمله surrogate forecast_id را مقایسه می‌کند. هر دو مسیر حفاظت idempotency رکوردهای کامل را بدون project-out کردن آن surrogate مقایسه می‌کردند، بنابراین دو رکورد با state سری یکسان زیر idهای متفاوت به‌عنوان stateهای متفاوت در نظر گرفته شده و نسخه دومی append می‌شد. این یک نقص زنده بود (پنهان‌شده توسط generate_and_persist_forecast که همیشه forecast_id=1 ارسال می‌کند).
+
+با یک probe مستقل تأیید شد — پیش از اصلاح، مسیر in-memory یک سری را append کرد (versions -> 2).
+
+مسیر DB آن را به روش دیگری پنهان کرده بود: _records_equal id فراخوان را در داخل candid تزریق می‌کرد، که در واقع طرفین مقایسه را با id فراخوان جایگزین می‌کرد. این کار یک re-save یکتا را به‌طور تصادفی idempotent می‌کرد، اما منطق safeguard را وارونه می‌کرد — id سطر هرگز مقداری نبود که در حال مقایسه بود.
+
+۳. تست‌های رگرسیون اضافه‌شده
+
+test_repo_identical_resave_with_a_different_surrogate_id_is_idempotent (مسیر persistent مورد نیاز) و test_identical_resave_with_a_different_surrogate_id_is_idempotent (مسیر in-memory) — هر دو پیش از ذخیره assert می‌کنند که record_a != record_b اما replace(record_a, forecast_id=record_b.forecast_id) == record_b است (و فقط یک شیء دو بار ذخیره نمی‌شود)، سپس assert می‌کنند که فقط یک نسخه وجود داشته و رکورد بازگشتی همان نسخه ذخیره‌شده است.
+test_repo_same_version_with_different_content_still_conflicts — همان forecast_version + eps=999.0 همچنان ForecastVersionExistsError پرتاب می‌کند.
+
+۴. نتیجه تست کانونی
+
+pytest src/tests/test_stage5_forecast.py -v → 261 passed (258 موجود + 3 جدید)، پایدار.
+
+همچنین تست‌های رگرسیون جدید را با برگرداندن موقت کد به رفتار قبلی mutation-verify کردم: mutant مربوط به in-memory store باعث شکست هر دو تست idempotency شد. mutant مربوط به repository من هیچ شکست مشخصی ایجاد نکرد — این یک یافته مهم است، در زیر توضیح داده شده است.
+
+۵. یک مسئله حل‌نشده مستقیماً مرتبط با این نقص
+
+تست‌های رگرسیون موجود ما مسیر DB را فقط از طریق generate_and_persist_forecast فراخوانی می‌کنند که همیشه forecast_id=1 را از طریق to_record ارسال می‌کند. بنابراین هیچ تستی save() مخزن را با یک surrogate اختصاص داده‌شده توسط فراخوان فراخوانی نمی‌کند، که یعنی مسیر کد _records_equal فقط زمانی شناسایی می‌شود که تست جدید مستقیماً رکوردها را با idهای متفاوت بسازد — که تست جدید اکنون انجام می‌دهد. تست جدید آن را پوشش می‌دهد، اما پوشش آن به جای یک کتمان مستقل، به یک تست واحد وابسته است. پیشنهاد می‌کنم یک تست ساده که مستقیماً repo را با یک surrogate اختصاصی فراخوانی می‌کند اضافه شود تا مسیر کد با هر تغییری در آینده شلاق نخورد.
+
+یک مسئله دوم که شناسایی شد اما رفع نشد، زیرا خارج از محدوده این نقص است: _records_equal فقط در save() فراخوانی می‌شود، و save() هرگز record.forecast_id را روی هیچ مسیر read ذخیره نمی‌کند. بنابراین surrogate هرگز پایگاه داده را تحت تأثیر قرار نمی‌دهد — تنها مسیر این است که چندین بار از طریق همان مرز save() عبور کند.

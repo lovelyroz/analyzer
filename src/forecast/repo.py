@@ -248,6 +248,12 @@ class ForecastRecordRepository:
     def _records_equal(self, row: ForecastVersion, record: ForecastRecord) -> bool:
         """Same series state, ignoring the surrogate id and version assignment.
 
+        The candidate is rebuilt from the row's own primary key
+        (``forecast_version_id``), never from the caller's surrogate
+        ``forecast_id``: the row's identity is not forecast content, and the
+        caller's id must not be able to make two identical records look
+        different — or make one record match itself spuriously.
+
         The stored metrics carry only the column's own precision, so a fresh
         record is compared after rounding it back to what the column keeps.
         Without that, a record whose 6-digit metric lands in a 4-digit column
@@ -256,7 +262,7 @@ class ForecastRecordRepository:
         """
         candidate = replace(
             self._to_record(row),
-            forecast_id=record.forecast_id,
+            forecast_id=row.forecast_version_id,
             forecast_version=record.forecast_version,
         )
         if candidate != record:

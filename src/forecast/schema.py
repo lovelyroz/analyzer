@@ -257,6 +257,19 @@ def filter_pit_inputs(refs: Iterable[ForecastInputRef],
     return available, dropped
 
 
+# ``forecast_id`` is a surrogate the caller mints for its own bookkeeping; it
+# never describes the forecast's state. Two records are the same series state
+# when every state field agrees, regardless of the ids they carry (spec §24).
+# ``forecast_version`` is an assignment rather than content for the same reason.
+_SURROGATE = object()
+
+
+def _same_forecast_state(stored: ForecastRecord, record: ForecastRecord) -> bool:
+    """Equal forecast state, ignoring the surrogate ``forecast_id``."""
+    return (replace(stored, forecast_id=_SURROGATE, forecast_version=_SURROGATE)
+            == replace(record, forecast_id=_SURROGATE, forecast_version=_SURROGATE))
+
+
 class ForecastVersionStore:
     """Append-only registry of versioned forecast records (spec §24).
 
@@ -277,7 +290,7 @@ class ForecastVersionStore:
         if record.forecast_version != 0:
             for stored in versions:
                 if stored.forecast_version == record.forecast_version:
-                    if stored == record:
+                    if _same_forecast_state(stored, record):
                         return stored
                     raise ForecastVersionExistsError(
                         f"forecast version {record.forecast_version} already stored for {key}"
@@ -287,7 +300,7 @@ class ForecastVersionStore:
         # version: the series is unchanged, so nothing was overwritten.
         if versions:
             latest = versions[-1]
-            if replace(latest, forecast_version=0) == replace(record, forecast_version=0):
+            if _same_forecast_state(latest, record):
                 return latest
 
         stored = replace(record, forecast_version=len(versions) + 1)
