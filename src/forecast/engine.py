@@ -59,15 +59,95 @@ class ForecastEngine:
         return params
 
     @staticmethod
-    def _trend_adjustment(context: Dict[str, Any], trend_state: Optional[str], params: Dict[str, Any]) -> float:
-        # Stage 4 is evidence only. An explicit model parameter is required to
-        # translate that evidence into a bounded forecast adjustment.
+    def _trend_adjustment(context: Dict[str, Any], trend_state: Optional[str],
+                          params: Dict[str, Any], low_base: bool = False
+                          ) -> tuple[float, str]:
+        """Translate Stage 4 trend evidence into a growth adjustment, or refuse to.
+
+        Stage 4 is evidence only. An explicit ``model_parameters["trend_adjustments"]``
+        entry is required before the evidence can move the forecast, and the
+        adjustment is never derived from Stage 4's momentum percentage: the
+        Stage 4 ``±2%`` band classifies trend direction, it is not a Stage 5
+        forecast growth magnitude (spec section 16). Returns the adjustment and
+        the reason it was or was not applied, so the audit trail can name it.
+        """
         state = trend_state or context.get("trend_state")
-        if context.get("low_base") or context.get("LOW_BASE"):
-            return 0.0
+        if low_base:
+            return 0.0, "SUPPRESSED_LOW_BASE"
         mapping = params.get("trend_adjustments") or {}
-        value = mapping.get(state, 0.0)
-        return float(value) if isinstance(value, (int, float)) else 0.0
+        if state not in mapping:
+            return 0.0, "NO_MODEL_PARAMETER"
+        value = mapping[state]
+        if not isinstance(value, (int, float)):
+            return 0.0, "NO_MODEL_PARAMETER"
+        return float(value), "MODEL_PARAMETER"
+
+    # Stage 4 sign transitions, carried as semantic classifications and never
+    # converted into percentage growth rates (spec section 19). A transition
+    # across zero has no ordinary percentage reading: (new - old) / old is
+    # meaningless when the prior period is the zero or the sign flip itself, so
+    # these cases never travel through the ordinary growth path.
+    SIGN_CHANGE_TRANSITIONS = frozenset({
+        "LOSS_TO_PROFIT",
+        "PROFIT_TO_LOSS",
+        "SIGN_CHANGE",
+    })
+
+    @classmethod
+    def _sign_change(cls, context: Dict[str, Any]) -> Optional[str]:
+        return context.get("sign_change") if isinstance(
+            context.get("sign_change"), str) else None
+
+    @classmethod
+    def _is_sign_transition(cls, context: Dict[str, Any]) -> bool:
+        sign_change = cls._sign_change(context)
+        return sign_change in cls.SIGN_CHANGE_TRANSITIONS
+
+    @staticmethod
+    def _safe_growth_rate(prior: Optional[float], current: Optional[float]
+                          ) -> Optional[float]:
+        """Percentage growth that is undefined across zero, never invented.
+
+        ``None`` is returned whenever a percentage reading is not defined: a
+        missing endpoint, either endpoint being zero (a zero-base transition is
+        not a growth rate), or the two endpoints carrying different signs.
+        Callers must treat ``None`` as "no ordinary percentage growth exists",
+        not as zero.
+        """
+        if prior is None or current is None:
+            return None
+        if prior == 0 or current == 0:
+            return None
+        if (prior < 0) != (current < 0):
+            return None
+        return (current - prior) / abs(prior)
+
+    # The Stage 4 low-base flag only names the condition; it is not itself a
+    # recovery percentage or a growth rate. Stage 5 keeps it as a control that
+    # disables the momentum-derived adjustment and records its own evidence
+    # state, so the forecast stays anchored to the declared baseline hierarchy.
+    @classmethod
+    def _low_base_control(cls, context: Dict[str, Any]) -> tuple[bool, str]:
+        """Classify a low base into: flag set, evidence state, or nothing to say.
+
+        ``low_base`` stays ``False`` unless evidence actually supports it, so a
+        caller-supplied flag cannot manufacture a low-base treatment the
+        underlying numbers do not show. Returns the control and the evidence
+        state recorded on the chain for the audit trail.
+        """
+        declared = bool(context.get("low_base") or context.get("LOW_BASE"))
+        if cls._is_sign_transition(context):
+            return True, "GROWTH_REFUSED_SIGN_TRANSITION"
+        prior = ForecastEngine._number(context, "prior_revenue")
+        current = ForecastEngine._number(context, "current_revenue")
+        if prior is not None and prior <= 0 and current is not None and current > 0:
+            return True, "GROWTH_REFUSED_ZERO_BASE"
+        if prior is None or current is None:
+            return declared, (
+                "LOW_BASE_DECLARED_INSUFFICIENT_EVIDENCE" if declared
+                else "NO_LOW_BASE_EVIDENCE")
+        return declared, (
+            "LOW_BASE_DECLARED" if declared else "NO_LOW_BASE_EVIDENCE")
 
     @staticmethod
     def _driver_based_revenue(context: Dict[str, Any]) -> Optional[float]:
@@ -146,6 +226,62 @@ class ForecastEngine:
             if value is not None:
                 return value
         return None
+
+    # ------------------------------------------------------------------
+    # Scenario uncertainty (spec section 21)
+    # ------------------------------------------------------------------
+
+    # Dispersion is never invented from a missing volatility observation: the
+    # engine names the evidence it actually used, and reports the absence when
+    # there is none. The defaults below are the already-established Stage 5
+    # model parameters, not new arbitrary spreads.
+    _UNCERTAINTY_EVIDENCE_KEYS = (
+        "revenue_volatility",
+        "historical_revenue_volatility",
+        "earnings_volatility",
+        "forecast_uncertainty",
+    )
+
+    @classmethod
+    def _uncertainty_evidence(cls, context: Dict[str, Any]) -> Optional[float]:
+        """An observed dispersion figure the caller declared, or nothing.
+
+        Stage 5 never manufactures dispersion from thin air and never derives a
+        spread from missing data. ``None`` means the evidence is unavailable and
+        the caller must accept the model's declared default spread as the only
+        dispersion there is.
+        """
+        return cls._baseline_value(context, *cls._UNCERTAINTY_EVIDENCE_KEYS)
+
+    @staticmethod
+    def _scenario_spread(
+        params: Dict[str, Any],
+        key: str,
+        fallback_key: str,
+        evidence: Optional[float],
+        context: Dict[str, Any],
+    ) -> tuple[float, str]:
+        """Resolve one scenario spread and name where it came from.
+
+        The declared model parameter is the already-established Stage 5 default.
+        A declared volatility observation may widen or narrow it — through the
+        caller's own declared sensitivity, never through an invented multiplier
+        — and missing evidence leaves the default untouched rather than being
+        filled with a fabricated dispersion estimate.
+        """
+        declared = float(params.get(fallback_key, 0.0))
+        parameter = params.get(key)
+        if parameter is None:
+            return declared, "MODEL_DEFAULT"
+        if not isinstance(parameter, (int, float)):
+            return declared, "MODEL_DEFAULT"
+        if evidence is None:
+            return float(parameter), "MODEL_PARAMETER"
+        sensitivity = ForecastEngine._number(context, "volatility_sensitivity")
+        if not isinstance(sensitivity, (int, float)) or sensitivity <= 0:
+            return float(parameter), "MODEL_PARAMETER"
+        return float(parameter) * float(sensitivity) * float(evidence), \
+            "VOLATILITY_EVIDENCE"
 
     # ------------------------------------------------------------------
     # Operational FX (spec §30)
@@ -346,7 +482,13 @@ class ForecastEngine:
             "baseline_method": baseline_method,
             "operating_margin_method": margin_method,
             "trend_adjustment": trend_adjustment,
+            "trend_adjustment_reason": context.get("__trend_adjustment_reason"),
             "low_base_control": bool(context.get("low_base") or context.get("LOW_BASE")),
+            "low_base_evidence": context.get("__low_base_evidence"),
+            "sign_change": ForecastEngine._sign_change(context),
+            "growth_rate_basis": context.get("__growth_rate_basis"),
+            "uncertainty_evidence": context.get("__uncertainty_evidence"),
+            "uncertainty_basis": context.get("__uncertainty_basis"),
             "net_profit_method_hierarchy": list(NET_PROFIT_HIERARCHY),
         }
 
@@ -472,7 +614,15 @@ class ForecastEngine:
 
         cutoff = normalize_datetime(data_cutoff_datetime) or datetime.now(timezone.utc)
         params = self._merge_parameters(financial_context)
-        trend_adj = self._trend_adjustment(financial_context, trend_state, params)
+        sign_change = self._sign_change(financial_context)
+        # The low-base control is resolved first because a sign transition or a
+        # zero base is a low-base condition: it suppresses the momentum-derived
+        # adjustment before the adjustment is ever computed.
+        low_base_control, low_base_evidence = self._low_base_control(financial_context)
+        low_base = low_base_control or bool(
+            financial_context.get("low_base") or financial_context.get("LOW_BASE"))
+        trend_adj, trend_reason = self._trend_adjustment(
+            financial_context, trend_state, params, low_base=low_base)
 
         # Point-in-Time: a forecast may only use inputs published at or before
         # its cutoff (spec §25). Late inputs are dropped, never silently kept.
@@ -488,10 +638,19 @@ class ForecastEngine:
                 "would be dated before the information it claims to see"
             )
 
-        scenario_spread = float(params.get("scenario_revenue_growth_spread", 0.05))
-        financial_spread = float(params.get("scenario_financial_growth_spread", scenario_spread))
-        margin_spread = float(params.get("scenario_operating_margin_spread", 0.02))
-        net_margin_spread = float(params.get("scenario_net_margin_spread", 0.01))
+        scenario_spread, spread_basis = self._scenario_spread(
+            params, "scenario_revenue_growth_spread", "scenario_revenue_growth_spread",
+            self._uncertainty_evidence(financial_context), financial_context)
+        financial_spread, financial_basis = self._scenario_spread(
+            params, "scenario_financial_growth_spread",
+            "scenario_revenue_growth_spread", self._uncertainty_evidence(financial_context),
+            financial_context)
+        margin_spread, margin_basis = self._scenario_spread(
+            params, "scenario_operating_margin_spread",
+            "scenario_operating_margin_spread", None, financial_context)
+        net_margin_spread, net_margin_basis = self._scenario_spread(
+            params, "scenario_net_margin_spread", "scenario_net_margin_spread",
+            None, financial_context)
         margin_adjustment = float(params.get("operating_margin_adjustment", 0.0))
 
         benchmark = None
@@ -505,8 +664,11 @@ class ForecastEngine:
         assumptions: Dict[str, Any] = {
             "model_parameters": params,
             "trend_evidence": trend_state or financial_context.get("trend_state"),
-            "sign_change": financial_context.get("sign_change"),
-            "low_base": bool(financial_context.get("low_base") or financial_context.get("LOW_BASE")),
+            "sign_change": sign_change,
+            "sign_transition": self._is_sign_transition(financial_context),
+            "trend_adjustment": trend_adj,
+            "trend_adjustment_reason": trend_reason,
+            "low_base": low_base,
             "operational_fx": resolved_fx.rate if resolved_fx is not None else None,
             "operational_fx_source": resolved_fx.source if resolved_fx is not None else None,
             "operational_fx_available": resolved_fx is not None,
@@ -517,6 +679,18 @@ class ForecastEngine:
                 resolved_fx.confidence if resolved_fx is not None else None
             ),
             "fx_ladder": self._fx_ladder_snapshot(financial_context, resolved_fx),
+            "uncertainty_evidence": self._uncertainty_evidence(financial_context),
+            "uncertainty_basis": spread_basis,
+            "scenario_revenue_growth_spread": scenario_spread,
+            "scenario_financial_growth_spread": financial_spread,
+            "scenario_operating_margin_spread": margin_spread,
+            "scenario_net_margin_spread": net_margin_spread,
+            "scenario_spread_bases": {
+                "revenue": spread_basis,
+                "financial": financial_basis,
+                "operating_margin": margin_basis,
+                "net_margin": net_margin_basis,
+            },
             "data_cutoff_datetime": cutoff.isoformat(),
             "pit_valid": pit_ok,
             "input_refs": [
@@ -554,19 +728,65 @@ class ForecastEngine:
                 scenarios = ScenarioForecastResult(empty, empty, empty)
                 quality = "INSUFFICIENT_DATA"
             else:
-                base_growth = self._number(financial_context, "baseline_revenue_growth")
-                if base_growth is None:
+                # Growth is resolved through the existing baseline/driver
+                # hierarchy: the declared growth parameter, the zero-safe
+                # reading of the historical arc, then flat. A sign transition
+                # or a zero base never yields an ordinary percentage growth.
+                low_base_control, low_base_evidence = self._low_base_control(
+                    financial_context)
+                assumptions["low_base_evidence"] = low_base_evidence
+                computed_growth = self._safe_growth_rate(
+                    self._number(financial_context, "prior_revenue"),
+                    self._number(financial_context, "current_revenue"))
+                declared_growth = self._number(financial_context, "baseline_revenue_growth")
+
+                if declared_growth is not None:
+                    base_growth = declared_growth
+                    growth_basis = "DECLARED_GROWTH_PARAMETER"
+                elif computed_growth is not None:
+                    base_growth = computed_growth
+                    growth_basis = "ZERO_SAFE_GROWTH"
+                elif self._is_sign_transition(financial_context):
                     base_growth = 0.0
+                    growth_basis = "FLAT_SIGN_TRANSITION"
+                elif computed_growth is None and (
+                        self._number(financial_context, "prior_revenue") is None
+                        or self._number(financial_context, "current_revenue") is None):
+                    base_growth = 0.0
+                    growth_basis = "FLAT_INSUFFICIENT_EVIDENCE"
+                elif computed_growth is None and (
+                        self._number(financial_context, "prior_revenue") <= 0
+                        or self._number(financial_context, "current_revenue") <= 0):
+                    base_growth = 0.0
+                    growth_basis = "FLAT_ZERO_BASE"
+                else:
+                    base_growth = 0.0
+                    growth_basis = (
+                        "FLAT_INSUFFICIENT_EVIDENCE"
+                        if low_base_evidence == "LOW_BASE_DECLARED_INSUFFICIENT_EVIDENCE"
+                        else "FLAT_NO_DECLARED_GROWTH")
+
                 base_growth += trend_adj
                 bear_growth = base_growth - scenario_spread
                 bull_growth = base_growth + scenario_spread
 
-                bear = self._non_financial_scenario(financial_context, baseline_revenue, baseline_method, bear_growth,
+                scenario_context = dict(financial_context)
+                scenario_context.update({
+                    "__trend_adjustment_reason": trend_reason,
+                    "__low_base_evidence": low_base_evidence,
+                    "__growth_rate_basis": growth_basis,
+                    "__uncertainty_evidence": self._uncertainty_evidence(financial_context),
+                    "__uncertainty_basis": spread_basis,
+                })
+                if low_base_control:
+                    scenario_context["low_base"] = True
+
+                bear = self._non_financial_scenario(scenario_context, baseline_revenue, baseline_method, bear_growth,
                                                     -margin_spread, -net_margin_spread, "BEAR", trend_adj)
-                base = self._non_financial_scenario(financial_context, baseline_revenue, baseline_method, base_growth,
+                base = self._non_financial_scenario(scenario_context, baseline_revenue, baseline_method, base_growth,
                                                     0.0, 0.0, "BASE", trend_adj,
                                                     margin_adjustment_base=margin_adjustment)
-                bull = self._non_financial_scenario(financial_context, baseline_revenue, baseline_method, bull_growth,
+                bull = self._non_financial_scenario(scenario_context, baseline_revenue, baseline_method, bull_growth,
                                                     margin_spread, net_margin_spread, "BULL", trend_adj)
                 scenarios = ScenarioForecastResult(
                     replace(bear, scenario="BEAR", forecast_horizon=horizon),
@@ -646,6 +866,9 @@ class ForecastEngine:
         # record must be able to testify that a late input was seen and dropped,
         # not silently forgotten (spec §29).
         assumptions["__input_refs"] = tuple(raw_refs)
+        if industry_code in NON_FINANCIAL_INDUSTRIES and baseline_revenue is not None:
+            assumptions["low_base_evidence"] = low_base_evidence
+            assumptions["growth_rate_basis"] = growth_basis
 
         # Provenance Stage 5 does not own: the caller's declarations are stored
         # verbatim so a stored record can still name its inputs. Kept under a

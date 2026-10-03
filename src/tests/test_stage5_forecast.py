@@ -1850,6 +1850,9 @@ def test_repeated_execution_is_deterministic():
         forecast_non_operating_items=100.0,
         forecast_financial_costs=50.0,
         forecast_tax=40.0)
+    # Identical inputs include the calculation timestamp: without pinning it the
+    # two runs differ only because the wall clock moved between them.
+    context["calculation_timestamp"] = datetime(2026, 1, 2, tzinfo=timezone.utc)
     first = _core_forecast(context).records(forecast_id_start=1)
     second = _core_forecast(context).records(forecast_id_start=1)
     assert len(first) == len(second) == 3
@@ -2171,6 +2174,11 @@ def test_eps_and_roe_are_deterministic_across_calls():
     ]
     context = _shares_context(
         history, actions, beginning_equity=9000.0, forecast_ending_equity=11000.0)
+    # The forecast is deterministic given identical inputs. A fixed
+    # calculation_timestamp pins the one input that would otherwise follow the
+    # wall clock: repeated runs must not differ only because they happened a
+    # millisecond apart.
+    context["calculation_timestamp"] = datetime(2026, 1, 2, tzinfo=timezone.utc)
     first = _core_forecast(context).records(forecast_id_start=1)
     second = _core_forecast(context).records(forecast_id_start=1)
     assert len(first) == len(second) == 3
@@ -2801,3 +2809,394 @@ def test_bank_and_holding_chains_never_report_a_revenue_baseline():
     for result in (bank, holding):
         for scenario in ("bear", "base", "bull"):
             assert getattr(result.scenario_forecasts, scenario).revenue is None
+
+
+# ==========================================================================
+# 18. Trend isolation / low base / sign change / scenario uncertainty
+#     (Prompt 9).  Stage 4 evidence is context only: the ±2% band classifies
+#     trend direction in Stage 4 and is never a Stage 5 growth magnitude, a
+#     fundamental score is never a forecast coefficient, a sign transition has
+#     no ordinary percentage reading, and scenario dispersion is only ever the
+#     already-declared model spread.
+# ==========================================================================
+
+# The ±2% Stage 4 threshold, expressed as the magnitudes the spec forbids it
+# from becoming on the Stage 5 side.
+_FORBIDDEN_TWO_PCT = (0.02, -0.02, 0.020, -0.020, 2.0, -2.0, 0.02 * 100)
+
+
+def _sign_context(sign_change=None, prior=None, current=None, **overrides):
+    """A non-financial context carrying a Stage 4 sign classification."""
+    context = _core_context(prior_revenue=prior, current_revenue=current,
+                            sign_change=sign_change)
+    context.pop("baseline_revenue_growth", None)
+    context.update(overrides)
+    return context
+
+
+@pytest.mark.parametrize("momentum_pct", _FORBIDDEN_TWO_PCT)
+@pytest.mark.parametrize("direction", ["Positive", "Negative", "Weak"])
+def test_stage4_two_pct_threshold_is_not_a_forecast_growth_rate(momentum_pct, direction):
+    # The ±2% band is Stage 4's own direction classifier. Feeding it to the
+    # adapter as momentum evidence cannot move the forecast by that percentage:
+    # no model_parameters["trend_adjustments"] entry exists, so the engine has
+    # no translation from evidence to a growth adjustment at all.
+    context = _core_context()
+    context.update({
+        "momentum_12m_pct": momentum_pct,
+        "trend_direction": direction,
+        "trend_state": direction,
+    })
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert result.assumptions["trend_adjustment"] == 0.0
+    assert result.assumptions["trend_adjustment_reason"] == "NO_MODEL_PARAMETER"
+    # The seasonal baseline grown at the declared 10%, untouched by the band.
+    assert base.revenue == pytest.approx(11000.0)
+    assert base.revenue != pytest.approx(10000.0 * (1.0 + momentum_pct))
+
+    # The same evidence arriving through the adapter is equally inert.
+    stage4 = _stage4(momentum_pct=momentum_pct, momentum_direction=direction)
+    adapted = build_financial_context(
+        stage4, {"historical_operating_margin": 0.20, "historical_net_margin": 0.10,
+                 "share_count": 1000.0, "seasonal_baseline_revenue": 10000.0})
+    forecast = ForecastEngine().generate_forecast(1, 101, "PETROCHEMICAL", adapted)
+    assert forecast.assumptions["trend_adjustment"] == 0.0
+    assert forecast.scenario_forecasts.base.revenue == pytest.approx(10000.0)
+
+
+def test_momentum_may_only_act_through_an_explicit_model_parameter():
+    # Evidence translated into a growth adjustment requires a declared
+    # model_parameters entry, which is the caller's calibration and never the
+    # evidence's own magnitude.
+    context = _core_context()
+    context["model_parameters"] = {"trend_adjustments": {"Strong": 0.03}}
+    result = ForecastEngine().generate_forecast(
+        1, 101, "PETROCHEMICAL", context,
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    # No trend_state was passed, so nothing maps and the forecast is flat.
+    assert result.assumptions["trend_adjustment"] == 0.0
+    assert result.assumptions["trend_adjustment_reason"] == "NO_MODEL_PARAMETER"
+
+    tuned = ForecastEngine().generate_forecast(
+        1, 101, "PETROCHEMICAL", context, trend_state="Strong",
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    assert tuned.assumptions["trend_adjustment"] == 0.03
+    assert tuned.assumptions["trend_adjustment_reason"] == "MODEL_PARAMETER"
+    assert tuned.scenario_forecasts.base.revenue == pytest.approx(10000.0 * 1.13)
+
+
+def test_momentum_strength_is_never_a_growth_multiplier():
+    context = _core_context()
+    context.update({"momentum_12m_strength": "STRONG",
+                    "momentum_12m_pct": 0.50})
+    result = _core_forecast(context)
+    # A 50% momentum reading is evidence, not a 50% forecast growth rate.
+    assert result.scenario_forecasts.base.revenue == pytest.approx(11000.0)
+    assert result.scenario_forecasts.base.revenue != pytest.approx(15000.0)
+
+
+@pytest.mark.parametrize("score", [0.0, 25.0, 50.0, 75.0, 100.0, -10.0])
+def test_fundamental_score_is_never_a_forecast_multiplier(score):
+    # No Fundamental Score -> growth / margin / revenue / spread relationship
+    # exists in the engine: changing the score leaves every chain identical.
+    plain = _core_forecast(_core_context())
+    context = _core_context(fundamental_score=score)
+    for key in ("fundamental_score", "stage4_fundamental_score",
+                "fundamental_score_value"):
+        context[key] = score
+    scored = _core_forecast(context)
+    for scenario in ("bear", "base", "bull"):
+        left = getattr(plain.scenario_forecasts, scenario)
+        right = getattr(scored.scenario_forecasts, scenario)
+        assert left.revenue == right.revenue
+        assert left.operating_margin == right.operating_margin
+        assert left.operating_profit == right.operating_profit
+        assert left.net_profit == right.net_profit
+        assert left.eps == right.eps
+        assert left.roe == right.roe
+
+    # A score cannot widen the scenario dispersion either.
+    assert scored.assumptions["scenario_revenue_growth_spread"] == \
+        plain.assumptions["scenario_revenue_growth_spread"]
+
+
+def test_fundamental_score_does_not_widen_or_narrow_the_scenario_spread():
+    plain = _core_forecast(_core_context())
+    scored = _core_forecast(_core_context(fundamental_score=90.0))
+    assert scored.assumptions["scenario_spread_bases"] == \
+        plain.assumptions["scenario_spread_bases"]
+
+
+# --- Low base --------------------------------------------------------------
+
+def test_genuinely_low_base_produces_no_momentum_adjustment():
+    # A prior period at or below zero with a positive current period is a
+    # genuinely low base: the trend adjustment is suppressed and the ordinary
+    # percentage reading is refused.
+    context = _sign_context(None, prior_revenue=0.0, current_revenue=10000.0)
+    context["seasonal_baseline_revenue"] = 10000.0
+    context["model_parameters"] = {"trend_adjustments": {"Strong": 0.50}}
+    result = ForecastEngine().generate_forecast(
+        1, 101, "PETROCHEMICAL", context, trend_state="Strong",
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    base = result.scenario_forecasts.base
+    assert result.assumptions["low_base"] is True
+    assert result.assumptions["low_base_evidence"] == "GROWTH_REFUSED_ZERO_BASE"
+    assert result.assumptions["trend_adjustment"] == 0.0
+    assert result.assumptions["trend_adjustment_reason"] == "SUPPRESSED_LOW_BASE"
+    assert result.assumptions["growth_rate_basis"] == "FLAT_ZERO_BASE"
+    # The declared baseline is carried forward flat: no recovery percentage
+    # is invented and no growth is fabricated.
+    assert base.revenue == pytest.approx(10000.0)
+
+
+def test_low_base_flag_alone_does_not_invent_a_growth_rate():
+    # The Stage 4 flag is declared but no prior/current evidence exists to
+    # confirm it: the flag is honoured as a control and the baseline stays flat
+    # rather than being given a manufactured recovery percentage.
+    context = _sign_context(None, prior_revenue=None, current_revenue=None,
+                            low_base=True)
+    context["seasonal_baseline_revenue"] = 8000.0
+    result = _core_forecast(context)
+    assert result.assumptions["low_base"] is True
+    assert result.assumptions["low_base_evidence"] == \
+        "LOW_BASE_DECLARED_INSUFFICIENT_EVIDENCE"
+    assert result.assumptions["growth_rate_basis"] == "FLAT_INSUFFICIENT_EVIDENCE"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(8000.0)
+
+
+def test_normal_growth_from_a_low_base_uses_the_declared_rate():
+    # A low base with a full positive history is ordinary growth, not a special
+    # case: the declared growth parameter applies and the flag stays off.
+    context = _sign_context(None, prior_revenue=10.0, current_revenue=12.0,
+                            low_base=True, baseline_revenue_growth=0.10)
+    context["seasonal_baseline_revenue"] = 10000.0
+    result = _core_forecast(context)
+    assert result.assumptions["low_base"] is True
+    assert result.assumptions["low_base_evidence"] == "LOW_BASE_DECLARED"
+    assert result.assumptions["growth_rate_basis"] == "DECLARED_GROWTH_PARAMETER"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(11000.0)
+
+
+def test_insufficient_evidence_preserves_the_insufficient_data_path():
+    # No baseline at all and no prior/current arc: the existing
+    # insufficient-data behaviour is preserved and nothing is manufactured.
+    context = _sign_context(None, prior_revenue=None, current_revenue=None)
+    context.pop("seasonality_valid", None)
+    context.pop("seasonal_baseline_revenue", None)
+    context.pop("recent_run_rate_revenue", None)
+    result = _core_forecast(context)
+    assert result.baseline_method == "INSUFFICIENT_DATA"
+    assert result.data_quality == "INSUFFICIENT_DATA"
+    assert result.scenario_forecasts.base.revenue is None
+
+
+# --- Sign change -----------------------------------------------------------
+
+@pytest.mark.parametrize("sign_change", ["LOSS_TO_PROFIT", "PROFIT_TO_LOSS",
+                                         "SIGN_CHANGE"])
+@pytest.mark.parametrize("prior,current", [(-1000.0, 1000.0), (1000.0, -1000.0),
+                                           (0.0, 1000.0), (0.0, -1000.0),
+                                           (-500.0, 0.0), (1000.0, 0.0)])
+def test_sign_change_never_uses_an_ordinary_percentage_growth(sign_change,
+                                                              prior, current):
+    # Every transition that crosses zero refuses the (new - old) / old reading.
+    context = _sign_context(sign_change, prior, current)
+    context["seasonal_baseline_revenue"] = 10000.0
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert result.assumptions["sign_transition"] is True
+    assert result.assumptions["sign_change"] == sign_change
+    assert result.assumptions["growth_rate_basis"] == "FLAT_SIGN_TRANSITION"
+    assert result.assumptions["low_base_evidence"] == \
+        "GROWTH_REFUSED_SIGN_TRANSITION"
+    assert result.assumptions["trend_adjustment"] == 0.0
+    # No exception, and the baseline is carried forward flat: the sign flip is
+    # never reinterpreted as an enormous or infinite percentage growth rate.
+    assert base.revenue == pytest.approx(10000.0)
+    record = result.to_record("base", forecast_id=1)
+    assert record.revenue == pytest.approx(10000.0)
+
+
+def test_sign_transition_suppresses_a_declared_trend_adjustment():
+    context = _sign_context("LOSS_TO_PROFIT", -1000.0, 1000.0)
+    context["seasonal_baseline_revenue"] = 10000.0
+    context["model_parameters"] = {"trend_adjustments": {"Strong": 0.40}}
+    result = ForecastEngine().generate_forecast(
+        1, 101, "PETROCHEMICAL", context, trend_state="Strong",
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    assert result.assumptions["trend_adjustment"] == 0.0
+    assert result.scenario_forecasts.base.revenue == pytest.approx(10000.0)
+
+
+def test_a_declared_growth_parameter_still_applies_across_a_sign_transition():
+    # The semantic classification suppresses the momentum path, but a caller's
+    # explicitly declared growth parameter is still their own decision and is
+    # honoured as the baseline hierarchy's declared input.
+    context = _sign_context("LOSS_TO_PROFIT", -1000.0, 1000.0,
+                            baseline_revenue_growth=0.10)
+    context["seasonal_baseline_revenue"] = 10000.0
+    result = _core_forecast(context)
+    assert result.assumptions["growth_rate_basis"] == "DECLARED_GROWTH_PARAMETER"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(11000.0)
+    # The sign classification is still recorded for the audit trail.
+    assert result.assumptions["sign_transition"] is True
+
+
+def test_zero_base_to_profit_is_flat_not_infinite_growth():
+    result = _core_forecast(_sign_context(None, 0.0, 5000.0))
+    assert result.assumptions["growth_rate_basis"] == "FLAT_ZERO_BASE"
+    # No growth was declared and none is invented from the zero base.
+    assert result.scenario_forecasts.base.revenue == pytest.approx(10000.0)
+
+
+def test_same_sign_arc_reads_an_ordinary_zero_safe_growth_rate():
+    # Two positive periods with no declared growth: the zero-safe reading is
+    # the ordinary percentage growth, and it applies.
+    context = _sign_context(None, 8000.0, 10000.0)
+    context["seasonal_baseline_revenue"] = 10000.0
+    result = _core_forecast(context)
+    assert result.assumptions["growth_rate_basis"] == "ZERO_SAFE_GROWTH"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(12500.0)
+
+
+def test_two_negative_periods_read_a_growth_rate_not_a_sign_change():
+    # Both periods negative: the arc is a contraction, not a sign transition,
+    # and the zero-safe reading still applies. A loss narrowing from -10000 to
+    # -8000 is a 20% improvement, which raises the baseline rather than
+    # shrinking it.
+    context = _sign_context(None, -10000.0, -8000.0)
+    context["seasonal_baseline_revenue"] = 10000.0
+    result = _core_forecast(context)
+    assert result.assumptions["sign_transition"] is False
+    assert result.assumptions["growth_rate_basis"] == "ZERO_SAFE_GROWTH"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(12000.0)
+
+
+def test_sign_change_propagation_still_names_the_transition():
+    # The adapter's semantic classification survives into the engine's own
+    # audit trail.
+    stage4 = _stage4(sign_change="PROFIT_TO_LOSS")
+    adapted = build_financial_context(
+        stage4, {"historical_operating_margin": 0.20, "historical_net_margin": 0.10,
+                 "share_count": 1000.0, "seasonal_baseline_revenue": 10000.0})
+    result = ForecastEngine().generate_forecast(1, 101, "PETROCHEMICAL", adapted)
+    assert result.assumptions["sign_change"] == "PROFIT_TO_LOSS"
+    assert result.assumptions["sign_transition"] is True
+
+
+# --- Scenario uncertainty ---------------------------------------------------
+
+def test_scenarios_use_the_declared_model_spread():
+    result = _core_forecast(_core_context(baseline_revenue_growth=0.10))
+    chains = result.scenario_forecasts
+    assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
+    assert result.assumptions["uncertainty_basis"] == "MODEL_PARAMETER"
+    assert chains.bear.revenue == pytest.approx(10000.0 * 1.05)
+    assert chains.base.revenue == pytest.approx(10000.0 * 1.10)
+    assert chains.bull.revenue == pytest.approx(10000.0 * 1.15)
+
+
+def test_missing_uncertainty_evidence_leaves_the_declared_spread():
+    # No volatility observation exists: the declared model spread stands and no
+    # dispersion estimate is manufactured from the absence.
+    context = _core_context()
+    for key in ("revenue_volatility", "historical_revenue_volatility",
+                "earnings_volatility", "forecast_uncertainty"):
+        context[key] = None
+    result = _core_forecast(context)
+    assert result.assumptions["uncertainty_evidence"] is None
+    assert result.assumptions["uncertainty_basis"] == "MODEL_PARAMETER"
+    assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
+    chains = result.scenario_forecasts
+    assert chains.bear.revenue == pytest.approx(10000.0 * 1.05)
+    assert chains.bull.revenue == pytest.approx(10000.0 * 1.15)
+
+
+def test_declared_volatility_only_acts_through_a_declared_sensitivity():
+    # Volatility evidence alone is an observation. Only a caller-declared
+    # sensitivity lets it move the spread, and by the caller's own factor.
+    context = _core_context(revenue_volatility=0.30)
+    assert _core_forecast(context).assumptions["uncertainty_basis"] == \
+        "MODEL_PARAMETER"
+
+    scaled = _core_context(revenue_volatility=0.30, volatility_sensitivity=2.0)
+    result = _core_forecast(scaled)
+    assert result.assumptions["uncertainty_basis"] == "VOLATILITY_EVIDENCE"
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(0.05 * 2.0 * 0.30)
+    chains = result.scenario_forecasts
+    assert chains.bear.revenue == pytest.approx(
+        10000.0 * (1.0 + 0.10 - 0.05 * 2.0 * 0.30))
+    assert chains.bull.revenue == pytest.approx(
+        10000.0 * (1.0 + 0.10 + 0.05 * 2.0 * 0.30))
+
+
+def test_an_arbitrary_spread_is_never_invented_from_missing_data():
+    # The engine must never conjure Base ± 5/10/15% on its own account: the
+    # spread is always either the declared model parameter or a declared
+    # parameter scaled by declared evidence.
+    result = _core_forecast(_core_context())
+    spread = result.assumptions["scenario_revenue_growth_spread"]
+    assert spread == result.assumptions["model_parameters"][
+        "scenario_revenue_growth_spread"]
+    for key in ("scenario_operating_margin_spread",
+                "scenario_net_margin_spread",
+                "scenario_financial_growth_spread"):
+        assert result.assumptions[key] == result.assumptions[
+            "model_parameters"][key]
+
+
+def test_scenario_spreads_are_deterministic_given_identical_inputs():
+    first = _core_forecast(_core_context()).scenario_forecasts
+    second = _core_forecast(_core_context()).scenario_forecasts
+    for left, right in zip((first.bear, first.base, first.bull),
+                           (second.bear, second.base, second.bull)):
+        assert left.revenue == right.revenue
+        assert left.operating_profit == right.operating_profit
+        assert left.net_profit == right.net_profit
+        assert left.eps == right.eps
+        assert left.roe == right.roe
+
+
+def test_insufficient_uncertainty_evidence_still_yields_three_scenarios():
+    # Missing dispersion does not collapse the scenario set: the three chains
+    # are produced on the declared spread alone.
+    chains = _core_forecast(_core_context()).scenario_forecasts
+    assert chains.bear.revenue < chains.base.revenue < chains.bull.revenue
+    assert chains.bear.net_profit < chains.base.net_profit < chains.bull.net_profit
+
+
+def test_bank_scenarios_use_the_financial_spread_and_no_invented_volatility():
+    # The financial spread is the declared model parameter; a missing
+    # volatility observation never fabricates a bank-specific dispersion.
+    context = _bank_context()
+    for key in ("revenue_volatility", "earnings_volatility", "forecast_uncertainty"):
+        context[key] = None
+    result = ForecastEngine().generate_forecast(1, 10, "BANK", context)
+    assert result.assumptions["scenario_financial_growth_spread"] == 0.05
+    assert result.assumptions["uncertainty_evidence"] is None
+    chains = result.scenario_forecasts
+    assert chains.bear.net_profit == pytest.approx(525.0)
+    assert chains.base.net_profit == pytest.approx(550.0)
+    assert chains.bull.net_profit == pytest.approx(575.0)
+
+
+# --- Determinism -----------------------------------------------------------
+
+def test_forecast_is_deterministic_across_identical_inputs():
+    context = _core_context(
+        prior_revenue=9000.0, current_revenue=10000.0,
+        revenue_volatility=0.20, volatility_sensitivity=1.5)
+    # The timestamp is one of the declared inputs: pinning it keeps repeated
+    # runs from differing only because the wall clock moved between them.
+    context["calculation_timestamp"] = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    first = _core_forecast(context).records(forecast_id_start=1)
+    second = _core_forecast(context).records(forecast_id_start=1)
+    assert len(first) == len(second) == 3
+    for left, right in zip(first, second):
+        assert left == right
+        assert left.revenue == right.revenue
+        assert left.eps == right.eps
+        assert left.roe == right.roe
