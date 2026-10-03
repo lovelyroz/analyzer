@@ -204,6 +204,22 @@ class ForecastDriver:
         }
 
     @staticmethod
+    def _holding_evidence(
+        assumptions: Optional[Dict[str, Any]],
+        base_nav: Optional[float],
+        nav_growth_rate: Optional[float],
+    ) -> Dict[str, Any]:
+        """NAV evidence, plus the valuation inputs this chain refuses to read."""
+        resolved_nav = None
+        if base_nav is not None and nav_growth_rate is not None:
+            resolved_nav = base_nav * (1.0 + nav_growth_rate)
+        merged = dict(assumptions or {})
+        merged["forecast_nav"] = ForecastDriver._round(resolved_nav)
+        merged["nav_growth_rate"] = ForecastDriver._round(nav_growth_rate)
+        merged["excluded_inputs"] = ["p_nav", "price_to_nav"]
+        return merged
+
+    @staticmethod
     def _with_bank_context(
         assumptions: Optional[Dict[str, Any]],
         npl_ratio: Optional[float],
@@ -245,7 +261,12 @@ class ForecastDriver:
             np = forecast_nav * net_profit_conversion
             method = "HOLDING_NAV_CONVERSION"
         else:
-            return SingleForecastChain(method="INSUFFICIENT_DATA", assumptions=assumptions or {})
+            return SingleForecastChain(
+                method="INSUFFICIENT_DATA",
+                assumptions=ForecastDriver._holding_evidence(
+                    assumptions, base_nav, nav_growth_rate
+                ),
+            )
 
         eps = np / share_count if share_count is not None and share_count > 0 else None
         roe = None
@@ -261,10 +282,7 @@ class ForecastDriver:
         if base_nav is not None and nav_growth_rate is not None:
             resolved_nav = base_nav * (1.0 + nav_growth_rate)
 
-        merged = dict(assumptions or {})
-        merged["forecast_nav"] = ForecastDriver._round(resolved_nav)
-        merged["nav_growth_rate"] = ForecastDriver._round(nav_growth_rate)
-        merged["excluded_inputs"] = ["p_nav", "price_to_nav"]
+        merged = ForecastDriver._holding_evidence(assumptions, base_nav, nav_growth_rate)
 
         return SingleForecastChain(
             net_profit=ForecastDriver._round(np),

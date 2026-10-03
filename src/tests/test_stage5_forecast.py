@@ -2191,3 +2191,613 @@ def test_deterministic_across_reordered_share_history():
                               ).scenario_forecasts.base
     assert first.eps == second.eps
     assert first.roe == second.roe
+
+# ==========================================================================
+# 17. Bank / Holding / Operational FX (Prompt 8)
+#     BANK:  Loans/Deposits -> NII/NIM -> Net Profit -> EPS -> ROE
+#     HOLDING: NAV -> NAV Growth -> Net Profit -> EPS -> ROE
+#     FX: operational and FREE_MARKET FX are separate concepts; an operational
+#     rate is never silently a FREE_MARKET rate, and missing is never zero.
+# ==========================================================================
+
+from src.forecast.schema import OperationalFx  # noqa: E402
+
+
+def _bank_context(**overrides):
+    context = {
+        "base_nii": 1000.0,
+        "baseline_nii_growth": 0.10,
+        "bank_net_profit_nii_conversion": 0.50,
+        "share_count": 100.0,
+        "beginning_equity": 8000.0,
+        "forecast_ending_equity": 12000.0,
+        "model_parameters": {"scenario_financial_growth_spread": 0.05},
+    }
+    context.update(overrides)
+    return context
+
+
+def _bank_forecast(**overrides):
+    context = _bank_context()
+    engine_kwargs = {}
+    for key, value in overrides.items():
+        if key in CONTEXT_KEYS or key in _BANK_CONTEXT_KEYS:
+            context[key] = value
+        else:
+            engine_kwargs[key] = value
+    engine_kwargs.setdefault("company_id", 1)
+    engine_kwargs.setdefault("forecast_period_id", 10)
+    engine_kwargs.setdefault("industry_code", "BANK")
+    engine_kwargs["financial_context"] = context
+    return ForecastEngine().generate_forecast(**engine_kwargs)
+
+
+_BANK_CONTEXT_KEYS = {
+    "base_nii", "baseline_nii_growth", "bank_net_profit_nii_conversion",
+    "forecast_net_profit", "forecast_nii", "npl_ratio", "nim", "loan_growth",
+    "deposit_growth", "p_nav", "price_to_nav", "free_market_fx_rate",
+}
+
+
+def _holding_context(**overrides):
+    context = {
+        "base_nav": 2000.0,
+        "baseline_nav_growth": 0.10,
+        "holding_net_profit_nav_conversion": 0.20,
+        "share_count": 100.0,
+        "beginning_equity": 15000.0,
+        "forecast_ending_equity": 25000.0,
+        "model_parameters": {"scenario_financial_growth_spread": 0.05},
+    }
+    context.update(overrides)
+    return context
+
+
+def _holding_forecast(**overrides):
+    context = _holding_context()
+    engine_kwargs = {}
+    for key, value in overrides.items():
+        if key in CONTEXT_KEYS or key in _HOLDING_CONTEXT_KEYS:
+            context[key] = value
+        else:
+            engine_kwargs[key] = value
+    engine_kwargs.setdefault("company_id", 1)
+    engine_kwargs.setdefault("forecast_period_id", 10)
+    engine_kwargs.setdefault("industry_code", "HOLDING")
+    engine_kwargs["financial_context"] = context
+    return ForecastEngine().generate_forecast(**engine_kwargs)
+
+
+_HOLDING_CONTEXT_KEYS = {
+    "base_nav", "baseline_nav_growth", "holding_net_profit_nav_conversion",
+    "forecast_net_profit", "p_nav", "price_to_nav", "free_market_fx_rate",
+}
+
+
+# --- BANK: specialized path ---------------------------------------------------
+
+def test_bank_chain_runs_on_nii_not_the_revenue_model():
+    result = _bank_forecast()
+    base = result.scenario_forecasts.base
+    assert result.baseline_method == "BANK_SPECIALIZED"
+    # The bank chain never produces a revenue figure: it is not routed through
+    # the non-financial revenue model.
+    assert base.revenue is None
+    assert base.operating_profit == 1100.0  # base_nii grown at 10%
+    assert base.net_profit == 550.0
+    assert base.method == "BANK_NII_CONVERSION"
+
+
+def test_bank_scenarios_are_ordered_and_use_the_financial_spread():
+    chains = _bank_forecast().scenario_forecasts
+    assert chains.bear.net_profit < chains.base.net_profit < chains.bull.net_profit
+    # 1000 x (1 + 0.10 - 0.05) x 0.50
+    assert chains.bear.net_profit == 525.0
+    assert chains.bull.net_profit == 575.0
+
+
+def test_bank_missing_nii_driver_stays_missing_not_zero():
+    # No NII at all: the whole chain is unknown, never a zero-profit bank.
+    result = _bank_forecast(base_nii=None, baseline_nii_growth=None,
+                            forecast_nii=None)
+    base = result.scenario_forecasts.base
+    assert base.method == "INSUFFICIENT_DATA"
+    assert base.operating_profit is None
+    assert base.net_profit is None
+    assert base.eps is None
+    assert base.roe is None
+    assert base.assumptions["reason"] == "missing_nii_driver"
+
+
+def test_bank_missing_net_profit_conversion_keeps_nii_visible():
+    # NII is known but no conversion to net profit exists: NII survives as the
+    # chain's own driver while net profit stays missing.
+    result = _bank_forecast(bank_net_profit_nii_conversion=None)
+    base = result.scenario_forecasts.base
+    assert base.method == "INSUFFICIENT_DATA"
+    assert base.assumptions["resolved_nii"] == 1100.0
+    assert base.net_profit is None
+    assert base.eps is None
+
+
+def test_bank_eps_is_net_profit_over_shares():
+    base = _bank_forecast().scenario_forecasts.base
+    assert base.eps == 5.5
+    assert base.eps == round(base.net_profit / 100.0, 6)
+
+
+def test_bank_roe_is_net_profit_over_average_equity():
+    base = _bank_forecast().scenario_forecasts.base
+    assert base.roe == pytest.approx(550.0 / ((8000.0 + 12000.0) / 2.0))
+    assert base.roe != pytest.approx(550.0 / 12000.0)
+
+
+def test_bank_missing_equity_leaves_roe_none_but_keeps_eps():
+    result = _bank_forecast(beginning_equity=None, forecast_ending_equity=None)
+    base = result.scenario_forecasts.base
+    assert base.net_profit == 550.0
+    assert base.eps == 5.5
+    assert base.roe is None
+    assert result.to_record("base", forecast_id=1).is_missing("roe")
+
+
+# --- BANK: NPL is context only ------------------------------------------------
+
+def test_npl_is_recorded_as_context_and_never_a_profit_factor():
+    without = _bank_forecast().scenario_forecasts.base
+    with_npl = _bank_forecast(npl_ratio=0.15).scenario_forecasts.base
+    # A 15% NPL does not move net profit: no NPL -> profit relationship exists.
+    assert with_npl.net_profit == without.net_profit
+    assert with_npl.eps == without.eps
+    assert with_npl.roe == without.roe
+    assert with_npl.assumptions["bank_context"]["npl_ratio"] == 0.15
+    assert with_npl.assumptions["bank_context"]["npl_role"] == "CONTEXT_ONLY"
+
+
+def test_missing_npl_leaves_the_bank_chain_unchanged():
+    # NPL is optional context, so its absence is not a data gap.
+    base = _bank_forecast().scenario_forecasts.base
+    assert base.assumptions["bank_context"]["npl_ratio"] is None
+    assert base.method == "BANK_NII_CONVERSION"
+    assert base.net_profit == 550.0
+
+
+def test_nim_and_loan_drivers_are_carried_as_context_only():
+    base = _bank_forecast(nim=0.035, loan_growth=0.20,
+                          deposit_growth=0.12).scenario_forecasts.base
+    context = base.assumptions["bank_context"]
+    assert context["nim"] == 0.035
+    assert context["loan_growth"] == 0.20
+    assert context["deposit_growth"] == 0.12
+    # Context is descriptive: the conversion, not NIM, sets net profit.
+    assert base.net_profit == 550.0
+
+
+def test_bank_component_based_net_profit_outranks_the_conversion():
+    base = _bank_forecast(forecast_net_profit=700.0).scenario_forecasts.base
+    assert base.method == "BANK_COMPONENT_BASED"
+    assert base.net_profit == 700.0
+    assert base.eps == 7.0
+
+
+def test_npl_context_survives_into_the_stored_record():
+    record = _bank_forecast(npl_ratio=0.08).to_record("base", forecast_id=1)
+    assert record.assumptions["bank_context"]["npl_ratio"] == 0.08
+    assert record.assumptions["bank_context"]["npl_role"] == "CONTEXT_ONLY"
+
+
+# --- HOLDING: specialized path -------------------------------------------------
+
+def test_holding_chain_runs_on_nav_not_the_revenue_model():
+    result = _holding_forecast()
+    base = result.scenario_forecasts.base
+    assert result.baseline_method == "HOLDING_SPECIALIZED"
+    assert base.revenue is None
+    assert base.net_profit == 440.0  # 2000 x 1.10 x 0.20
+    assert base.method == "HOLDING_NAV_CONVERSION"
+
+
+def test_holding_nav_growth_drives_net_profit():
+    base = _holding_forecast(baseline_nav_growth=0.25).scenario_forecasts.base
+    assert base.assumptions["forecast_nav"] == 2500.0
+    assert base.assumptions["nav_growth_rate"] == 0.25
+    assert base.net_profit == 500.0
+
+
+def test_holding_scenarios_are_ordered_around_nav_growth():
+    chains = _holding_forecast().scenario_forecasts
+    assert chains.bear.net_profit < chains.base.net_profit < chains.bull.net_profit
+    assert chains.bear.assumptions["forecast_nav"] < \
+        chains.base.assumptions["forecast_nav"] < \
+        chains.bull.assumptions["forecast_nav"]
+
+
+def test_holding_eps_is_net_profit_over_shares():
+    base = _holding_forecast().scenario_forecasts.base
+    assert base.eps == 4.4
+    assert base.eps == round(base.net_profit / 100.0, 6)
+
+
+def test_holding_roe_is_net_profit_over_average_equity():
+    base = _holding_forecast().scenario_forecasts.base
+    assert base.roe == pytest.approx(440.0 / ((15000.0 + 25000.0) / 2.0))
+    assert base.roe != pytest.approx(440.0 / 25000.0)
+
+
+def test_holding_missing_equity_leaves_roe_none_but_keeps_eps():
+    result = _holding_forecast(beginning_equity=None, forecast_ending_equity=None)
+    base = result.scenario_forecasts.base
+    assert base.net_profit == 440.0
+    assert base.eps == 4.4
+    assert base.roe is None
+
+
+def test_holding_missing_nav_and_conversion_stay_missing():
+    result = _holding_forecast(base_nav=None, baseline_nav_growth=None,
+                               holding_net_profit_nav_conversion=None)
+    base = result.scenario_forecasts.base
+    assert base.method == "INSUFFICIENT_DATA"
+    assert base.net_profit is None
+    assert base.eps is None
+    assert base.assumptions["forecast_nav"] is None
+
+
+def test_holding_component_net_profit_outranks_nav_conversion():
+    base = _holding_forecast(forecast_net_profit=600.0).scenario_forecasts.base
+    assert base.method == "HOLDING_COMPONENT_BASED"
+    assert base.net_profit == 600.0
+    assert base.eps == 6.0
+
+
+# --- HOLDING: P/NAV exclusion ---------------------------------------------------
+
+def test_holding_excludes_p_nav_from_the_forecast_chain():
+    base = _holding_forecast(p_nav=1.5).scenario_forecasts.base
+    assert base.net_profit == 440.0
+    # The valuation ratio is named as excluded, never read as a driver.
+    assert base.assumptions["excluded_inputs"] == ["p_nav", "price_to_nav"]
+    for key in ("p_nav", "price_to_nav", "target_p_nav"):
+        assert key not in base.assumptions
+
+
+def test_holding_ignores_a_declared_p_nav_completely():
+    with_pnav = _holding_forecast(p_nav=3.0, price_to_nav=3.0).scenario_forecasts.base
+    without = _holding_forecast().scenario_forecasts.base
+    assert with_pnav.net_profit == without.net_profit
+    assert with_pnav.eps == without.eps
+    assert with_pnav.roe == without.roe
+
+
+def test_holding_p_nav_exclusion_is_recorded_on_the_stored_record():
+    record = _holding_forecast(p_nav=2.0).to_record("base", forecast_id=1)
+    assert record.assumptions["excluded_inputs"] == ["p_nav", "price_to_nav"]
+    assert "p_nav" not in record.assumptions
+
+
+# --- FX: operational rate and the FX-linked revenue path ------------------------
+
+_FX_BASE_RATE = 500000.0
+_FX_NEW_RATE = 550000.0  # a 10% operational depreciation
+
+
+def _fx_context(**overrides):
+    context = _core_context()
+    context["operational_fx_rate"] = _FX_NEW_RATE
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    context.update(overrides)
+    return context
+
+
+def test_operational_fx_reprices_the_exposed_revenue_share():
+    no_fx = _core_forecast(_core_context())
+    with_fx = _core_forecast(_fx_context())
+    plain = no_fx.scenario_forecasts.base.revenue
+    moved = with_fx.scenario_forecasts.base.revenue
+    # Only half the revenue is exposed, and the move is +10% x 0.80 sensitivity.
+    assert moved == pytest.approx(plain + plain * 0.50 * 0.08)
+
+
+def test_operational_fx_provenance_is_recorded():
+    result = _core_forecast(_fx_context(operational_fx_source="codal_operational"))
+    assert result.assumptions["operational_fx"] == _FX_NEW_RATE
+    assert result.assumptions["operational_fx_source"] == "codal_operational"
+    assert result.assumptions["operational_fx_available"] is True
+    assert result.assumptions["operational_fx_estimated"] is False
+    assert result.assumptions["operational_fx_confidence"] == "HIGH"
+    assert "operational_fx_proxy" not in result.assumptions
+    base = result.scenario_forecasts.base
+    assert base.assumptions["operational_fx_provenance"]["source"] == \
+        "codal_operational"
+
+
+def test_operational_fx_object_is_accepted_directly():
+    context = _fx_context()
+    context["operational_fx_rate"] = OperationalFx(
+        rate=_FX_NEW_RATE, source="fx_rates_table", confidence="HIGH")
+    result = _core_forecast(context)
+    assert result.assumptions["operational_fx_source"] == "fx_rates_table"
+    assert result.assumptions["operational_fx"] == _FX_NEW_RATE
+
+
+def test_fx_without_declared_exposure_leaves_revenue_untouched():
+    context = _fx_context()
+    del context["fx_exposed_revenue_share"]
+    context["fx_revenue_share"] = None
+    base = _core_forecast(context).scenario_forecasts.base
+    plain = _core_forecast(_core_context()).scenario_forecasts.base.revenue
+    assert base.revenue == pytest.approx(plain)
+    assert "fx" not in base.assumptions
+
+
+def test_fx_without_declared_sensitivity_leaves_revenue_untouched():
+    context = _fx_context()
+    del context["fx_revenue_sensitivity"]
+    base = _core_forecast(context).scenario_forecasts.base
+    plain = _core_forecast(_core_context()).scenario_forecasts.base.revenue
+    assert base.revenue == pytest.approx(plain)
+    assert "fx" not in base.assumptions
+
+
+def test_fx_applies_identically_across_all_three_scenarios():
+    chains = _core_forecast(_fx_context()).scenario_forecasts
+    plain = _core_forecast(_core_context()).scenario_forecasts
+    for chain, original in zip((chains.bear, chains.base, chains.bull),
+                               (plain.bear, plain.base, plain.bull)):
+        assert chain.revenue == pytest.approx(
+            original.revenue + original.revenue * 0.50 * 0.08)
+
+
+# --- FX: missing operational FX ---------------------------------------------------
+
+def test_missing_operational_fx_is_none_and_never_zero():
+    context = _core_context()
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    result = _core_forecast(context)
+    assert result.assumptions["operational_fx"] is None
+    assert result.assumptions["operational_fx_available"] is False
+    # No FX effect is invented: the chain is the plain, unrepriced chain.
+    plain = _core_forecast(_core_context())
+    assert result.scenario_forecasts.base.revenue == \
+        pytest.approx(plain.scenario_forecasts.base.revenue)
+    assert "fx" not in result.scenario_forecasts.base.assumptions
+
+
+def test_missing_operational_fx_still_produces_a_full_chain():
+    context = _core_context()
+    context["fx_exposed_revenue_share"] = 0.50
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.revenue is not None
+    assert base.net_profit is not None
+    assert base.eps is not None
+    assert base.method == "MARGIN"
+
+
+def test_missing_operational_fx_reports_an_empty_ladder():
+    context = _core_context()
+    context["fx_exposed_revenue_share"] = 0.50
+    ladder = _core_forecast(context).assumptions["fx_ladder"]
+    assert ladder == []
+
+
+def test_free_market_fx_alone_does_not_resolve_operational_fx():
+    # A free-market rate present in the context is never read as the
+    # operational rate. A company with no declared FX exposure is unaffected,
+    # so the free-market rate is recorded as present but unused.
+    context = _core_context()
+    context["free_market_fx_rate"] = 700000.0
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    result = _core_forecast(context)
+    assert result.assumptions["operational_fx"] is None
+    assert result.assumptions["fx_ladder"] == [
+        "free_market_fx_rate:PRESENT_UNUSED",
+    ]
+    plain = _core_forecast(_core_context())
+    assert result.scenario_forecasts.base.revenue == \
+        pytest.approx(plain.scenario_forecasts.base.revenue)
+
+
+# --- FX: FREE_MARKET separation ---------------------------------------------------
+
+def test_free_market_fx_is_never_used_as_operational_fx():
+    context = _fx_context(free_market_fx_rate=700000.0)
+    result = _core_forecast(context)
+    # The operational rate, not the 700,000 free-market rate, repriced revenue.
+    assert result.assumptions["operational_fx"] == _FX_NEW_RATE
+    assert result.assumptions["operational_fx_source"] == "DECLARED_OPERATIONAL"
+    base = result.scenario_forecasts.base
+    plain = _core_forecast(_core_context()).scenario_forecasts.base
+    assert base.revenue == pytest.approx(
+        plain.revenue + plain.revenue * 0.50 * 0.08)
+    assert result.assumptions["fx_ladder"][-1] == "resolved:DECLARED_OPERATIONAL"
+    assert "free_market_fx_rate:PRESENT_UNUSED" in result.assumptions["fx_ladder"]
+
+
+def test_free_market_fx_cannot_silently_substitute_for_operational_fx():
+    # The operational rate is missing, exposure is declared, and only a
+    # free-market rate is available. That is the forbidden substitution, so
+    # the engine refuses to produce a forecast priced at the wrong currency.
+    context = _core_context()
+    context["operational_fx_rate"] = None
+    context["operational_fx"] = None
+    context["operational_fx_proxy"] = None
+    context["operational_fx_proxy_rate"] = None
+    context["operational_fx_reference_rate"] = None
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    context["free_market_fx_rate"] = 700000.0
+    with pytest.raises(ValueError, match="silently substituted"):
+        ForecastEngine().generate_forecast(
+            1, 101, "PETROCHEMICAL", context,
+            data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+
+
+def test_free_market_rate_without_exposure_is_not_a_substitution():
+    # A company with no declared FX exposure is unaffected: there is nothing to
+    # reprice, so the free-market rate is simply unused.
+    context = _core_context(free_market_fx_rate=700000.0)
+    result = _core_forecast(context)
+    assert result.assumptions["operational_fx"] is None
+    assert "free_market_fx_rate:PRESENT_UNUSED" in result.assumptions["fx_ladder"]
+    plain = _core_forecast(_core_context())
+    assert result.scenario_forecasts.base.revenue == \
+        pytest.approx(plain.scenario_forecasts.base.revenue)
+
+
+def test_free_market_fx_is_ignored_on_the_bank_chain():
+    context = _bank_context(free_market_fx_rate=700000.0)
+    result = ForecastEngine().generate_forecast(1, 10, "BANK", context)
+    assert result.assumptions["operational_fx"] is None
+    assert result.scenario_forecasts.base.net_profit == 550.0
+
+
+def test_free_market_fx_is_ignored_on_the_holding_chain():
+    context = _holding_context(free_market_fx_rate=700000.0)
+    result = ForecastEngine().generate_forecast(1, 10, "HOLDING", context)
+    assert result.assumptions["operational_fx"] is None
+    assert result.scenario_forecasts.base.net_profit == 440.0
+
+
+# --- FX: explicit proxy and provenance -------------------------------------------
+
+def test_declared_proxy_rate_stands_in_for_missing_operational_fx():
+    context = _core_context()
+    context["operational_fx_proxy_rate"] = _FX_NEW_RATE
+    context["operational_fx_proxy_source"] = "NIAM_PROXY"
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    result = _core_forecast(context)
+    assert result.assumptions["operational_fx"] == _FX_NEW_RATE
+    assert result.assumptions["operational_fx_available"] is True
+    assert result.assumptions["operational_fx_estimated"] is True
+    assert result.assumptions["operational_fx_confidence"] == "LOW"
+
+
+def test_proxy_is_marked_estimated_and_named():
+    context = _core_context()
+    context["operational_fx_proxy_rate"] = _FX_NEW_RATE
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    result = _core_forecast(context)
+    proxy = result.assumptions["operational_fx_proxy"]
+    assert proxy["estimated"] is True
+    assert proxy["proxy_basis"] == "DECLARED_PROXY"
+    assert proxy["source"] == "DECLARED_PROXY"
+    assert proxy["confidence"] == "LOW"
+
+
+def test_proxy_provenance_reaches_the_stored_record():
+    context = _core_context()
+    context["operational_fx_proxy_rate"] = _FX_NEW_RATE
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    result = _core_forecast(context)
+    record = result.to_record("base", forecast_id=1)
+    # The record freezes the chain's own view of the FX it applied.
+    provenance = record.assumptions["operational_fx_provenance"]
+    assert provenance["estimated"] is True
+    assert provenance["proxy_basis"] == "DECLARED_PROXY"
+    assert record.assumptions["fx"]["operational_fx_source"] == "OPERATIONAL"
+    assert result.assumptions["operational_fx_estimated"] is True
+
+
+def test_an_operational_fx_proxy_object_is_carried_verbatim():
+    context = _core_context()
+    context["operational_fx_proxy"] = OperationalFx(
+        rate=_FX_NEW_RATE, source="OFFICIAL_NIMA", estimated=True,
+        proxy_basis="DECLARED_PROXY", confidence="MEDIUM")
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    result = _core_forecast(context)
+    assert result.assumptions["operational_fx_source"] == "OFFICIAL_NIMA"
+    assert result.assumptions["operational_fx_confidence"] == "MEDIUM"
+    assert result.assumptions["operational_fx_proxy"]["proxy_basis"] == \
+        "DECLARED_PROXY"
+
+
+def test_a_proxy_rate_does_not_allow_the_free_market_rate_in():
+    context = _core_context()
+    context["operational_fx_proxy_rate"] = _FX_NEW_RATE
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    context["free_market_fx_rate"] = 700000.0
+    result = _core_forecast(context)
+    assert result.assumptions["operational_fx"] == _FX_NEW_RATE
+    plain = _core_forecast(_core_context()).scenario_forecasts.base
+    assert result.scenario_forecasts.base.revenue == pytest.approx(
+        plain.revenue + plain.revenue * 0.50 * 0.08)
+
+
+def test_proxy_ladder_is_reported_in_order():
+    context = _core_context()
+    context["operational_fx_rate"] = _FX_NEW_RATE
+    context["operational_fx_proxy_rate"] = _FX_NEW_RATE
+    context["free_market_fx_rate"] = 700000.0
+    ladder = _core_forecast(context).assumptions["fx_ladder"]
+    assert ladder[0] == "operational_fx_rate:DECLARED"
+    assert "operational_fx_proxy_rate:DECLARED" in ladder
+    assert "free_market_fx_rate:PRESENT_UNUSED" in ladder
+    assert ladder[-1] == "resolved:DECLARED_OPERATIONAL"
+
+
+def test_reference_rate_is_the_second_proxy_rung():
+    context = _core_context()
+    context["operational_fx_reference_rate"] = _FX_NEW_RATE
+    context["operational_fx_base_rate"] = _FX_BASE_RATE
+    context["fx_exposed_revenue_share"] = 0.50
+    context["fx_revenue_sensitivity"] = 0.80
+    result = _core_forecast(context)
+    assert result.assumptions["operational_fx_proxy"]["proxy_basis"] == \
+        "DECLARED_REFERENCE_RATE"
+    assert result.assumptions["operational_fx"] == _FX_NEW_RATE
+
+
+# --- Determinism ------------------------------------------------------------------
+
+def test_bank_forecast_is_deterministic_across_calls():
+    first = _bank_forecast(npl_ratio=0.10, nim=0.03).records(forecast_id_start=1)
+    second = _bank_forecast(npl_ratio=0.10, nim=0.03).records(forecast_id_start=1)
+    assert len(first) == len(second) == 3
+    for left, right in zip(first, second):
+        assert left.net_profit == right.net_profit
+        assert left.eps == right.eps
+        assert left.roe == right.roe
+
+
+def test_holding_forecast_is_deterministic_across_calls():
+    first = _holding_forecast().records(forecast_id_start=1)
+    second = _holding_forecast().records(forecast_id_start=1)
+    assert len(first) == len(second) == 3
+    for left, right in zip(first, second):
+        assert left.net_profit == right.net_profit
+        assert left.eps == right.eps
+        assert left.roe == right.roe
+
+
+def test_operational_fx_effect_is_deterministic_across_calls():
+    context = _fx_context()
+    first = _core_forecast(context).records(forecast_id_start=1)
+    second = _core_forecast(context).records(forecast_id_start=1)
+    assert len(first) == len(second) == 3
+    for left, right in zip(first, second):
+        assert left.revenue == right.revenue
+        assert left.eps == right.eps
+
+
+def test_bank_and_holding_chains_never_report_a_revenue_baseline():
+    bank = _bank_forecast()
+    holding = _holding_forecast()
+    assert bank.baseline_method == "BANK_SPECIALIZED"
+    assert holding.baseline_method == "HOLDING_SPECIALIZED"
+    for result in (bank, holding):
+        for scenario in ("bear", "base", "bull"):
+            assert getattr(result.scenario_forecasts, scenario).revenue is None
