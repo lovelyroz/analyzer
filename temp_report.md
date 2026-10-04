@@ -541,3 +541,605 @@ The identified production-path gaps are implemented or already correctly handled
 The implementation is NOT being declared frozen or fully validation-approved until the required executable test suites are run.
 
 # Stage 5 is NOT declared frozen.
+
+=====================================================================
+REPORT Stage 5 Prompt 14
+
+1. خلاصه اجرایی
+
+من Prompt 14 را به‌عنوان یک گیت مستقل نهایی بررسی کردم؛ یعنی صرفاً به این دلیل که تست‌های موجود ظاهراً قبلاً پاس شده‌اند، Stage 5 را تأیید نکردم.
+
+نتیجه بررسی این است که در وضعیت فعلی، Stage 5 نباید برای Freeze تأیید شود.
+
+دو مورد اصلی و جدی وجود دارد:
+
+در مسیرهای تخصصی BANK و HOLDING، قانون استفاده از Attributable Profit برای EPS می‌تواند دور زده شود.
+برای Scenarioها، spreadهای ثابت پیش‌فرض در کد وجود دارند، اما در محدوده اسناد و فایل‌های مجاز برای این Verification، مدرک مستقل و authoritative کافی برای اعتبار این اعداد پیدا نشد.
+
+علاوه بر این، دو مسئله دیگر نیز وجود دارد که برای یک سیستم مالی production-grade باید قبل از Freeze روشن یا اصلاح شوند:
+
+مسیر تعیین baseline_revenue_growth امکان اتکا به مقدار اعلام‌شده توسط caller را دارد، در حالی که Prompt 14 الزام می‌کند رشد تاریخی Revenue بر اساس مشاهدات واقعی و PIT-valid باشد.
+PIT در production query path به‌خوبی رعایت شده، اما در سطح عمومی ForecastEngine، صرفاً فیلتر کردن provenance referenceها تضمین نمی‌کند که یک مقدار عددی late واردشده بدون provenance معتبر نتواند وارد محاسبات شود.
+
+و یک نکته مهم:
+
+تست‌های الزامی Prompt 14 در محیط فعلی من قابل اجرا نبودند؛ بنابراین من نه آنها را Pass اعلام کرده‌ام و نه نتیجه تاریخی تست‌های قبلی را به‌عنوان نتیجه این Verification محسوب کرده‌ام.
+
+2. وضعیت Verification
+حوزه	نتیجه بررسی
+Persistence / Idempotency	✅ PASS — از نظر استاتیک
+Production Path	✅ PASS — از نظر استاتیک
+Revenue hierarchy	⚠️ نیازمند بررسی دقیق
+Operating Margin	⚠️ نیازمند بررسی دقیق
+Net Profit	⚠️ نیازمند بررسی دقیق
+EPS attributable-profit rule	❌ FAIL
+ROE	✅ PASS — از نظر استاتیک
+PIT production path	✅ PASS — ولی firewall عمومی ناقص
+Stage 4 adapter-only boundary	✅ PASS
+Momentum/Fundamental isolation	✅ PASS
+Sign-change / zero-base	✅ PASS
+Scenario evidence	❌ FAIL / insufficient evidence
+Specialized cores	⚠️ PARTIAL
+FX boundary	✅ PASS
+Determinism	⚠️ نیازمند runtime verification
+Focused pytest	⚠️ NOT EXECUTED
+Full regression pytest	⚠️ NOT EXECUTED
+Freeze decision	❌ NOT VERIFIED
+3. Persistence و Idempotency
+
+در schema.py مشخص است که مقایسه state، فیلدهای surrogate مانند:
+
+forecast_id
+forecast_version
+
+را از مقایسه meaningful state جدا می‌کند.
+
+در repo.py نیز _records_equal() state واقعی forecast را مقایسه می‌کند، نه صرفاً شناسه رکورد.
+
+همچنین تست مشخصی برای این رفتار وجود دارد:
+
+test_repo_identical_resave_with_a_different_surrogate_id_is_idempotent
+
+این تست نشان می‌دهد که ایجاد دوباره یک forecast با state یکسان ولی surrogate ID متفاوت، نباید به‌عنوان forecast جدید معنایی تلقی شود.
+
+نتیجه
+
+PASS از نظر بررسی استاتیک.
+
+اما چون runtime test اجرا نشد، این PASS به معنی اجرای موفق تست در این Verification نیست.
+
+4. Production Path
+
+مسیر production به‌صورت کلی چنین است:
+
+Stage 1 facts
+    ↓
+Stage 4 / context
+    ↓
+share history
+    ↓
+weighted shares
+    ↓
+ForecastEngine.generate_forecast()
+    ↓
+forecast record
+    ↓
+repository persistence
+
+این مسیر در service.py قابل مشاهده است و معماری آن با هدف Stage 5 سازگار است.
+
+یعنی ForecastEngine صرفاً یک helper جدا از production path نیست و در مسیر واقعی تولید forecast استفاده می‌شود.
+
+نتیجه
+
+PASS از نظر معماری و static inspection.
+
+5. مهم‌ترین Defect — EPS در BANK/HOLDING
+
+این مهم‌ترین یافته این Verification است.
+
+در خود ForecastEngine منطق صحیحی برای EPS وجود دارد:
+
+net profit
+    ↓
+attributable-profit validation
+    ↓
+EPS
+
+متد _eps(...) بررسی می‌کند که سود قابل انتساب باشد.
+
+این دقیقاً همان چیزی است که برای یک سیستم مالی لازم است.
+
+اما مشکل در مسیرهای specialized به وجود می‌آید.
+
+در مسیر BANK، _bank_chain() ابتدا چیزی مشابه این انجام می‌دهد:
+
+eps, eps_reason = self._eps(...)
+
+یعنی EPS معتبر را محاسبه می‌کند.
+
+اما سپس این مقدار به:
+
+ForecastDriver.build_bank_chain(...)
+
+ارسال می‌شود.
+
+در مسیر Driver، EPS می‌تواند مجدداً از:
+
+net_profit / share_count
+
+محاسبه شود.
+
+در نتیجه، مسیر specialized می‌تواند عملاً نتیجه validation قبلی را bypass کند.
+
+همین مسئله در مسیر HOLDING نیز وجود دارد.
+
+چرا این مسئله مهم است؟
+
+فرض کنید:
+
+net_profit = 1,000
+share_count = 100
+net_profit_is_attributable = False
+
+طبق invariant مورد نظر:
+
+EPS = insufficient
+
+باید نتیجه شود، زیرا مشخص نیست کل سود متعلق به سهامداران عادی/قابل انتساب است.
+
+اما اگر specialized driver مستقیماً بگوید:
+
+EPS = 1,000 / 100 = 10
+
+آن‌وقت EPS تولید شده، برخلاف invariant مالی، به سودی متکی است که attributable بودنش اثبات نشده.
+
+این صرفاً یک مشکل تست نیست.
+
+خود مسیر محاسباتی اجازه چنین رفتاری را می‌دهد.
+
+6. چرا این مورد را فقط به‌عنوان Test Gap تلقی نکردم؟
+
+چون Prompt 14 صراحتاً می‌گوید:
+
+Passing tests that encode incorrect financial behavior are not sufficient.
+
+یعنی اگر تست‌های فعلی بگویند:
+
+PASS
+
+ولی implementation از نظر financial invariant اشتباه باشد، Stage 5 نباید تأیید شود.
+
+در اینجا دقیقاً چنین ریسکی وجود دارد.
+
+بنابراین این مورد را:
+
+Genuine Stage 5 Defect
+
+در نظر گرفتم.
+
+7. Scenario Spreadها
+
+در DEFAULT_MODEL_PARAMETERS مقادیر زیر وجود دارند:
+
+scenario_revenue_growth_spread = 0.05
+scenario_operating_margin_spread = 0.02
+scenario_net_margin_spread = 0.01
+scenario_financial_growth_spread = 0.05
+
+و Engine از این مقادیر برای ساخت Scenarioها استفاده می‌کند.
+
+مشکل خود عدد 0.05 یا 0.02 نیست.
+
+مشکل این است که Prompt 14 الزام کرده:
+
+fixed scenario spreads such as ±5%, ±10%, ±15% must be rejected unless explicitly supported by authoritative project specification/evidence.
+
+در محدوده فایل‌هایی که برای Verification مجاز بود بررسی شوند، من مدرک authoritative مستقل و کافی پیدا نکردم که این spreadها را به‌عنوان یک financial specification رسمی توجیه کند.
+
+تستی مانند:
+
+test_scenarios_use_the_declared_model_spread
+
+وجود دارد.
+
+اما اینکه تست می‌گوید:
+
+declared spread = 5%
+
+خودش proof مستقلی نیست که:
+
+5%
+
+از نظر مدل مالی صحیح و authoritative است.
+
+نتیجه
+
+Scenario evidence برای Freeze کافی نیست.
+
+8. Historical Revenue Growth
+
+Prompt 14 الزام می‌کند که historical revenue growth بر اساس:
+
+actual
++
+PIT-valid
++
+historical observations
+
+باشد.
+
+در production service، مسیر خوبی وجود دارد که prior_revenue را از historical observations استخراج می‌کند.
+
+این بخش درست است.
+
+اما در Engine، baseline_revenue_growth می‌تواند از caller وارد شود و بر growth محاسبه‌شده تاریخی precedence داشته باشد.
+
+بنابراین اگر caller مقدار growth را مستقیماً اعلام کند، این امکان وجود دارد که Engine به‌جای اینکه الزام کند:
+
+actual historical observations
+        ↓
+PIT-valid growth
+        ↓
+forecast
+
+از:
+
+caller-provided baseline growth
+        ↓
+forecast
+
+استفاده کند.
+
+ارزیابی
+
+این مورد به اندازه EPS defect قطعی نیست، زیرا باید با specification نهایی پروژه مشخص شود که آیا declared model parameter عمداً authoritative محسوب می‌شود یا خیر.
+
+اما تحت wording سختگیرانه Prompt 14:
+
+این invariant به‌طور کامل اثبات نشده است.
+
+9. PIT — Point-in-Time Correctness
+
+یکی از بخش‌های قوی implementation، query layer است.
+
+در queries.py، financial facts با شرط publication datetime محدود می‌شوند:
+
+publication_datetime <= cutoff
+
+همچنین historical share data و corporate actions نیز cutoff دارند.
+
+بنابراین در production data retrieval path، اطلاعات منتشرشده بعد از cutoff نباید وارد forecast شوند.
+
+این بخش:
+
+PASS
+
+است.
+
+اما یک ضعف معماری باقی می‌ماند
+
+در Engine، _raw_input_refs() و _pit_safe() می‌توانند provenance referenceهایی را که:
+
+available_at > cutoff
+
+دارند حذف/نادیده بگیرند.
+
+اما این الزاماً به این معنی نیست که خود numeric value از financial_context نیز حذف شده است.
+
+یعنی اگر caller یک مقدار عددی late را داخل context بگذارد ولی provenance آن ناقص یا نامعتبر باشد، صرف فیلتر کردن referenceها لزوماً مانع استفاده از آن عدد نمی‌شود.
+
+بنابراین:
+
+Production query PIT
+        ✅
+
+General Engine PIT firewall
+        ⚠️ incomplete
+10. Stage 4 Firewall
+
+در adapter.py مرز Stage 4 به شکل مشخصی تعریف شده است.
+
+هدف architecture این است که Stage 4 به‌عنوان adapter/evidence boundary عمل کند، نه اینکه TrendResult مستقیماً به‌عنوان financial metric وارد forecast شود.
+
+در بررسی انجام‌شده:
+
+TrendResult به‌عنوان Revenue یا Profit یا Margin مستقیم استفاده نمی‌شود.
+مقدار ±2% trend به‌صورت خودکار به forecast growth تبدیل نمی‌شود.
+trend adjustment فقط در صورت وجود explicit model parameter مربوطه وارد محاسبات می‌شود.
+نتیجه
+
+PASS از نظر static inspection.
+
+11. Momentum / Fundamental Isolation
+
+این بخش نیز نسبتاً تمیز است.
+
+تست‌هایی وجود دارند که تغییر صرفاً در:
+
+momentum
+
+یا:
+
+fundamental score
+
+نباید به‌صورت مستقیم forecast یا scenario spread را تغییر دهد.
+
+Trend adjustment فقط زمانی وارد محاسبه می‌شود که به‌طور explicit در model parameters تعریف شده باشد.
+
+نتیجه
+
+PASS از نظر معماری و static inspection.
+
+12. Sign Change و Zero Base
+
+این قسمت از implementation مناسب است.
+
+_safe_growth_rate() برای شرایطی مانند:
+
+missing
+zero endpoint
+sign change
+
+نرخ رشد عادی را تولید نمی‌کند.
+
+Engine نیز baseهای مشخصی برای شرایط خاص دارد، مانند:
+
+LOSS_TO_PROFIT
+PROFIT_TO_LOSS
+SIGN_CHANGE
+ZERO_BASE
+
+بنابراین سیستم نباید مثلاً این محاسبه را انجام دهد:
+
+(loss → profit)
+
+و آن را به یک درصد رشد معمولی تبدیل کند.
+
+نتیجه
+
+PASS از نظر static inspection.
+
+13. ROE
+
+ROE بر مبنای:
+
+Net Profit
+-------------------------------
+Average Beginning/Ending Equity
+
+محاسبه می‌شود.
+
+یعنی:
+
+ROE = Net Profit /
+      ((Beginning Equity + Ending Equity) / 2)
+
+و نه صرفاً:
+
+Net Profit / Ending Equity
+
+همچنین production service برای beginning equity به historical PIT-valid data رجوع می‌کند.
+
+نتیجه
+
+PASS از نظر static inspection.
+
+14. Specialized Cores
+
+معماری specialized cores به شکل زیر است.
+
+NON_FINANCIAL
+Revenue
+ ↓
+Operating Margin
+ ↓
+Operating Profit
+ ↓
+Net Profit
+ ↓
+EPS
+ ↓
+ROE
+BANK
+NII
+ ↓
+Net Profit
+ ↓
+EPS
+ ↓
+ROE
+HOLDING
+NAV
+ ↓
+NAV Growth
+ ↓
+Net Profit
+ ↓
+EPS
+ ↓
+ROE
+
+این تفکیک معماری صحیح است.
+
+همچنین P/NAV به‌عنوان forecast driver استفاده نمی‌شود و NPL در مسیر بانک به‌عنوان context مربوطه باقی می‌ماند.
+
+اما همان‌طور که در بخش EPS توضیح داده شد:
+
+specialized core architecture خوب است، ولی EPS firewall در BANK/HOLDING کامل نیست.
+
+بنابراین این بخش:
+
+PARTIAL
+
+ارزیابی می‌شود.
+
+15. FX Boundary
+
+تفکیک بین:
+
+Operational / Company FX
+
+و:
+
+Free-market FX
+
+در implementation رعایت شده است.
+
+به‌خصوص نکته مهم این است که اگر شرکت exposure ارزی دارد ولی operational FX موجود نیست، سیستم نباید silently از free-market FX استفاده کند.
+
+مسیر _operational_fx() این مرز را حفظ می‌کند.
+
+در صورت نبود operational FX و وجود صرفاً free-market FX، implementation به‌جای substitution پنهانی، خطا/عدم کفایت را حفظ می‌کند.
+
+نتیجه
+
+PASS از نظر static inspection.
+
+16. Determinism
+
+با:
+
+same inputs
++
+same cutoff
++
+same explicit model parameters
+
+منطق Engine باید deterministic باشد.
+
+این رفتار در ساختار implementation با عدم استفاده از randomness سازگار است.
+
+یک نکته وجود دارد:
+
+اگر calculation_timestamp توسط caller داده نشود، service از current UTC time استفاده می‌کند.
+
+این لزوماً financial calculation nondeterminism نیست، زیرا timestamp بخشی از recorded state است.
+
+با این حال، چون runtime test اجرا نشده، deterministic behavior را به‌صورت تجربی تأیید نکرده‌ام.
+
+نتیجه
+
+Static PASS / Runtime unverified.
+
+17. تست‌های الزامی Prompt 14
+
+Prompt 14 دو تست مشخص را الزام کرده است:
+
+pytest src/tests/test_stage5_forecast.py -v
+
+و:
+
+pytest src/tests -v
+نتیجه
+
+هیچ‌کدام در این Verification اجرا نشدند.
+
+علت این است که محیط فعلی که از طریق connector در اختیار من بود، امکان اجرای repository به‌صورت local و اجرای pytest را فراهم نمی‌کرد.
+
+بنابراین من عمداً از اعلام نتایج جعلی مانند:
+
+261 passed
+621 passed
+
+خودداری کردم.
+
+گزارش‌های تاریخی تست‌ها نیز به‌عنوان نتیجه این Verification محسوب نشده‌اند.
+
+18. آیا عدم اجرای pytest به‌تنهایی باعث FAIL شدن Stage 5 شد؟
+
+خیر.
+
+حتی اگر فرض کنیم هر دو تست در محیط local با موفقیت کامل اجرا شوند، من باز هم Stage 5 را Freeze نمی‌کنم.
+
+دلیل اصلی، وجود defect واقعی در مسیر EPS مربوط به BANK/HOLDING است.
+
+یعنی وضعیت به این صورت است:
+
+pytest PASS
+        ≠
+Stage 5 VERIFIED
+
+اگر implementation یک financial invariant را نقض کند.
+
+این دقیقاً با فلسفه Prompt 14 سازگار است.
+
+19. جمع‌بندی مشکلات بر اساس شدت
+🔴 Blocker 1 — EPS Attributable Profit
+
+قطعی‌ترین defect
+
+مسیرهای BANK/HOLDING می‌توانند EPS را از:
+
+Net Profit / Shares
+
+تولید کنند بدون اینکه attributable بودن سود به‌درستی enforce شده باشد.
+
+وضعیت: باید اصلاح شود.
+
+🔴 Blocker 2 — Scenario Evidence
+
+مقادیر ثابت:
+
+5%
+2%
+1%
+5%
+
+در implementation وجود دارند، اما در محدوده Verification مدرک authoritative مستقل کافی برای صحت آنها پیدا نشد.
+
+وضعیت: باید یا:
+
+specification/evidence معتبر برای این مقادیر ارائه شود،
+
+یا
+
+منطق Scenario به یک مبنای معتبرتر متصل شود.
+🟠 Concern 3 — Historical Revenue Growth Override
+
+baseline_revenue_growth می‌تواند توسط caller وارد شود و بر محاسبه historical growth precedence داشته باشد.
+
+این با الزام سختگیرانه PIT-valid historical evidence بالقوه ناسازگار است.
+
+وضعیت: نیازمند تصمیم معماری/اصلاح.
+
+🟠 Concern 4 — Engine-level PIT Firewall
+
+Production queries PIT-safe هستند، اما Engine به‌تنهایی تضمین کاملی نمی‌دهد که numeric late facts با provenance ناقص وارد محاسبات نشوند.
+
+وضعیت: نیازمند hardening.
+
+🟡 Verification Gap 5 — Runtime Tests
+
+دو تست اصلی Prompt 14 در محیط فعلی اجرا نشده‌اند.
+
+وضعیت: باید در local repository اجرا شوند.
+
+20. تصمیم نهایی
+
+با توجه به کل بررسی:
+
+Stage 5 NOT VERIFIED FOR FREEZE
+
+و دلیل این تصمیم فقط «تست اجرا نشده» نیست.
+
+حتی بدون در نظر گرفتن محدودیت runtime، حداقل یک financial correctness defect واقعی در مسیر EPS وجود دارد که مانع Freeze است.
+
+به‌صورت خلاصه:
+
+Persistence                  PASS
+Production path              PASS
+Stage 4 firewall             PASS
+Momentum isolation           PASS
+Sign/zero handling           PASS
+ROE                          PASS
+FX boundary                  PASS
+
+BANK/HOLDING EPS             FAIL
+Scenario evidence            FAIL
+Historical revenue growth    PARTIAL
+General PIT firewall         PARTIAL
+Runtime verification         NOT EXECUTED
+
+FINAL DECISION:
+Stage 5 NOT VERIFIED FOR FREEZE
