@@ -200,6 +200,71 @@ class ForecastEngine:
                 return value, method
         return None, "INSUFFICIENT_DATA"
 
+    # Stage 5's EPS contract divides profit *attributable to common
+    # shareholders* (05_Stage5_Forecast_Engine.md section 9). Stage 1 exposes
+    # only NET_PROFIT, so whether that total is the attributable amount is the
+    # caller's statement about its data, not the engine's assumption.
+    _EPS_ATTRIBUTABLE_BASIS_KEY = "eps_attributable_basis"
+    _UNVERIFIED_TOTAL_NET_PROFIT = "UNVERIFIED_TOTAL_NET_PROFIT"
+
+    # The keys a caller may declare to make that statement.
+    _ATTRIBUTABLE_AMOUNT_KEY = "net_profit_attributable"
+    _ATTRIBUTABLE_EQUIVALENCE_KEY = "net_profit_is_attributable"
+
+    @classmethod
+    def _eps_attributable_basis(cls, context: Dict[str, Any]) -> str:
+        """The basis on which net profit may be called attributable.
+
+        ``UNVERIFIED_TOTAL_NET_PROFIT`` is not a basis the engine may divide on:
+        it means the caller said nothing, and Stage 1 alone does not establish
+        the equivalence (no NET_PROFIT_ATTRIBUTABLE metric, no documented
+        equivalence, and no minority-interest fields to isolate the attributable
+        portion by subtraction).
+        """
+        if ForecastEngine._number(context, cls._ATTRIBUTABLE_AMOUNT_KEY) is not None:
+            return "CALLER_DECLARED_NET_PROFIT_ATTRIBUTABLE"
+        if context.get(cls._ATTRIBUTABLE_EQUIVALENCE_KEY) is True:
+            return "CALLER_DECLARED_EQUIVALENCE"
+        return cls._UNVERIFIED_TOTAL_NET_PROFIT
+
+    @classmethod
+    def _attributable_net_profit(cls, context: Dict[str, Any],
+                                 net_profit: Optional[float]) -> Optional[float]:
+        """The EPS numerator, or ``None`` when its basis is unverified.
+
+        Neither the total nor a minority-interest amount is invented: a caller
+        who has the attributable figure hands it over, and a caller who knows
+        their reporting regime publishes no minority interest says so. Anything
+        else leaves the numerator unknown, so EPS records INSUFFICIENT rather
+        than dividing an unverified total.
+        """
+        if net_profit is None:
+            return None
+        declared = ForecastEngine._number(context, cls._ATTRIBUTABLE_AMOUNT_KEY)
+        if declared is not None:
+            return declared
+        if context.get(cls._ATTRIBUTABLE_EQUIVALENCE_KEY) is True:
+            return net_profit
+        return None
+
+    @classmethod
+    def _eps(cls, context: Dict[str, Any], net_profit: Optional[float],
+             shares: Optional[float]) -> tuple[Optional[float], Optional[str]]:
+        """EPS over the weighted-average share base, naming its own basis.
+
+        Returns the EPS and the reason it is missing when it is, because a
+        ``None`` here means two different things: no share base at all, or a
+        numerator whose attributable basis the caller did not establish. Both
+        keep EPS absent, but only the second is an insufficient-data condition
+        on a chain that otherwise produced a forecast.
+        """
+        if shares is None or shares <= 0:
+            return None, "missing_share_base"
+        attributable = cls._attributable_net_profit(context, net_profit)
+        if attributable is None:
+            return None, "unverified_attributable_profit"
+        return attributable / shares, None
+
     @staticmethod
     def _share_count(context: Dict[str, Any]) -> Optional[float]:
         """Weighted average shares built from Stage 1 share data (spec §9).
@@ -490,6 +555,7 @@ class ForecastEngine:
             "uncertainty_evidence": context.get("__uncertainty_evidence"),
             "uncertainty_basis": context.get("__uncertainty_basis"),
             "net_profit_method_hierarchy": list(NET_PROFIT_HIERARCHY),
+            "eps_attributable_basis": self._eps_attributable_basis(context),
         }
 
         # Explicit, traceable driver adjustments may be supplied by the caller.
@@ -518,6 +584,15 @@ class ForecastEngine:
                     scenario_assumptions["fx"] = fx_applied
                     scenario_assumptions["operational_fx_provenance"] = fx.provenance()
 
+        # EPS needs the numerator, so the engine resolves the forecast net
+        # profit here and passes the driver its already-computed EPS. The tiers
+        # are the driver's own, in the driver's own order, so the two cannot
+        # disagree about which net profit was built.
+        forecast_np = self._forecast_net_profit(
+            context, revenue, revenue * op_margin, net_margin_override=net_margin)
+        eps, eps_reason = self._eps(context, forecast_np, self._share_count(context))
+        if eps_reason is not None and forecast_np is not None:
+            scenario_assumptions["eps_reason"] = eps_reason
         return ForecastDriver.build_non_financial_chain(
             revenue=revenue,
             operating_margin=op_margin,
@@ -533,6 +608,7 @@ class ForecastEngine:
             ending_equity=self._number(context, "forecast_ending_equity"),
             method_hint=baseline_method,
             assumptions=scenario_assumptions,
+            eps=eps,
         )
 
     @staticmethod
@@ -595,6 +671,30 @@ class ForecastEngine:
                 ("tax", "forecast_tax"),
             )
         }
+
+    @staticmethod
+    def _forecast_net_profit(
+        context: Dict[str, Any],
+        revenue: Optional[float],
+        operating_profit: Optional[float],
+        net_margin_override: Optional[float],
+    ) -> Optional[float]:
+        """Resolve the forecast net profit the driver's own hierarchy resolves.
+
+        EPS needs the numerator, so the engine resolves it here and hands the
+        driver its already-computed EPS. The tiers are the driver's, kept in the
+        same order, so the two cannot drift apart.
+        """
+        components = ForecastEngine._net_profit_components(context)
+        if all(v is not None for v in components.values()):
+            return operating_profit + components["non_operating_items"] \
+                - components["financial_costs"] - components["tax"]
+        conversion = ForecastEngine._number(context, "historical_net_operating_conversion")
+        if conversion is not None:
+            return None if operating_profit is None else operating_profit * conversion
+        if net_margin_override is not None and revenue is not None:
+            return revenue * net_margin_override
+        return ForecastEngine._number(context, "forecast_net_profit")
 
     def generate_forecast(
         self,
@@ -693,6 +793,7 @@ class ForecastEngine:
             },
             "data_cutoff_datetime": cutoff.isoformat(),
             "pit_valid": pit_ok,
+            "eps_attributable_basis": self._eps_attributable_basis(financial_context),
             "input_refs": [
                 {"fact_key": ref.fact_key, "report_version_id": ref.report_version_id,
                  "available_at": ref.available_at.isoformat() if ref.available_at else None,
@@ -808,23 +909,37 @@ class ForecastEngine:
                 nii_growth = 0.0
             nii_growth += trend_adj
             bear_g, base_g, bull_g = nii_growth - financial_spread, nii_growth, nii_growth + financial_spread
-            bank_kwargs = {
-                "net_profit_conversion": self._number(financial_context, "bank_net_profit_nii_conversion"),
-                "forecast_net_profit": self._number(financial_context, "forecast_net_profit"),
-                "beginning_equity": self._number(financial_context, "beginning_equity"),
-                "ending_equity": self._number(financial_context, "forecast_ending_equity"),
-                "npl_ratio": self._number(financial_context, "npl_ratio"),
-                "nim": self._number(financial_context, "nim"),
-                "loan_growth": self._number(financial_context, "loan_growth"),
-                "deposit_growth": self._number(financial_context, "deposit_growth"),
-            }
+            bank_conversion = self._number(
+                financial_context, "bank_net_profit_nii_conversion")
+            bank_forecast_np = self._number(financial_context, "forecast_net_profit")
+            bank_shares = self._share_count(financial_context)
+
+            def _bank_chain(growth: float, scenario: str) -> SingleForecastChain:
+                nii = None if base_nii is None else base_nii * (1.0 + growth)
+                chain_np = bank_forecast_np
+                if chain_np is None and nii is not None and bank_conversion is not None:
+                    chain_np = nii * bank_conversion
+                eps, eps_reason = self._eps(financial_context, chain_np, bank_shares)
+                assumptions = {"scenario": scenario}
+                if eps_reason is not None and chain_np is not None:
+                    assumptions["eps_reason"] = eps_reason
+                return ForecastDriver.build_bank_chain(
+                    base_nii, growth, bank_shares, assumptions=assumptions,
+                    net_profit_conversion=bank_conversion,
+                    forecast_net_profit=bank_forecast_np,
+                    beginning_equity=self._number(financial_context, "beginning_equity"),
+                    ending_equity=self._number(financial_context, "forecast_ending_equity"),
+                    npl_ratio=self._number(financial_context, "npl_ratio"),
+                    nim=self._number(financial_context, "nim"),
+                    loan_growth=self._number(financial_context, "loan_growth"),
+                    deposit_growth=self._number(financial_context, "deposit_growth"),
+                    eps=eps,
+                )
+
             scenarios = ScenarioForecastResult(
-                ForecastDriver.build_bank_chain(base_nii, bear_g, self._share_count(financial_context),
-                                                assumptions={"scenario": "BEAR"}, **bank_kwargs),
-                ForecastDriver.build_bank_chain(base_nii, base_g, self._share_count(financial_context),
-                                                assumptions={"scenario": "BASE"}, **bank_kwargs),
-                ForecastDriver.build_bank_chain(base_nii, bull_g, self._share_count(financial_context),
-                                                assumptions={"scenario": "BULL"}, **bank_kwargs),
+                _bank_chain(bear_g, "BEAR"),
+                _bank_chain(base_g, "BASE"),
+                _bank_chain(bull_g, "BULL"),
             )
 
         else:
@@ -839,18 +954,31 @@ class ForecastEngine:
             bear_g, base_g, bull_g = nav_growth - financial_spread, nav_growth, nav_growth + financial_spread
             shares = self._share_count(financial_context)
             conversion = self._number(financial_context, "holding_net_profit_nav_conversion")
-            holding_kwargs = {
-                "forecast_net_profit": self._number(financial_context, "forecast_net_profit"),
-                "beginning_equity": self._number(financial_context, "beginning_equity"),
-                "ending_equity": self._number(financial_context, "forecast_ending_equity"),
-            }
+            holding_forecast_np = self._number(financial_context, "forecast_net_profit")
+
+            def _holding_chain(growth: float, scenario: str) -> SingleForecastChain:
+                chain_np = holding_forecast_np
+                if chain_np is None and base_nav is not None \
+                        and conversion is not None:
+                    chain_np = base_nav * (1.0 + growth) * conversion
+                eps, eps_reason = self._eps(financial_context, chain_np, shares)
+                assumptions = {"scenario": scenario}
+                if eps_reason is not None and chain_np is not None:
+                    assumptions["eps_reason"] = eps_reason
+                return ForecastDriver.build_holding_chain(
+                    base_nav, growth, shares,
+                    net_profit_conversion=conversion,
+                    forecast_net_profit=holding_forecast_np,
+                    beginning_equity=self._number(financial_context, "beginning_equity"),
+                    ending_equity=self._number(financial_context, "forecast_ending_equity"),
+                    assumptions=assumptions,
+                    eps=eps,
+                )
+
             scenarios = ScenarioForecastResult(
-                ForecastDriver.build_holding_chain(base_nav, bear_g, shares, net_profit_conversion=conversion,
-                                                   assumptions={"scenario": "BEAR"}, **holding_kwargs),
-                ForecastDriver.build_holding_chain(base_nav, base_g, shares, net_profit_conversion=conversion,
-                                                   assumptions={"scenario": "BASE"}, **holding_kwargs),
-                ForecastDriver.build_holding_chain(base_nav, bull_g, shares, net_profit_conversion=conversion,
-                                                   assumptions={"scenario": "BULL"}, **holding_kwargs),
+                _holding_chain(bear_g, "BEAR"),
+                _holding_chain(base_g, "BASE"),
+                _holding_chain(bull_g, "BULL"),
             )
 
         # Scenario identity and horizon are recorded on every chain so a frozen

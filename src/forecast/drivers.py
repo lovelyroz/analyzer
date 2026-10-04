@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
 
+from dataclasses import replace
+
 from src.forecast.schema import SingleForecastChain
 
 
@@ -42,8 +44,15 @@ class ForecastDriver:
         ending_equity: Optional[float] = None,
         method_hint: str = "BASELINE",
         assumptions: Optional[Dict[str, Any]] = None,
+        eps: Optional[float] = None,
     ) -> SingleForecastChain:
-        """Revenue -> Operating Profit -> Net Profit -> EPS -> ROE."""
+        """Revenue -> Operating Profit -> Net Profit -> EPS -> ROE.
+
+        ``eps`` is the already-resolved EPS numerator-and-denominator decision.
+        The driver only divides; it does not decide whether the net profit it
+        built is attributable to common shareholders, because that depends on
+        the reporting regime rather than on this chain.
+        """
         if revenue is None or revenue < 0 or operating_margin is None:
             return SingleForecastChain(method="INSUFFICIENT_DATA", assumptions=assumptions or {})
 
@@ -76,10 +85,6 @@ class ForecastDriver:
                 quality="INSUFFICIENT_DATA",
                 assumptions=assumptions or {},
             )
-
-        eps = None
-        if share_count is not None and share_count > 0:
-            eps = forecast_np / share_count
 
         # ROE is net profit over the average of opening and closing equity.
         # Both ends are required: closing equity alone is not the specified
@@ -119,6 +124,7 @@ class ForecastDriver:
         loan_growth: Optional[float] = None,
         deposit_growth: Optional[float] = None,
         assumptions: Optional[Dict[str, Any]] = None,
+        eps: Optional[float] = None,
     ) -> SingleForecastChain:
         """Loans/Deposits -> NII/NIM -> Net Profit -> EPS -> ROE.
 
@@ -179,7 +185,7 @@ class ForecastDriver:
             quality=ForecastDriver._quality(method),
             assumptions=ForecastDriver._with_bank_context(
                 assumptions, npl_ratio, nim, loan_growth, deposit_growth,
-                bank_context=bank_context,
+                bank_context=bank_context, np=np,
             ),
         )
 
@@ -230,12 +236,15 @@ class ForecastDriver:
         reason: Optional[str] = None,
         bank_context: Optional[Dict[str, Any]] = None,
         nii: Optional[float] = None,
+        np: Optional[float] = None,
     ) -> Dict[str, Any]:
         merged = dict(assumptions or {})
         if reason is not None:
             merged["reason"] = reason
         if nii is not None:
             merged["resolved_nii"] = ForecastDriver._round(nii)
+        if np is not None:
+            merged["resolved_net_profit"] = ForecastDriver._round(np)
         merged["bank_context"] = bank_context if bank_context is not None \
             else ForecastDriver._bank_context(npl_ratio, nim, loan_growth, deposit_growth)
         return merged
@@ -251,6 +260,7 @@ class ForecastDriver:
         beginning_equity: Optional[float] = None,
         ending_equity: Optional[float] = None,
         assumptions: Optional[Dict[str, Any]] = None,
+        eps: Optional[float] = None,
     ) -> SingleForecastChain:
         """NAV -> NAV Growth -> Net Profit -> EPS -> ROE; P/NAV is excluded."""
         if forecast_net_profit is not None:
@@ -297,12 +307,17 @@ class ForecastDriver:
     # inject hidden defaults or scenario assumptions.
     @staticmethod
     def build_general_chain(base_revenue: float, growth_rate: float, operating_margin: float,
-                            net_margin: float, share_count: float) -> SingleForecastChain:
+                            net_margin: float, share_count: float,
+                            net_profit_is_attributable: bool = True) -> SingleForecastChain:
         revenue = base_revenue * (1.0 + growth_rate)
-        return ForecastDriver.build_non_financial_chain(
+        chain = ForecastDriver.build_non_financial_chain(
             revenue=revenue,
             operating_margin=operating_margin / 100.0,
             share_count=share_count,
             net_margin=net_margin / 100.0,
             method_hint="RUN_RATE",
         )
+        if net_profit_is_attributable:
+            return replace(chain, eps=ForecastDriver._round(
+                chain.net_profit / share_count))
+        return replace(chain, eps=None)

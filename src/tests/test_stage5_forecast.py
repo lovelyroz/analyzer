@@ -28,6 +28,10 @@ def _context(**overrides):
         "historical_operating_margin": 0.20,
         "historical_net_margin": 0.10,
         "share_count": 1000.0,
+        # These chains exercise the EPS division itself, so they vouch for the
+        # numerator: the production path does not, and a dedicated test below
+        # covers the unverified case.
+        "net_profit_is_attributable": True,
     }
     base.update(overrides)
     return base
@@ -1637,6 +1641,10 @@ def _core_context(**overrides):
         "share_count": 1000.0,
         "beginning_equity": 9000.0,
         "forecast_ending_equity": 11000.0,
+        # These chains exercise the EPS division itself, so they vouch for the
+        # numerator: the production path does not, and a dedicated test below
+        # covers the unverified case.
+        "net_profit_is_attributable": True,
     }
     context.update(overrides)
     return context
@@ -2300,6 +2308,7 @@ def _bank_context(**overrides):
         "share_count": 100.0,
         "beginning_equity": 8000.0,
         "forecast_ending_equity": 12000.0,
+        "net_profit_is_attributable": True,
         "model_parameters": {"scenario_financial_growth_spread": 0.05},
     }
     context.update(overrides)
@@ -2336,6 +2345,7 @@ def _holding_context(**overrides):
         "share_count": 100.0,
         "beginning_equity": 15000.0,
         "forecast_ending_equity": 25000.0,
+        "net_profit_is_attributable": True,
         "model_parameters": {"scenario_financial_growth_spread": 0.05},
     }
     context.update(overrides)
