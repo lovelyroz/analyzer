@@ -1218,7 +1218,10 @@ def test_repo_read_at_cutoff_hides_forecasts_built_on_later_data(repo):
 #     24, 25, 29)
 # ==========================================================================
 
-from src.forecast.service import generate_and_persist_forecast  # noqa: E402
+from src.forecast.service import (  # noqa: E402
+    _stage1_derived_context,
+    generate_and_persist_forecast,
+)
 from src.migrations.runner import MigrationRunner  # noqa: E402
 
 from src.models.entity import Company, Industry  # noqa: E402
@@ -1410,6 +1413,107 @@ def _seed_stage1(session):
     session.flush()
 
 
+def test_stage1_derived_context_uses_authoritative_latest_and_nearest_prior_facts():
+    refs = lambda facts: [
+        ForecastInputRef(
+            fact_key=key,
+            report_version_id=version,
+            available_at=datetime(2025, 12, 1, tzinfo=timezone.utc),
+            source="normalized_financial_facts",
+        )
+        for key, version in facts
+    ]
+
+    periods = [
+        (
+            99,
+            date(2025, 6, 30),
+            {"REVENUE": 10_000.0, "TOTAL_EQUITY": 4_000.0},
+            refs([("REVENUE", 99), ("TOTAL_EQUITY", 99)]),
+        ),
+        (
+            100,
+            date(2025, 9, 30),
+            {"NET_PROFIT": 900.0},
+            refs([("NET_PROFIT", 100)]),
+        ),
+        (
+            101,
+            date(2025, 12, 31),
+            {
+                "REVENUE": 12_000.0,
+                "OPERATING_PROFIT": 2_400.0,
+                "NET_PROFIT": 1_200.0,
+                "TOTAL_EQUITY": 6_000.0,
+            },
+            refs([
+                ("REVENUE", 101),
+                ("OPERATING_PROFIT", 101),
+                ("NET_PROFIT", 101),
+                ("TOTAL_EQUITY", 101),
+            ]),
+        ),
+    ]
+
+    derived, derived_refs = _stage1_derived_context(periods)
+
+    assert derived["historical_operating_margin"] == pytest.approx(0.20)
+    assert derived["historical_net_margin"] == pytest.approx(0.10)
+    # Period 100 has no equity, so the nearest earlier valid balance is period 99.
+    assert derived["beginning_equity"] == 4_000.0
+    # The same missing intermediate period must not force fabricated growth.
+    assert derived["prior_revenue"] == 10_000.0
+    assert derived["current_revenue"] == 12_000.0
+    assert {ref.fact_key for ref in derived_refs} >= {
+        "DERIVED_OPERATING_MARGIN",
+        "DERIVED_NET_MARGIN",
+        "BEGINNING_EQUITY",
+        "PRIOR_REVENUE",
+    }
+
+
+def test_stage1_derived_context_does_not_fabricate_prior_observations():
+    periods = [(
+        101,
+        date(2025, 12, 31),
+        {
+            "REVENUE": 12_000.0,
+            "OPERATING_PROFIT": 2_400.0,
+            "NET_PROFIT": 1_200.0,
+            "TOTAL_EQUITY": 6_000.0,
+        },
+        [
+            ForecastInputRef(
+                fact_key=key,
+                report_version_id=101,
+                available_at=datetime(2025, 12, 1, tzinfo=timezone.utc),
+                source="normalized_financial_facts",
+            )
+            for key in ("REVENUE", "OPERATING_PROFIT", "NET_PROFIT", "TOTAL_EQUITY")
+        ],
+    )]
+
+    derived, derived_refs = _stage1_derived_context(periods)
+
+    assert derived["historical_operating_margin"] == pytest.approx(0.20)
+    assert derived["historical_net_margin"] == pytest.approx(0.10)
+    assert "beginning_equity" not in derived
+    assert "prior_revenue" not in derived
+    assert "current_revenue" not in derived
+    assert "BEGINNING_EQUITY" not in {ref.fact_key for ref in derived_refs}
+    assert "PRIOR_REVENUE" not in {ref.fact_key for ref in derived_refs}
+
+
+def test_unverified_net_profit_does_not_produce_eps():
+    context = _core_context(net_profit_is_attributable=None)
+    context.pop("net_profit_is_attributable")
+    result = _core_forecast(context)
+    base = result.scenario_forecasts.base
+    assert base.net_profit is not None
+    assert base.eps is None
+    assert base.assumptions["eps_reason"] == "unverified_attributable_profit"
+
+
 def _production_kwargs(**overrides):
     kwargs = {
         "trend_result": _production_stage4(),
@@ -1419,6 +1523,9 @@ def _production_kwargs(**overrides):
         "extra_facts": {
             "historical_operating_margin": 0.20,
             "historical_net_margin": 0.10,
+            # Explicit test declaration: this fixture treats NET_PROFIT as
+            # attributable so the weighted-share EPS path can be exercised.
+            "net_profit_is_attributable": True,
         },
     }
     kwargs.update(overrides)
