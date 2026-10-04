@@ -444,3 +444,100 @@ pytest src/tests/test_stage5_forecast.py -v → 261 passed (258 موجود + 3 �
 تست‌های رگرسیون موجود ما مسیر DB را فقط از طریق generate_and_persist_forecast فراخوانی می‌کنند که همیشه forecast_id=1 را از طریق to_record ارسال می‌کند. بنابراین هیچ تستی save() مخزن را با یک surrogate اختصاص داده‌شده توسط فراخوان فراخوانی نمی‌کند، که یعنی مسیر کد _records_equal فقط زمانی شناسایی می‌شود که تست جدید مستقیماً رکوردها را با idهای متفاوت بسازد — که تست جدید اکنون انجام می‌دهد. تست جدید آن را پوشش می‌دهد، اما پوشش آن به جای یک کتمان مستقل، به یک تست واحد وابسته است. پیشنهاد می‌کنم یک تست ساده که مستقیماً repo را با یک surrogate اختصاصی فراخوانی می‌کند اضافه شود تا مسیر کد با هر تغییری در آینده شلاق نخورد.
 
 یک مسئله دوم که شناسایی شد اما رفع نشد، زیرا خارج از محدوده این نقص است: _records_equal فقط در save() فراخوانی می‌شود، و save() هرگز record.forecast_id را روی هیچ مسیر read ذخیره نمی‌کند. بنابراین surrogate هرگز پایگاه داده را تحت تأثیر قرار نمی‌دهد — تنها مسیر این است که چندین بار از طریق همان مرز save() عبور کند.
+
+=============================================================================
+REPORT — Stage 5 Prompt 13
+
+## Scope
+
+This prompt was executed against the current repository state using only the explicit Stage 5 files and the existing Prompt 3–12 implementation history.
+
+Stage 4 and Stage 1–4 implementation files were not modified.
+
+## Files inspected
+
+- temp_report.md
+- src/forecast/service.py
+- src/forecast/queries.py
+- src/forecast/engine.py
+- src/forecast/drivers.py
+- src/forecast/schema.py
+- src/forecast/repo.py
+- src/models/forecast.py
+- src/models/normalized.py
+- src/models/share_action.py
+- src/tests/test_stage5_forecast.py
+
+## Files modified
+
+- src/forecast/service.py
+- src/tests/test_stage5_forecast.py
+- temp_report.md
+
+## Production-path gaps addressed
+
+### A — Operating Margin
+
+The production path already derived historical operating margin from authoritative Stage 1 Revenue and Operating Profit: Operating Margin = Operating Profit / Revenue. The existing implementation was retained because it already uses PIT-filtered Stage 1 period data and refuses undefined division. Its provenance handling was tightened so the derived margin availability is the latest publication time of the facts actually used for the ratio, rather than assuming Revenue's publication time is sufficient.
+
+### B — Net Margin
+
+The production path already derived historical net margin from authoritative Stage 1 Net Profit and Revenue using zero-safe ratio semantics. The implementation was retained and its derived provenance was tightened to use the latest publication time among Net Profit and Revenue.
+
+### C — Historical Revenue Growth
+
+The production path already supplied actual Stage 1 revenue observations to the existing Stage 5 zero/sign-safe growth mechanism. A real production-path edge case was corrected: the previous implementation only looked at the immediately preceding reporting period. If that period had no Revenue observation, it failed to use an older but still PIT-valid actual Revenue observation. The implementation now selects the nearest earlier valid Revenue observation from the already PIT-filtered Stage 1 period sequence. No Stage 4 momentum, ±2% threshold, Fundamental Score, arbitrary percentage, or scenario assumption is used as a substitute.
+
+### D — Beginning Equity for ROE
+
+A corresponding production-path edge case was corrected. The previous implementation only inspected the immediately preceding reporting period for Beginning Equity. It now searches backward through the existing PIT-filtered period sequence and selects the nearest earlier valid TOTAL_EQUITY observation. No ending-equity-only fallback, interpolation, estimation, or fabricated value was introduced. The existing average-equity ROE formula remains unchanged.
+
+### E — Attributable Net Profit for EPS
+
+No unsafe production change was made. The current implementation correctly refuses to treat Stage 1 NET_PROFIT as attributable profit unless the caller explicitly declares attributable profit or an established equivalence. Without that declaration, EPS remains insufficient/None. The production-path fixture was made explicit by declaring the equivalence only where the test intentionally exercises the weighted-share EPS calculation. A dedicated regression test now verifies that an undeclared NET_PROFIT does not produce EPS.
+
+### F — Persistence Regression
+
+Prompt 12's logical-state/idempotency correction remains intact. The current repository already contains the required behavioral regression using two distinct records with different surrogate forecast_id values and identical logical forecast state. The repository conflict regression also remains intact: genuinely different content under the same explicit version raises ForecastVersionExistsError. No persistence redesign was introduced.
+
+## Tests added/changed
+
+Added focused Stage 5 coverage for operating-margin derivation, net-margin derivation, nearest earlier valid Equity, nearest earlier valid Revenue, absence of fabricated prior observations, and undeclared NET_PROFIT not producing EPS. The existing persistent different-surrogate-id idempotency and same-version conflict tests were preserved. The production fixture's EPS path now explicitly declares attributable-profit equivalence rather than relying on an implicit assumption.
+
+## Focused test result
+
+NOT EXECUTED in this ChatGPT repository-connector environment.
+
+The connected repository interface available in this session supports repository file inspection and file editing, but does not provide a local shell/pytest execution capability. Therefore no test result is being fabricated or claimed.
+
+Required command for local execution:
+
+pytest src/tests/test_stage5_forecast.py -v
+
+## Broader Stage 5 / project test result
+
+NOT EXECUTED for the same environment limitation.
+
+Required command after the focused suite passes:
+
+pytest src/tests -v
+
+No bare pytest command should be used.
+
+## Environmental / unrelated failures
+
+No new runtime failure was observed because the test suites could not be executed in this environment. Previously documented unrelated/environmental conditions in Prompt 11 remain implementation history and were not changed.
+
+## Remaining Stage 5 issues
+
+1. The repository changes made by this prompt have not received executable pytest verification in this environment.
+2. Stage 5 therefore cannot be considered validation-complete solely from this prompt's static inspection.
+3. No known unresolved production-path gap remains among the A–F gaps specified by this prompt after the corrections above, but this conclusion still requires the focused and broader pytest runs to be confirmed.
+
+## Production-path status
+
+The identified production-path gaps are implemented or already correctly handled, including PIT-safe margins, nearest valid prior observations for Revenue and Equity, conservative attributable-profit handling, and persistence idempotency.
+
+The implementation is NOT being declared frozen or fully validation-approved until the required executable test suites are run.
+
+# Stage 5 is NOT declared frozen.
