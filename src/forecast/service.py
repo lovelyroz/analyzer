@@ -153,40 +153,45 @@ def _stage1_derived_context(
             source="derived_from_" + FACT_SOURCE,
         ))
 
-    if len(periods) > 1:
-        _prior_id, _prior_end, prior_facts, prior_refs = periods[-2]
+    # Beginning equity must be the nearest earlier valid observation, not
+    # merely the immediately preceding reporting period. A period may legitimately
+    # omit equity while an older PIT-valid balance still establishes the opening
+    # point for the latest reported ending equity.
+    if revenue is not None:
+        for _prior_id, _prior_end, prior_facts, prior_refs in reversed(periods[:-1]):
+            prior_equity = prior_facts.get("TOTAL_EQUITY")
+            if prior_equity is not None:
+                derived["beginning_equity"] = prior_equity
+                for ref in prior_refs:
+                    if ref.fact_key == "TOTAL_EQUITY":
+                        refs.append(ForecastInputRef(
+                            fact_key="BEGINNING_EQUITY",
+                            report_version_id=ref.report_version_id,
+                            available_at=ref.available_at,
+                            source=ref.source,
+                        ))
+                        break
+                break
 
-        prior_equity = prior_facts.get("TOTAL_EQUITY")
-        if prior_equity is not None:
-            # Beginning equity is the previous *reported* observation, never the
-            # closing balance standing in for it. Average equity needs both ends.
-            derived["beginning_equity"] = prior_equity
-            for ref in prior_refs:
-                if ref.fact_key == "TOTAL_EQUITY":
-                    refs.append(ForecastInputRef(
-                        fact_key="BEGINNING_EQUITY",
-                        report_version_id=ref.report_version_id,
-                        available_at=ref.available_at,
-                        source=ref.source,
-                    ))
-                    break
-
-        prior_revenue = prior_facts.get("REVENUE")
-        if prior_revenue is not None and revenue is not None:
-            # Growth is only ever read through the engine's own zero-safe logic
-            # (05_Stage5 section 16): the prior arc is supplied as endpoints and
-            # the engine refuses the percentage across a zero or a sign flip.
-            derived["prior_revenue"] = prior_revenue
-            derived["current_revenue"] = revenue
-            for ref in prior_refs:
-                if ref.fact_key == "REVENUE":
-                    refs.append(ForecastInputRef(
-                        fact_key="PRIOR_REVENUE",
-                        report_version_id=ref.report_version_id,
-                        available_at=ref.available_at,
-                        source=ref.source,
-                    ))
-                    break
+    # Historical revenue growth uses the nearest earlier actual observation.
+    # Missing revenue in an intervening period must not force a fabricated
+    # percentage or a false zero-base interpretation.
+    if revenue is not None:
+        for _prior_id, _prior_end, prior_facts, prior_refs in reversed(periods[:-1]):
+            prior_revenue = prior_facts.get("REVENUE")
+            if prior_revenue is not None:
+                derived["prior_revenue"] = prior_revenue
+                derived["current_revenue"] = revenue
+                for ref in prior_refs:
+                    if ref.fact_key == "REVENUE":
+                        refs.append(ForecastInputRef(
+                            fact_key="PRIOR_REVENUE",
+                            report_version_id=ref.report_version_id,
+                            available_at=ref.available_at,
+                            source=ref.source,
+                        ))
+                        break
+                break
 
     return derived, refs
 
