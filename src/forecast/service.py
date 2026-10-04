@@ -157,7 +157,7 @@ def _stage1_derived_context(
     # merely the immediately preceding reporting period. A period may legitimately
     # omit equity while an older PIT-valid balance still establishes the opening
     # point for the latest reported ending equity.
-    if revenue is not None:
+    if len(periods) > 1:
         for _prior_id, _prior_end, prior_facts, prior_refs in reversed(periods[:-1]):
             prior_equity = prior_facts.get("TOTAL_EQUITY")
             if prior_equity is not None:
