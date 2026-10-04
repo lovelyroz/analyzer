@@ -139,7 +139,9 @@ def _stage1_derived_context(
         refs.append(ForecastInputRef(
             fact_key="DERIVED_OPERATING_MARGIN",
             report_version_id=None,
-            available_at=_latest_publication(periods[-1][3], "REVENUE"),
+            available_at=_latest_publication(
+                periods[-1][3], "REVENUE", "OPERATING_PROFIT"
+            ),
             source="derived_from_" + FACT_SOURCE,
         ))
 
@@ -149,7 +151,9 @@ def _stage1_derived_context(
         refs.append(ForecastInputRef(
             fact_key="DERIVED_NET_MARGIN",
             report_version_id=None,
-            available_at=_latest_publication(periods[-1][3], "REVENUE"),
+            available_at=_latest_publication(
+                periods[-1][3], "REVENUE", "NET_PROFIT"
+            ),
             source="derived_from_" + FACT_SOURCE,
         ))
 
@@ -196,12 +200,15 @@ def _stage1_derived_context(
     return derived, refs
 
 
-def _latest_publication(refs: Sequence[ForecastInputRef], fact_key: str
+def _latest_publication(refs: Sequence[ForecastInputRef], *fact_keys: str
                         ) -> Optional[datetime]:
-    for ref in refs:
-        if ref.fact_key == fact_key:
-            return ref.available_at
-    return None
+    """Latest publication time among the facts used to derive a value."""
+    available = [
+        ref.available_at
+        for ref in refs
+        if ref.fact_key in fact_keys and ref.available_at is not None
+    ]
+    return max(available) if available else None
 
 
 def _eps_attributable_basis(extra_facts: Optional[Dict[str, Any]]) -> str:
