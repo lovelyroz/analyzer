@@ -110,9 +110,9 @@ def _stage1_derived_context(
     ``extra_facts``. Every one of these is computable from facts already read
     under the same cutoff, so it is derived here rather than required.
 
-    The latest period supplies the numerators and denominators. The previous
-    reported period supplies the opening equity and the prior revenue, and it
-    clears the same cutoff/publication rules because it comes from the same
+    The latest period supplies the numerators and denominators. The nearest
+    earlier valid observations supply opening equity and prior revenue, and they
+    clear the same cutoff/publication rules because they come from the same
     PIT-restricted read.
 
     Nothing is fabricated: a ratio with no defined division, or an opening
