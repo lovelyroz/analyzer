@@ -1143,3 +1143,334 @@ Runtime verification         NOT EXECUTED
 
 FINAL DECISION:
 Stage 5 NOT VERIFIED FOR FREEZE
+
+====================================================================
+REPORT Stage 5 Prompt 15
+
+نتیجه نهایی اجرای Prompt 15
+
+وضعیت: NOT EXECUTED — FULL REMEDIATION NOT COMPLETED
+
+دلیل این تصمیم این است که Prompt 15 صرفاً یک بررسی نظری نیست؛ صراحتاً الزام می‌کند که:
+
+کد اصلاح شود،
+تست‌های رفتاری اضافه/اصلاح شوند،
+pytest src/tests/test_stage5_forecast.py -v اجرا شود،
+سپس pytest src/tests -v اجرا شود،
+و temp_report.md با نتیجه واقعی به‌روزرسانی شود.
+
+در محیط فعلی من working copy قابل‌اجرا از repository وجود ندارد. من repository را از طریق اتصال GitHub می‌توانم بخوانم، اما نمی‌توانم آن را به یک محیط local قابل اجرای pytest تبدیل کنم؛ تلاش برای clone مستقیم repository نیز به دلیل نبود دسترسی شبکه از محیط اجرایی شکست خورد.
+
+بنابراین من عمداً ادعا نمی‌کنم که Prompt 15 را کامل اجرا کرده‌ام یا تستی پاس شده است.
+
+1. کاری که واقعاً انجام شد
+
+نسخه فعلی فایل‌های تعیین‌شده در Prompt 15 را از lovelyroz/analyzer بررسی کردم:
+
+temp_report.md
+src/forecast/engine.py
+src/forecast/drivers.py
+src/forecast/service.py
+src/forecast/queries.py
+src/forecast/schema.py
+src/tests/test_stage5_forecast.py
+
+همچنین گزارش‌های قبلی Prompt 13 و Prompt 14 موجود در temp_report.md را مبنا قرار دادم.
+
+Prompt 15 نیز صراحتاً می‌گوید که یافته‌های Prompt 14 باید به‌عنوان verified engineering findings تلقی شوند، نه پیشنهاد اختیاری.
+
+2. Blocker A — EPS
+
+این مشکل در نسخه فعلی repository هنوز وجود دارد.
+
+در engine.py یک مسیر مرکزی برای validation وجود دارد:
+
+_eps(...)
+
+و این مسیر اساساً منطق attributable-profit را می‌شناسد.
+
+اما در drivers.py، مسیر BANK همچنان در نهایت EPS را خودش از:
+
+net_profit / share_count
+
+محاسبه می‌کند.
+
+همین وضعیت در HOLDING نیز وجود دارد.
+
+یعنی ساختار فعلی هنوز می‌تواند چنین وضعیتی ایجاد کند:
+
+Engine:
+    attributable profit validation
+            ↓
+         EPS = None
+
+Driver:
+    net profit / shares
+            ↓
+         EPS = value
+
+این دقیقاً همان bypassی است که Prompt 15 برای اصلاح آن نوشته شده است.
+
+Prompt 15 نیز صریحاً می‌گوید validation باید در final calculation boundary enforce شود و specialized driver نباید بتواند آن را دور بزند.
+
+نتیجه
+
+🔴 BLOCKER A هنوز رفع نشده است.
+
+3. نکته مهم در مورد معماری فعلی
+
+در drivers.py حتی نشانه‌ای وجود دارد که طراحی در مسیر اصلاح قرار گرفته است.
+
+برای مسیر generic، eps به driver داده می‌شود و driver می‌تواند EPS از قبل resolve شده را مصرف کند.
+
+یعنی architecture عملاً ظرفیت این را دارد که:
+
+Engine
+  ↓
+single authoritative EPS validation
+  ↓
+eps
+  ↓
+Driver
+
+را اجرا کند.
+
+مشکل این است که BANK و HOLDING هنوز در داخل خودشان EPS را دوباره محاسبه می‌کنند.
+
+بنابراین اصلاح مورد نیاز احتمالاً کوچک و local است؛ لازم نیست معماری Stage 5 دوباره طراحی شود.
+
+4. Blocker B — Scenario Spreads
+
+این مشکل نیز هنوز در repository وجود دارد.
+
+در engine.py همچنان:
+
+DEFAULT_MODEL_PARAMETERS = {
+    "trend_adjustments": {},
+    "scenario_revenue_growth_spread": 0.05,
+    "scenario_operating_margin_spread": 0.02,
+    "scenario_net_margin_spread": 0.01,
+    "scenario_financial_growth_spread": 0.05,
+}
+
+وجود دارد.
+
+این دقیقاً همان چیزی است که Prompt 15 می‌گوید نباید صرفاً با اضافه کردن تستی که همین اعداد را تأیید کند، «حل» شود.
+
+Prompt 15 به‌درستی بین این دو تفاوت می‌گذارد:
+
+test says 5% is used
+
+و:
+
+authoritative financial specification says 5% is correct
+
+تست به‌تنهایی مورد دوم را ثابت نمی‌کند.
+
+نتیجه
+
+🔴 BLOCKER B هنوز رفع نشده است.
+
+و مهم‌تر اینکه من در محدوده فایل‌های مجاز، مدرک authoritative جدیدی پیدا نکردم که این چهار مقدار را به‌عنوان specification مالی رسمی اثبات کند.
+
+5. Concern C — Historical Revenue Growth
+
+این مورد نیز همچنان قابل مشاهده است.
+
+در engine.py منطق فعلی تقریباً این hierarchy را دارد:
+
+declared baseline_revenue_growth
+        ↓
+computed historical growth
+
+یعنی اگر:
+
+baseline_revenue_growth
+
+وجود داشته باشد، مقدار محاسبه‌شده از:
+
+prior_revenue
+current_revenue
+
+را کنار می‌زند.
+
+از طرف دیگر، service.py نیز صراحتاً extra_facts را بعد از derived facts وارد context می‌کند:
+
+Stage 1 derived values
+        ↓
+extra_facts
+
+در نتیجه caller می‌تواند بعضی داده‌ها را override کند.
+
+Prompt 15 دقیقاً می‌خواهد این distinction روشن شود:
+
+authoritative model parameter
+
+در مقابل:
+
+arbitrary caller override
+
+و صراحتاً می‌گوید legitimate model parameter نباید صرفاً به خاطر caller-provided بودن حذف شود.
+
+نتیجه
+
+🟠 Concern C هنوز unresolved است.
+
+اما برخلاف Blocker A، اینجا قبل از تغییر باید specification موجود پروژه مشخص کند که baseline_revenue_growth دقیقاً چه semantic contractی دارد.
+
+من توصیه نمی‌کنم صرفاً برای سبز کردن تست، این قابلیت حذف شود.
+
+6. Concern D — Engine-level PIT
+
+Production query path وضعیت خوبی دارد.
+
+queries.py همچنان facts را با:
+
+ReportVersion.publication_datetime <= cutoff
+
+فیلتر می‌کند.
+
+بنابراین مسیر production:
+
+Database
+ ↓
+PIT query
+ ↓
+financial_context
+
+به‌صورت اصولی PIT-safe است.
+
+اما concern مربوط به Engine همچنان باقی است.
+
+Prompt 15 به‌درستی می‌گوید:
+
+filtering provenance references alone is not sufficient.
+
+یعنی اگر:
+
+numeric value = 100
+provenance = post-cutoff
+
+باشد، نباید فقط provenance حذف شود و عدد 100 همچنان قابل استفاده باقی بماند.
+
+همین مسئله در wording Prompt 15 به‌صراحت آمده است.
+
+نتیجه
+
+🟠 Concern D هنوز unresolved است.
+
+7. Scenario / Stage 4 isolation
+
+در این قسمت، چیزی پیدا نکردم که نشان دهد Prompt 15 باید architecture موجود را از نو طراحی کند.
+
+مرز فعلی همچنان این است:
+
+Stage 4 evidence
+        ↓
+adapter
+        ↓
+Stage 5 context
+
+و Stage 4 ±2% نباید مستقیماً به forecast growth تبدیل شود.
+
+تست‌های موجود نیز این boundary را نسبتاً خوب پوشش می‌دهند.
+
+Prompt 15 نیز صراحتاً حفظ این boundary را الزام کرده است.
+
+نتیجه
+
+🟢 No new defect identified here.
+
+8. چیزی که من عمداً انجام ندادم
+
+من در GitHub repository تغییر مستقیم ایجاد نکردم.
+
+دلیل مهمش این است که این کار در این محیط می‌توانست منجر به:
+
+GitHub commit
+
+مستقیم روی repository شود، در حالی که امکان اجرای واقعی pytest بعد از آن تغییرات را نداشتم.
+
+این برای پروژه‌ای که:
+
+financial correctness
+auditability
+PIT correctness
+deterministic behavior
+
+را در اولویت قرار داده، روش قابل قبولی نیست.
+
+بنابراین به‌جای ایجاد یک commit بدون امکان verification، repository را دستکاری نکردم.
+
+9. تست‌های Prompt 15
+
+Prompt 15 دو سطح تست را الزام می‌کند:
+
+Focused
+pytest src/tests/test_stage5_forecast.py -v
+
+نتیجه:
+
+NOT EXECUTED
+
+Broader
+pytest src/tests -v
+
+نتیجه:
+
+NOT EXECUTED
+
+هیچ عددی مثل:
+
+X passed
+Y failed
+
+برای Prompt 15 اعلام نمی‌کنم.
+
+10. temp_report.md
+
+Prompt 15 الزام کرده که پس از remediation، گزارشی با عنوان:
+
+REPORT — Stage 5 Prompt 15
+
+به temp_report.md اضافه شود و در انتها حتماً نوشته شود:
+
+Stage 5 is NOT declared frozen.
+
+چون remediation واقعاً انجام نشده و تست‌ها نیز اجرا نشده‌اند، من گزارش جعلی به temp_report.md اضافه نکردم.
+
+11. وضعیت واقعی پس از این بررسی
+
+بنابراین وضعیت repository از نظر Prompt 15:
+
+مورد	وضعیت
+Blocker A — BANK/HOLDING EPS bypass	🔴 هنوز وجود دارد
+Blocker B — unsupported scenario spreads	🔴 هنوز وجود دارد
+Concern C — revenue growth override	🟠 هنوز unresolved
+Concern D — Engine PIT firewall	🟠 هنوز unresolved
+Stage 4 boundary	🟢 حفظ شده
+Stage 4 ±2% isolation	🟢 حفظ شده
+Momentum isolation	🟢 حفظ شده
+Fundamental Score isolation	🟢 حفظ شده
+Code modification	❌ انجام نشد
+Regression tests	❌ اجرا نشد
+temp_report update	❌ انجام نشد
+Stage 5 freeze	❌ اعلام نشد
+12. نتیجه نهایی
+Prompt 15 در محیط فعلی به‌طور کامل قابل اجرا نبود.
+
+اما بررسی مستقیم نسخه فعلی repository نشان داد که یافته‌های Prompt 14 هنوز معتبرند:
+
+Blocker A هنوز وجود دارد.
+
+Blocker B هنوز وجود دارد.
+
+Concern C و D نیز هنوز تعیین تکلیف نشده‌اند.
+
+بنابراین نتیجه فنی فعلی:
+
+Stage 5 remains NOT VERIFIED FOR FREEZE
+
+و من هیچ تغییر ناقص یا تست‌نشده‌ای را روی repository اصلی اعمال نکردم.
+
+نکته مثبت این است که برای Blocker A، مشکل به‌نظر می‌رسد یک اصلاح محدود در مرز EPS باشد و architecture فعلی ظرفیت اصلاح آن را دارد؛ بنابراین برای رفع این blocker نیازی به بازطراحی Stage 5 مشاهده نکردم.
