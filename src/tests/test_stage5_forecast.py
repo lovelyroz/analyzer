@@ -89,6 +89,8 @@ def test_stage5_uses_seasonal_baseline_and_parameterized_trend():
         "historical_operating_margin": 0.20,
         "historical_net_margin": 0.10,
         "share_count": 1000.0,
+        # The caller vouches for the numerator before the engine will divide it.
+        "net_profit_is_attributable": True,
         "model_parameters": {
             "trend_adjustments": {"Strong Improvement": 0.05},
             "scenario_revenue_growth_spread": 0.05,
@@ -135,6 +137,8 @@ def test_low_base_disables_trend_adjustment():
 
 
 def test_component_based_net_profit_has_priority_and_roe():
+    # The driver divides only the EPS the caller already resolved, so the test
+    # hands it the same attributable reading the engine would have produced.
     chain = ForecastDriver.build_non_financial_chain(
         revenue=1000.0,
         operating_margin=0.20,
@@ -145,6 +149,7 @@ def test_component_based_net_profit_has_priority_and_roe():
         net_margin=0.01,
         beginning_equity=400.0,
         ending_equity=600.0,
+        eps=180.0 / 100.0,
     )
     assert chain.method == "COMPONENT_BASED"
     assert chain.net_profit == 180.0
@@ -170,6 +175,7 @@ def test_bank_specialized_core_does_not_use_general_revenue_model():
         "baseline_nii_growth": 0.10,
         "bank_net_profit_nii_conversion": 0.50,
         "share_count": 100.0,
+        "net_profit_is_attributable": True,
         "model_parameters": {"scenario_financial_growth_spread": 0.05},
     }
     result = ForecastEngine().generate_forecast(1, 10, "BANK", context)
@@ -184,6 +190,7 @@ def test_holding_core_excludes_p_nav():
         "baseline_nav_growth": 0.10,
         "holding_net_profit_nav_conversion": 0.20,
         "share_count": 100.0,
+        "net_profit_is_attributable": True,
     }
     result = ForecastEngine().generate_forecast(1, 10, "HOLDING", context)
     assert result.baseline_method == "HOLDING_SPECIALIZED"
@@ -3398,3 +3405,467 @@ def test_forecast_is_deterministic_across_identical_inputs():
         assert left.revenue == right.revenue
         assert left.eps == right.eps
         assert left.roe == right.roe
+
+
+# ==========================================================================
+# 17. Prompt 15 remediation: the four Prompt 14 findings, as behaviour.
+#     A — EPS must divide attributable profit only, on every specialized
+#         path. B — scenario spreads must come from the declared model.
+#     C — baseline_revenue_growth precedence must be explicit and must
+#         never let a post-cutoff actual through. D — the engine must not
+#         trust a numeric value whose provenance is late or absent.
+# ==========================================================================
+
+_CUTOFF = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+# --- A. EPS attributable-profit invariant -----------------------------------
+
+def test_eps_is_calculated_when_attributable_profit_is_established():
+    base = _core_forecast(_core_context()).scenario_forecasts.base
+    assert base.net_profit is not None
+    assert base.eps is not None
+    # EPS is the attributable net profit over the weighted average share base.
+    assert base.eps == round(base.net_profit / 1000.0, 6)
+
+
+def test_eps_is_unavailable_when_attributable_status_is_not_established():
+    context = _core_context()
+    context.pop("net_profit_is_attributable")
+    base = _core_forecast(context).scenario_forecasts.base
+    # The chain still produced a net profit: only the division was refused.
+    assert base.net_profit is not None
+    assert base.eps is None
+    assert base.assumptions["eps_reason"] == "unverified_attributable_profit"
+    assert base.assumptions["eps_attributable_basis"] == \
+        "UNVERIFIED_TOTAL_NET_PROFIT"
+    assert result_basis_recorded_as_unverified(context)
+
+
+def result_basis_recorded_as_unverified(context):
+    return _core_forecast(context).assumptions["eps_attributable_basis"] \
+        == "UNVERIFIED_TOTAL_NET_PROFIT"
+
+
+def test_eps_is_unavailable_when_attributable_status_is_explicitly_false():
+    # A caller who knows their profit is NOT attributable says so: the engine
+    # honours the negative statement rather than treating silence as the only
+    # reason to refuse.
+    base = _core_forecast(_core_context(net_profit_is_attributable=False)
+                          ).scenario_forecasts.base
+    assert base.net_profit is not None
+    assert base.eps is None
+    assert base.assumptions["eps_attributable_basis"] == \
+        "UNVERIFIED_TOTAL_NET_PROFIT"
+    assert base.assumptions["eps_reason"] == "unverified_attributable_profit"
+
+
+def test_declared_attributable_amount_is_used_as_the_numerator():
+    base = _core_forecast(_core_context(
+        net_profit_attributable=900.0, net_profit_is_attributable=False)
+                          ).scenario_forecasts.base
+    # The declared attributable amount wins over the chain's own net profit,
+    # and over the caller's own negative equivalence statement.
+    assert base.net_profit == 1100.0
+    assert base.eps == round(900.0 / 1000.0, 6)
+
+
+def test_bank_eps_is_unavailable_when_profit_is_not_attributable():
+    context = _bank_context()
+    context.pop("net_profit_is_attributable")
+    base = ForecastEngine().generate_forecast(
+        1, 10, "BANK", context, data_cutoff_datetime=_CUTOFF
+    ).scenario_forecasts.base
+    assert base.net_profit == 550.0
+    assert base.eps is None
+    assert base.assumptions["eps_reason"] == "unverified_attributable_profit"
+    assert base.assumptions["eps_attributable_basis"] == \
+        "UNVERIFIED_TOTAL_NET_PROFIT"
+
+
+def test_holding_eps_is_unavailable_when_profit_is_not_attributable():
+    context = _holding_context()
+    context.pop("net_profit_is_attributable")
+    base = ForecastEngine().generate_forecast(
+        1, 10, "HOLDING", context, data_cutoff_datetime=_CUTOFF
+    ).scenario_forecasts.base
+    assert base.net_profit == 440.0
+    assert base.eps is None
+    assert base.assumptions["eps_reason"] == "unverified_attributable_profit"
+
+
+def test_bank_component_based_path_cannot_bypass_the_eps_gate():
+    # The specialized path's own net-profit input is still divided only when
+    # attributable profit was established.
+    context = _bank_context(forecast_net_profit=700.0)
+    context.pop("net_profit_is_attributable")
+    base = ForecastEngine().generate_forecast(
+        1, 10, "BANK", context, data_cutoff_datetime=_CUTOFF
+    ).scenario_forecasts.base
+    assert base.method == "BANK_COMPONENT_BASED"
+    assert base.net_profit == 700.0
+    assert base.eps is None
+
+
+def test_holding_component_based_path_cannot_bypass_the_eps_gate():
+    context = _holding_context(forecast_net_profit=600.0)
+    context.pop("net_profit_is_attributable")
+    base = ForecastEngine().generate_forecast(
+        1, 10, "HOLDING", context, data_cutoff_datetime=_CUTOFF
+    ).scenario_forecasts.base
+    assert base.method == "HOLDING_COMPONENT_BASED"
+    assert base.net_profit == 600.0
+    assert base.eps is None
+
+
+def test_valid_attributable_bank_forecast_still_calculates_eps():
+    base = _bank_forecast().scenario_forecasts.base
+    assert base.net_profit == 550.0
+    assert base.eps == 5.5
+    assert base.assumptions["eps_attributable_basis"] == \
+        "CALLER_DECLARED_EQUIVALENCE"
+
+
+def test_valid_attributable_holding_forecast_still_calculates_eps():
+    base = _holding_forecast().scenario_forecasts.base
+    assert base.net_profit == 440.0
+    assert base.eps == 4.4
+    assert base.assumptions["eps_attributable_basis"] == \
+        "CALLER_DECLARED_EQUIVALENCE"
+
+
+def test_eps_matches_net_profit_in_every_scenario_once_attributable():
+    # EPS tracks the chain it came from: the numerator and the denominator are
+    # the same forecast, so the ordering is preserved scenario by scenario.
+    chains = _core_forecast(_core_context()).scenario_forecasts
+    assert chains.bear.eps < chains.base.eps < chains.bull.eps
+    for chain in (chains.bear, chains.base, chains.bull):
+        assert chain.eps == round(chain.net_profit / 1000.0, 6)
+
+
+# --- B. Scenario spreads come from the declared model only ------------------
+
+def test_scenario_spread_authority_is_recorded_per_spread():
+    result = _core_forecast(_core_context())
+    for key in ("revenue", "financial", "operating_margin", "net_margin"):
+        assert result.assumptions["scenario_spread_bases"][key] in (
+            "MODEL_PARAMETER", "MODEL_DEFAULT", "VOLATILITY_EVIDENCE")
+    # The model parameters that produced them are frozen verbatim.
+    declared = result.assumptions["scenario_spread_model_parameters"]
+    assert declared["scenario_revenue_growth_spread"] == 0.05
+    assert declared["scenario_operating_margin_spread"] == 0.02
+    assert declared["scenario_net_margin_spread"] == 0.01
+    assert declared["scenario_financial_growth_spread"] == 0.05
+
+
+def test_authoritative_scenario_parameters_are_respected():
+    context = _core_context()
+    context["model_parameters"] = {"scenario_revenue_growth_spread": 0.03}
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_revenue_growth_spread"] == 0.03
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "MODEL_PARAMETER"
+    chains = result.scenario_forecasts
+    assert chains.bear.revenue == pytest.approx(10000.0 * (1.0 + 0.10 - 0.03))
+    assert chains.bull.revenue == pytest.approx(10000.0 * (1.0 + 0.10 + 0.03))
+
+
+def test_no_authoritative_parameter_leaves_the_model_default_standing():
+    context = _core_context()
+    context["model_parameters"] = {}
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "MODEL_DEFAULT"
+    # The default is the model's own value, never an invented dispersion.
+    assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
+
+
+def test_no_arbitrary_spread_is_fabricated_from_absent_evidence():
+    context = _core_context()
+    context["model_parameters"] = {}
+    for key in ("revenue_volatility", "historical_revenue_volatility",
+                "earnings_volatility", "forecast_uncertainty"):
+        context[key] = None
+    result = _core_forecast(context)
+    assert result.assumptions["uncertainty_evidence"] is None
+    # No dispersion estimate was manufactured from the missing observation.
+    assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
+
+
+@pytest.mark.parametrize("momentum_pct", [-0.02, -0.019, 0.019, 0.02, 0.25])
+def test_stage4_two_pct_cannot_become_a_scenario_spread(momentum_pct):
+    # Stage 4's ±2% band classifies trend direction. It is not a Stage 5
+    # scenario spread in any of its forms: neither the band itself, nor a
+    # momentum reading inside or outside it, can set the dispersion.
+    plain = _core_forecast(_core_context())
+    context = _core_context(momentum_12m_pct=momentum_pct, trend_state="Positive")
+    moved = _core_forecast(context)
+    assert moved.assumptions["scenario_revenue_growth_spread"] == \
+        plain.assumptions["scenario_revenue_growth_spread"]
+    assert moved.assumptions["scenario_spread_bases"] == \
+        plain.assumptions["scenario_spread_bases"]
+    assert abs(moved.assumptions["scenario_revenue_growth_spread"] - 0.02) > 0.0 \
+        or momentum_pct not in (-0.02, 0.02)
+    assert moved.assumptions["scenario_revenue_growth_spread"] != abs(
+        momentum_pct)
+
+
+def test_momentum_cannot_become_a_scenario_spread():
+    plain = _core_forecast(_core_context())
+    context = _core_context(momentum_12m_pct=0.50, momentum_12m_strength="STRONG")
+    moved = _core_forecast(context)
+    assert moved.assumptions["scenario_revenue_growth_spread"] == \
+        plain.assumptions["scenario_revenue_growth_spread"]
+    assert moved.assumptions["scenario_financial_growth_spread"] == \
+        plain.assumptions["scenario_financial_growth_spread"]
+    assert moved.assumptions["scenario_operating_margin_spread"] == \
+        plain.assumptions["scenario_operating_margin_spread"]
+
+
+@pytest.mark.parametrize("score", [0.0, 50.0, 100.0])
+def test_fundamental_score_cannot_become_a_scenario_spread(score):
+    plain = _core_forecast(_core_context())
+    context = _core_context()
+    for key in ("fundamental_score", "stage4_fundamental_score",
+                "fundamental_score_value"):
+        context[key] = score
+    scored = _core_forecast(context)
+    assert scored.assumptions["scenario_spread_bases"] == \
+        plain.assumptions["scenario_spread_bases"]
+    for key in ("scenario_revenue_growth_spread",
+                "scenario_operating_margin_spread",
+                "scenario_net_margin_spread",
+                "scenario_financial_growth_spread"):
+        assert scored.assumptions[key] == plain.assumptions[key]
+
+
+def test_bank_financial_spread_stays_a_declared_model_parameter():
+    context = _bank_context()
+    context["model_parameters"] = {"scenario_financial_growth_spread": 0.04}
+    result = ForecastEngine().generate_forecast(
+        1, 10, "BANK", context, data_cutoff_datetime=_CUTOFF)
+    assert result.assumptions["scenario_financial_growth_spread"] == 0.04
+    assert result.assumptions["scenario_spread_bases"]["financial"] == \
+        "MODEL_PARAMETER"
+    chains = result.scenario_forecasts
+    assert chains.bear.net_profit == pytest.approx(1000.0 * 1.06 * 0.50)
+    assert chains.bull.net_profit == pytest.approx(1000.0 * 1.14 * 0.50)
+
+
+def test_volatility_evidence_only_acts_through_a_declared_sensitivity():
+    # Declared dispersion may move the declared parameter, by the caller's own
+    # factor and no other — this is the one channel through which an
+    # observation widens the spread.
+    context = _core_context(revenue_volatility=0.25, volatility_sensitivity=2.0)
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "VOLATILITY_EVIDENCE"
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(0.05 * 2.0 * 0.25)
+
+
+def test_volatility_without_a_declared_sensitivity_changes_nothing():
+    # The observation alone is not a spread: without the caller's sensitivity it
+    # is inert, so no estimate is inferred from it.
+    plain = _core_forecast(_core_context())
+    context = _core_context(revenue_volatility=0.25)
+    moved = _core_forecast(context)
+    assert moved.assumptions["scenario_revenue_growth_spread"] == \
+        plain.assumptions["scenario_revenue_growth_spread"]
+    assert moved.assumptions["scenario_spread_evidence_notes"]["revenue"] == \
+        "VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY"
+
+
+# --- C. baseline_revenue_growth precedence ----------------------------------
+
+def test_baseline_revenue_growth_is_a_declared_caller_parameter():
+    # It outranks the historical arc because the caller owns the growth it
+    # declares; the record names that precedence instead of leaving it implicit.
+    context = _core_context(
+        baseline_revenue_growth=0.30, prior_revenue=9000.0, current_revenue=10000.0)
+    result = _core_forecast(context)
+    assert result.assumptions["growth_rate_basis"] == "DECLARED_GROWTH_PARAMETER"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(13000.0)
+
+
+def test_absent_baseline_growth_falls_back_to_the_historical_arc():
+    # No declared growth: the PIT-valid arc is the only source left, so the
+    # zero-safe reading of the two actual observations supplies the rate.
+    context = _core_context(prior_revenue=8000.0, current_revenue=10000.0)
+    context.pop("baseline_revenue_growth")
+    result = _core_forecast(context)
+    assert result.assumptions["growth_rate_basis"] == "ZERO_SAFE_GROWTH"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(12500.0)
+
+
+def test_pit_valid_prior_revenue_is_used_for_the_growth_rate():
+    context = _core_context(prior_revenue=8000.0, current_revenue=10000.0)
+    context.pop("baseline_revenue_growth")
+    result = _core_forecast(context)
+    # 10000 / 8000 - 1 = 0.25, the ordinary reading of the two same-sign
+    # observations, and nothing else.
+    assert result.scenario_forecasts.base.revenue == pytest.approx(12500.0)
+
+
+def test_post_cutoff_historical_revenue_is_ignored_by_the_growth_rate():
+    # The prior revenue observation was published after the cutoff. Both the
+    # provenance and the number must be unusable, so the arc is absent and the
+    # baseline is carried flat rather than grown on look-ahead data.
+    context = _core_context(prior_revenue=8000.0, current_revenue=10000.0)
+    context.pop("baseline_revenue_growth")
+    context["input_refs"] = [ForecastInputRef(
+        fact_key="prior_revenue",
+        available_at=datetime(2026, 6, 1, tzinfo=timezone.utc))]
+    result = _core_forecast(context)
+    assert result.assumptions["pit_valid"] is False
+    assert result.assumptions["pit_dropped_values"] == ["prior_revenue"]
+    assert result.assumptions["growth_rate_basis"] in (
+        "FLAT_INSUFFICIENT_EVIDENCE", "FLAT_NO_DECLARED_GROWTH")
+    # A forecast grown at 25% on data the cutoff could not see is refused.
+    assert result.scenario_forecasts.base.revenue == pytest.approx(10000.0)
+
+
+def test_baseline_revenue_growth_cannot_override_pit_valid_history_silently():
+    # The precedence is declared-first, but the declaration is a caller choice
+    # that must remain visible on the record: the historical arc is still named
+    # so an auditor can see which of the two was discarded.
+    context = _core_context(
+        baseline_revenue_growth=0.05, prior_revenue=9000.0, current_revenue=10000.0)
+    result = _core_forecast(context)
+    assert result.assumptions["growth_rate_basis"] == "DECLARED_GROWTH_PARAMETER"
+    # The discarded arc is still recorded for the audit trail.
+    chain = result.scenario_forecasts.base
+    assert chain.assumptions["growth_rate_prior_revenue"] == 9000.0
+    assert chain.assumptions["growth_rate_current_revenue"] == 10000.0
+    # The declared value is used, not the 1/9 historical reading.
+    assert result.scenario_forecasts.base.revenue == pytest.approx(10500.0)
+
+
+def test_sign_transition_refuses_the_historical_arc_without_a_declaration():
+    # An arc that crosses zero has no ordinary percentage reading, so without a
+    # declared growth parameter the baseline is carried flat.
+    context = _sign_context("LOSS_TO_PROFIT", prior_revenue=-1000.0,
+                            current_revenue=1000.0)
+    context["seasonal_baseline_revenue"] = 10000.0
+    context.pop("baseline_revenue_growth", None)
+    result = _core_forecast(context)
+    assert result.assumptions["growth_rate_basis"] == "FLAT_SIGN_TRANSITION"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(10000.0)
+
+
+# --- D. Engine-level PIT / provenance firewall -------------------------------
+
+def test_pit_valid_value_with_valid_provenance_is_usable():
+    context = _core_context(prior_revenue=8000.0, current_revenue=10000.0)
+    context.pop("baseline_revenue_growth")
+    context["input_refs"] = [
+        ForecastInputRef("prior_revenue",
+                         available_at=datetime(2025, 12, 1, tzinfo=timezone.utc)),
+        ForecastInputRef("current_revenue",
+                         available_at=datetime(2025, 12, 1, tzinfo=timezone.utc)),
+    ]
+    result = _core_forecast(context)
+    assert result.assumptions["pit_valid"] is True
+    assert result.assumptions["pit_dropped_values"] == []
+    assert result.scenario_forecasts.base.revenue == pytest.approx(12500.0)
+
+
+def test_post_cutoff_numeric_value_is_unusable():
+    # The number itself is perfectly ordinary and positive: it must be unusable
+    # purely because its own provenance is later than the cutoff.
+    context = _core_context(prior_revenue=8000.0, current_revenue=10000.0)
+    context.pop("baseline_revenue_growth")
+    context["input_refs"] = [ForecastInputRef(
+        "current_revenue", available_at=datetime(2026, 6, 1, tzinfo=timezone.utc))]
+    result = _core_forecast(context)
+    assert result.assumptions["pit_valid"] is False
+    assert result.assumptions["pit_dropped_values"] == ["current_revenue"]
+    # The arc lost an endpoint, so no percentage growth is produced at all.
+    assert result.assumptions["growth_rate_basis"] in (
+        "FLAT_INSUFFICIENT_EVIDENCE", "FLAT_NO_DECLARED_GROWTH")
+    assert result.scenario_forecasts.base.revenue == pytest.approx(10000.0)
+
+
+def test_post_cutoff_provenance_makes_a_usable_value_unusable():
+    # A value that would have driven the baseline is dropped once its
+    # provenance is late: the late ref must not survive alongside the number.
+    context = _core_context()
+    context["input_refs"] = [ForecastInputRef(
+        "seasonal_baseline_revenue",
+        available_at=datetime(2026, 6, 1, tzinfo=timezone.utc))]
+    result = _core_forecast(context)
+    assert result.assumptions["pit_valid"] is False
+    assert result.assumptions["pit_dropped_values"] == [
+        "seasonal_baseline_revenue"]
+    # Tier 1 fell away with the late value, so the run rate takes over.
+    assert result.baseline_method == "RUN_RATE"
+    assert result.scenario_forecasts.base.revenue == pytest.approx(9900.0)
+
+
+def test_missing_mandatory_provenance_is_reported_not_trusted():
+    # Provenance is opt-in, so an undeclared mandatory fact is still used — but
+    # the record names it rather than leaving the reader to infer the engine
+    # trusted a number it cannot trace.
+    context = _core_context()
+    result = _core_forecast(context)
+    undeclared = result.assumptions["undeclared_mandatory_inputs"]
+    assert "seasonal_baseline_revenue" in undeclared
+    assert "recent_run_rate_revenue" in undeclared
+
+
+def test_declared_provenance_clears_the_undeclared_warning():
+    context = _core_context()
+    context["input_refs"] = [
+        ForecastInputRef("seasonal_baseline_revenue",
+                         available_at=datetime(2025, 12, 1, tzinfo=timezone.utc)),
+        ForecastInputRef("recent_run_rate_revenue",
+                         available_at=datetime(2025, 12, 1, tzinfo=timezone.utc)),
+        ForecastInputRef("historical_operating_margin",
+                         available_at=datetime(2025, 12, 1, tzinfo=timezone.utc)),
+        ForecastInputRef("historical_net_margin",
+                         available_at=datetime(2025, 12, 1, tzinfo=timezone.utc)),
+    ]
+    undeclared = _core_forecast(context).assumptions["undeclared_mandatory_inputs"]
+    assert "seasonal_baseline_revenue" not in undeclared
+    assert "recent_run_rate_revenue" not in undeclared
+
+
+def test_an_undeclared_late_value_is_dropped_from_the_calculation():
+    # Both halves of the same violation: the ref is filtered and the numeric
+    # value is gone too, so the engine cannot divide a late number.
+    context = _core_context()
+    context["input_refs"] = [ForecastInputRef(
+        "historical_net_margin",
+        available_at=datetime(2026, 6, 1, tzinfo=timezone.utc))]
+    result = _core_forecast(context)
+    assert result.assumptions["pit_dropped_values"] == ["historical_net_margin"]
+    base = result.scenario_forecasts.base
+    # The margin hierarchy fell through to a level that still exists, and no
+    # late margin reached the chain.
+    assert base.operating_margin == 0.20
+    assert base.net_profit is not None
+
+
+def test_pit_guard_applies_to_the_bank_chain_too():
+    context = _bank_context()
+    context["input_refs"] = [ForecastInputRef(
+        "base_nii", available_at=datetime(2026, 6, 1, tzinfo=timezone.utc))]
+    result = ForecastEngine().generate_forecast(
+        1, 10, "BANK", context, data_cutoff_datetime=_CUTOFF)
+    assert result.assumptions["pit_dropped_values"] == ["base_nii"]
+    base = result.scenario_forecasts.base
+    # With no NII there is no bank chain to forecast, never a zero-profit one.
+    assert base.method == "INSUFFICIENT_DATA"
+    assert base.net_profit is None
+
+
+def test_pit_guard_applies_to_the_holding_chain_too():
+    context = _holding_context()
+    context["input_refs"] = [ForecastInputRef(
+        "base_nav", available_at=datetime(2026, 6, 1, tzinfo=timezone.utc))]
+    result = ForecastEngine().generate_forecast(
+        1, 10, "HOLDING", context, data_cutoff_datetime=_CUTOFF)
+    assert result.assumptions["pit_dropped_values"] == ["base_nav"]
+    base = result.scenario_forecasts.base
+    assert base.method == "INSUFFICIENT_DATA"
+    assert base.net_profit is None

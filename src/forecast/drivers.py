@@ -164,7 +164,12 @@ class ForecastDriver:
                 ),
             )
 
-        eps = np / share_count if share_count is not None and share_count > 0 else None
+        # EPS is the caller-resolved attributable-profit decision, not a fresh
+        # division of this chain's own net profit. Dividing here would let a
+        # specialized path produce an EPS the common EPS gate had already
+        # refused, so a missing ``eps`` stays missing rather than being
+        # reconstructed from ``np / share_count``.
+        eps = ForecastDriver._round(eps)
         roe = None
         if beginning_equity is not None and ending_equity is not None:
             avg_equity = (beginning_equity + ending_equity) / 2.0
@@ -278,7 +283,10 @@ class ForecastDriver:
                 ),
             )
 
-        eps = np / share_count if share_count is not None and share_count > 0 else None
+        # Same EPS contract as the bank chain: the caller-resolved EPS is the
+        # only authoritative reading, so the chain never divides its own net
+        # profit and a refused EPS cannot be reconstructed here.
+        eps = ForecastDriver._round(eps)
         roe = None
         if beginning_equity is not None and ending_equity is not None:
             avg_equity = (beginning_equity + ending_equity) / 2.0
@@ -304,20 +312,23 @@ class ForecastDriver:
         )
 
     # Compatibility wrappers retained for existing callers; they no longer
-    # inject hidden defaults or scenario assumptions.
+    # inject hidden defaults or scenario assumptions. Its signature keeps the
+    # caller's attributable declaration as an explicit argument, so the division
+    # it performs is the caller's own statement about its profit — the same
+    # contract the engine applies, expressed through this wrapper.
     @staticmethod
     def build_general_chain(base_revenue: float, growth_rate: float, operating_margin: float,
                             net_margin: float, share_count: float,
                             net_profit_is_attributable: bool = True) -> SingleForecastChain:
         revenue = base_revenue * (1.0 + growth_rate)
-        chain = ForecastDriver.build_non_financial_chain(
+        eps = None
+        if net_profit_is_attributable and share_count > 0:
+            eps = (revenue * net_margin / 100.0) / share_count
+        return ForecastDriver.build_non_financial_chain(
             revenue=revenue,
             operating_margin=operating_margin / 100.0,
             share_count=share_count,
             net_margin=net_margin / 100.0,
             method_hint="RUN_RATE",
+            eps=eps,
         )
-        if net_profit_is_attributable:
-            return replace(chain, eps=ForecastDriver._round(
-                chain.net_profit / share_count))
-        return replace(chain, eps=None)

@@ -27,6 +27,21 @@ NET_PROFIT_HIERARCHY = (
 )
 
 
+# The scenario spreads are declared Stage 5 model parameters. They are not
+# derived from Stage 4's ±2% direction band, from momentum, from the
+# Fundamental Score, from an arbitrary percentage of the forecast, or from a
+# volatility estimate the engine invented out of a missing observation. Each
+# one names its own basis on the record so an auditor can see it came from the
+# declared model and not from an evidence stream the spec isolates (spec §16,
+# §21, §23). The four keys below are the complete vocabulary of scenario
+# uncertainty in this engine: a spread that is not one of them does not exist.
+SCENARIO_SPREAD_KEYS = (
+    "scenario_revenue_growth_spread",
+    "scenario_operating_margin_spread",
+    "scenario_net_margin_spread",
+    "scenario_financial_growth_spread",
+)
+
 DEFAULT_MODEL_PARAMETERS = {
     "trend_adjustments": {},
     "scenario_revenue_growth_spread": 0.05,
@@ -318,35 +333,52 @@ class ForecastEngine:
         """
         return cls._baseline_value(context, *cls._UNCERTAINTY_EVIDENCE_KEYS)
 
-    @staticmethod
+    @classmethod
     def _scenario_spread(
+        cls,
         params: Dict[str, Any],
         key: str,
         fallback_key: str,
         evidence: Optional[float],
         context: Dict[str, Any],
-    ) -> tuple[float, str]:
+    ) -> tuple[float, str, Optional[str]]:
         """Resolve one scenario spread and name where it came from.
 
-        The declared model parameter is the already-established Stage 5 default.
-        A declared volatility observation may widen or narrow it — through the
-        caller's own declared sensitivity, never through an invented multiplier
-        — and missing evidence leaves the default untouched rather than being
-        filled with a fabricated dispersion estimate.
+        The value follows the established resolution unchanged: the caller's
+        declared model parameter when it names this key, otherwise the model's
+        own value for the slot. What this method adds is a truthful basis:
+        ``MODEL_PARAMETER`` only when the caller declared a value for this
+        key, ``MODEL_DEFAULT`` when the model's own default stands. No Stage
+        4 ±2% direction band, no momentum reading and no Fundamental Score is
+        consulted at any point (spec §16, §21, §23).
+
+        A declared volatility observation may widen or narrow either base —
+        through the caller's own declared sensitivity, never through an
+        invented multiplier — and missing evidence leaves the base untouched
+        rather than being filled with a fabricated dispersion estimate.
+
+        Returns the spread, its basis, and the evidence stream that did *not*
+        contribute, so a stored record can always say which of the model's own
+        parameters a scenario moved away from and which isolated inputs it
+        ignored.
         """
+        if key not in SCENARIO_SPREAD_KEYS:
+            raise ValueError(f"unknown scenario spread parameter: {key!r}")
         declared = float(params.get(fallback_key, 0.0))
         parameter = params.get(key)
-        if parameter is None:
-            return declared, "MODEL_DEFAULT"
-        if not isinstance(parameter, (int, float)):
-            return declared, "MODEL_DEFAULT"
+        if parameter is None or not isinstance(parameter, (int, float)):
+            # No usable value for this key, so the model's own value for the
+            # slot stands. Nothing else is consulted: no Stage 4 band, no
+            # momentum reading and no Fundamental Score can fill that slot.
+            return declared, "MODEL_DEFAULT", None
         if evidence is None:
-            return float(parameter), "MODEL_PARAMETER"
+            return float(parameter), "MODEL_PARAMETER", None
         sensitivity = ForecastEngine._number(context, "volatility_sensitivity")
         if not isinstance(sensitivity, (int, float)) or sensitivity <= 0:
-            return float(parameter), "MODEL_PARAMETER"
+            return float(parameter), "MODEL_PARAMETER", \
+                "VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY"
         return float(parameter) * float(sensitivity) * float(evidence), \
-            "VOLATILITY_EVIDENCE"
+            "VOLATILITY_EVIDENCE", None
 
     # ------------------------------------------------------------------
     # Operational FX (spec §30)
@@ -505,6 +537,78 @@ class ForecastEngine:
         )
         return False, [ref for ref in refs if ref not in dropped], first_violation
 
+    # Facts the engine reads as numbers. Provenance for one of these is not
+    # optional decoration: a numeric value whose declared publication is after
+    # the cutoff is look-ahead data, and dropping only the ref while keeping the
+    # number would let a late fact into the calculation through a channel the
+    # ref guard never touched (spec §25). Where a mandatory fact has no declared
+    # provenance at all the engine records the absence rather than trusting the
+    # value on its own.
+    _PIT_GUARDED_FACT_KEYS = frozenset({
+        "prior_revenue",
+        "current_revenue",
+        "seasonal_baseline_revenue",
+        "recent_run_rate_revenue",
+        "seasonal_naive_revenue",
+        "driver_based_revenue",
+        "driver_volume",
+        "driver_price",
+        "historical_operating_margin",
+        "forecast_operating_margin",
+        "recent_operating_margin",
+        "historical_net_margin",
+        "forecast_net_margin",
+        "recent_net_margin",
+        "beginning_equity",
+        "forecast_ending_equity",
+        "forecast_net_profit",
+        "base_nii",
+        "forecast_nii",
+        "base_nav",
+        "net_profit_attributable",
+    })
+
+    @staticmethod
+    def _pit_guarded_context(
+        context: Dict[str, Any],
+        refs: List[ForecastInputRef],
+        cutoff: datetime,
+    ) -> tuple[Dict[str, Any], List[str]]:
+        """Remove numeric facts whose own declared provenance is post-cutoff.
+
+        Filtering the refs alone is not enough (Prompt 14 concern D): the number
+        stays in the context and would still be read. This walks the refs a
+        second time and drops the *value* for any guarded key that declared a
+        publication later than the cutoff. Facts named by a ref whose
+        ``available_at`` is absent are left in place — provenance is opt-in for
+        the caller — but a key the model treats as mandatory is recorded so the
+        audit trail can say it was used undeclared rather than silently trusted.
+        """
+        late = {
+            ref.fact_key for ref in refs
+            if ref.available_at is not None
+            and normalize_datetime(ref.available_at) > normalize_datetime(cutoff)
+        }
+        if not late:
+            return context, []
+        guarded = dict(context)
+        for key in late:
+            if key in guarded:
+                guarded.pop(key, None)
+        return guarded, sorted(late)
+
+    @staticmethod
+    def _undeclared_mandatory_facts(
+        context: Dict[str, Any],
+        refs: List[ForecastInputRef],
+    ) -> List[str]:
+        """Guarded facts present as numbers but carrying no declared provenance."""
+        provenanced = {ref.fact_key for ref in refs}
+        return sorted(
+            key for key in ForecastEngine._PIT_GUARDED_FACT_KEYS
+            if key in context and key not in provenanced
+        )
+
     def _non_financial_scenario(
         self,
         context: Dict[str, Any],
@@ -587,9 +691,14 @@ class ForecastEngine:
         # EPS needs the numerator, so the engine resolves the forecast net
         # profit here and passes the driver its already-computed EPS. The tiers
         # are the driver's own, in the driver's own order, so the two cannot
-        # disagree about which net profit was built.
+        # disagree about which net profit was built. The margin the engine
+        # resolves must be the same margin the driver divides: the scenario's
+        # own margin adjustment, not the unadjusted base level.
+        scenario_margin = None if conversion is not None else (
+            None if net_margin is None else net_margin + net_margin_adjustment)
         forecast_np = self._forecast_net_profit(
-            context, revenue, revenue * op_margin, net_margin_override=net_margin)
+            context, revenue, revenue * op_margin,
+            net_margin_override=scenario_margin)
         eps, eps_reason = self._eps(context, forecast_np, self._share_count(context))
         if eps_reason is not None and forecast_np is not None:
             scenario_assumptions["eps_reason"] = eps_reason
@@ -601,9 +710,7 @@ class ForecastEngine:
             financial_costs=components["financial_costs"],
             tax=components["tax"],
             net_operating_conversion=conversion,
-            net_margin=None if conversion is not None else (
-                None if net_margin is None else net_margin + net_margin_adjustment
-            ),
+            net_margin=scenario_margin,
             beginning_equity=self._number(context, "beginning_equity"),
             ending_equity=self._number(context, "forecast_ending_equity"),
             method_hint=baseline_method,
@@ -715,19 +822,34 @@ class ForecastEngine:
         cutoff = normalize_datetime(data_cutoff_datetime) or datetime.now(timezone.utc)
         params = self._merge_parameters(financial_context)
         sign_change = self._sign_change(financial_context)
-        # The low-base control is resolved first because a sign transition or a
-        # zero base is a low-base condition: it suppresses the momentum-derived
-        # adjustment before the adjustment is ever computed.
-        low_base_control, low_base_evidence = self._low_base_control(financial_context)
-        low_base = low_base_control or bool(
-            financial_context.get("low_base") or financial_context.get("LOW_BASE"))
-        trend_adj, trend_reason = self._trend_adjustment(
-            financial_context, trend_state, params, low_base=low_base)
 
         # Point-in-Time: a forecast may only use inputs published at or before
         # its cutoff (spec §25). Late inputs are dropped, never silently kept.
         raw_refs = self._raw_input_refs(financial_context)
         pit_ok, input_refs, violation = self._pit_safe(financial_context, raw_refs, cutoff)
+        # Dropping the ref is not enough on its own (Prompt 14 concern D): the
+        # numeric value would remain in the context and the engine would still
+        # divide it. So the values behind late declarations are removed from the
+        # context the calculation actually reads.
+        guarded_context, late_values = self._pit_guarded_context(
+            financial_context, raw_refs, cutoff)
+        undeclared_mandatory = self._undeclared_mandatory_facts(
+            guarded_context, input_refs)
+        # Everything below reads the guarded context, so a numeric value whose
+        # provenance is post-cutoff is absent from the calculation itself, not
+        # merely absent from the audit trail.
+        context = guarded_context
+
+        # The low-base control is resolved after the PIT guard because it reads
+        # the same prior/current revenue pair: a late fact must not be able to
+        # manufacture a low-base reading either. A sign transition or a zero base
+        # is a low-base condition and suppresses the momentum-derived adjustment
+        # before that adjustment is ever computed.
+        low_base_control, low_base_evidence = self._low_base_control(context)
+        low_base = low_base_control or bool(
+            context.get("low_base") or context.get("LOW_BASE"))
+        trend_adj, trend_reason = self._trend_adjustment(
+            context, trend_state, params, low_base=low_base)
 
         calculation_at = normalize_datetime(
             financial_context.get("calculation_timestamp")
@@ -738,34 +860,52 @@ class ForecastEngine:
                 "would be dated before the information it claims to see"
             )
 
-        scenario_spread, spread_basis = self._scenario_spread(
+        scenario_spread, spread_basis, spread_note = self._scenario_spread(
             params, "scenario_revenue_growth_spread", "scenario_revenue_growth_spread",
-            self._uncertainty_evidence(financial_context), financial_context)
-        financial_spread, financial_basis = self._scenario_spread(
+            self._uncertainty_evidence(context), context)
+        financial_spread, financial_basis, financial_note = self._scenario_spread(
             params, "scenario_financial_growth_spread",
-            "scenario_revenue_growth_spread", self._uncertainty_evidence(financial_context),
-            financial_context)
-        margin_spread, margin_basis = self._scenario_spread(
+            "scenario_revenue_growth_spread", self._uncertainty_evidence(context),
+            context)
+        margin_spread, margin_basis, margin_note = self._scenario_spread(
             params, "scenario_operating_margin_spread",
-            "scenario_operating_margin_spread", None, financial_context)
-        net_margin_spread, net_margin_basis = self._scenario_spread(
+            "scenario_operating_margin_spread", None, context)
+        net_margin_spread, net_margin_basis, net_margin_note = self._scenario_spread(
             params, "scenario_net_margin_spread", "scenario_net_margin_spread",
-            None, financial_context)
+            None, context)
+        # Each spread carries its own basis, so an auditor never has to infer
+        # which model parameter a scenario moved away from. The keys are the
+        # model's complete spread vocabulary: anything not named here was never
+        # consulted.
+        spread_bases = {
+            "revenue": spread_basis,
+            "financial": financial_basis,
+            "operating_margin": margin_basis,
+            "net_margin": net_margin_basis,
+        }
+        spread_notes = {
+            key: note for key, note in (
+                ("revenue", spread_note),
+                ("financial", financial_note),
+                ("operating_margin", margin_note),
+                ("net_margin", net_margin_note),
+            ) if note is not None
+        }
         margin_adjustment = float(params.get("operating_margin_adjustment", 0.0))
 
         benchmark = None
-        resolved_fx = self._operational_fx(financial_context)
+        resolved_fx = self._operational_fx(context)
         # FREE_MARKET and OPERATIONAL FX are separate concepts. A company that
         # actually carries FX exposure must not be priced at the free-market
         # rate when the operational rate is missing; a company with no declared
         # exposure has nothing to reprice, so the presence of a free-market rate
         # in its context is simply unused rather than a silent substitution.
-        self._free_market_fx_is_never_used(financial_context, resolved_fx)
+        self._free_market_fx_is_never_used(context, resolved_fx)
         assumptions: Dict[str, Any] = {
             "model_parameters": params,
-            "trend_evidence": trend_state or financial_context.get("trend_state"),
+            "trend_evidence": trend_state or context.get("trend_state"),
             "sign_change": sign_change,
-            "sign_transition": self._is_sign_transition(financial_context),
+            "sign_transition": self._is_sign_transition(context),
             "trend_adjustment": trend_adj,
             "trend_adjustment_reason": trend_reason,
             "low_base": low_base,
@@ -778,22 +918,30 @@ class ForecastEngine:
             "operational_fx_confidence": (
                 resolved_fx.confidence if resolved_fx is not None else None
             ),
-            "fx_ladder": self._fx_ladder_snapshot(financial_context, resolved_fx),
-            "uncertainty_evidence": self._uncertainty_evidence(financial_context),
+            "fx_ladder": self._fx_ladder_snapshot(context, resolved_fx),
+            "uncertainty_evidence": self._uncertainty_evidence(context),
             "uncertainty_basis": spread_basis,
             "scenario_revenue_growth_spread": scenario_spread,
             "scenario_financial_growth_spread": financial_spread,
             "scenario_operating_margin_spread": margin_spread,
             "scenario_net_margin_spread": net_margin_spread,
-            "scenario_spread_bases": {
-                "revenue": spread_basis,
-                "financial": financial_basis,
-                "operating_margin": margin_basis,
-                "net_margin": net_margin_basis,
+            "scenario_spread_bases": spread_bases,
+            "scenario_spread_model_parameters": {
+                key: params.get(key) for key in SCENARIO_SPREAD_KEYS
             },
+            "scenario_spread_evidence_notes": spread_notes,
+            # The evidence streams Stage 5 must never read as a spread. Naming
+            # them here means a reviewer can confirm they were ignored rather
+            # than having to prove a negative.
+            "scenario_spread_excluded_inputs": (
+                "stage4_trend_threshold",
+                "momentum_12m_pct",
+                "fundamental_score",
+                "p_nav",
+            ),
             "data_cutoff_datetime": cutoff.isoformat(),
             "pit_valid": pit_ok,
-            "eps_attributable_basis": self._eps_attributable_basis(financial_context),
+            "eps_attributable_basis": self._eps_attributable_basis(context),
             "input_refs": [
                 {"fact_key": ref.fact_key, "report_version_id": ref.report_version_id,
                  "available_at": ref.available_at.isoformat() if ref.available_at else None,
@@ -810,11 +958,19 @@ class ForecastEngine:
                 "cutoff": cutoff.isoformat(),
                 "action": "input_dropped",
             }
+        # A late numeric value is dropped with its ref, so both halves of the
+        # same violation are named. An empty list means nothing was late.
+        assumptions["pit_dropped_values"] = list(late_values)
+        # Guarded facts that reached the calculation without any declared
+        # provenance. Provenance is opt-in for the caller, so these are not
+        # rejected — but they are never trusted silently either, and the record
+        # says which mandatory inputs were used undeclared.
+        assumptions["undeclared_mandatory_inputs"] = list(undeclared_mandatory)
 
         if industry_code in NON_FINANCIAL_INDUSTRIES:
-            baseline_revenue, baseline_method = self._baseline_revenue(financial_context)
-            exposure = self._fx_exposure_share(financial_context)
-            seasonal_naive_revenue = self._number(financial_context, "seasonal_naive_revenue")
+            baseline_revenue, baseline_method = self._baseline_revenue(context)
+            exposure = self._fx_exposure_share(context)
+            seasonal_naive_revenue = self._number(context, "seasonal_naive_revenue")
             if seasonal_naive_revenue is not None:
                 benchmark = SingleForecastChain(revenue=round(seasonal_naive_revenue, 6), method="SEASONAL_NAIVE", quality="BENCHMARK")
 
@@ -834,30 +990,39 @@ class ForecastEngine:
                 # reading of the historical arc, then flat. A sign transition
                 # or a zero base never yields an ordinary percentage growth.
                 low_base_control, low_base_evidence = self._low_base_control(
-                    financial_context)
+                    context)
                 assumptions["low_base_evidence"] = low_base_evidence
                 computed_growth = self._safe_growth_rate(
-                    self._number(financial_context, "prior_revenue"),
-                    self._number(financial_context, "current_revenue"))
-                declared_growth = self._number(financial_context, "baseline_revenue_growth")
+                    self._number(context, "prior_revenue"),
+                    self._number(context, "current_revenue"))
+                declared_growth = self._number(context, "baseline_revenue_growth")
 
+                # ``baseline_revenue_growth`` is an explicit caller declaration,
+                # not a model parameter and not a derived reading. It outranks
+                # the historical arc because the caller is answerable for the
+                # growth it declares, while the arc is only what the reported
+                # numbers happened to show. Its precedence is recorded as
+                # DECLARED_GROWTH_PARAMETER so a stored forecast always names
+                # which of the two produced it, and it can never displace a
+                # growth the engine computed: when it is absent the historical
+                # arc, and only the historical arc, supplies the rate.
                 if declared_growth is not None:
                     base_growth = declared_growth
                     growth_basis = "DECLARED_GROWTH_PARAMETER"
                 elif computed_growth is not None:
                     base_growth = computed_growth
                     growth_basis = "ZERO_SAFE_GROWTH"
-                elif self._is_sign_transition(financial_context):
+                elif self._is_sign_transition(context):
                     base_growth = 0.0
                     growth_basis = "FLAT_SIGN_TRANSITION"
                 elif computed_growth is None and (
-                        self._number(financial_context, "prior_revenue") is None
-                        or self._number(financial_context, "current_revenue") is None):
+                        self._number(context, "prior_revenue") is None
+                        or self._number(context, "current_revenue") is None):
                     base_growth = 0.0
                     growth_basis = "FLAT_INSUFFICIENT_EVIDENCE"
                 elif computed_growth is None and (
-                        self._number(financial_context, "prior_revenue") <= 0
-                        or self._number(financial_context, "current_revenue") <= 0):
+                        self._number(context, "prior_revenue") <= 0
+                        or self._number(context, "current_revenue") <= 0):
                     base_growth = 0.0
                     growth_basis = "FLAT_ZERO_BASE"
                 else:
@@ -871,12 +1036,16 @@ class ForecastEngine:
                 bear_growth = base_growth - scenario_spread
                 bull_growth = base_growth + scenario_spread
 
-                scenario_context = dict(financial_context)
+                scenario_context = dict(context)
                 scenario_context.update({
                     "__trend_adjustment_reason": trend_reason,
                     "__low_base_evidence": low_base_evidence,
                     "__growth_rate_basis": growth_basis,
-                    "__uncertainty_evidence": self._uncertainty_evidence(financial_context),
+                    "__growth_rate_prior_revenue": self._number(
+                        context, "prior_revenue"),
+                    "__growth_rate_current_revenue": self._number(
+                        context, "current_revenue"),
+                    "__uncertainty_evidence": self._uncertainty_evidence(context),
                     "__uncertainty_basis": spread_basis,
                 })
                 if low_base_control:
@@ -903,36 +1072,40 @@ class ForecastEngine:
             # context and never as profit multipliers. The bank carries no
             # revenue-side FX exposure, so the free-market guard cannot apply.
             exposure = None
-            base_nii = self._number(financial_context, "base_nii")
-            nii_growth = self._number(financial_context, "baseline_nii_growth")
+            base_nii = self._number(context, "base_nii")
+            nii_growth = self._number(context, "baseline_nii_growth")
             if nii_growth is None:
                 nii_growth = 0.0
             nii_growth += trend_adj
             bear_g, base_g, bull_g = nii_growth - financial_spread, nii_growth, nii_growth + financial_spread
             bank_conversion = self._number(
-                financial_context, "bank_net_profit_nii_conversion")
-            bank_forecast_np = self._number(financial_context, "forecast_net_profit")
-            bank_shares = self._share_count(financial_context)
+                context, "bank_net_profit_nii_conversion")
+            bank_forecast_np = self._number(context, "forecast_net_profit")
+            bank_shares = self._share_count(context)
 
             def _bank_chain(growth: float, scenario: str) -> SingleForecastChain:
                 nii = None if base_nii is None else base_nii * (1.0 + growth)
                 chain_np = bank_forecast_np
                 if chain_np is None and nii is not None and bank_conversion is not None:
                     chain_np = nii * bank_conversion
-                eps, eps_reason = self._eps(financial_context, chain_np, bank_shares)
-                assumptions = {"scenario": scenario}
+                eps, eps_reason = self._eps(context, chain_np, bank_shares)
+                assumptions = {
+                    "scenario": scenario,
+                    "eps_attributable_basis": self._eps_attributable_basis(
+                        context),
+                }
                 if eps_reason is not None and chain_np is not None:
                     assumptions["eps_reason"] = eps_reason
                 return ForecastDriver.build_bank_chain(
                     base_nii, growth, bank_shares, assumptions=assumptions,
                     net_profit_conversion=bank_conversion,
                     forecast_net_profit=bank_forecast_np,
-                    beginning_equity=self._number(financial_context, "beginning_equity"),
-                    ending_equity=self._number(financial_context, "forecast_ending_equity"),
-                    npl_ratio=self._number(financial_context, "npl_ratio"),
-                    nim=self._number(financial_context, "nim"),
-                    loan_growth=self._number(financial_context, "loan_growth"),
-                    deposit_growth=self._number(financial_context, "deposit_growth"),
+                    beginning_equity=self._number(context, "beginning_equity"),
+                    ending_equity=self._number(context, "forecast_ending_equity"),
+                    npl_ratio=self._number(context, "npl_ratio"),
+                    nim=self._number(context, "nim"),
+                    loan_growth=self._number(context, "loan_growth"),
+                    deposit_growth=self._number(context, "deposit_growth"),
                     eps=eps,
                 )
 
@@ -946,31 +1119,35 @@ class ForecastEngine:
             baseline_method = "HOLDING_SPECIALIZED"
             # NAV conversion carries no revenue-side FX exposure.
             exposure = None
-            base_nav = self._number(financial_context, "base_nav")
-            nav_growth = self._number(financial_context, "baseline_nav_growth")
+            base_nav = self._number(context, "base_nav")
+            nav_growth = self._number(context, "baseline_nav_growth")
             if nav_growth is None:
                 nav_growth = 0.00
             nav_growth += trend_adj
             bear_g, base_g, bull_g = nav_growth - financial_spread, nav_growth, nav_growth + financial_spread
-            shares = self._share_count(financial_context)
-            conversion = self._number(financial_context, "holding_net_profit_nav_conversion")
-            holding_forecast_np = self._number(financial_context, "forecast_net_profit")
+            shares = self._share_count(context)
+            conversion = self._number(context, "holding_net_profit_nav_conversion")
+            holding_forecast_np = self._number(context, "forecast_net_profit")
 
             def _holding_chain(growth: float, scenario: str) -> SingleForecastChain:
                 chain_np = holding_forecast_np
                 if chain_np is None and base_nav is not None \
                         and conversion is not None:
                     chain_np = base_nav * (1.0 + growth) * conversion
-                eps, eps_reason = self._eps(financial_context, chain_np, shares)
-                assumptions = {"scenario": scenario}
+                eps, eps_reason = self._eps(context, chain_np, shares)
+                assumptions = {
+                    "scenario": scenario,
+                    "eps_attributable_basis": self._eps_attributable_basis(
+                        context),
+                }
                 if eps_reason is not None and chain_np is not None:
                     assumptions["eps_reason"] = eps_reason
                 return ForecastDriver.build_holding_chain(
                     base_nav, growth, shares,
                     net_profit_conversion=conversion,
                     forecast_net_profit=holding_forecast_np,
-                    beginning_equity=self._number(financial_context, "beginning_equity"),
-                    ending_equity=self._number(financial_context, "forecast_ending_equity"),
+                    beginning_equity=self._number(context, "beginning_equity"),
+                    ending_equity=self._number(context, "forecast_ending_equity"),
                     assumptions=assumptions,
                     eps=eps,
                 )

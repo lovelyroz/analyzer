@@ -32,6 +32,7 @@ from src.forecast.adapter import build_financial_context
 from src.forecast.builder import build_weighted_average_shares
 from src.forecast.engine import ForecastEngine
 from src.forecast.queries import (
+    FACT_SOURCE,
     load_financial_fact_periods,
     load_financial_facts,
     load_industry_code,
