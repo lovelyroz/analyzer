@@ -1615,3 +1615,172 @@ Final status
 Prompt 15 remediation completed. Focused suite 305 passed. Broader suite 668 passed, 2 skipped (pre-existing environmental), 0 failed. All four Prompt 14 findings (A–D) addressed and manually re-validated. The REPORT — Stage 5 Prompt 15 section has been appended to temp_report.md. No commit was made. Prompt 16 not started.
 
 Stage 5 is NOT declared frozen.
+
+===========================================================================
+REPORT — Stage 5 Prompt 16
+
+Independent cumulative adversarial validation of Stage 5 (executed 2026-10-05,
+local working tree only, no commits, no GitHub access, no branch operations,
+no repo-wide exploration; scope limited to the Stage 5 files named in the
+prompt plus src/models/share_action.py read-only for one directly-referenced
+column type).
+
+1. Files inspected
+src/forecast/engine.py (full, 1228 lines), src/forecast/drivers.py (full),
+src/forecast/schema.py (full), src/forecast/service.py (full),
+src/forecast/queries.py (full), src/forecast/adapter.py (full),
+src/forecast/builder.py (full), src/forecast/repo.py (full),
+src/models/forecast.py (full), src/tests/test_stage5_forecast.py (helpers,
+Sections 15/17/18 remediation tests, bank/holding/NII-gate tests),
+src/models/share_action.py (read-only: announcement_date/effective_date
+column types), temp_report.md (P14/P15 sections), stage5prompt1-2report.md,
+PROJECT_HANDOFF_INSTRUCTIONS.md, 05_Stage5_Forecast_Engine.md (§21-22).
+
+2. Production paths traced
+Stage 1 facts (queries.py PIT SQL: publication_datetime <= cutoff;
+announcement_date coalesce guard on CorporateAction) -> derived margins /
+opening equity / prior revenue (service.py _stage1_derived_context) ->
+weighted shares (builder.py triple cutoff guard) -> build_financial_context
+(adapter.py merge, Stage 4 never overrides caller) ->
+ForecastEngine.generate_forecast (PIT value-guard -> low-base control ->
+trend mapping -> spreads -> branch NON_FINANCIAL / BANK / HOLDING) ->
+to_record (freezes chain + all declared refs incl. rejected late ones) ->
+ForecastRecordRepository.save (append-only versioning, idempotent resave,
+conflict rejection, column-precision equality).
+
+3. Invariants challenged (all 11) + method
+Each invariant was challenged BEHAVIORALLY against the live engine via 64
+throwaway probes (deleted afterwards), not by re-reading test names:
+(1) Stage 4 boundary: trend_state with no mapping leaves revenue identical +
+reason NO_MODEL_PARAMETER; momentum 0.02 vs 0.25 identical.
+(2) PIT/provenance: late ref drops ref AND numeric value (pit_dropped_values);
+late-announced corporate action ignored with note; pre-cutoff action applied;
+undeclared mandatory facts named in undeclared_mandatory_inputs.
+(3) Financial calcs: _safe_growth_rate None on zero/missing/sign-flip;
+negative-negative defined; zero equity -> ROE None; sign transition ->
+FLAT_SIGN_TRANSITION; missing margin -> INSUFFICIENT chain.
+(4) EPS invariant: ordinary NP without attributable -> EPS None, NP kept, on
+all three branches incl. BANK/HOLDING COMPONENT paths; zero shares -> None;
+direct driver calls with eps=None never re-divide; wrapper flag honored.
+(5) Company-type isolation: P/NAV never moves HOLDING NP; NPL never scales
+BANK NP (CONTEXT_ONLY verbatim); bank never enters revenue model.
+(6) FX: free-market + declared exposure without operational rate raises
+ValueError; free-market without exposure PRESENT_UNUSED; operational rate
+reprices only the exposed share via declared sensitivity.
+(7) Signal isolation: fundamental_score 10 vs 95 leaves all scenarios
+identical.
+(8) Scenario uncertainty: isolated inputs (momentum/score/p_nav/threshold)
+leave spreads and bear/bull revenues identical; undeclared -> MODEL_DEFAULT;
+declared 0.03 -> MODEL_PARAMETER with changed revenues; excluded-inputs tuple
+names all four isolated streams. The deeper magnitudes question is unchanged
+from P15: the four defaults are honestly labeled model defaults, not
+caller-authoritative evidence — that distinction (not a magnitude proof) is
+what the remediation contract required.
+(9) Baseline/Low Base: declared 0.10 outranks 0.25 arc as
+DECLARED_GROWTH_PARAMETER with revenue 11000.0; absent declaration -> arc
+ZERO_SAFE_GROWTH with revenue 12500.0; late current_revenue dropped ->
+LOW_BASE_DECLARED_INSUFFICIENT_EVIDENCE (never manufactures low-base).
+(10) Persistence/auditability: identical resave idempotent (no new version);
+changed resave appends v2 with v1 preserved; conflicting caller version
+rejected; read_at_cutoff skips late-input records; pit_violations flags them;
+revision trend UPWARD across versions.
+(11) Determinism: identical inputs + pinned timestamp -> fully equal records;
+omitted timestamps -> identical forecast numbers (timestamp is caller state,
+numbers carry no clock).
+
+4. Adversarial cases (incl. required combined case)
+COMBINED (BANK): post-cutoff base_nii fact + ordinary forecast_net_profit
+700.0 without attributable declaration + caller baseline_nii_growth 0.10 +
+missing ending equity + NPL/NIM context. Result: late NII dropped AND named;
+NII-gate refuses whole chain (INSUFFICIENT_DATA, reason missing_nii_driver,
+all three scenarios) rather than promoting the surviving component NP —
+missing stays missing, consistent with the suite-pinned hierarchy
+(test_bank_missing_nii_driver_stays_missing_not_zero) and the generic
+revenue-gate parallel. EPS None with unverified_attributable_profit reason;
+ROE None; NPL CONTEXT_ONLY. My first probe wrongly expected the component NP
+to survive the NII gate; the engine behavior is the deliberate hierarchy, so
+the probe was corrected, not the engine. No existing test needed weakening:
+no test covers that exact late-NII-plus-component combination, and the engine
+took the stricter (refuse) branch, so there is no green-suite-masking-defect
+pattern here.
+EDGE builder-datetime: a datetime-valued announcement_date raises TypeError
+(datetime subclasses date, passes the isinstance gate, then datetime > date
+crashes). PROVEN by reproduction. Unreachable via the production path
+(announcement_date/effective_date columns are SQLAlchemy Date -> date|None;
+verified in src/models/share_action.py); fails closed (crash, never a wrong
+number); the suite's duck-typed stand-ins use dates. Recorded as a residual
+robustness note (harden with _as_date on the attribute), NOT a freeze
+blocker: no look-ahead can pass through it, no silent misstatement is
+possible, and fixing it now would be speculative hardening beyond the
+smallest-necessary-fix rule. No regression test added: the existing
+late-announcement tests already pin the in-contract behavior, and a test
+would have to inject an out-of-contract type the DB layer cannot produce.
+
+5. Tests run
+pytest src/tests/test_stage5_forecast.py -v -> 305 passed, 0 failed (2.42s).
+pytest src/tests -v -> 668 passed, 2 skipped, 0 failed (311.56s). The 2 skips
+are the pre-existing environmental skips from Prompt 11 (unavailable Codal
+sample PDF; openpyxl not installed) — unrelated to Stage 5. No bare pytest
+was run. Behavioral probes: 64/64 pass (29 + 19 + 8 + 4 sets; one initial
+probe expectation corrected as described in §4, no engine change).
+
+6. Defects found / fixes made / regression tests added
+Defects found: none meeting the genuine-correctness-defect bar (prove ->
+minimal fix -> regression test). Fixes made: none (no production or test file
+was modified; git status clean). Regression tests added: none (nothing to
+pin that the suite does not already pin; see §4 for the two cases examined
+and why neither warranted a change). Existing assertions were not weakened.
+
+7. Focused result
+305 passed, 0 failed.
+
+8. Full result
+668 passed, 2 skipped (pre-existing environmental), 0 failed.
+
+9. P14/P15 recheck (after final run)
+A (EPS attributable gate, all branches): RECHECKED BEHAVIORALLY — PASS.
+Ordinary NP without attributable yields EPS None with reason on
+NON_FINANCIAL, BANK (incl. BANK_COMPONENT_BASED with forecast_net_profit),
+and HOLDING (incl. HOLDING_COMPONENT_BASED); valid attributable cases still
+produce EPS; drivers never re-divide.
+B (scenario spread evidence/labels): RECHECKED BEHAVIORALLY — PASS.
+Inherited default labeled MODEL_DEFAULT; declared parameter MODEL_PARAMETER;
+isolated streams structurally unread (verified no engine read outside the
+excluded-inputs audit tuple) and behaviorally inert.
+C (declared growth precedence + PIT arc): RECHECKED BEHAVIORALLY — PASS.
+Declared outranks arc explicitly as DECLARED_GROWTH_PARAMETER; arc supplies
+ZERO_SAFE_GROWTH only when absent; post-cutoff revenue removed from the
+calculation itself.
+D (engine PIT firewall): RECHECKED BEHAVIORALLY — PASS. Late ref + late value
+both dropped and named; undeclared mandatory inputs named, not silently
+trusted; pre-cutoff evidence usable; service path defaults to UNVERIFIED
+unless the caller declares (incl. explicit False is not equivalence).
+
+10. Determinism result
+PASS (behaviorally proven): identical inputs + pinned timestamp -> fully
+equal records (persist-idempotent); identical inputs without timestamp ->
+identical forecast numbers. No randomness in the engine; the only clock read
+is the caller-owned calculation_timestamp.
+
+11. Proof-status classification
+Behaviorally proven (live-engine probes this session): invariants
+1,2,3,4,5,6,7,9,10,11 and the spread-isolation/label half of 8.
+Structurally verified (code read, no contrary path found): no second PIT
+architecture (single ref/value guard reused by store and repo); no Stage 4
+recalculation (adapter carries, engine maps only via explicit parameters);
+surrogate-ID independence (_same_forecast_state + column-precision equality).
+Not fully proven (acknowledged limit): the deeper authoritative-magnitude
+question behind invariant 8 — no independent financial specification for
+0.05/0.02/0.01/0.05 was found or invented, exactly as P15 recorded; the
+remediation contract (honest MODEL_DEFAULT labeling, structural + behavioral
+isolation) is fully met. The builder datetime-attribute edge is proven to
+fail closed and unreachable via production types, recorded as a robustness
+note, not a correctness defect.
+
+12. Final classification
+PASS — FREEZE ELIGIBLE
+Stage 5 is frozen.
+
+No unrelated work performed. No Stage 6 started.
+
+===========================================================================
