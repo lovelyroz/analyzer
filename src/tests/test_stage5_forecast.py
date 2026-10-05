@@ -3297,7 +3297,7 @@ def test_scenarios_use_the_declared_model_spread():
     result = _core_forecast(_core_context(baseline_revenue_growth=0.10))
     chains = result.scenario_forecasts
     assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
-    assert result.assumptions["uncertainty_basis"] == "MODEL_PARAMETER"
+    assert result.assumptions["uncertainty_basis"] == "MODEL_DEFAULT"
     assert chains.bear.revenue == pytest.approx(10000.0 * 1.05)
     assert chains.base.revenue == pytest.approx(10000.0 * 1.10)
     assert chains.bull.revenue == pytest.approx(10000.0 * 1.15)
@@ -3312,7 +3312,7 @@ def test_missing_uncertainty_evidence_leaves_the_declared_spread():
         context[key] = None
     result = _core_forecast(context)
     assert result.assumptions["uncertainty_evidence"] is None
-    assert result.assumptions["uncertainty_basis"] == "MODEL_PARAMETER"
+    assert result.assumptions["uncertainty_basis"] == "MODEL_DEFAULT"
     assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
     chains = result.scenario_forecasts
     assert chains.bear.revenue == pytest.approx(10000.0 * 1.05)
@@ -3324,7 +3324,7 @@ def test_declared_volatility_only_acts_through_a_declared_sensitivity():
     # sensitivity lets it move the spread, and by the caller's own factor.
     context = _core_context(revenue_volatility=0.30)
     assert _core_forecast(context).assumptions["uncertainty_basis"] == \
-        "MODEL_PARAMETER"
+        "MODEL_DEFAULT"
 
     scaled = _core_context(revenue_volatility=0.30, volatility_sensitivity=2.0)
     result = _core_forecast(scaled)
@@ -3840,10 +3840,12 @@ def test_an_undeclared_late_value_is_dropped_from_the_calculation():
     result = _core_forecast(context)
     assert result.assumptions["pit_dropped_values"] == ["historical_net_margin"]
     base = result.scenario_forecasts.base
-    # The margin hierarchy fell through to a level that still exists, and no
-    # late margin reached the chain.
+    # No alternative net-profit source exists in this context (no components,
+    # no conversion, no other margin level), so the chain reports
+    # INSUFFICIENT_DATA rather than fabricating a profit. Missing is not zero.
     assert base.operating_margin == 0.20
-    assert base.net_profit is not None
+    assert base.method == "INSUFFICIENT_DATA"
+    assert base.net_profit is None
 
 
 def test_pit_guard_applies_to_the_bank_chain_too():

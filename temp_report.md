@@ -1512,3 +1512,106 @@ STOP — no Prompt 16, no freeze declaration
 4. Current verdict
 
 🔴 Stage 5 is NOT declared frozen.
+
+=============================================================================
+REPORT — Stage 5 Prompt 15
+
+1. Files changed (this completion session; all uncommitted, no commit made)
+File	Change
+src/forecast/engine.py	_scenario_spread now checks raw caller membership in context["model_parameters"] so an inherited default is labeled MODEL_DEFAULT and only an explicit caller declaration is labeled MODEL_PARAMETER; _non_financial_scenario now surfaces growth_rate_prior_revenue / growth_rate_current_revenue on each chain's assumptions (audit surfacing only)
+src/tests/test_stage5_forecast.py	4 test-expectation corrections: 3 spread-basis assertions updated from MODEL_PARAMETER to MODEL_DEFAULT (inherited-default cases), test_an_undeclared_late_value_is_dropped_from_the_calculation corrected to INSUFFICIENT_DATA + net_profit None
+
+Already present in the working tree from the prior partial remediation and left untouched by this session: the BANK/HOLDING EPS gate in src/forecast/drivers.py (specialized chains consume only the caller-resolved EPS, never recompute np/shares), the PIT numeric-value guard (_pit_guarded_context) and declared-growth precedence (DECLARED_GROWTH_PARAMETER) in src/forecast/engine.py, the FACT_SOURCE import fix in src/forecast/service.py, and the Section 17 behavioral tests. No Stage 1–4 or Stage 6+ file was inspected or modified; git status confirms only the two files above differ from HEAD.
+
+2. Production changes
+- Spread-basis honesty (Failure 1 fix): _scenario_spread resolves the numeric value exactly as before (no behavior change to any forecast number) but now derives the basis label from the raw caller dict. Inherited default → MODEL_DEFAULT; explicit caller declaration → MODEL_PARAMETER; evidence-scaled value → VOLATILITY_EVIDENCE regardless of which base it scaled. No default was removed, no new number invented.
+- Growth audit surfacing (Failure 2 fix): the already-computed __growth_rate_prior_revenue / __growth_rate_current_revenue keys are copied onto each non-financial chain's assumptions as growth_rate_prior_revenue / growth_rate_current_revenue. Precedence semantics unchanged: declared baseline_revenue_growth still outranks the PIT-valid historical arc and is recorded as DECLARED_GROWTH_PARAMETER; the arc still supplies ZERO_SAFE_GROWTH only when no declaration exists.
+- No production change for Failure 3: INSUFFICIENT_DATA + net_profit None was already the correct engine behavior; only the test expectation was wrong.
+
+3. Test changes
+- test_no_authoritative_parameter_leaves_the_model_default_standing: unchanged, now passes (MODEL_DEFAULT for the inherited 0.05 default).
+- test_scenarios_use_the_declared_model_spread, test_missing_uncertainty_evidence_leaves_the_declared_spread, test_declared_volatility_only_acts_through_a_declared_sensitivity: basis assertions corrected MODEL_PARAMETER → MODEL_DEFAULT for the undeclared-spread cases; all numeric assertions untouched.
+- test_an_undeclared_late_value_is_dropped_from_the_calculation: now asserts method INSUFFICIENT_DATA and net_profit None (was: net_profit is not None); operating_margin == 0.20 and pit_dropped_values assertions kept.
+- No new tests added; no production behavior altered to satisfy a test.
+
+4. Original three failures and resolutions
+- Failure 1 (MODEL_DEFAULT vs MODEL_PARAMETER): confirmed as an implementation defect — the merged dict made the label unable to distinguish caller declaration from inherited default. Fixed in _scenario_spread via raw-membership check, as the task specified.
+- Failure 2 (growth_rate_prior_revenue KeyError): confirmed the behavior was correct (declared 0.05 used, revenue 10500.0) and only audit visibility was missing. Fixed by surfacing the two keys on the chain; no methodology or precedence change.
+- Failure 3 (late net-margin value): independently verified the context has no alternative net-profit source (no components, no conversion, no surviving margin level), so INSUFFICIENT_DATA + net_profit None is correct and the test's "net_profit is not None" expectation was wrong. Fixed the test; no profit fabricated, no zero substituted, PIT firewall untouched.
+
+5. Focused test result
+pytest src/tests/test_stage5_forecast.py -v → 305 passed, 0 failed (executed 2026-10-05, local .venv interpreter). Previously 302 passed / 3 failed.
+
+6. Broader test result
+pytest src/tests -v → 668 passed, 2 skipped, 0 failed in ~5m35s (executed 2026-10-05). The 2 skips are the pre-existing environmental skips documented in Prompt 11 (unavailable Codal sample PDF; openpyxl not installed) — unrelated to Stage 5. No regression attributable to Prompt 15 changes; no other failure observed.
+
+7. Manual validation result
+A — EPS attributable-profit invariant: PASS. Generic path divides only via _eps with an established attributable basis; BANK/HOLDING drivers accept only the caller-resolved eps argument and never recompute net_profit/share_count (verified in drivers.py source); unverified-profit cases yield eps None with eps_reason unverified_attributable_profit (pinned by passing tests); valid attributable BANK/HOLDING cases still produce EPS.
+B — Scenario evidence: PASS. engine.py contains no read of momentum, Fundamental Score, p_nav/price_to_nav, or the Stage 4 ±2% band outside comments and the scenario_spread_excluded_inputs audit tuple; spreads resolve only to declared parameter / model default / declared-sensitivity-scaled evidence; inherited defaults are now honestly labeled MODEL_DEFAULT.
+C — Historical Revenue Growth: PASS. PIT-valid prior/current Revenue arc supplies ZERO_SAFE_GROWTH only absent a declaration; declared baseline_revenue_growth outranks it as DECLARED_GROWTH_PARAMETER with the discarded arc now visible on the chain; post-cutoff Revenue is removed from the calculation context itself (pit_dropped_values), never silently trusted.
+D — Engine PIT firewall: PASS. Post-cutoff provenance drops both ref and numeric value; missing mandatory provenance is recorded in undeclared_mandatory_inputs, not silently trusted; pre-cutoff declared evidence remains usable (pinned by passing tests).
+Step-10 invariants spot-check: PASS by inspection + green suite — ROE requires both equity ends (average, zero-base guarded); _safe_growth_rate refuses zero endpoints and sign flips (LOSS_TO_PROFIT / PROFIT_TO_LOSS / SIGN_CHANGE / ZERO_BASE paths intact); missing data stays None (never zero); weighted-average-shares path, FX operational/free-market boundary with hard-error guard, Stage 4 adapter-only boundary, momentum/Fundamental/P-NAV isolation, and determinism tests all pass. Stage 4 untouched (no src/trend change in working tree). No new critical defect found; nothing outside Prompt 15 scope was redesigned.
+
+8. Unresolved issues
+None within Prompt 15 scope. Note on Blocker B's deeper question: the four DEFAULT_MODEL_PARAMETERS spread values (0.05/0.02/0.01/0.05) remain the model's own defaults — no independent authoritative financial specification for the magnitudes was found or invented. Per the remediation contract they are now honestly labeled MODEL_DEFAULT (not caller-authoritative), which is what Prompt 15 required: distinguish, don't fabricate authority.
+
+9. Environment limitations
+None encountered. Both suites executed locally with .venv/Scripts/python.exe -m pytest; no bare-pytest collection issue (project tests live under src/tests); warnings are pre-existing datetime.utcnow()/sqlite deprecations only.
+
+FINAL STATUS: Prompt 15 remediation completed. Focused suite 305 passed. Broader suite 668 passed, 2 skipped (pre-existing environmental), 0 failed. All four Prompt 14 findings (A–D) addressed and manually re-validated; no remaining Prompt 14 item outstanding.
+
+Stage 5 is NOT declared frozen.
+
+===========================================================================
+REPORT — Stage 5 Prompt 15 (completion)
+1. Files changed
+This session modified 2 files (uncommitted, no commit made):
+
+src/forecast/engine.py
+src/tests/test_stage5_forecast.py
+Already present from the prior partial remediation (committed in 8ad3a75) and left untouched by this session:
+
+src/forecast/drivers.py — BANK/HOLDING EPS gate
+src/forecast/service.py — FACT_SOURCE import fix
+No Stage 1–4 or Stage 6+ file was inspected or modified.
+
+2. Production changes
+Spread-basis honesty (_scenario_spread):
+Numeric resolution is unchanged. The basis label is now derived from raw caller membership in context["model_parameters"]:
+inherited default → MODEL_DEFAULT
+explicit caller declaration → MODEL_PARAMETER
+evidence-scaled value → VOLATILITY_EVIDENCE
+No default was removed. No number was invented.
+Growth audit surfacing (_non_financial_scenario):
+The already-computed __growth_rate_prior_revenue / __growth_rate_current_revenue values are now copied onto each non-financial chain's assumptions as growth_rate_prior_revenue / growth_rate_current_revenue. Precedence is unchanged: declared baseline_revenue_growth outranks the PIT-valid arc as DECLARED_GROWTH_PARAMETER.
+No production change for Failure 3. INSUFFICIENT_DATA + net_profit None was already correct.
+3. Test changes
+3 pre-existing spread-basis assertions corrected from MODEL_PARAMETER to MODEL_DEFAULT for inherited-default cases.
+test_an_undeclared_late_value_is_dropped_from_the_calculation corrected to assert method == INSUFFICIENT_DATA and net_profit is None instead of net_profit is not None.
+No new tests added. No production behavior altered to satisfy a test.
+4. The three failures and resolutions
+Failure 1 (test_no_authoritative_parameter_leaves_the_model_default_standing): Confirmed as an implementation defect. The merged defaults dict made the label unable to distinguish caller declaration from inherited default. Fixed in _scenario_spread via raw-membership check.
+Failure 2 (test_baseline_revenue_growth_cannot_override...): Behavior was correct (declared 0.05 used, revenue 10500.0); only audit visibility was missing (KeyError on chain assumptions). Fixed by surfacing the two audit keys. No methodology or precedence change.
+Failure 3 (test_an_undeclared_late_value...): Independently verified the context has no alternative net-profit source, so INSUFFICIENT_DATA + net_profit None is correct. Fixed the wrong test expectation. No profit fabricated, no zero substituted, PIT firewall untouched.
+5. Focused test result
+305 passed, 0 failed. Previously 302 passed / 3 failed.
+
+6. Broader test result
+668 passed, 2 skipped, 0 failed in ~5m35s. The 2 skips are the pre-existing environmental skips from Prompt 11 (unavailable Codal sample PDF; openpyxl not installed). No regression from Prompt 15 changes.
+
+7. Manual validation result
+A — EPS attributable-profit invariant: PASS. Generic path divides only via _eps with an established basis; BANK/HOLDING drivers consume only the caller-resolved eps and never recompute net_profit / share_count; unverified cases yield eps None; valid attributable BANK/HOLDING cases still produce EPS.
+B — Scenario evidence: PASS. No engine read of momentum, Fundamental Score, p_nav, or the Stage 4 ±2% band outside comments and the scenario_spread_excluded_inputs audit tuple. Inherited defaults now honestly labeled MODEL_DEFAULT.
+C — Historical Revenue Growth: PASS. PIT-valid arc supplies ZERO_SAFE_GROWTH only absent a declaration; declared growth outranks it as DECLARED_GROWTH_PARAMETER with the discarded arc visible on the chain; post-cutoff Revenue is removed from the calculation context itself.
+D — Engine PIT firewall: PASS. Post-cutoff provenance drops both ref and numeric value; missing mandatory provenance is recorded in undeclared_mandatory_inputs; pre-cutoff declared evidence remains usable.
+Step-10 invariants spot-check: PASS — ROE requires both equity ends; _safe_growth_rate refuses zero endpoints and sign flips; missing data stays None; weighted-average-shares path, FX operational/free-market boundary with hard-error guard, Stage 4 adapter-only boundary, momentum/Fundamental/P-NAV isolation, and determinism all pass. Stage 4 untouched.
+8. Unresolved issues
+None within Prompt 15 scope. One note on Blocker B's deeper question: the four default spread magnitudes (0.05/0.02/0.01/0.05) remain the model's own defaults — no independent authoritative financial specification for the magnitudes was found or invented. Per the remediation contract they are now honestly labeled MODEL_DEFAULT.
+
+9. Environment limitations
+None encountered. Both suites executed locally. Warnings are pre-existing datetime.utcnow()/sqlite deprecations only.
+
+Final status
+Prompt 15 remediation completed. Focused suite 305 passed. Broader suite 668 passed, 2 skipped (pre-existing environmental), 0 failed. All four Prompt 14 findings (A–D) addressed and manually re-validated. The REPORT — Stage 5 Prompt 15 section has been appended to temp_report.md. No commit was made. Prompt 16 not started.
+
+Stage 5 is NOT declared frozen.

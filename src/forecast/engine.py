@@ -364,18 +364,31 @@ class ForecastEngine:
         """
         if key not in SCENARIO_SPREAD_KEYS:
             raise ValueError(f"unknown scenario spread parameter: {key!r}")
-        declared = float(params.get(fallback_key, 0.0))
+        fallback = float(params.get(fallback_key, 0.0))
         parameter = params.get(key)
         if parameter is None or not isinstance(parameter, (int, float)):
             # No usable value for this key, so the model's own value for the
             # slot stands. Nothing else is consulted: no Stage 4 band, no
             # momentum reading and no Fundamental Score can fill that slot.
-            return declared, "MODEL_DEFAULT", None
+            return fallback, "MODEL_DEFAULT", None
+        # The merged dict always carries the model's own default, so a usable
+        # merged value alone cannot prove the caller declared it. Only raw
+        # caller membership makes a MODEL_PARAMETER; an inherited default
+        # stands as MODEL_DEFAULT. Evidence scaling is unaffected: it moves
+        # whichever base stands, and names itself.
+        raw = context.get("model_parameters")
+        raw_value = raw.get(key) if isinstance(raw, dict) else None
+        caller_declared = isinstance(raw_value, (int, float))
         if evidence is None:
-            return float(parameter), "MODEL_PARAMETER", None
+            if caller_declared:
+                return float(parameter), "MODEL_PARAMETER", None
+            return float(parameter), "MODEL_DEFAULT", None
         sensitivity = ForecastEngine._number(context, "volatility_sensitivity")
         if not isinstance(sensitivity, (int, float)) or sensitivity <= 0:
-            return float(parameter), "MODEL_PARAMETER", \
+            if caller_declared:
+                return float(parameter), "MODEL_PARAMETER", \
+                    "VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY"
+            return float(parameter), "MODEL_DEFAULT", \
                 "VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY"
         return float(parameter) * float(sensitivity) * float(evidence), \
             "VOLATILITY_EVIDENCE", None
@@ -651,6 +664,10 @@ class ForecastEngine:
             "baseline_method": baseline_method,
             "operating_margin_method": margin_method,
             "trend_adjustment": trend_adjustment,
+            "growth_rate_prior_revenue": context.get(
+                "__growth_rate_prior_revenue"),
+            "growth_rate_current_revenue": context.get(
+                "__growth_rate_current_revenue"),
             "trend_adjustment_reason": context.get("__trend_adjustment_reason"),
             "low_base_control": bool(context.get("low_base") or context.get("LOW_BASE")),
             "low_base_evidence": context.get("__low_base_evidence"),
