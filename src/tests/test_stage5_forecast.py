@@ -3871,3 +3871,210 @@ def test_pit_guard_applies_to_the_holding_chain_too():
     base = result.scenario_forecasts.base
     assert base.method == "INSUFFICIENT_DATA"
     assert base.net_profit is None
+
+
+# ==========================================================================
+# Regression: adapter _trend_direction fallback branches (spec section 16)
+# and NULL announcement_date production path (spec section 25)
+# ==========================================================================
+
+def _assert_carried_direction_is_not_a_growth_rate(stage4):
+    """A carried direction must never become a forecast growth rate.
+
+    Mirrors test_stage4_two_pct_threshold_is_not_a_forecast_growth_rate: with
+    no explicit model_parameters["trend_adjustments"] entry, the engine has no
+    translation from evidence to a growth adjustment at all.
+    """
+    adapted = build_financial_context(
+        stage4, {"historical_operating_margin": 0.20, "historical_net_margin": 0.10,
+                 "share_count": 1000.0, "seasonal_baseline_revenue": 10000.0})
+    forecast = ForecastEngine().generate_forecast(1, 101, "PETROCHEMICAL", adapted)
+    assert forecast.assumptions["trend_adjustment"] == 0.0
+    assert forecast.assumptions["trend_adjustment_reason"] == "NO_MODEL_PARAMETER"
+    assert forecast.scenario_forecasts.base.revenue == pytest.approx(10000.0)
+
+
+def test_trend_direction_fallback_positive_from_momentum_sign():
+    # Stage 4 left direction blank; the adapter reads the positive sign only.
+    stage4 = _stage4(momentum_direction=None, momentum_pct=0.08)
+    assert adapt_stage4(stage4).trend_direction == "Positive"
+    _assert_carried_direction_is_not_a_growth_rate(stage4)
+
+
+def test_trend_direction_fallback_negative_from_momentum_sign():
+    stage4 = _stage4(momentum_direction=None, momentum_pct=-0.03)
+    assert adapt_stage4(stage4).trend_direction == "Negative"
+    _assert_carried_direction_is_not_a_growth_rate(stage4)
+
+
+def test_trend_direction_fallback_zero_is_weak():
+    stage4 = _stage4(momentum_direction=None, momentum_pct=0.0)
+    assert adapt_stage4(stage4).trend_direction == "Weak"
+    _assert_carried_direction_is_not_a_growth_rate(stage4)
+
+
+def test_trend_direction_insufficient_data_is_none():
+    stage4 = _stage4(trend_state="INSUFFICIENT_DATA", momentum_direction=None)
+    assert adapt_stage4(stage4).trend_direction is None
+    _assert_carried_direction_is_not_a_growth_rate(stage4)
+
+
+def test_trend_direction_missing_pct_is_none():
+    stage4 = _stage4(momentum_direction=None, momentum_pct=None)
+    assert adapt_stage4(stage4).trend_direction is None
+    _assert_carried_direction_is_not_a_growth_rate(stage4)
+
+
+def test_null_announcement_action_is_treated_as_knowable_in_production_path(production_db):
+    # An action with no announcement date is knowable at the cutoff: the
+    # loader's func.coalesce falls back to the cutoff itself, and the builder
+    # only skips actions announced (as a date) after the cutoff.
+    production_db.add(CorporateAction(
+        company_id=COMPANY_ID,
+        announcement_date=None,
+        effective_date=date(2025, 10, 1),
+        action_type="CAPITAL_INCREASE",
+        old_share_count=INCREASED_SHARES,
+        new_share_count=2_000_000,
+    ))
+    production_db.flush()
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    base = forecast.scenario_forecasts.base
+    # 1M shares for 181 days, 1.5M for 92, then 2M for 92 of the 365-day window.
+    expected_shares = (181 * SEEDED_SHARES + 92 * INCREASED_SHARES + 92 * 2_000_000) / 365
+    assert base.eps == pytest.approx(FORECAST_NET_PROFIT / expected_shares, rel=1e-6)
+    # Had the unannounced action been ignored, EPS would sit on the seeded baseline.
+    assert base.eps != pytest.approx(FORECAST_NET_PROFIT / _WEIGHTED_SHARES, rel=1e-6)
+
+
+# ==========================================================================
+# P19: late-NII-plus-component BANK combination (P16 throwaway-probe pinning).
+# The NII driver gate refuses the whole chain even when a surviving explicit
+# component net profit exists: missing stays missing, never a zero-profit bank.
+# ==========================================================================
+
+def test_late_nii_with_a_surviving_component_still_refuses_the_bank_chain():
+    # Post-cutoff base_nii is dropped by the PIT value guard, while an ordinary
+    # forecast_net_profit 700.0 (callable only through the NII hierarchy) is
+    # still present. The chain must refuse rather than promote the survivor.
+    context = _bank_context(forecast_net_profit=700.0)
+    context["input_refs"] = [ForecastInputRef(
+        "base_nii", available_at=datetime(2026, 6, 1, tzinfo=timezone.utc))]
+    result = ForecastEngine().generate_forecast(
+        1, 10, "BANK", context, data_cutoff_datetime=_CUTOFF)
+    assert result.assumptions["pit_dropped_values"] == ["base_nii"]
+    for chain in (result.scenario_forecasts.bear,
+                  result.scenario_forecasts.base,
+                  result.scenario_forecasts.bull):
+        assert chain.method == "INSUFFICIENT_DATA"
+        assert chain.net_profit is None
+        assert chain.eps is None
+        assert chain.roe is None
+        assert chain.assumptions["reason"] == "missing_nii_driver"
+
+
+# ==========================================================================
+# P19: build_general_chain wrapper honours the attributable declaration.
+# The compatibility wrapper divides only on the caller's statement; an
+# explicit False refuses EPS while the default still produces it.
+# ==========================================================================
+
+def test_general_chain_wrapper_refuses_eps_when_not_attributable():
+    default = ForecastDriver.build_general_chain(
+        10000.0, 0.10, 20.0, 10.0, 1000.0)
+    assert default.eps == 1.1
+    refused = ForecastDriver.build_general_chain(
+        10000.0, 0.10, 20.0, 10.0, 1000.0,
+        net_profit_is_attributable=False)
+    assert refused.eps is None
+    assert refused.net_profit is not None
+
+# ==========================================================================
+# P20: derived margins are absent — never zero — when the division is not
+# defined. A missing-as-zero _ratio would fabricate a 0.0 margin here and
+# let the engine read a margin off evidence that establishes none.
+# ==========================================================================
+
+def test_zero_revenue_leaves_derived_margins_absent_not_zero():
+    refs = [
+        ForecastInputRef(
+            fact_key=key,
+            report_version_id=101,
+            available_at=datetime(2025, 12, 1, tzinfo=timezone.utc),
+            source="normalized_financial_facts",
+        )
+        for key in ("REVENUE", "OPERATING_PROFIT", "NET_PROFIT", "TOTAL_EQUITY")
+    ]
+    periods = [(
+        101,
+        date(2025, 12, 31),
+        {
+            "REVENUE": 0.0,
+            "OPERATING_PROFIT": 500.0,
+            "NET_PROFIT": 100.0,
+            "TOTAL_EQUITY": 6_000.0,
+        },
+        refs,
+    )]
+
+    derived, derived_refs = _stage1_derived_context(periods)
+
+    # A zero-revenue company has no margin to read off: the margins stay
+    # absent rather than collapsing to a fabricated 0.0.
+    assert "historical_operating_margin" not in derived
+    assert "historical_net_margin" not in derived
+    assert "DERIVED_OPERATING_MARGIN" not in {ref.fact_key for ref in derived_refs}
+    assert "DERIVED_NET_MARGIN" not in {ref.fact_key for ref in derived_refs}
+
+
+def test_missing_profit_numerator_leaves_its_margin_absent_not_zero():
+    refs = [
+        ForecastInputRef(
+            fact_key=key,
+            report_version_id=101,
+            available_at=datetime(2025, 12, 1, tzinfo=timezone.utc),
+            source="normalized_financial_facts",
+        )
+        for key in ("REVENUE", "NET_PROFIT", "TOTAL_EQUITY")
+    ]
+    periods = [(
+        101,
+        date(2025, 12, 31),
+        {
+            "REVENUE": 12_000.0,
+            "NET_PROFIT": 1_200.0,
+            "TOTAL_EQUITY": 6_000.0,
+        },
+        refs,
+    )]
+
+    derived, derived_refs = _stage1_derived_context(periods)
+
+    # No operating profit was reported, so there is no operating margin to
+    # derive; the net margin still reads off its own evidence.
+    assert "historical_operating_margin" not in derived
+    assert derived["historical_net_margin"] == pytest.approx(0.10)
+
+# ==========================================================================
+# P20: the production path never fabricates an attributable-profit
+# declaration. Without a caller statement the forecast keeps its net profit
+# but refuses EPS as UNVERIFIED_TOTAL_NET_PROFIT — a production path that
+# silently injected net_profit_is_attributable=True would divide an
+# unverified total here.
+# ==========================================================================
+
+def test_production_path_without_attribution_declaration_keeps_eps_none(
+        production_db):
+    kwargs = _production_kwargs(extra_facts={
+        "historical_operating_margin": 0.20,
+        "historical_net_margin": 0.10,
+    })
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **kwargs)
+    base = forecast.scenario_forecasts.base
+
+    assert base.net_profit is not None
+    assert base.eps is None
+    assert base.assumptions["eps_attributable_basis"] == \
+        "UNVERIFIED_TOTAL_NET_PROFIT"

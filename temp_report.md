@@ -1784,3 +1784,827 @@ Stage 5 is frozen.
 No unrelated work performed. No Stage 6 started.
 
 ===========================================================================
+
+===========================================================================
+P17 — Retrospective Validation Map (P3 through P13)
+
+Executed 2026-10-06. Local working tree only. No code modified, no commits,
+no GitHub access, no Stage 6. P16's "PASS — FREEZE ELIGIBLE / Stage 5 is
+frozen" is treated as NON-FINAL: freeze claims for P3–P13 are re-grounded
+here under the validation standard "if the implementation were wrong in the
+exact opposite way, would an existing committed test necessarily fail?"
+Passing suites, prior verdicts, comments, and report prose are not proof.
+
+1. Scope actually inspected
+- temp_report.md P3–P16 report sections (full read across sessions).
+- stage5prompts1to9.md P3–P9 original intents (full read). P10–P13 prompt
+  texts are absent from the repo; their scope is inferred from reports.
+- Live spot-check of 7 remediation claims (all CONFIRMED with line
+  citations) plus a fresh focused run: 305 passed, 0 failed (242
+  def test_, parametrization accounts for the difference).
+- NOT inspected: exhaustive per-invariant mapping of all 242 tests,
+  src/trend (firewall), unrelated modules.
+
+2. P3–P13 validation matrix
+P3 Non-financial core (report built boundary plumbing instead):
+  no-recompute DIRECTLY PROVEN; builder cutoff PARTIALLY PROVEN.
+P4 EPS/ROE/shares (report built persistence instead):
+  idempotency DIRECTLY PROVEN in-memory; repo-path single-test gap.
+P5 Bank/Holding/FX (report built the production service path instead):
+  wiring DIRECTLY PROVEN; forecast core out of scope as designed.
+P6 Scenarios/trend (report built core hierarchies instead):
+  hierarchies + sign/zero refusal DIRECTLY PROVEN; driver tier partial.
+P7 Test hardening (report fixed ROE + added tests):
+  both-ends ROE DIRECTLY PROVEN; NCI split resolved as caller contract.
+P8 Final audit (report implemented Bank/Holding/FX):
+  NPL / P-NAV / FX-guard DIRECTLY PROVEN; EPS-on-specialized was
+  CONTRADICTED at P14, remediated at P15, now DIRECTLY PROVEN.
+P9 Full regression (report implemented controls):
+  isolation + spread labels DIRECTLY PROVEN; magnitude authority UNPROVEN.
+P10 Cumulative audit: effective audit (real defects found, fixed by P12);
+  not behavior proof.
+P11 Regression counts: suite-state evidence only; freeze verdict NON-FINAL.
+P12 Idempotency fix: DIRECTLY PROVEN in-memory; single-test repo coverage.
+P13 Production gaps A–F: fixes live-present; EPS-declaration pinning now
+  DIRECTLY PROVEN via P15/P16 tests; nearest-earlier lookups UNCONFIRMED
+  (P18 must check).
+
+3. Per-prompt detail
+P3 — Files: new src/forecast/adapter.py (Stage4Context, adapt_stage4,
+  build_financial_context), new src/forecast/builder.py
+  (build_weighted_average_shares), engine._share_count helper, +23 tests
+  (31 -> 54; Stage 4 suite 102 unaffected). Invariant: Stage 4 carried,
+  never recalculated; shares PIT-cutoff, missing never zero. Proof:
+  no-recompute directly proven (momentum carried, revenue==10000; an
+  opposite-way growth conversion changes revenue and fails). Builder:
+  partially proven — triple cutoff guard live in queries.py SQL
+  (publication/effective/announcement <= cutoff, confirmed) but builder
+  unit tests use duck-typed stand-ins (P3's own admission); no DB-backed
+  builder test. Gap: committed-test mapping for each guard unconfirmed.
+P4 — Files: new src/models/forecast.py (forecast_versions,
+  forecast_input_refs, uq_forecast_version), new src/forecast/repo.py
+  (append-only, ForecastVersionExistsError, history/latest/revision_trend/
+  read_at_cutoff/pit_violations), +14 tests (67 passed). Invariant:
+  idempotent equal resave; conflict rejection. Proof: directly proven
+  in-memory (different-surrogate resave stays one version; opposite-way
+  surrogate comparison appends v2 and fails). Gap: DB path exercised only
+  via forecast_id=1 facade (P12 admission); repo-mutant note ambiguous.
+P5 — Files: new src/forecast/queries.py (PIT SQL), new
+  src/forecast/service.py (generate_and_persist_forecast; caller owns
+  Session, never commits), +10 section-14 tests (77 passed); fixed
+  calculation_timestamp idempotency + column-precision equality.
+  Invariant: one production path Stage1 -> Stage4 -> shares -> engine ->
+  repo x3 scenarios. Proof: directly proven wiring — the FACT_SOURCE
+  import breakage failed 12 production-path tests pre-fix (opposite-way
+  evidence: an unwired path fails). Gap: margins/growth via extra_facts
+  (Stage 2 KPI unwired) — documented boundary, not a Stage 5 defect.
+P6 — Files: engine revenue 3-tier baseline + independent margin hierarchy
+  + net-profit hierarchy + component extraction; drivers average-equity
+  ROE; +38 section-15 tests. Invariant: SEASONAL -> RUN_RATE ->
+  DRIVER_BASED -> INSUFFICIENT_DATA; COMPONENT -> HIST_CONVERSION ->
+  NET_MARGIN -> INSUFFICIENT; missing != zero. Proof: directly proven
+  incl. _safe_growth_rate zero/sign refusals (live-confirmed
+  engine.py:132-138). Gap: driver_volume/price unpopulated; no
+  driver-tier repo-path coverage.
+P7 — Files: drivers ROE fix (both equity ends required, average/2,
+  zero-base guarded), +334 lines section-16, 30 cases covering all 13
+  required cases. Invariant: EPS = NP/shares iff shares > 0; ROE on
+  average of both ends. Proof: directly proven (opposite-way ending-only
+  ROE changes value and fails). NCI/attributable split: resolved as
+  caller-declared contract (P13 E, P15 A), not a defect. Note: split
+  tests pin 2025 calendar arithmetic (date-drift fragility, not
+  correctness).
+P8 — Files: schema +35 (OperationalFx), drivers +28/-8 (BANK NPL
+  context, HOLDING NAV), engine +64/-12 (FX resolver + FREE_MARKET
+  guard), +610 section-17, +44 tests (192 passed). Invariants: NPL
+  CONTEXT_ONLY; P/NAV excluded; free-market never substitutes
+  (ValueError). Proof: all three directly proven (NPL variation leaves
+  NP identical; p_nav variation leaves NP identical; missing operational
+  + exposure + free rate raises). Correction: P8-era EPS on BANK/HOLDING
+  was CONTRADICTED by P14 (bypass recomputed np/shares); remediated P15
+  (caller-resolved eps only, live-confirmed drivers.py:167-172 and
+  286-289: "_round(eps)-only, never re-divides"); now directly proven.
+P9 — Files: engine +261/-19, tests +399 section-18 (258 passed x6 runs);
+  fixed low-base-before-trend ordering. Invariants: trend adjustment only
+  via explicit model_parameters; LOW_BASE/SIGN_CHANGE controls; honest
+  spreads. Proof: directly proven for isolation (momentum sweep leaves
+  revenue 0.0; 6 fundamental scores bit-identical) and labels
+  (MODEL_DEFAULT vs MODEL_PARAMETER from raw caller membership,
+  live-confirmed engine.py:379-385). UNPROVEN: magnitude authority for
+  0.05/0.02/0.01/0.05 — no independent spec found or invented
+  (acknowledged P15/P16; labeling contract met, authority absent).
+P10 — No code. Value: real defects found (surrogate-id comparison at
+  schema.py:271/repo.py:60; trivial same-object resave test). Fixed by
+  P12. Status: effective audit, not behavior proof. Standing unverified:
+  src/trend untouched (firewall), industry routing fixtures.
+P11 — No production change. Value: suite-state snapshot (258 focused;
+  621 full, 2 environmental skips). Freeze verdict overturned by P14;
+  treat as NON-FINAL.
+P12 — Files: schema _same_forecast_state (surrogates projected out),
+  repo _records_equal via row PK, +81 (3 regression + 2 helpers); 261
+  passed; in-memory mutant verified. Proof: directly proven in-memory +
+  committed conflict test. Gap: repo-path coverage rests on one test.
+P13 — Files: service.py (nearest-earlier valid prior revenue and
+  beginning equity; margin provenance to latest publication; attributable
+  refusal + regression test); tests added but NOT EXECUTED at the time —
+  explicitly NOT validated then. Status now: fixes live-present and
+  suites green since (305 P15; 305 + 668 P16; 305 this session), but
+  green does not prove the new tests pin the fixes. EPS-declaration
+  pinning: now directly proven via P15 section-17 + P16 probes. Nearest-
+  earlier lookups: committed pinning UNCONFIRMED — an opposite-way
+  revert to immediate-prior-only has not been shown to fail. P18 must
+  verify by revert-and-run.
+
+4. Highest-risk unvalidated areas
+H1. Spread magnitudes (0.05/0.02/0.01/0.05) have no authoritative
+  financial specification. Labels honest; authority absent. Requires a
+  finance-authority decision, not more tests.
+H2. P13 nearest-earlier Revenue/Equity lookups may lack committed
+  regression pinning; a revert might stay green. P18 must check.
+H3. P16's 64 probes were throwaway (deleted). Demonstrated behaviors
+  that lack committed counterparts are unprotected (known example:
+  late-NII + component BANK combo). P18 must map probe -> test.
+H4. Repo-path idempotency rests on one test; P12's repo-mutant note is
+  ambiguous. P19 mutant protocol must clarify.
+H5. Builder datetime edge (datetime announcement_date -> TypeError):
+  fails closed, unreachable via Date columns; no regression test by
+  design. Minor _as_date hardening still open.
+H6. Driver-tier (volume x price) repo-path coverage absent since P6.
+
+5. Exact targets for P18 / P19 / P20
+P18 (committed-test mapping; files: src/tests/test_stage5_forecast.py,
+  src/forecast/service.py, src/forecast/repo.py,
+  src/forecast/builder.py; symbols: _stage1_derived_context,
+  _same_forecast_state, _records_equal, build_weighted_average_shares,
+  _pit_guarded_context, _scenario_spread): for each P13 A–F test cite
+  the test name and show it fails when the fix is reverted; map each
+  P16 probe behavior to a committed test name or mark MISSING; re-run
+  the P12 repo mutant to resolve the ambiguity.
+P19 (adversarial opposite-way execution; symbols: _eps in engine.py,
+  build_bank_chain / build_holding_chain eps argument,
+  _scenario_spread basis, _pit_guarded_context, _safe_growth_rate,
+  both-ends ROE, FX guard): mutate each guard to its exact opposite,
+  run the focused suite, record caught vs survived; every survived
+  mutant becomes a committed test or a filed defect.
+P20 (authority + readiness; files: 05_Stage5_Forecast_Engine.md,
+  PROJECT_HANDOFF_INSTRUCTIONS.md, temp_report.md): resolve H1 with a
+  finance-authority source or an explicit signed-off model-assumption
+  record; confirm the Stage 2 unwired-margin boundary is documented;
+  deliver the freeze verdict only then.
+6. Remediation vs validation
+Needs code (remediation): builder _as_date hardening (minor; fails
+  closed today). Nothing else; no redesign, no Stage 6.
+Needs tests (validation): H2, H3, H4, H6 pinning.
+Needs decision (authority): H1 spread magnitudes.
+P14 findings A–D: remediated in P15 and live-confirmed this session
+  (EPS gate drivers.py:167-172, 286-289; spread basis engine.py:379-385;
+  PIT guard engine.py:590-611; _safe_growth_rate engine.py:132-138;
+  _eps gate engine.py:276-281; adapter sign-test adapter.py:179-196;
+  PIT SQL queries.py:75-79) — no code outstanding.
+
+Stage 5 is NOT declared frozen.
+
+===========================================================================
+P18 — Retrospective Validation P3–P6
+
+Executed 2026-10-06. Repository: analyzer. Local working tree only. No
+commits, no GitHub access, no branch operations, no Stage 6. P16's freeze
+conclusion remains suspended; Stage 5 is NOT frozen. This prompt validates
+P3–P6 only, using the P17 map. Standard applied throughout: "if the
+implementation were changed to violate this invariant, would a committed
+test fail?" Test counts and prior verdicts are not treated as proof.
+
+1. Exact files/symbols inspected (read-only; no production file modified)
+- src/forecast/adapter.py: Stage4Context, to_dict, adapt_stage4,
+  build_financial_context, _trend_direction (lines 179–196).
+- src/forecast/builder.py: SHARE_CHANGING_ACTIONS, WeightedAverageShares
+  (+get), build_weighted_average_shares; history filter, effective>cutoff
+  skip (182–183), announcement guard (184–192).
+- src/forecast/queries.py: FACT_SOURCE, load_industry_code,
+  load_financial_fact_periods, load_financial_facts, load_share_history;
+  _period_rows PIT filter (publication_datetime<=cutoff, lines 75–79),
+  share effective<=cutoff (195), coalesce(announcement,cutoff)<=cutoff
+  (203–206).
+- src/forecast/service.py: DEFAULT_FACT_METRICS, FORECAST_SCENARIOS,
+  EPS_ATTRIBUTABLE_PROVENANCE_KEY, _to_context, _ratio,
+  _stage1_derived_context (nearest-earlier reversed() loops),
+  _latest_publication, _eps_attributable_basis,
+  generate_and_persist_forecast (Stage1<derived<extra_facts update order).
+- src/forecast/repo.py: ForecastRecordRepository
+  (save/history/latest/revision_trend/read_at_cutoff/pit_violations/count),
+  conflict raise (:75), _records_equal (248–270),
+  _metrics_equal_at_column_precision.
+- src/forecast/schema.py: SingleForecastChain, ScenarioForecastResult,
+  CompanyForecastResult (to_record/records), ForecastInput,
+  OperationalFx, ForecastInputRef, ForecastRecord (key),
+  ForecastVersionExistsError, normalize_datetime, filter_pit_inputs,
+  ForecastVersionStore, _same_forecast_state (:267).
+- src/tests/test_stage5_forecast.py: full read of P3–P6-area tests +
+  6 tests added (append-only, 75 insertions, 0 deletions).
+- src/models/forecast.py: NOT re-read this session; table behavior proven
+  through DB-backed repo/production tests (MigrationRunner upgrade +
+  conflict/reads). Constraint text remains P4-report-claimed.
+- Engine/drivers P6 hierarchies: NOT re-read (outside P18 symbol list;
+  P19 scope). Pinned via committed tests below + P17 live confirmation.
+
+2. Invariant-by-invariant validation result
+A. Adapter boundary (P3). trend carried as direction only — VALIDATED.
+   No arithmetic beyond sign test — VALIDATED by code read (only
+   float() coercion and >/ comparisons; all division lives in
+   builder.py). seasonaility_valid gate (FULL + baseline) — VALIDATED.
+   Sign-change Layer-4-first with Layer-1/2 fallback — VALIDATED.
+   NEW: _trend_direction fallback branches (pct-sign Positive/Negative/
+   Weak, INSUFFICIENT_DATA->None, missing pct->None) were UNPINNED —
+   an always-"Positive" fallback would have stayed green. Now VALIDATED
+   by 5 added tests (see §5).
+B. Financial context (P5 + P13 fixes). PIT SQL filter — VALIDATED.
+   Latest-publication/latest-period selection — VALIDATED. Nearest-
+   earlier-valid prior revenue + beginning equity — VALIDATED: this
+   resolves P17 H2. The 3-period gap fixture (middle period lacks both
+   REVENUE and TOTAL_EQUITY, older period has both) asserts
+   beginning_equity==4000.0 and prior_revenue==10000.0; reverting the
+   reversed() scan to immediate-prior-only would fail. No-fabrication
+   single-period case asserts keys absent. Zero-safe margins, missing
+   stays None — VALIDATED. extra_facts override order — code order
+   confirmed by read; dedicated test name unmapped (minor, §8).
+C. Weighted shares (P3). History/effective/announcement guards —
+   VALIDATED at builder level: removing the announcement guard alone
+   breaks two committed tests (effective 2025-07-01<=cutoff but
+   announced 2026-03-01>cutoff; shares would move ~1.25M/~1.5M vs
+   pinned 1M + applied_actions==[]). NULL announcement treated as
+   knowable (queries coalesce + builder fall-through) — was MISSING at
+   DB level; now VALIDATED by 1 added production-path test (see §5).
+   Missing->None reasons, unresolvable-action notes, _share_count/.get
+   wiring, EPS-None-on-missing-shares — all VALIDATED.
+D. Persistence (P4 + P12 fix). Append-only, idempotent resave, conflict
+   rejection, revision_trend, separate series — all VALIDATED at both
+   store and repo levels. Surrogate-ID independence — VALIDATED at both
+   levels: this resolves P17 H4 definitively. The repo test saves
+   forecast_id=101 vs 202 through the DB path and asserts one version;
+   making forecast_id significant would append v2 and fail count==1.
+   The companion conflict test proves surrogate-exclusion does not
+   weaken overwrite protection.
+E. Auditability (P4/P5). read_at_cutoff ref-level skip — VALIDATED at
+   both levels with the exact distinguishing fixture (record cutoff
+   2026-09-01<=read 2026-09-15 BUT ref 2026-10-05>cutoff returns v1;
+   record-level-only filtering would return contaminated v2 and fail).
+   pit_violations surfacing, future-input flagging, filter_pit_inputs,
+   input-ref recording/mapping/rejection, timestamp-before-cutoff
+   rejection, UTC normalization, missing-metric-None — all VALIDATED.
+F. P6 core hierarchies (tests only this session; mutants to P19).
+   SEASONAL->RUN_RATE->DRIVER_BASED->INSUFFICIENT_DATA,
+   COMPONENT->HIST_CONVERSION->NET_MARGIN->INSUFFICIENT, margin
+   independence, both-ends ROE: each tier has committed tests that move
+   the asserted value under the opposite behavior (e.g. seasonal
+   outranks run rate; partial components never fabricated; revenue/margin
+   move independently). JUDGED VALIDATED on test evidence; full
+   opposite-way mutant execution deferred to P19 per firewall.
+
+3. Existing tests that genuinely prove each invariant (selected)
+A: test_adapter_does_not_recompute_stage4_quantities,
+   test_stage4_adapter_maps_core_fields_without_recalculating,
+   test_stage4_adapter_output_drives_the_engine,
+   test_production_path_uses_stage4_without_recalculation,
+   test_seasonal_baseline_requires_stage4_sufficiency,
+   test_sign_change_propagates_from_stage4_context,
+   test_sign_change_propagates_from_layer_flags_without_context.
+B: test_stage1_derived_context_uses_authoritative_latest_and_nearest_prior_facts,
+   test_stage1_derived_context_does_not_fabricate_prior_observations,
+   test_production_path_preserves_pit_metadata,
+   test_pit_valid_prior_revenue_is_used_for_the_growth_rate,
+   test_post_cutoff_historical_revenue_is_ignored_by_the_growth_rate,
+   test_insufficient_baseline_reports_missing_rather_than_zero,
+   test_missing_operating_margin_halts_the_chain.
+C: test_share_history_after_cutoff_is_invisible,
+   test_action_after_cutoff_does_not_affect_the_forecast,
+   test_action_effective_before_cutoff_but_announced_after_is_ignored,
+   test_a_late_announced_action_is_reported_not_silently_dropped,
+   test_an_action_after_the_cutoff_leaves_eps_at_the_observed_base,
+   test_an_action_announced_after_the_cutoff_leaves_eps_undiluted,
+   test_weighted_shares_missing_history_is_none_not_invented,
+   test_weighted_shares_no_observation_at_cutoff_is_none,
+   test_weighted_shares_unresolvable_action_is_reported_not_guessed,
+   test_engine_accepts_builder_output_for_eps,
+   test_missing_share_count_leaves_eps_none_not_zero,
+   test_eps_is_never_zero_as_a_substitute_for_a_missing_share_base,
+   test_production_path_weights_real_share_history,
+   test_production_path_missing_share_history_keeps_eps_none.
+D: test_version_store_appends_and_never_overwrites,
+   test_revised_forecast_keeps_the_older_version,
+   test_identical_resave_is_idempotent,
+   test_identical_resave_with_a_different_surrogate_id_is_idempotent,
+   test_explicit_version_collision_is_rejected,
+   test_repo_first_forecast_persists,
+   test_repo_second_save_creates_a_new_version,
+   test_repo_does_not_overwrite_the_previous_forecast,
+   test_repo_old_version_remains_readable,
+   test_repo_identical_resave_is_idempotent,
+   test_repo_identical_resave_with_a_different_surrogate_id_is_idempotent,
+   test_repo_conflicting_version_is_rejected,
+   test_repo_same_version_with_different_content_still_conflicts,
+   test_scenarios_are_separate_series,
+   test_repo_scenarios_are_separate_series,
+   test_repo_horizons_are_separate_series,
+   test_revision_trend_reports_direction,
+   test_repo_revision_trend_built_from_stored_versions.
+E: test_read_at_cutoff_hides_forecasts_built_on_later_data,
+   test_repo_read_at_cutoff_hides_forecasts_built_on_later_data,
+   test_pit_violations_are_detectable_across_the_store,
+   test_future_input_is_flagged_not_silently_used,
+   test_filter_pit_inputs_drops_future_information,
+   test_input_refs_are_recorded_for_auditability,
+   test_input_refs_accept_mapping_form,
+   test_input_ref_without_publication_date_is_never_rejected,
+   test_malformed_input_ref_is_rejected,
+   test_repo_preserves_input_provenance,
+   test_calculation_timestamp_before_cutoff_is_rejected,
+   test_naive_cutoff_datetime_is_assumed_utc,
+   test_cutoff_timezone_normalization_is_consistent,
+   test_record_schema_carries_all_contract_fields,
+   test_missing_metric_is_none_not_zero.
+F: test_seasonal_baseline_outranks_the_run_rate,
+   test_recent_run_rate_is_the_fallback_baseline,
+   test_driver_based_baseline_is_the_third_tier,
+   test_explicit_driver_based_level_beats_the_volume_price_split,
+   test_non_positive_driver_level_is_refused_not_treated_as_zero,
+   test_insufficient_baseline_reports_missing_rather_than_zero,
+   test_forecast_margin_outranks_the_historical_margin,
+   test_revenue_can_rise_while_margin_falls,
+   test_changing_revenue_growth_does_not_move_the_margin,
+   test_operating_profit_is_revenue_times_margin,
+   test_component_based_net_profit_wins_through_the_engine,
+   test_partial_components_do_not_get_fabricated,
+   test_historical_conversion_falls_back_from_components,
+   test_net_margin_is_the_third_tier,
+   test_missing_net_profit_evidence_leaves_net_profit_unknown,
+   test_roe_uses_both_ends_not_the_closing_balance_alone,
+   test_one_missing_equity_end_leaves_roe_none,
+   test_average_equity_of_zero_is_not_a_divisor.
+
+4. Tests that were insufficient and why
+(a) Adapter _trend_direction fallback: NO committed test passed
+    momentum_direction=None, so any fallback corruption stayed green.
+    Fixed by 5 added tests (§5).
+(b) NULL announcement_date at production/DB level: builder unit tests
+    default announcement None (action applied), but no DB test pinned
+    the queries coalesce branch; a coalesce regression would stay
+    green. Fixed by 1 added test (§5).
+(c) P16-throwaway-probe mapping for P3–P6 scope: every probed behavior
+    (boundary inertness, PIT drop, idempotency, determinism) maps to a
+    committed test named in §3. No MISSING item in P3–P6 scope.
+
+5. Focused tests added (append-only; no existing test touched)
+1. test_trend_direction_fallback_positive_from_momentum_sign
+2. test_trend_direction_fallback_negative_from_momentum_sign
+3. test_trend_direction_fallback_zero_is_weak
+4. test_trend_direction_insufficient_data_is_none
+5. test_trend_direction_missing_pct_is_none
+   (each also asserts the carried direction yields trend_adjustment
+   0.0 / NO_MODEL_PARAMETER without explicit parameters — direction
+   never becomes growth).
+6. test_null_announcement_action_is_treated_as_knowable_in_production_path
+   (DB-level: NULL-announcement CAPITAL_INCREASE applied through
+   generate_and_persist_forecast; EPS matches the 3-segment weighted
+   average and differs from the ignored baseline).
+
+6. Test results
+Targeted: 6 passed. Full focused file: 311 passed (305 + 6), 0 failed,
+0 skipped, in ~3s. git diff --stat shows only
+src/tests/test_stage5_forecast.py changed (insertions only, zero
+removed lines). No production file modified; no existing test
+modified; no production behavior changed.
+
+7. Confirmed defects
+None meeting the genuine-correctness-defect bar. No STOP triggered.
+One minor non-behavioral finding: builder.py carries a stale comment
+("an unannounced action is unknowable") while the code (None
+fall-through) and queries.py (func.coalesce to cutoff) deliberately
+treat NULL announcement as knowable — now pinned by added test 6.
+Minimum remediation: correct the comment to state the knowable rule.
+Not applied this session (no production-file edits per test-quality
+rule scope); left for the owner.
+
+8. Remaining validation gaps for P3–P6 (all minor; none blocking)
+- DB-level late-announcement filtering (queries SQL path with
+  post-cutoff announcement_date): pinned at builder level ×2, unpinned
+  at DB level. Defense-in-depth gap only.
+- extra_facts-over-derived override order: code order confirmed by
+  read; dedicated committed test name unmapped.
+- Column-precision equality (_metrics_equal_at_column_precision):
+  live in code, exercised implicitly by idempotency tests; dedicated
+  rounding-boundary test unmapped.
+- models/forecast.py constraint text (uq_forecast_version): not
+  re-read; behavior proven via DB tests.
+- P3 window_start full-span default: documented caller-must-narrow
+  design note, unchanged.
+- P6 hierarchy mutants: deferred to P19 per firewall.
+
+9. Classification
+Adapter boundary: VALIDATED. Financial context: VALIDATED.
+Weighted shares: VALIDATED. Persistence: VALIDATED. Auditability:
+VALIDATED. P6 hierarchies: VALIDATED on test evidence (mutants P19).
+P3–P6 area: VALIDATED.
+
+Stage 5 is NOT declared frozen.
+
+===========================================================================
+P19 — Retrospective Validation P7–P10
+
+Executed 2026-10-06. Repository: analyzer. Local working tree only. No
+commits, no GitHub access, no branch operations, no Stage 6, no Stage 5
+redesign. P16's freeze conclusion remains suspended; Stage 5 is NOT frozen.
+This prompt validates P7–P10 only, using the P17 map and the P18 baseline
+(311 passed). Standard applied throughout: "if the implementation were
+changed to violate this invariant, would a committed test fail?" Evidence:
+a 12-mutant opposite-way sweep (subagent, each mutant applied, suite-run,
+and immediately reverted), a live re-verification of the 2 ambiguous sweep
+results, 2 closing mutants for the prompt's remaining example questions,
+and 2 new committed regression tests for the gaps found.
+
+1. Exact files/symbols inspected
+- src/forecast/engine.py (full read): _trend_adjustment, _safe_growth_rate,
+  _low_base_control, _driver_based_revenue, _baseline_revenue,
+  _baseline_operating_margin, _eps_attributable_basis,
+  _attributable_net_profit, _eps, _share_count, _uncertainty_evidence,
+  _scenario_spread, _operational_fx, _free_market_fx_is_never_used,
+  _fx_ladder_snapshot, _raw_input_refs, _pit_safe, _PIT_GUARDED_FACT_KEYS,
+  _pit_guarded_context, _undeclared_mandatory_facts, _non_financial_scenario,
+  _net_profit_components, _forecast_net_profit, _fx_exposure_share,
+  _fx_move, _apply_fx_to_revenue, generate_forecast (growth precedence,
+  _bank_chain, _holding_chain).
+- src/forecast/drivers.py (full read): build_non_financial_chain,
+  build_bank_chain, build_holding_chain, build_general_chain wrapper.
+- src/tests/test_stage5_forecast.py: full read of sections 15/16/17/18 and
+  all helpers (_core_context/_core_forecast, _bank_context/_bank_forecast,
+  _holding_context/_holding_forecast, _sign_context, _fx_context); 2 tests
+  added append-only (see section 5).
+- NOT re-read: adapter/builder/queries/service/repo/schema (P18 scope,
+  unchanged since; production tree verified clean at close).
+
+2. Invariant-by-invariant validation result
+Chain Revenue→OpMargin→OpProfit→NetProfit→EPS→ROE, each step on valid
+upstream evidence only — VALIDATED. Exact-value tests pin the full order
+(11000.0/0.20/2200.0/1100.0/1.1); missing margin halts the chain
+(INSUFFICIENT_DATA, missing_operating_margin); missing net-profit evidence
+keeps revenue/profit but leaves NP/EPS None. Margin moves independently of
+revenue growth in both directions.
+Historical growth on PIT-valid actuals; no ordinary % across zero/sign —
+VALIDATED. M6 (zero/sign refusals removed) caught by 22 failures; late
+prior/current revenue refused flat (10000.0, never 12500.0 on look-ahead).
+NON_FINANCIAL path — VALIDATED (chain, 3-tier NP hierarchy with no
+partial-component fabrication, independence).
+BANK path, NPL context-only — VALIDATED. M9 (NPL as profit factor) caught
+by test_npl_is_recorded_as_context_and_never_a_profit_factor. The NII gate
+refuses the whole chain on missing/late NII even with a surviving explicit
+component NP — probed live (INSUFFICIENT_DATA/missing_nii_driver, all three
+scenarios, pit_dropped_values ["base_nii"]), now pinned by added test 1.
+HOLDING path, P/NAV excluded — VALIDATED. M10 (p_nav leak into NAV
+conversion) caught by test_holding_ignores_a_declared_p_nav_completely;
+excluded_inputs recorded on chain and stored record.
+Scenario logic, no invented dispersion, Stage 4 ±2% classification-only —
+VALIDATED. M11 (±2%-as-growth) caught by 21 failures; M13 (fabricated 0.10
+default) caught by 7; M3/M4 re-verified on the live MODEL_DEFAULT branch,
+caught by 6 and 7 (correction in section 7).
+Low base on hierarchy, no invented formula — VALIDATED
+(GROWTH_REFUSED_ZERO_BASE / LOW_BASE_DECLARED_INSUFFICIENT_EVIDENCE /
+LOW_BASE_DECLARED; trend adjustment suppressed under all three).
+Momentum / Fundamental Score isolation — VALIDATED. M14 (score into growth)
+caught by 5; M4 (score into spread) caught by 7; M3 (momentum into spread)
+caught by 6; M11 (±2% into growth) caught by 21.
+Sign-change LOSS_TO_PROFIT / PROFIT_TO_LOSS / SIGN_CHANGE + ZERO_BASE —
+VALIDATED. M6 caught by 22 including all 18 sign-change params;
+FLAT_SIGN_TRANSITION / FLAT_ZERO_BASE carry the baseline flat; a declared
+growth still applies as caller choice (M12 caught by 3).
+EPS attributable gate on all three branches — VALIDATED. M1 (gate removed)
+caught by 8; M2a/M2b (driver-side re-division) each caught by 2 gate tests.
+ROE both-ends average — VALIDATED. M7 (single-end fallback) caught by both
+params of test_one_missing_equity_end_leaves_roe_none.
+FX operational/free-market boundary — VALIDATED. M8 (guard neutralized)
+caught by test_free_market_fx_cannot_silently_substitute_for_operational_fx;
+proxy ladder stays declared-only, estimated, LOW confidence.
+Engine PIT value firewall — VALIDATED. M5 (value guard dropped, refs only)
+caught by 6 across revenue arc, NII, NAV, and late-margin paths.
+
+3. Existing tests that genuinely prove each invariant (selected)
+Chain/hierarchies: test_full_chain_is_resolved_in_order,
+test_operating_profit_is_revenue_times_margin,
+test_revenue_can_rise_while_margin_falls,
+test_revenue_can_fall_while_margin_rises,
+test_changing_revenue_growth_does_not_move_the_margin,
+test_forecast_margin_outranks_the_historical_margin,
+test_missing_operating_margin_halts_the_chain,
+test_component_based_net_profit_wins_through_the_engine,
+test_partial_components_do_not_get_fabricated,
+test_historical_conversion_falls_back_from_components,
+test_net_margin_is_the_third_tier,
+test_missing_net_profit_evidence_leaves_net_profit_unknown,
+test_seasonal_baseline_outranks_the_run_rate,
+test_recent_run_rate_is_the_fallback_baseline,
+test_driver_based_baseline_is_the_third_tier,
+test_non_positive_driver_level_is_refused_not_treated_as_zero,
+test_insufficient_baseline_reports_missing_rather_than_zero.
+Growth/sign/low-base: test_sign_change_never_uses_an_ordinary_percentage_growth,
+test_sign_transition_suppresses_a_declared_trend_adjustment,
+test_a_declared_growth_parameter_still_applies_across_a_sign_transition,
+test_zero_base_to_profit_is_flat_not_infinite_growth,
+test_same_sign_arc_reads_an_ordinary_zero_safe_growth_rate,
+test_two_negative_periods_read_a_growth_rate_not_a_sign_change,
+test_sign_transition_refuses_the_historical_arc_without_a_declaration,
+test_genuinely_low_base_produces_no_momentum_adjustment,
+test_low_base_flag_alone_does_not_invent_a_growth_rate,
+test_normal_growth_from_a_low_base_uses_the_declared_rate,
+test_insufficient_evidence_preserves_the_insufficient_data_path,
+test_baseline_revenue_growth_is_a_declared_caller_parameter,
+test_absent_baseline_growth_falls_back_to_the_historical_arc,
+test_pit_valid_prior_revenue_is_used_for_the_growth_rate,
+test_post_cutoff_historical_revenue_is_ignored_by_the_growth_rate,
+test_baseline_revenue_growth_cannot_override_pit_valid_history_silently.
+BANK/HOLDING: test_bank_chain_runs_on_nii_not_the_revenue_model,
+test_bank_scenarios_are_ordered_and_use_the_financial_spread,
+test_bank_missing_nii_driver_stays_missing_not_zero,
+test_bank_missing_net_profit_conversion_keeps_nii_visible,
+test_bank_component_based_net_profit_outranks_the_conversion,
+test_npl_is_recorded_as_context_and_never_a_profit_factor,
+test_missing_npl_leaves_the_bank_chain_unchanged,
+test_nim_and_loan_drivers_are_carried_as_context_only,
+test_holding_chain_runs_on_nav_not_the_revenue_model,
+test_holding_nav_growth_drives_net_profit,
+test_holding_missing_nav_and_conversion_stay_missing,
+test_holding_component_net_profit_outranks_nav_conversion,
+test_holding_excludes_p_nav_from_the_forecast_chain,
+test_holding_ignores_a_declared_p_nav_completely,
+test_holding_p_nav_exclusion_is_recorded_on_the_stored_record,
+test_bank_and_holding_chains_never_report_a_revenue_baseline.
+EPS gate: test_eps_is_calculated_when_attributable_profit_is_established,
+test_eps_is_unavailable_when_attributable_status_is_not_established,
+test_eps_is_unavailable_when_attributable_status_is_explicitly_false,
+test_declared_attributable_amount_is_used_as_the_numerator,
+test_bank_eps_is_unavailable_when_profit_is_not_attributable,
+test_holding_eps_is_unavailable_when_profit_is_not_attributable,
+test_bank_component_based_path_cannot_bypass_the_eps_gate,
+test_holding_component_based_path_cannot_bypass_the_eps_gate,
+test_valid_attributable_bank_forecast_still_calculates_eps,
+test_valid_attributable_holding_forecast_still_calculates_eps,
+test_eps_matches_net_profit_in_every_scenario_once_attributable,
+test_unverified_net_profit_does_not_produce_eps.
+Isolation/spreads: test_stage4_two_pct_threshold_is_not_a_forecast_growth_rate,
+test_momentum_may_only_act_through_an_explicit_model_parameter,
+test_momentum_strength_is_never_a_growth_multiplier,
+test_fundamental_score_is_never_a_forecast_multiplier,
+test_fundamental_score_does_not_widen_or_narrow_the_scenario_spread,
+test_scenarios_use_the_declared_model_spread,
+test_missing_uncertainty_evidence_leaves_the_declared_spread,
+test_declared_volatility_only_acts_through_a_declared_sensitivity,
+test_an_arbitrary_spread_is_never_invented_from_missing_data,
+test_stage4_two_pct_cannot_become_a_scenario_spread,
+test_momentum_cannot_become_a_scenario_spread,
+test_fundamental_score_cannot_become_a_scenario_spread,
+test_scenario_spread_authority_is_recorded_per_spread,
+test_authoritative_scenario_parameters_are_respected,
+test_no_authoritative_parameter_leaves_the_model_default_standing,
+test_no_arbitrary_spread_is_fabricated_from_absent_evidence,
+test_bank_scenarios_use_the_financial_spread_and_no_invented_volatility,
+test_bank_financial_spread_stays_a_declared_model_parameter,
+test_volatility_evidence_only_acts_through_a_declared_sensitivity,
+test_volatility_without_a_declared_sensitivity_changes_nothing.
+PIT firewall: test_post_cutoff_numeric_value_is_unusable,
+test_post_cutoff_provenance_makes_a_usable_value_unusable,
+test_an_undeclared_late_value_is_dropped_from_the_calculation,
+test_pit_guard_applies_to_the_bank_chain_too,
+test_pit_guard_applies_to_the_holding_chain_too,
+test_missing_mandatory_provenance_is_reported_not_trusted,
+test_declared_provenance_clears_the_undeclared_warning,
+test_pit_valid_value_with_valid_provenance_is_usable.
+FX: test_operational_fx_reprices_the_exposed_revenue_share,
+test_missing_operational_fx_is_none_and_never_zero,
+test_free_market_fx_alone_does_not_resolve_operational_fx,
+test_free_market_fx_is_never_used_as_operational_fx,
+test_free_market_fx_cannot_silently_substitute_for_operational_fx,
+test_declared_proxy_rate_stands_in_for_missing_operational_fx,
+test_proxy_is_marked_estimated_and_named,
+test_a_proxy_rate_does_not_allow_the_free_market_rate_in,
+test_free_market_fx_is_ignored_on_the_bank_chain,
+test_free_market_fx_is_ignored_on_the_holding_chain.
+
+4. Missing behavioral tests found (and why they were missing)
+(a) Late-NII + surviving-component BANK combination: the P16 throwaway probe
+demonstrated the strict-refusal behavior but no committed test pinned it,
+so a future relaxation of the NII gate would stay green. Fixed by added
+test 1 (section 5).
+(b) build_general_chain wrapper flag: the legacy-compat wrapper divides on
+its own net_profit_is_attributable default (True); no committed test pinned
+that an explicit False refuses EPS, so a default-flip would stay green.
+Fixed by added test 2 (section 5).
+(c) Apparent M3/M4 survival in the sweep: NOT a test gap. The sweep edited
+the `parameter is None` early return in _scenario_spread, which is
+unreachable in practice (the merged params dict always carries the four
+defaults). Live-branch re-tests (section 6) prove the isolation tests pin
+the real path. No test change needed.
+
+5. New focused tests (append-only; no existing test touched)
+1. test_late_nii_with_a_surviving_component_still_refuses_the_bank_chain —
+post-cutoff base_nii + surviving forecast_net_profit 700.0: all three
+scenarios INSUFFICIENT_DATA / missing_nii_driver, NP/EPS/ROE None,
+pit_dropped_values ["base_nii"].
+2. test_general_chain_wrapper_refuses_eps_when_not_attributable — default
+eps 1.1 vs explicit-False eps None with net profit kept.
+Behavior probed live before committing; no production behavior changed.
+
+6. Test results
+Baseline: 311 passed, 0 failed. Sweep M1–M12: 10 CAUGHT by the sweep
+(M1: 8 failures; M2a/M2b: 2 each; M5: 6; M6: 22; M7: 2; M8: 1; M9: 1;
+M10: 1; M11: 21; M12: 3), M3/M4 first reported SURVIVED on an unreachable
+branch, then CAUGHT on live-branch re-test (M3: 6 failures —
+test_stage4_two_pct_cannot_become_a_scenario_spread x5,
+test_momentum_cannot_become_a_scenario_spread; M4: 7 failures —
+test_fundamental_score_is_never_a_forecast_multiplier x5,
+test_fundamental_score_cannot_become_a_scenario_spread x2). Closing
+mutants: M13 fabricated-default caught by 7; M14 score-into-growth caught
+by 5. Total: 14/14 CAUGHT, 0 survived, 0 errors; every mutant reverted
+immediately after its run. Final suite after the 2 added tests: 313 passed,
+0 failed. Production tree verified clean (git diff --stat -- src/forecast/
+empty); only src/tests/test_stage5_forecast.py and temp_report.md modified.
+
+7. Confirmed defects
+None meeting the genuine-correctness-defect bar. No STOP triggered. One
+method correction recorded: the sweep's M3/M4 edits targeted the
+`parameter is None` early return in _scenario_spread, unreachable because
+_merge_parameters always supplies the four defaults; the green run measured
+a dead branch, not the isolation tests. The live MODEL_DEFAULT return (the
+`evidence is None` branch) is pinned: momentum leak fails 6 tests, score
+leak fails 7. Sweep verdicts for M3/M4 are therefore corrected from
+SURVIVED to CAUGHT; nothing in the suite needed changing for this.
+
+8. Remaining gaps (none blocking P7–P10 logic)
+- H1 spread-magnitude authority (0.05/0.02/0.01/0.05): still no independent
+financial specification; honestly labeled MODEL_DEFAULT per the P15
+contract. This is a P20 finance-authority decision, not a P7–P10 logic gap.
+- Every P16 throwaway probe in P7–P10 scope now has a committed counterpart
+(the late-NII combination was the last one; closed this session).
+- build_general_chain remains legacy-compat only; now pinned by added test 2.
+
+9. Classification
+Forecast chain: VALIDATED. Historical growth: VALIDATED. Company-specific
+paths (NON_FINANCIAL / BANK / HOLDING): VALIDATED. Scenario logic:
+VALIDATED. Low base: VALIDATED. Momentum / Fundamental Score isolation:
+VALIDATED. Sign-change / zero-base: VALIDATED. EPS / ROE / FX / PIT guards:
+VALIDATED. P7–P10 area: VALIDATED.
+
+===========================================================================
+P20 — Retrospective Validation P11–P13 and Cross-Chain
+
+Executed 2026-10-06. Repository: analyzer. Local working tree only. No
+commits, no GitHub access, no branch operations, no Stage 6, no Stage 5
+redesign. P16's freeze conclusion remains suspended; Stage 5 is NOT frozen.
+Scope: P11–P13 per the P17 map plus the cross-chain invariant matrix from
+the brief. Standard throughout: "if the implementation were changed to
+violate this invariant, would a committed test fail?" Evidence: 8
+opposite-way mutants (each applied, probed, immediately reverted via git
+checkout), 3 new committed regression tests for the gaps found, focused
+suite 313 -> 316, broader suite 679 passed / 2 skipped.
+
+1. Exact inspected scope
+- src/forecast/schema.py: _same_forecast_state, ForecastVersionStore.save
+  (mutant M1).
+- src/forecast/repo.py: save, _records_equal, _to_record,
+  _metrics_equal_at_column_precision (mutants M2a/M2b).
+- src/forecast/service.py: _ratio, _stage1_derived_context (nearest-earlier
+  reversed() scans), _latest_publication, _eps_attributable_basis,
+  generate_and_persist_forecast ordering and the
+  EPS_ATTRIBUTABLE_PROVENANCE_KEY stamp (mutants M3/M4/M5/M6/M6b).
+- src/forecast/engine.py (read-only): _eps_attributable_basis /
+  _attributable_net_profit recomputation from raw context keys and the
+  assumptions-label overwrite (engine.py:222-261, 679, 961, 1111, 1157);
+  explains the M6 survival.
+- src/tests/test_stage5_forecast.py: P11–P13 test bodies mapped; 3 tests
+  added append-only, no existing test touched.
+- NOT re-inspected: adapter/builder/queries/drivers (P18/P19 scope,
+  unchanged; production tree verified clean at close).
+
+2. P11 validation (persistence correction)
+- Surrogate independence, store layer — M1 (raw `stored == record`)
+  CAUGHT, 2 failed: test_identical_resave_is_idempotent,
+  test_identical_resave_with_a_different_surrogate_id_is_idempotent.
+- Surrogate independence, repo layer — M2a (drop the projection, keep the
+  precision fallback) SURVIVED the 16-test subset: analyzed, not a pass.
+  The fallback _metrics_equal_at_column_precision never compares
+  forecast_id/forecast_version, so it masked the primary comparison. The
+  true opposite-way mutant M2b (raw full-record equality: no projection,
+  no fallback) CAUGHT, 4 failed:
+  test_repo_identical_resave_is_idempotent,
+  test_repo_identical_resave_with_a_different_surrogate_id_is_idempotent,
+  test_repo_same_version_with_different_content_still_conflicts,
+  test_production_path_duplicate_save_is_idempotent.
+  This resolves P17 H4: repo-path surrogate independence is proven by 3
+  repo tests + 1 production test, not one.
+- Conflict protection intact under surrogate exclusion: the same-version
+  conflict tests kill M2b, so excluding the surrogate does not weaken
+  overwrite protection. P11: VALIDATED.
+
+3. P12 validation (idempotency fix)
+- P12's in-memory proof reconfirmed via M1; the repo-path ambiguity (P17
+  H4) resolved via M2b. Determinism
+  (test_production_path_is_deterministic) green on the final tree. P12:
+  VALIDATED.
+
+4. P13 validation (production financial context)
+- Operating margin from PIT-valid Revenue + Operating Profit only; net
+  margin from PIT-valid Net Profit + Revenue — M3 (_ratio returns 0.0 on
+  undefined division) SURVIVED the full suite (313 passed, mutant live):
+  genuine gap. Direct probe: zero revenue yielded 0.0 margins; missing
+  operating profit yielded a 0.0 operating margin. Closed by 2 new tests
+  (both FAIL against the live mutant, both PASS on clean code); the net-
+  margin leg is pinned by the same tests (own evidence still reads 0.10
+  while the operating leg stays absent).
+- Historical growth from PIT-valid prior actuals; no silent caller
+  override — M5 (immediate-prior-only revenue lookup) CAUGHT, 2 failed.
+  Declared-growth precedence stays audited (growth_rate_basis plus the
+  discarded arc on the record).
+- Beginning equity from the nearest earlier valid observation; ending
+  never reused — M4 (immediate-prior-only equity lookup) CAUGHT, 1 failed
+  (the 3-period gap fixture: beginning_equity == 4000.0). Single-period
+  absence stays absent. P17 H2 resolved.
+- EPS requires attributable profit + valid shares; BANK/HOLDING cannot
+  bypass — M6b (production path fabricates
+  net_profit_is_attributable=True when the caller declares nothing)
+  SURVIVED the 22-test subset: analyzed. Every production test declares
+  attribution, so the mutant branch never fired; the undeclared
+  production path had no committed test. Genuine gap, closed by
+  test_production_path_without_attribution_declaration_keeps_eps_none
+  (FAILS against live M6b, PASSES clean). M6 (service label default flip)
+  SURVIVED — explained, not a gap: the service stamp is write-only. The
+  engine recomputes the basis from the raw context keys and overwrites
+  the assumptions label, so a label-only mutant changes no behavior
+  (recorded as a minor dead-write note in section 9, not a defect).
+- P13: VALIDATED.
+
+5. Cross-chain invariant matrix (final tree; mutant evidence cited)
+- Stage 4 recalculation: VALIDATED (P18 adapter tests).
+- Stage 4 ±2% as magnitude: VALIDATED (P19 M11, 21 failures).
+- Fundamental Score leakage: VALIDATED (P19 M4/M14).
+- Momentum leakage: VALIDATED (P19 M3).
+- P/NAV leakage: VALIDATED (P19 M10).
+- Arbitrary scenario spreads: VALIDATED (P19 M13).
+- Fabricated shares: VALIDATED (P18 builder guards).
+- Fabricated equity: VALIDATED (P20 M4 + no ending-reuse).
+- Fabricated attribution: VALIDATED (P20 M6b + new test; engine gate P19
+  M1).
+- Sign-change percentage growth: VALIDATED (P19 M6).
+- Future information leakage: VALIDATED (P18 PIT SQL + P19 late-NII test).
+- Missing-data-as-zero: VALIDATED (P20 M3 + 2 new tests; engine side
+  P18/P19).
+- Full chain Revenue -> Operating Margin -> Operating Profit -> Net Profit
+  -> EPS -> ROE on PIT-safe evidence at every boundary: coherent. Focused
+  316 + broader 679 green with all guards live; each mutant failed only
+  its own invariant's tests, so no cross-guard interference.
+
+6. Behavioral tests executed / added
+- Mutants: 8 (M1, M2a, M2b, M3, M4, M5, M6, M6b). Caught: M1 (2), M2b
+  (4), M4 (1), M5 (2), M3 (2 new tests), M6b (1 new test). Explained
+  survivals: M2a (masked by the precision fallback; superseded by M2b),
+  M6 (write-only label; no behavioral effect). Genuine coverage gaps
+  found and closed: 2 (margin-absence, undeclared-attribution production
+  path). Every mutant reverted immediately after its run.
+- Added (append-only): test_zero_revenue_leaves_derived_margins_absent_
+  not_zero, test_missing_profit_numerator_leaves_its_margin_absent_not_
+  zero, test_production_path_without_attribution_declaration_keeps_eps_
+  none.
+
+7. Test results
+- Baseline 313 passed. Final focused file: 316 passed, 0 failed. Broader
+  src/tests: 679 passed, 2 skipped (pre-existing environmental skips).
+  Final `git diff --stat -- src/forecast/` empty: no production file
+  modified, no existing test modified. Only
+  src/tests/test_stage5_forecast.py (append-only) and temp_report.md
+  changed.
+
+8. Confirmed defects
+- None meeting the genuine-correctness-defect bar. No STOP triggered.
+  All production behavior encountered was correct; every opposite-way
+  violation was either caught by committed tests or analyzed and closed
+  with a committed test.
+
+9. Remaining gaps (none blocking P11–P13 / cross-chain behavior)
+- H1 spread-magnitude authority (0.05/0.02/0.01/0.05): still no
+  independent financial specification; labels remain honestly
+  MODEL_DEFAULT. A finance-authority decision for the owner, not a
+  behavioral gap — unchanged since P19.
+- Minor dead-write note: service.py stamps eps_attributable_basis into
+  the financial context, but the engine recomputes the basis from raw
+  keys and overwrites the label, so the stamp is never read downstream.
+  No behavioral effect (proven by the M6 survival analysis). Owner may
+  consume or remove it; no edit made here.
+- Carried P18 minors, unchanged: DB-level late-announcement filtering;
+  extra_facts-override-order dedicated test name; column-precision
+  rounding-boundary test; uq constraint text; window_start
+  caller-must-narrow note.
+
+10. Classification
+- P11 persistence correction: VALIDATED. P12 idempotency: VALIDATED.
+- P13 production financial context: VALIDATED. PIT/provenance firewall:
+  VALIDATED. Full chain: VALIDATED (coherent, 316 + 679 green).
+- Cross-chain matrix (12 invariants): all VALIDATED. P17 H2 and H4 are
+  closed; H1 remains an authority decision, not a validation failure.
+- P11–P13 + cross-chain area: VALIDATED.
+
+Stage 5 is NOT declared frozen.
