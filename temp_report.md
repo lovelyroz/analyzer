@@ -2608,3 +2608,236 @@ suite 313 -> 316, broader suite 679 passed / 2 skipped.
 - P11–P13 + cross-chain area: VALIDATED.
 
 Stage 5 is NOT declared frozen.
+
+===========================================================================
+P21 — Independent Retrospective Audit / Freeze Gate
+
+Executed 2026-10-06. Repository: analyzer. Read-only audit: no production
+file modified, no test added or weakened, no commit, no branch operation,
+no GitHub access, no Stage 6, no redesign. P16's freeze conclusion remains
+suspended. Standard throughout: "if the implementation were changed to
+violate this invariant in a realistic way, would an existing committed
+test fail?" Prior VALIDATED verdicts were treated as claims to check, not
+as proof.
+
+1. Audit scope
+- temp_report.md P17–P20 sections read in full (P17 map, P18 P3–P6,
+  P19 P7–P10, P20 P11–P13 + cross-chain).
+- Live spot-checks (read-only): engine.py DEFAULT_MODEL_PARAMETERS +
+  _merge_parameters + _scenario_spread, the EPS attributable gate, the PIT
+  value guard, the four eps_attributable_basis label writes; service.py
+  derived-context ordering and the attribution stamp; schema.py/repo.py
+  surrogate-independent equality (reads pre-compaction, contents retained).
+- Authority search: 05_Stage5_Forecast_Engine.md sections 16, 20, 22,
+  32–34 plus full numeric/percentage search; PROJECT_HANDOFF_INSTRUCTIONS.md
+  "Scenario spread" and dispersion sections.
+- Test presence verified by name and line for 14 critical tests plus the
+  3 P20 regression tests (P20 bodies read in full); spread-authority and
+  isolation test bodies read in full.
+- Suites re-run independently: focused src/tests/test_stage5_forecast.py
+  316 passed; broader src/tests 679 passed / 2 skipped (pre-existing
+  environmental skips). Production tree verified clean
+  (git diff --stat -- src/forecast/ empty).
+- NOT done: no new mutants executed (P19/P20 mutant logs reviewed for
+  methodology instead), no repo-wide discovery, no unrelated stages.
+
+2. Evidence reviewed
+- P17 validation map (per-prompt matrix, H1–H6 risk list, P18/P19/P20
+  targets).
+- P18 opposite-way revert probes + 6 added tests (P3–P6 area).
+- P19 12-mutant sweep + 2 live-branch re-tests + 2 closing mutants
+  (M13/M14) + 2 added tests (P7–P10 area).
+- P20 8-mutant set (M1, M2a, M2b, M3, M4, M5, M6, M6b) + 3 added tests
+  + 12-invariant cross-chain matrix (P11–P13 area).
+- Live code, spec, handoff doc, and the two independent suite runs above.
+
+3. P3–P13 overall assessment
+The behavioral evidence is genuine. No VALIDATED claim is overturned:
+nearest-earlier lookups (H2), repo-path surrogate independence (H4), and
+the late-NII combination (H3) are each pinned by committed tests whose
+bodies were verified; the P19/P20 methodology corrections (M2a masking,
+M3/M4 unreachable branch, M6 write-only label) were each re-verified
+against live code and are logically sound (section 5). H5/H6 remain minor
+non-behavioral notes. H1 alone blocks the gate (section 7).
+
+4. Critical invariant matrix (high-risk invariants 1–14)
+1. Stage 4 never recalculated — evidence:
+   test_adapter_does_not_recompute_stage4_quantities,
+   test_production_path_uses_stage4_without_recalculation (P17 opposite-way:
+   growth conversion moves revenue and fails) — adversarial: P17 probe —
+   result: PASS.
+2. Stage 4 ±2% classification-only — evidence:
+   test_stage4_two_pct_threshold_is_not_a_forecast_growth_rate (exact
+   11000.0 + trend_adjustment 0.0/NO_MODEL_PARAMETER, adapter path too),
+   test_stage4_two_pct_cannot_become_a_scenario_spread — adversarial: P19
+   M11, 21 failures — result: PASS.
+3. Fundamental Score never multiplier/spread — evidence:
+   test_fundamental_score_is_never_a_forecast_multiplier (6 scores, full
+   chain identical), test_fundamental_score_cannot_become_a_scenario_spread
+   — adversarial: P19 M14 (5) + M4 live-branch (7) — result: PASS.
+4. Momentum never growth/multiplier/spread — evidence:
+   test_momentum_strength_is_never_a_growth_multiplier (50% still 11000.0,
+   != 15000.0), test_momentum_cannot_become_a_scenario_spread,
+   test_momentum_may_only_act_through_an_explicit_model_parameter —
+   adversarial: P19 M3 live-branch (6) — result: PASS.
+5. P/NAV never leaks — evidence:
+   test_holding_ignores_a_declared_p_nav_completely (+ exclusion recorded
+   on stored record) — adversarial: P19 M10 (1) — result: PASS.
+6. Missing never zero — evidence:
+   test_insufficient_baseline_reports_missing_rather_than_zero,
+   test_missing_metric_is_none_not_zero, P20 zero-revenue + missing-
+   numerator absence tests (bodies verified) — adversarial: P20 M3,
+   killed by the 2 new tests — result: PASS.
+7. Sign-change/zero-base no ordinary % — evidence:
+   test_sign_change_never_uses_an_ordinary_percentage_growth,
+   test_zero_base_to_profit_is_flat_not_infinite_growth, FLAT_* handling —
+   adversarial: P19 M6, 22 incl. all 18 sign params — result: PASS.
+8. EPS attributable gate — evidence: unavailability tests (undeclared,
+   explicit-false), declared-amount test, unverified-total test —
+   adversarial: P19 M1 (8) — result: PASS.
+9. BANK/HOLDING no gate bypass — evidence: component-path no-bypass tests
+   both branches, unavailability + valid-attributable positive tests, P19
+   late-NII refusal test — adversarial: P19 M2a/M2b (2 each), P20 M6b
+   killed by new production test (body verified) — result: PASS.
+10. ROE no ending-substitute — evidence:
+   test_roe_uses_both_ends_not_the_closing_balance_alone,
+   test_one_missing_equity_end_leaves_roe_none (both params) —
+   adversarial: P19 M7 (2) — result: PASS.
+11. No future information — evidence: PIT SQL triple filter (P18-read),
+   engine value-drop guard, post-cutoff value + provenance tests,
+   read_at_cutoff ref-level tests (record-level-only filtering would
+   return contaminated v2), late-NII production test — adversarial: P19
+   M5 (6) — result: PASS.
+12. FX boundary — evidence:
+   test_free_market_fx_cannot_silently_substitute_for_operational_fx
+   (ValueError), proxy estimated/LOW tests, bank/holding ignore tests —
+   adversarial: P19 M8 (1) — result: PASS.
+13. Persistence append-only/deterministic/idempotent/conflict-protected/
+   auditable — evidence: store + repo idempotency incl. different-
+   surrogate, same-version conflict tests, history/revision_trend,
+   input_refs/pit_violations/UTC tests — adversarial: P20 M1 (2), M2b
+   (4, incl. production duplicate-save) — result: PASS.
+14. Production-path parity — evidence: PIT-metadata, weighted-shares,
+   missing-shares, undeclared-attribution, duplicate-save, determinism
+   production tests; Stage1<derived<extra_facts ordering; engine-side
+   attribution recompute — adversarial: P20 M2b/M6b production kills —
+   result: PASS.
+
+5. Mutation-quality assessment
+P19's 14/14 and P20's 6-caught + 2-explained are accepted as genuine,
+not counts, for three independently verified reasons. (a) M2a masking:
+structurally confirmed — the precision fallback compares metrics and
+non-metric fields only, never forecast_id/forecast_version — so the
+survival measured the fallback, and M2b (raw equality, no projection, no
+fallback) is the true opposite-way mutant, caught by 4 invariant-
+specific tests. (b) M3/M4 unreachable branch: structurally confirmed —
+_merge_parameters always injects the four defaults, so the parameter-None
+branch is dead; the live MODEL_DEFAULT-branch re-tests (6 and 7 fails)
+pin the real isolation path. (c) M6 write-only label: confirmed by
+exhaustive key search — the engine never reads the stamped
+eps_attributable_basis key; all four chain sites recompute the basis
+from the raw net_profit_attributable / net_profit_is_attributable keys
+and overwrite the label — so the survival reflects zero behavioral
+delta, correctly classified as no gap. All mutants were exact guard
+inversions on live paths, each capable of violating its invariant in
+production, each reverted (tree verified clean), and each kill came from
+that invariant's own committed tests while the rest of the suite stayed
+green (no incidental coupling). Caveat: kill counts are log-reported,
+not re-executed here; accepted because the killing tests were verified
+present, the highest-risk bodies were read, and both suites were re-run
+green on the final tree.
+
+6. Production-path consistency assessment
+No weaker-rules path exists. Stage 1 → derived (same PIT read, nearest-
+earlier scans) → extra_facts override → shares builder → engine
+(recompute of attribution, value-level PIT drop) → repo (surrogate-
+projected idempotency + conflicts) behaves identically to the direct
+engine paths on every checked invariant (PIT, attribution, shares,
+equity, margins, growth, idempotency). The single asymmetry ever found
+(undeclared-attribution production path, P20 M6b) is closed by committed
+test. Consistent: PASS.
+
+7. H1 scenario-spread authority determination: C — UNRESOLVED FINANCIAL
+   AUTHORITY.
+- The spec states no numeric spread values anywhere (full search: none).
+- Spec section 20 requires scenarios built from drivers/uncertainty and
+  forbids definition by fully arbitrary percentages (e.g. ±20%).
+- Spec section 16 requires adjustment ranges be stored as Model
+  Parameter, not fixed architecture constants — the mechanism complies
+  (overridable params, MODEL_PARAMETER/MODEL_DEFAULT labeling,
+  authoritative-override test). Mechanism compliance is not magnitude
+  authority.
+- Spec section 22 sets range by Historical Dispersion and Model
+  Uncertainty when drivers are absent — the defaults derive from no
+  computed dispersion (proven: missing evidence leaves 0.05 standing
+  with uncertainty_evidence None), and "Model Uncertainty" is unnamed
+  and unquantified; it does not establish 0.05/0.02/0.01/0.05.
+- PROJECT_HANDOFF_INSTRUCTIONS.md "Scenario spread" states explicitly:
+  REAL GAP / specification compliance issue; the default values are
+  arbitrary and not derived from historical dispersion; do not replace
+  blindly with another arbitrary constant.
+- Therefore not A (no explicit values), not B (no explicit permission
+  for these defaults nor defined default-status; project docs call them
+  arbitrary), not D (no stated value contradicted; §16 mechanism
+  complied with). Classification: C.
+- Materiality: spreads move bear/bull outputs directly (declared-0.03
+  test pins bull = base×(1+0.10+0.03); the 0.05 default moves outputs
+  symmetrically). An inappropriate magnitude ships green — no committed
+  test constrains financial appropriateness, by design.
+
+8. Dead-write assessment
+service.py stamps financial_context["eps_attributable_basis"], but the
+engine never reads that key: every chain site recomputes the basis from
+the raw caller keys and overwrites the assumptions label, so every
+stored record carries the recomputed (correct) value. No correctness
+risk, no misleading stored artifact (proven by the M6 zero-delta
+analysis). Verdict: harmless audit redundancy in transient context only.
+No edit made (audit-only mandate); the owner may consume or remove the
+stamp at leisure.
+
+9. Remaining gaps
+- Blocking: H1 (C) — finance-authority decision required (section 11).
+  This needs a document, not a test; no new behavioral test is required
+  for the freeze decision.
+- Non-blocking carried minors (unchanged, none plausibly producing
+  incorrect output while green): DB-level late-announcement filtering;
+  extra_facts-override dedicated test name; column-precision rounding
+  boundary; uq constraint text; window_start caller-must-narrow note;
+  builder stale comment; H5 _as_date hardening (fails closed); H6
+  driver-tier repo-path coverage (engine driver behavior pinned; repo
+  path generic).
+
+10. Freeze-gate criteria 1–10
+1. P3–P13 independently validated — PASS (evidence re-verified live;
+   suites re-run 316 + 679/2).
+2. No critical invariant unproven — PASS (all 14 high-risk invariants
+   carry committed negative/opposite-way protection).
+3. No unresolved production-path correctness issue — PASS (M6b closed;
+   dead-write proven harmless).
+4. PIT/provenance proven — PASS (SQL filter + value guard + ref-level
+   reads + late-NII production test).
+5. Persistence/idempotency/versioning proven — PASS (M1/M2b kills incl.
+   production duplicate-save; conflicts intact).
+6. Cross-company-type behavior proven — PASS (BANK/HOLDING chains,
+   no-bypass gates, valid-attributable positives).
+7. Adversarial tests protect the negative paths — PASS (methodology
+   corrections verified sound; kills invariant-specific).
+8. H1 resolved as A or B — FAIL (C, section 7).
+9. No undocumented arbitrary assumption materially affecting forecasts —
+   FAIL (0.05/0.02/0.01/0.05 move bear/bull; basis undocumented).
+10. No remaining gap plausibly producing materially incorrect output
+    while green — FAIL (consequential on H1: an inappropriate magnitude
+    ships green).
+
+11. Final classification: FAIL — REMEDIATION REQUIRED.
+Exact remediation required (documentation/decision only — NOT a code or
+test change): an owner/finance authority record establishing the
+scenario-spread magnitudes 0.05/0.02/0.01/0.05 — by historical-dispersion
+calibration, by a stated model-uncertainty rationale, or by explicit
+signed-off assumption. Do not replace the values with another arbitrary
+constant; do not substitute Stage 4 ±2%. No production or test edit is
+required by this audit: apart from H1, no known critical validation gap
+remains — every behavioral invariant is pinned, every past survival is
+resolved, both suites are green, and the production tree is clean.
+
+Stage 5 is NOT declared frozen.
