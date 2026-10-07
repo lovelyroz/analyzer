@@ -639,23 +639,96 @@ Holdout outcomes must not create or qualify the calibration that is subsequently
 
 Preserve the temporal ordering.
 
+### TESTING REQUIREMENT
+
+Apply the MANDATORY MULTI-LAYER TESTING DOCTRINE below.
+
+For P20 specifically, every newly authorized Reliability mapping, confidence adjustment, unavailable-component rule, calibration state transition, and model-version transition must have:
+* Layer 1 unit/formula coverage;
+* Layer 2 contract/boundary coverage;
+* Layer 3 production-path coverage where the behavior is wired into the Stage 6 path;
+* Layer 4 adversarial/negative coverage;
+* Layer 5 focused regression coverage.
+
+Do not write numeric expected values for B2/B7/B3/B4 while those methodology decisions remain unresolved. For unresolved rules, the required test is fail-closed behavior plus an explicit report of the missing authority.
+
 ### TESTS
 
-Add behavioral tests for:
-
+Add behavioral tests for the authorized portions of:
 * Reliability ≠ Accuracy;
 * confidence adjustment;
 * unavailable Reliability components;
-* persistent vs isolated bias;
-* no-calibration;
-* calibration-candidate;
-* calibrated;
+* persistent vs isolated bias only if the persistence rule is authoritative; otherwise test that unresolved persistence cannot produce CALIBRATED;
+* NO_CALIBRATION;
+* CALIBRATION_CANDIDATE only when the transition rule is authoritative;
+* CALIBRATED only when the transition rule is authoritative;
 * new model version;
 * old version preservation;
 * calibration/training vs holdout isolation;
 * PIT leakage.
 
 Do not connect Reliability to P/E.
+
+### MANDATORY MULTI-LAYER TESTING DOCTRINE
+
+Testing in Stage 6 is a multi-layer verification requirement, not a single unit-test pass.
+
+For every implemented Stage 6 behavior, apply all applicable layers:
+
+1. Layer 1 — Unit / Formula
+   * Test deterministic formulas, mappings, state transitions, boundary values, and edge cases.
+   * Cover normal and pathological inputs.
+   * Verify exact numeric results where methodology is authoritative.
+
+2. Layer 2 — Contract / Boundary
+   * Test PIT cutoff/publication semantics.
+   * Test ReportVersion validity and Actual identity.
+   * Test Forecast Horizon and Model Version isolation.
+   * Test NULL != 0.
+   * Test duplicate handling.
+   * Test data-quality eligibility.
+   * Test Stage 5 and Stage 7 boundaries.
+   * Test unavailable/insufficient components fail closed rather than silently becoming zero or a fabricated score.
+
+3. Layer 3 — Production-Path / Integration
+   * At least one test for every critical invariant must exercise the actual Stage 6 production service/engine/orchestration path, not only a helper.
+   * Prove that the production path actually uses the tested behavior.
+   * Helper-level tests alone are not proof of production integration.
+
+4. Layer 4 — Adversarial / Negative
+   Intentionally attempt to violate the contract, including as applicable:
+   * future information before cutoff;
+   * later-published Actual incorrectly rejected;
+   * invalid ReportVersion;
+   * duplicate observations;
+   * zero values;
+   * sign-change regimes;
+   * mixed horizons;
+   * mixed Model Versions;
+   * invalid/suspicious/unmapped/restated data;
+   * unavailable components;
+   * baseline leakage;
+   * calibration holdout contamination;
+   * attempts to turn unresolved methodology into a numeric default.
+   Expected behavior must be explicit fail-closed behavior where methodology is unresolved.
+
+5. Layer 5 — Regression
+   * Run the focused Stage 6 suite first.
+   * After focused tests are clean, run: pytest src/tests -v
+   * Do not delete, weaken, bypass, or rewrite unrelated tests merely to obtain a green suite.
+   * Classify failures as Stage 6 implementation defect, methodology-authority gap, or unrelated regression.
+
+6. Layer 6 — Independent Audit
+   * Prompt 22 must independently challenge both the implementation and the adequacy of the tests.
+   * Passing tests alone are insufficient.
+   * Re-run selected adversarial/production-path tests and inspect whether critical invariants are actually evidenced.
+
+Evidence rule: Every critical invariant must have either (a) a behavioral/production-path test that genuinely proves it, or (b) an explicit structural proof. If only structurally verified, report it as structural—not behavioral—proof.
+
+Anti-mirroring rule: Tests must not merely duplicate implementation internals. Critical tests must assert externally observable contract behavior, including at least one production-path test where applicable.
+
+Methodology-authority rule: A passing test, existing constant, current implementation behavior, or convenient fallback is NOT authority for a financial methodology. If the required rule is unresolved, test and preserve the fail-closed boundary; do not manufacture a numeric expected value merely to make the test pass.
+
 
 Do not implement Stage 7.
 
@@ -732,14 +805,26 @@ Do NOT alter Stage 5.
 
 Do NOT implement Stage 7.
 
+### MANDATORY MULTI-LAYER PRODUCTION-PATH TESTING
+
+Apply the MANDATORY MULTI-LAYER TESTING DOCTRINE defined in Prompt 20.
+
+P21 is the first prompt where the complete production path must be proven. Do not accept helper-level coverage as sufficient.
+
+At minimum, the integrated path must be exercised behaviorally from:
+
+Forecast Version → PIT-safe Actual → Error → Accuracy/Bias → Baseline → Sufficiency → Performance Score → Reliability → Calibration/OOS boundary
+
+For every unresolved methodology blocker carried from P17–P20, the production path must demonstrate a safe fail-closed boundary rather than inventing a value.
+
 ### BEHAVIORAL TEST MATRIX
 
-Ensure coverage for:
-
+Ensure coverage for the following where authoritative; for unresolved methodology items, test the required fail-closed behavior instead:
 * normal forecast/actual;
 * under-forecast;
 * over-forecast;
 * zero forecast;
+* zero actual where the current authority remains unresolved;
 * LOSS_TO_PROFIT;
 * PROFIT_TO_LOSS;
 * SIGN_CHANGE;
@@ -750,19 +835,19 @@ Ensure coverage for:
 * baseline better than model;
 * model better than baseline;
 * zero baseline dispersion/error where applicable;
-* persistent bias;
+* persistent bias only if the persistence rule is authoritative;
 * isolated bias;
 * PIT cutoff;
 * later-published Actual as outcome;
 * invalid Actual;
 * duplicate observation;
+* invalid/suspicious/unmapped/restated data according to authorized rules;
 * calibration training period;
 * calibration holdout;
 * old model-version preservation;
 * Reliability component unavailability.
 
 Verify:
-
 * NULL != 0;
 * no future information leaks into forecast/evaluation inputs;
 * no horizon mixing;
@@ -771,13 +856,14 @@ Verify:
 * no TTM double counting;
 * no double counting across overlapping evaluation horizons;
 * no Reliability → Forward P/E numerical adjustment;
-* no Stage 5 modification.
+* no Stage 5 modification;
+* no unresolved methodology gap is silently converted into a numeric default.
 
 Run focused Stage 6 tests first.
 
 Only after the focused suite is clean, run:
 
-`pytest src/tests -v`
+pytest src/tests -v
 
 Do not modify unrelated failing tests.
 
@@ -940,17 +1026,49 @@ Report:
 * whether it is implementation defect or methodology-authority gap;
 * exact evidence.
 
+### MULTI-LAYER INDEPENDENT VERIFICATION
+
+Apply the MANDATORY MULTI-LAYER TESTING DOCTRINE defined in Prompt 20, but act independently rather than trusting previous reports.
+
+P22 must explicitly verify all six layers:
+1. unit/formula correctness;
+2. contract/boundary correctness;
+3. production-path integration;
+4. adversarial/negative behavior;
+5. focused + full regression;
+6. independent audit of test adequacy.
+
+For each critical invariant, trace the requirement to actual evidence. A test that merely calls an internal helper is not sufficient proof of the production path. A green regression suite is not sufficient proof of methodology authority.
+
+Before declaring PASS, challenge at least:
+* future information injected before cutoff;
+* later-published Actual incorrectly rejected;
+* invalid ReportVersion;
+* duplicate observations;
+* NULL vs zero;
+* zero/sign-change regimes;
+* mixed horizons;
+* mixed Model Versions;
+* baseline leakage;
+* unavailable Reliability component;
+* unresolved methodology being forced into a numeric default;
+* calibration holdout contamination;
+* old Model Version overwrite;
+* Reliability → Forward P/E leakage.
+
 ### TESTS
 
 Run focused Stage 6 tests.
 
-If and only if they pass, run:
+Inspect whether the focused tests genuinely exercise the production path and whether critical invariants have adequate adversarial coverage.
 
-`pytest src/tests -v`
+If and only if the focused suite is clean, run:
 
-Do not weaken tests.
+pytest src/tests -v
 
-Do not modify unrelated failing tests.
+Do not weaken, delete, bypass, or rewrite tests merely to obtain a green suite.
+
+If a failure is found, distinguish implementation defect, methodology-authority gap, and unrelated regression; do not fix anything in this read-only audit.
 
 ### REPORT
 
