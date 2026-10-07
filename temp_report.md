@@ -3036,3 +3036,156 @@ This section records a Stage 5 model-governance decision taken to resolve H1. It
 H1 Scenario Spread Authority: RESOLVED — Historical Dispersion Methodology v1.
 
 Stage 5 Freeze Status: NOT FROZEN — this task resolves H1; it does not itself authorize skipping the final independent Stage 5 freeze validation.
+====================================================================
+
+## FINAL INDEPENDENT STAGE 5 FREEZE GATE (post-H1 remediation)
+
+Independent final validation of Historical Dispersion Scenario Spread Methodology v1
+in the live production path, and confirmation that its introduction did not break
+previously validated Stage 5 invariants. H1 report claims were treated as hypotheses
+and checked against the current code.
+
+### 1. Scope
+
+Files/symbols actually inspected:
+
+- temp_report.md — H1 authority investigation, H1 remediation, H1 implementation
+  report (used only as hypotheses, not evidence).
+- src/forecast/engine.py (1487 lines, read in full) — DEFAULT_MODEL_PARAMETERS,
+  SCENARIO_SPREAD_KEYS, RETIRED_SCENARIO_SPREAD_DEFAULTS, _sample_std,
+  _SPREAD_SERIES_KEYS, _series_refs / _element_refs / _series_element_pit_valid,
+  _revenue_growth_observations, _margin_observations, _scenario_spread,
+  _insufficient_scenario, all four call sites, non-financial / bank / holding
+  scenario branches, scenario_spread_excluded_inputs, _pit_guarded_context.
+- src/forecast/service.py (412 lines, read in full) — _stage1_dispersion_series
+  and the production assembly path.
+- src/forecast/queries.py — cutoff filtering only (publication_datetime <= cutoff,
+  share-history cutoff).
+- src/forecast/drivers.py — bank/holding EPS consumption and the
+  build_general_chain wrapper.
+- src/tests/test_stage5_forecast.py — H1 block A–J plus production-path test.
+- Git metadata only (read-only): git status, git log for src/trend/,
+  git show --name-only HEAD.
+
+### 2. H1 Verification
+
+- Revenue Growth — PASS. _scenario_spread reads only historical_revenue_series via
+  _SPREAD_SERIES_KEYS; consecutive PIT-valid levels pass through _safe_growth_rate,
+  so missing endpoints, zero bases, and sign changes never enter dispersion. An
+  11-level series with zero-base, zero-endpoint, and sign-flip transitions yields
+  exactly the 6 valid observations (committed test E pins
+  [0.10, -0.10, -0.10, 0.10, 0.10, 0.10]); a 0.0 level contributes nothing while
+  valid negative growths are retained.
+- Operating Margin — PASS. _margin_observations requires (profit, revenue) pairs
+  with present profit over present non-zero revenue. Committed test proves a revenue
+  series alone leaves both margin spreads None, and margin pairs alone leave the
+  revenue spread None.
+- Net Margin — PASS. Same pair rule under the independent historical_net_series key;
+  cross-supply in both directions is tested absent.
+- Financial Growth — PASS. Mapped solely to historical_financial_series; no series
+  means unavailable, revenue dispersion never crosses over (committed test: revenue
+  spread present while financial is None with basis
+  INSUFFICIENT_HISTORICAL_EVIDENCE). The production path builds no financial series
+  by construction (service.py), so the financial spread fails closed on the live path.
+
+### 3. PIT / Provenance
+
+PASS. The Stage 1 period read feeding the series is cutoff-restricted
+(ReportVersion.publication_datetime <= cutoff; same cutoff for share history and
+corporate actions). Each series element is gated by its own parallel *_refs
+provenance via _series_element_pit_valid, reusing ForecastInputRef and
+normalize_datetime — no second PIT implementation exists. A late revenue level
+excludes both transitions touching it (committed test D: 7 levels -> 4 observations,
+eligible_observations == 6; live M2 check confirmed). _pit_guarded_context drops the
+numeric value behind any late-declared guarded key, not just the ref; everything
+downstream reads the guarded context.
+
+### 4. Legacy Spread Isolation
+
+PASS. DEFAULT_MODEL_PARAMETERS carries no scenario spread of any kind. The four
+retired values (0.05/0.02/0.01/0.05) survive only in RETIRED_SCENARIO_SPREAD_DEFAULTS,
+whose single read site is an equality check producing the
+RETIRED_SPREAD_CONSTANT_IGNORED note — never applied. Grep confirms no other read
+path (context.get("scenario_..."), params.get("scenario_...")) exists in the engine,
+and no `if spread is None: spread = <constant>` fallback exists on any path.
+Committed test covers detection on all four keys; live M1 check confirmed a supplied
+0.05 is reported-and-ignored both with and without a series present.
+
+### 5. Excluded Signal Isolation
+
+PASS. The _scenario_spread body references only the series keys, element refs,
+cutoff, and the inert volatility evidence — no Stage 4 threshold, momentum,
+Fundamental Score, or P/NAV symbol appears in the data flow (remaining mentions are
+comments and the scenario_spread_excluded_inputs audit tuple). The legacy
+volatility-scaling channel is closed: volatility evidence with or without a declared
+sensitivity yields only an ..._IGNORED_... note and a None spread. Committed
+isolation tests pin ±2%, momentum, and score invariance of spread bases.
+
+### 6. Scenario Construction
+
+PASS. Non-financial branch: bear_growth = base_growth - spread,
+bull_growth = base_growth + spread (absolute offsets in native growth units);
+margin legs -spread / +spread as absolute margin offsets around the baseline margin.
+Bank/holding branches apply base_g ∓ financial_spread identically. No
+Base * (1 ± Spread) construction exists. Base needs no spread and always stands;
+missing dispersion refuses only the side scenarios via _insufficient_scenario with
+the missing keys named. Committed test J pins Low = B - S / Base = B / High = B + S.
+
+### 7. Regression Validation
+
+- Stage 5 focused: `.venv/Scripts/python.exe -m pytest
+  src/tests/test_stage5_forecast.py -q` → 332 passed in 2.43 s.
+- Full project: `.venv/Scripts/python.exe -m pytest src/tests -q` → 695 passed,
+  2 skipped (pre-existing environmental skips) in ~254 s.
+- Counts match the H1 implementation report exactly (332 / 695+2). H1 touched only
+  engine.py, service.py, test_stage5_forecast.py, temp_report.md (commit file list
+  verified). Side observation: the prior P14 EPS-bypass blocker is closed —
+  build_bank_chain/build_holding_chain consume only the engine-resolved eps and
+  never divide np / share_count themselves; the build_general_chain wrapper has no
+  production callers (test-only).
+
+### 8. Adversarial Validation
+
+Temporary harness (removed afterward) run against the live code — all PASS:
+
+- M0 — spread matches statistics.stdev, differs from pstdev (n-1 proven, not
+  population).
+- M1 — retired 0.05 supplied via model_parameters reported
+  RETIRED_SPREAD_CONSTANT_IGNORED, never applied (with and without series).
+- M2 — one element given post-cutoff provenance; eligible 6 → observations 4,
+  spread unavailable.
+- M3 — 3 observations plus a volatility-evidence argument; spread refused, no
+  substitution.
+- M4 — revenue series present, no financial series; financial spread unavailable,
+  no aliasing.
+- M5 — six levels at exactly 10% growth; spread ≈ 0 (float residue 3.8e-17),
+  basis HISTORICAL_DISPERSION, chains stand — no floor. (First harness run showed
+  two False lines that were harness artifacts: hand-rounded literal expectations
+  vs. float-derived growths, and exact-0.0 comparison vs. float residue. The
+  corrected re-run passed all checks; the committed margin test pins exact 0.0
+  where the arithmetic is exact.)
+
+### 9. Freeze Gate
+
+| Criterion                   | Result |
+| --------------------------- | ------ |
+| H1 methodology enforced     | PASS   |
+| Legacy constants isolated   | PASS   |
+| PIT/provenance              | PASS   |
+| Metric isolation            | PASS   |
+| Financial Growth protection | PASS   |
+| Insufficient evidence       | PASS   |
+| Scenario construction       | PASS   |
+| Stage 4 firewall            | PASS   |
+| Regression suite            | PASS   |
+| Working tree clean          | PASS   |
+
+Stage 4 firewall detail: H1 commit contains no src/trend/ file; git log shows the
+last Stage 4 change predates H1; git diff HEAD --stat -- src/trend/ is empty; the
+±2% band appears in the spread path only as a named excluded input.
+
+### 10. Final Decision
+
+STAGE 5 FROZEN
+====================================================================
+
