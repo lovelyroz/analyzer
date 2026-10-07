@@ -111,8 +111,9 @@ def test_stage5_uses_seasonal_baseline_and_parameterized_trend():
     assert result.horizon == "12M"
     assert result.scenario_forecasts.base.revenue == 12500.0
     assert result.scenario_forecasts.base.eps == 1.25
-    assert result.scenario_forecasts.bear.eps < result.scenario_forecasts.base.eps
-    assert result.scenario_forecasts.base.eps < result.scenario_forecasts.bull.eps
+    # The retired 0.05 spread is ignored, so the side scenarios fail closed.
+    assert result.scenario_forecasts.bear.method == "INSUFFICIENT_DATA"
+    assert result.scenario_forecasts.bull.method == "INSUFFICIENT_DATA"
 
 
 def test_low_base_disables_trend_adjustment():
@@ -235,7 +236,12 @@ def test_records_freeze_all_three_scenarios():
     assert [r.scenario for r in records] == ["BEAR", "BASE", "BULL"]
     assert [r.forecast_id for r in records] == [100, 101, 102]
     assert all(r.forecast_horizon == "12M" for r in records)
-    assert records[0].eps < records[1].eps < records[2].eps
+    # The side scenarios carry no data: without dispersion they are refused, so
+    # the base is the only chain with a value to freeze.
+    assert records[1].eps is not None
+    for refused in (records[0], records[2]):
+        assert refused.eps is None
+        assert refused.revenue is None
     # Every chain knows its own scenario identity.
     chains = _forecast().scenario_forecasts
     assert chains.base.scenario == "BASE"
@@ -1839,9 +1845,12 @@ def test_revenue_growth_applies_to_the_baseline():
     result = _core_forecast(_core_context(baseline_revenue_growth=0.25))
     chains = result.scenario_forecasts
     assert chains.base.revenue == 12500.0
-    # Bear/base/bull are the growth spread around the declared rate.
-    assert chains.bear.revenue == pytest.approx(10000.0 * (0.25 - 0.05) + 10000.0)
-    assert chains.bull.revenue == pytest.approx(10000.0 * (0.25 + 0.05) + 10000.0)
+    # Without five valid dispersion observations the side scenarios fail closed
+    # and the declared growth carries the base alone.
+    assert chains.bear.method == "INSUFFICIENT_DATA"
+    assert chains.bull.method == "INSUFFICIENT_DATA"
+    assert "scenario_revenue_growth_spread" in \
+        chains.bear.assumptions["missing_spreads"]
 
 
 def test_missing_revenue_growth_defaults_to_flat_not_invented():
@@ -2256,15 +2265,12 @@ def test_eps_is_never_zero_as_a_substitute_for_a_missing_share_base():
 
 # --- 7. EPS is derived, never independently forecast ---------------------------
 
-def test_eps_tracks_net_profit_across_scenarios():
+def test_eps_tracks_net_profit_in_the_base_scenario():
     history = [_ShareRecord(date(2025, 1, 1), 1_000_000)]
-    chains = _shares_forecast(history).scenario_forecasts
-    # EPS is a pure function of the forecast chain: it orders with net profit
-    # and divides it by the same share base in every scenario.
-    assert chains.bear.net_profit < chains.base.net_profit < chains.bull.net_profit
-    assert chains.bear.eps < chains.base.eps < chains.bull.eps
-    for chain in (chains.bear, chains.base, chains.bull):
-        assert chain.eps == pytest.approx(_expected_eps(chain.net_profit, 1_000_000))
+    base = _shares_forecast(history).scenario_forecasts.base
+    # EPS is a pure function of the forecast chain: it divides net profit by the
+    # same share base. The side scenarios are unavailable without dispersion.
+    assert base.eps == pytest.approx(_expected_eps(base.net_profit, 1_000_000))
 
 
 def test_eps_moves_with_the_share_base_and_not_with_net_profit():
@@ -2343,13 +2349,11 @@ def test_no_equity_and_no_shares_leaves_eps_and_roe_none():
 
 # --- 10. ROE is derived, never independently forecast --------------------------
 
-def test_roe_tracks_net_profit_across_scenarios():
+def test_roe_tracks_net_profit_in_the_base_scenario():
     context = _core_context(beginning_equity=9000.0, forecast_ending_equity=11000.0)
-    chains = _core_forecast(context).scenario_forecasts
-    assert chains.bear.roe < chains.base.roe < chains.bull.roe
-    for chain in (chains.bear, chains.base, chains.bull):
-        assert chain.roe == pytest.approx(
-            chain.net_profit / ((9000.0 + 11000.0) / 2.0))
+    base = _core_forecast(context).scenario_forecasts.base
+    assert base.roe == pytest.approx(
+        base.net_profit / ((9000.0 + 11000.0) / 2.0))
 
 
 def test_roe_is_unaffected_by_the_share_base():
@@ -2501,12 +2505,14 @@ def test_bank_chain_runs_on_nii_not_the_revenue_model():
     assert base.method == "BANK_NII_CONVERSION"
 
 
-def test_bank_scenarios_are_ordered_and_use_the_financial_spread():
+def test_bank_scenarios_fail_closed_without_a_financial_spread():
     chains = _bank_forecast().scenario_forecasts
-    assert chains.bear.net_profit < chains.base.net_profit < chains.bull.net_profit
-    # 1000 x (1 + 0.10 - 0.05) x 0.50
-    assert chains.bear.net_profit == 525.0
-    assert chains.bull.net_profit == 575.0
+    # The financial series has no Stage 1 source, so the side scenarios are
+    # refused and the base stands alone on NII.
+    assert chains.base.net_profit == 550.0
+    for chain in (chains.bear, chains.bull):
+        assert chain.method == "INSUFFICIENT_DATA"
+        assert chain.assumptions["reason"] == "insufficient_scenario_spread"
 
 
 def test_bank_missing_nii_driver_stays_missing_not_zero():
@@ -2617,12 +2623,16 @@ def test_holding_nav_growth_drives_net_profit():
     assert base.net_profit == 500.0
 
 
-def test_holding_scenarios_are_ordered_around_nav_growth():
+def test_holding_scenarios_fail_closed_without_a_financial_spread():
     chains = _holding_forecast().scenario_forecasts
-    assert chains.bear.net_profit < chains.base.net_profit < chains.bull.net_profit
-    assert chains.bear.assumptions["forecast_nav"] < \
-        chains.base.assumptions["forecast_nav"] < \
-        chains.bull.assumptions["forecast_nav"]
+    # NAV history is no more in the Stage 1 read than NII is, so the financial
+    # spread is unavailable and the side scenarios are refused.
+    assert chains.base.net_profit == 440.0
+    for chain in (chains.bear, chains.bull):
+        assert chain.method == "INSUFFICIENT_DATA"
+        assert chain.assumptions["reason"] == "insufficient_scenario_spread"
+        assert chain.assumptions["missing_spreads"] == \
+            ["scenario_financial_growth_spread"]
 
 
 def test_holding_eps_is_net_profit_over_shares():
@@ -2753,13 +2763,13 @@ def test_fx_without_declared_sensitivity_leaves_revenue_untouched():
     assert "fx" not in base.assumptions
 
 
-def test_fx_applies_identically_across_all_three_scenarios():
-    chains = _core_forecast(_fx_context()).scenario_forecasts
-    plain = _core_forecast(_core_context()).scenario_forecasts
-    for chain, original in zip((chains.bear, chains.base, chains.bull),
-                               (plain.bear, plain.base, plain.bull)):
-        assert chain.revenue == pytest.approx(
-            original.revenue + original.revenue * 0.50 * 0.08)
+def test_fx_applies_identically_across_the_base_scenario():
+    # The base is the chain FX reprices; the side scenarios are unavailable
+    # without dispersion, so the effect is observed on the base alone.
+    base = _core_forecast(_fx_context()).scenario_forecasts.base
+    plain = _core_forecast(_core_context()).scenario_forecasts.base
+    assert base.revenue == pytest.approx(
+        plain.revenue + plain.revenue * 0.50 * 0.08)
 
 
 # --- FX: missing operational FX ---------------------------------------------------
@@ -3293,64 +3303,57 @@ def test_sign_change_propagation_still_names_the_transition():
 
 # --- Scenario uncertainty ---------------------------------------------------
 
-def test_scenarios_use_the_declared_model_spread():
+def test_scenarios_disperse_around_the_declared_baseline_growth():
+    # Methodology v1: without five valid revenue-growth observations there is no
+    # spread, so the side scenarios fail closed and the base stands alone.
     result = _core_forecast(_core_context(baseline_revenue_growth=0.10))
     chains = result.scenario_forecasts
-    assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
-    assert result.assumptions["uncertainty_basis"] == "MODEL_DEFAULT"
-    assert chains.bear.revenue == pytest.approx(10000.0 * 1.05)
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
+    assert result.assumptions["uncertainty_basis"] == \
+        "INSUFFICIENT_HISTORICAL_EVIDENCE"
     assert chains.base.revenue == pytest.approx(10000.0 * 1.10)
-    assert chains.bull.revenue == pytest.approx(10000.0 * 1.15)
+    assert chains.bear.method == "INSUFFICIENT_DATA"
+    assert chains.bull.method == "INSUFFICIENT_DATA"
+    assert chains.bear.assumptions["reason"] == "insufficient_scenario_spread"
 
 
-def test_missing_uncertainty_evidence_leaves_the_declared_spread():
-    # No volatility observation exists: the declared model spread stands and no
-    # dispersion estimate is manufactured from the absence.
+def test_missing_uncertainty_evidence_leaves_no_spread():
+    # No volatility observation exists and none is invented: without historical
+    # dispersion there is no spread at all.
     context = _core_context()
     for key in ("revenue_volatility", "historical_revenue_volatility",
                 "earnings_volatility", "forecast_uncertainty"):
         context[key] = None
     result = _core_forecast(context)
     assert result.assumptions["uncertainty_evidence"] is None
-    assert result.assumptions["uncertainty_basis"] == "MODEL_DEFAULT"
-    assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
-    chains = result.scenario_forecasts
-    assert chains.bear.revenue == pytest.approx(10000.0 * 1.05)
-    assert chains.bull.revenue == pytest.approx(10000.0 * 1.15)
+    assert result.assumptions["uncertainty_basis"] == \
+        "INSUFFICIENT_HISTORICAL_EVIDENCE"
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
+    assert result.scenario_forecasts.base.revenue == pytest.approx(11000.0)
 
 
 def test_declared_volatility_only_acts_through_a_declared_sensitivity():
-    # Volatility evidence alone is an observation. Only a caller-declared
-    # sensitivity lets it move the spread, and by the caller's own factor.
+    # Volatility evidence alone is an observation. Under Methodology v1 it can
+    # never become a spread, with or without a declared sensitivity.
     context = _core_context(revenue_volatility=0.30)
-    assert _core_forecast(context).assumptions["uncertainty_basis"] == \
-        "MODEL_DEFAULT"
+    assert _core_forecast(context).assumptions["scenario_revenue_growth_spread"] \
+        is None
 
     scaled = _core_context(revenue_volatility=0.30, volatility_sensitivity=2.0)
     result = _core_forecast(scaled)
-    assert result.assumptions["uncertainty_basis"] == "VOLATILITY_EVIDENCE"
-    assert result.assumptions["scenario_revenue_growth_spread"] == \
-        pytest.approx(0.05 * 2.0 * 0.30)
-    chains = result.scenario_forecasts
-    assert chains.bear.revenue == pytest.approx(
-        10000.0 * (1.0 + 0.10 - 0.05 * 2.0 * 0.30))
-    assert chains.bull.revenue == pytest.approx(
-        10000.0 * (1.0 + 0.10 + 0.05 * 2.0 * 0.30))
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
+    assert result.assumptions["scenario_spread_evidence_notes"]["revenue"] == \
+        "VOLATILITY_EVIDENCE_IGNORED_UNDER_V1"
 
 
 def test_an_arbitrary_spread_is_never_invented_from_missing_data():
-    # The engine must never conjure Base ± 5/10/15% on its own account: the
-    # spread is always either the declared model parameter or a declared
-    # parameter scaled by declared evidence.
+    # The engine must never conjure Base ± 5/10/15% on its own account: the only
+    # source is historical dispersion, and without it every spread is absent.
     result = _core_forecast(_core_context())
-    spread = result.assumptions["scenario_revenue_growth_spread"]
-    assert spread == result.assumptions["model_parameters"][
-        "scenario_revenue_growth_spread"]
-    for key in ("scenario_operating_margin_spread",
-                "scenario_net_margin_spread",
-                "scenario_financial_growth_spread"):
-        assert result.assumptions[key] == result.assumptions[
-            "model_parameters"][key]
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
+    assert result.assumptions["scenario_operating_margin_spread"] is None
+    assert result.assumptions["scenario_net_margin_spread"] is None
+    assert result.assumptions["scenario_financial_growth_spread"] is None
 
 
 def test_scenario_spreads_are_deterministic_given_identical_inputs():
@@ -3365,27 +3368,32 @@ def test_scenario_spreads_are_deterministic_given_identical_inputs():
         assert left.roe == right.roe
 
 
-def test_insufficient_uncertainty_evidence_still_yields_three_scenarios():
-    # Missing dispersion does not collapse the scenario set: the three chains
-    # are produced on the declared spread alone.
+def test_insufficient_uncertainty_evidence_still_yields_a_base_scenario():
+    # Missing dispersion fails the side scenarios closed, but the base needs no
+    # spread and still stands.
     chains = _core_forecast(_core_context()).scenario_forecasts
-    assert chains.bear.revenue < chains.base.revenue < chains.bull.revenue
-    assert chains.bear.net_profit < chains.base.net_profit < chains.bull.net_profit
+    assert chains.base.method != "INSUFFICIENT_DATA"
+    assert chains.base.revenue is not None
+    assert chains.bear.method == "INSUFFICIENT_DATA"
+    assert chains.bull.method == "INSUFFICIENT_DATA"
 
 
-def test_bank_scenarios_use_the_financial_spread_and_no_invented_volatility():
-    # The financial spread is the declared model parameter; a missing
-    # volatility observation never fabricates a bank-specific dispersion.
+def test_bank_scenarios_fail_closed_without_financial_dispersion():
+    # The financial series never exists in the Stage 1 read, so the financial
+    # spread is unavailable and the side scenarios are refused.
     context = _bank_context()
     for key in ("revenue_volatility", "earnings_volatility", "forecast_uncertainty"):
         context[key] = None
     result = ForecastEngine().generate_forecast(1, 10, "BANK", context)
-    assert result.assumptions["scenario_financial_growth_spread"] == 0.05
+    assert result.assumptions["scenario_financial_growth_spread"] is None
     assert result.assumptions["uncertainty_evidence"] is None
     chains = result.scenario_forecasts
-    assert chains.bear.net_profit == pytest.approx(525.0)
-    assert chains.base.net_profit == pytest.approx(550.0)
-    assert chains.bull.net_profit == pytest.approx(575.0)
+    assert chains.base.net_profit == 550.0
+    for chain in (chains.bear, chains.bull):
+        assert chain.method == "INSUFFICIENT_DATA"
+        assert chain.assumptions["reason"] == "insufficient_scenario_spread"
+        assert chain.assumptions["missing_spreads"] == \
+            ["scenario_financial_growth_spread"]
 
 
 # --- Determinism -----------------------------------------------------------
@@ -3534,13 +3542,12 @@ def test_valid_attributable_holding_forecast_still_calculates_eps():
         "CALLER_DECLARED_EQUIVALENCE"
 
 
-def test_eps_matches_net_profit_in_every_scenario_once_attributable():
+def test_eps_matches_net_profit_once_attributable():
     # EPS tracks the chain it came from: the numerator and the denominator are
-    # the same forecast, so the ordering is preserved scenario by scenario.
-    chains = _core_forecast(_core_context()).scenario_forecasts
-    assert chains.bear.eps < chains.base.eps < chains.bull.eps
-    for chain in (chains.bear, chains.base, chains.bull):
-        assert chain.eps == round(chain.net_profit / 1000.0, 6)
+    # the same forecast. The side scenarios are unavailable without dispersion,
+    # so the identity holds on the base.
+    base = _core_forecast(_core_context()).scenario_forecasts.base
+    assert base.eps == round(base.net_profit / 1000.0, 6)
 
 
 # --- B. Scenario spreads come from the declared model only ------------------
@@ -3548,36 +3555,43 @@ def test_eps_matches_net_profit_in_every_scenario_once_attributable():
 def test_scenario_spread_authority_is_recorded_per_spread():
     result = _core_forecast(_core_context())
     for key in ("revenue", "financial", "operating_margin", "net_margin"):
-        assert result.assumptions["scenario_spread_bases"][key] in (
-            "MODEL_PARAMETER", "MODEL_DEFAULT", "VOLATILITY_EVIDENCE")
-    # The model parameters that produced them are frozen verbatim.
-    declared = result.assumptions["scenario_spread_model_parameters"]
-    assert declared["scenario_revenue_growth_spread"] == 0.05
-    assert declared["scenario_operating_margin_spread"] == 0.02
-    assert declared["scenario_net_margin_spread"] == 0.01
-    assert declared["scenario_financial_growth_spread"] == 0.05
+        assert result.assumptions["scenario_spread_bases"][key] == \
+            "INSUFFICIENT_HISTORICAL_EVIDENCE"
+    assert result.assumptions["scenario_spread_methodology_version"] == \
+        "HISTORICAL_DISPERSION_V1"
+    assert result.assumptions["scenario_spread_min_observations"] == 5
 
 
-def test_authoritative_scenario_parameters_are_respected():
-    context = _core_context()
+def test_authoritative_scenario_parameters_are_never_spreads():
+    # A caller declaration is not a dispersion source: under Methodology v1 a
+    # declared value stays inert while the series supplies the spread.
+    context = _core_context(
+        historical_revenue_series=[100.0, 110.0, 126.5, 139.15, 160.0225,
+                                   176.02475],
+        historical_operating_series=[(20.0, 100.0), (25.0, 110.0),
+                                     (22.0, 121.0), (26.0, 130.0),
+                                     (28.0, 140.0)],
+        historical_net_series=[(10.0, 100.0), (13.0, 110.0), (11.0, 121.0),
+                               (12.0, 130.0), (15.0, 140.0)],
+    )
     context["model_parameters"] = {"scenario_revenue_growth_spread": 0.03}
     result = _core_forecast(context)
-    assert result.assumptions["scenario_revenue_growth_spread"] == 0.03
+    assert result.assumptions["scenario_revenue_growth_spread"] != \
+        pytest.approx(0.03)
     assert result.assumptions["scenario_spread_bases"]["revenue"] == \
-        "MODEL_PARAMETER"
+        "HISTORICAL_DISPERSION"
     chains = result.scenario_forecasts
-    assert chains.bear.revenue == pytest.approx(10000.0 * (1.0 + 0.10 - 0.03))
-    assert chains.bull.revenue == pytest.approx(10000.0 * (1.0 + 0.10 + 0.03))
+    assert chains.bear.revenue < chains.base.revenue < chains.bull.revenue
 
 
-def test_no_authoritative_parameter_leaves_the_model_default_standing():
+def test_no_authoritative_parameter_leaves_any_spread_standing():
     context = _core_context()
     context["model_parameters"] = {}
     result = _core_forecast(context)
     assert result.assumptions["scenario_spread_bases"]["revenue"] == \
-        "MODEL_DEFAULT"
-    # The default is the model's own value, never an invented dispersion.
-    assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
+        "INSUFFICIENT_HISTORICAL_EVIDENCE"
+    # Without dispersion there is no spread at all.
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
 
 
 def test_no_arbitrary_spread_is_fabricated_from_absent_evidence():
@@ -3589,7 +3603,7 @@ def test_no_arbitrary_spread_is_fabricated_from_absent_evidence():
     result = _core_forecast(context)
     assert result.assumptions["uncertainty_evidence"] is None
     # No dispersion estimate was manufactured from the missing observation.
-    assert result.assumptions["scenario_revenue_growth_spread"] == 0.05
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
 
 
 @pytest.mark.parametrize("momentum_pct", [-0.02, -0.019, 0.019, 0.02, 0.25])
@@ -3600,14 +3614,10 @@ def test_stage4_two_pct_cannot_become_a_scenario_spread(momentum_pct):
     plain = _core_forecast(_core_context())
     context = _core_context(momentum_12m_pct=momentum_pct, trend_state="Positive")
     moved = _core_forecast(context)
-    assert moved.assumptions["scenario_revenue_growth_spread"] == \
-        plain.assumptions["scenario_revenue_growth_spread"]
+    assert moved.assumptions["scenario_revenue_growth_spread"] is None
     assert moved.assumptions["scenario_spread_bases"] == \
         plain.assumptions["scenario_spread_bases"]
-    assert abs(moved.assumptions["scenario_revenue_growth_spread"] - 0.02) > 0.0 \
-        or momentum_pct not in (-0.02, 0.02)
-    assert moved.assumptions["scenario_revenue_growth_spread"] != abs(
-        momentum_pct)
+    assert abs(momentum_pct) != pytest.approx(0.05)
 
 
 def test_momentum_cannot_become_a_scenario_spread():
@@ -3639,29 +3649,31 @@ def test_fundamental_score_cannot_become_a_scenario_spread(score):
         assert scored.assumptions[key] == plain.assumptions[key]
 
 
-def test_bank_financial_spread_stays_a_declared_model_parameter():
+def test_bank_financial_spread_needs_a_metric_specific_series():
+    # A declared constant is not a financial spread. Only a metric-specific
+    # financial series with five valid observations is.
     context = _bank_context()
+    context["historical_financial_series"] = [0.08, 0.10, 0.12, 0.09, 0.11]
     context["model_parameters"] = {"scenario_financial_growth_spread": 0.04}
     result = ForecastEngine().generate_forecast(
         1, 10, "BANK", context, data_cutoff_datetime=_CUTOFF)
-    assert result.assumptions["scenario_financial_growth_spread"] == 0.04
+    assert result.assumptions["scenario_financial_growth_spread"] != \
+        pytest.approx(0.04)
     assert result.assumptions["scenario_spread_bases"]["financial"] == \
-        "MODEL_PARAMETER"
+        "HISTORICAL_DISPERSION"
     chains = result.scenario_forecasts
-    assert chains.bear.net_profit == pytest.approx(1000.0 * 1.06 * 0.50)
-    assert chains.bull.net_profit == pytest.approx(1000.0 * 1.14 * 0.50)
+    assert chains.bear.net_profit < chains.base.net_profit < \
+        chains.bull.net_profit
 
 
 def test_volatility_evidence_only_acts_through_a_declared_sensitivity():
-    # Declared dispersion may move the declared parameter, by the caller's own
-    # factor and no other — this is the one channel through which an
-    # observation widens the spread.
+    # Volatility evidence is inert under Methodology v1, with or without a
+    # declared sensitivity: it is an observation, not a dispersion.
     context = _core_context(revenue_volatility=0.25, volatility_sensitivity=2.0)
     result = _core_forecast(context)
     assert result.assumptions["scenario_spread_bases"]["revenue"] == \
-        "VOLATILITY_EVIDENCE"
-    assert result.assumptions["scenario_revenue_growth_spread"] == \
-        pytest.approx(0.05 * 2.0 * 0.25)
+        "INSUFFICIENT_HISTORICAL_EVIDENCE"
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
 
 
 def test_volatility_without_a_declared_sensitivity_changes_nothing():
@@ -3964,14 +3976,23 @@ def test_late_nii_with_a_surviving_component_still_refuses_the_bank_chain():
     result = ForecastEngine().generate_forecast(
         1, 10, "BANK", context, data_cutoff_datetime=_CUTOFF)
     assert result.assumptions["pit_dropped_values"] == ["base_nii"]
-    for chain in (result.scenario_forecasts.bear,
-                  result.scenario_forecasts.base,
-                  result.scenario_forecasts.bull):
+    # The base needs no spread, so its own NII gate names the reason. The side
+    # scenarios additionally need a dispersion the financial series cannot
+    # supply (Methodology v1), so they fail closed on the spread.
+    base = result.scenario_forecasts.base
+    assert base.method == "INSUFFICIENT_DATA"
+    assert base.net_profit is None
+    assert base.eps is None
+    assert base.roe is None
+    assert base.assumptions["reason"] == "missing_nii_driver"
+    for chain in (result.scenario_forecasts.bear, result.scenario_forecasts.bull):
         assert chain.method == "INSUFFICIENT_DATA"
         assert chain.net_profit is None
         assert chain.eps is None
         assert chain.roe is None
-        assert chain.assumptions["reason"] == "missing_nii_driver"
+        assert chain.assumptions["reason"] == "insufficient_scenario_spread"
+        assert chain.assumptions["missing_spreads"] == \
+            ["scenario_financial_growth_spread"]
 
 
 # ==========================================================================
@@ -4078,3 +4099,322 @@ def test_production_path_without_attribution_declaration_keeps_eps_none(
     assert base.eps is None
     assert base.assumptions["eps_attributable_basis"] == \
         "UNVERIFIED_TOTAL_NET_PROFIT"
+
+# ==========================================================================
+# H1: Scenario Spread Methodology v1 — Historical Dispersion.
+# Each spread is the sample standard deviation (n-1) of its own metric's
+# eligible PIT-valid historical observations, in native units. Fewer than
+# five valid observations: no spread, side scenarios fail closed.
+# ==========================================================================
+
+# Growth observations read off these levels: 0.08, 0.10, 0.12, 0.09, 0.11.
+# Sample SD = sqrt(0.001 / 4) = 0.015811388300841896.
+_REVENUE_LEVELS_A = [100.0, 108.0, 118.8, 133.056, 145.03104, 160.9844544]
+_EXPECTED_DISPERSION_A = 0.015811388300841896
+# Operating margins 0.18, 0.20, 0.22, 0.19, 0.21: same dispersion as above.
+_OPERATING_PAIRS_A = [(18.0, 100.0), (20.0, 100.0), (22.0, 100.0),
+                      (19.0, 100.0), (21.0, 100.0)]
+# Net margins 0.08, 0.10, 0.12, 0.09, 0.11: same dispersion as above.
+_NET_PAIRS_A = [(8.0, 100.0), (10.0, 100.0), (12.0, 100.0),
+                (9.0, 100.0), (11.0, 100.0)]
+_FINANCIAL_GROWTHS_A = [0.08, 0.10, 0.12, 0.09, 0.11]
+
+
+def _dispersed_context(**overrides):
+    """Core context with all three non-financial dispersion series."""
+    context = _core_context(
+        historical_revenue_series=list(_REVENUE_LEVELS_A),
+        historical_operating_series=list(_OPERATING_PAIRS_A),
+        historical_net_series=list(_NET_PAIRS_A),
+    )
+    context.update(overrides)
+    return context
+
+
+# --- A. Historical Dispersion: sample SD, n-1, native units ------------------
+
+def test_historical_dispersion_is_sample_std_n_minus_1():
+    result = _core_forecast(_dispersed_context())
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(_EXPECTED_DISPERSION_A)
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "HISTORICAL_DISPERSION"
+    detail = result.assumptions["scenario_spread_details"]["revenue"]
+    assert detail["method"] == "SAMPLE_STD_N_MINUS_1"
+    assert detail["methodology_version"] == "HISTORICAL_DISPERSION_V1"
+    assert detail["series_key"] == "historical_revenue_series"
+    assert detail["minimum_observations"] == 5
+    assert detail["observation_count"] == 5
+    assert detail["observations"] == pytest.approx([0.08, 0.10, 0.12, 0.09, 0.11])
+
+
+# --- B. Minimum evidence: n < 5 fails closed ---------------------------------
+
+def test_four_observations_leave_the_spread_unavailable():
+    context = _core_context(
+        historical_revenue_series=[100.0, 108.0, 118.8, 133.056, 145.03104])
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "INSUFFICIENT_HISTORICAL_EVIDENCE"
+    detail = result.assumptions["scenario_spread_details"]["revenue"]
+    assert detail["observation_count"] == 4
+    assert detail["minimum_observations"] == 5
+    assert result.scenario_forecasts.base.revenue == pytest.approx(11000.0)
+    for chain in (result.scenario_forecasts.bear, result.scenario_forecasts.bull):
+        assert chain.method == "INSUFFICIENT_DATA"
+        assert chain.assumptions["reason"] == "insufficient_scenario_spread"
+
+
+def test_five_observations_supply_the_spread():
+    result = _core_forecast(_dispersed_context())
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(_EXPECTED_DISPERSION_A)
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "HISTORICAL_DISPERSION"
+
+
+# --- C. Zero dispersion: identical observations yield exactly 0.0 ------------
+
+def test_identical_observations_yield_zero_spread_not_refusal():
+    context = _core_context(
+        historical_revenue_series=[100.0, 110.0, 121.0, 133.1, 146.41, 161.051],
+        historical_operating_series=[(20.0, 100.0)] * 5,
+        historical_net_series=[(10.0, 100.0)] * 5,
+    )
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(0.0, abs=1e-9)
+    assert result.assumptions["scenario_operating_margin_spread"] == 0.0
+    assert result.assumptions["scenario_net_margin_spread"] == 0.0
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "HISTORICAL_DISPERSION"
+    chains = result.scenario_forecasts
+    assert chains.bear.method != "INSUFFICIENT_DATA"
+    assert chains.bear.revenue == pytest.approx(chains.base.revenue)
+    assert chains.bull.revenue == pytest.approx(chains.base.revenue)
+
+
+# --- D. PIT exclusion applies per series element ------------------------------
+
+def _pit_refs(n, late_index):
+    refs = []
+    for i in range(n):
+        refs.append(ForecastInputRef(
+            "REVENUE", report_version_id=1,
+            available_at=datetime(2025, 12, 1, tzinfo=timezone.utc),
+            source="normalized_financial_facts"))
+    refs[late_index] = ForecastInputRef(
+        "REVENUE", report_version_id=2,
+        available_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        source="normalized_financial_facts")
+    return refs
+
+
+def test_post_cutoff_series_element_is_excluded_from_dispersion():
+    levels = _REVENUE_LEVELS_A + [177.0825584]
+    plain = _core_forecast(_core_context(historical_revenue_series=levels))
+    assert plain.assumptions["scenario_spread_bases"]["revenue"] == \
+        "HISTORICAL_DISPERSION"
+    assert plain.assumptions["scenario_spread_details"]["revenue"][
+        "observation_count"] == 6
+    context = _core_context(
+        historical_revenue_series=levels,
+        historical_revenue_series_refs=_pit_refs(7, 3),
+    )
+    result = _core_forecast(context)
+    # The late level touches two transitions: six observations become four.
+    detail = result.assumptions["scenario_spread_details"]["revenue"]
+    assert detail["eligible_observations"] == 6
+    assert detail["observation_count"] == 4
+    assert 0.12 not in detail["observations"]
+    assert 0.09 not in detail["observations"]
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "INSUFFICIENT_HISTORICAL_EVIDENCE"
+
+
+# --- E. Invalid growth observations never enter dispersion --------------------
+
+def test_zero_base_and_sign_change_transitions_are_excluded():
+    levels = [100.0, 110.0, 0.0, 120.0, -132.0, -145.2, -159.72,
+              160.0, 176.0, 193.6, 212.96]
+    context = _core_context(historical_revenue_series=levels)
+    result = _core_forecast(context)
+    detail = result.assumptions["scenario_spread_details"]["revenue"]
+    # Eleven levels give ten transitions; the zero-base, zero-endpoint and
+    # sign-change transitions contribute nothing. The valid negative growths
+    # stay: exclusion follows the zero-safe rule, not the sign.
+    assert detail["observation_count"] == 6
+    assert detail["observations"] == pytest.approx(
+        [0.10, -0.10, -0.10, 0.10, 0.10, 0.10])
+    assert result.assumptions["scenario_spread_bases"]["revenue"] == \
+        "HISTORICAL_DISPERSION"
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(0.1032795555)
+
+
+# --- F. Metric isolation: no series is inherited or aliased --------------------
+
+def test_each_spread_disperses_only_its_own_series():
+    context = _core_context(
+        historical_revenue_series=list(_REVENUE_LEVELS_A),
+        historical_operating_series=[(15.0, 100.0), (25.0, 100.0),
+                                     (15.0, 100.0), (25.0, 100.0),
+                                     (15.0, 100.0)],
+    )
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(_EXPECTED_DISPERSION_A)
+    assert result.assumptions["scenario_operating_margin_spread"] == \
+        pytest.approx(0.0547722558)
+    assert result.assumptions["scenario_revenue_growth_spread"] != \
+        pytest.approx(result.assumptions["scenario_operating_margin_spread"])
+    revenue_obs = result.assumptions["scenario_spread_details"]["revenue"][
+        "observations"]
+    assert revenue_obs == pytest.approx([0.08, 0.10, 0.12, 0.09, 0.11])
+    operating_detail = result.assumptions["scenario_spread_details"][
+        "operating_margin"]
+    assert operating_detail["series_key"] == "historical_operating_series"
+
+
+def test_revenue_series_never_supplies_a_margin_spread():
+    context = _core_context(
+        historical_revenue_series=list(_REVENUE_LEVELS_A))
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(_EXPECTED_DISPERSION_A)
+    assert result.assumptions["scenario_operating_margin_spread"] is None
+    assert result.assumptions["scenario_net_margin_spread"] is None
+
+
+def test_margin_series_never_supplies_a_revenue_spread():
+    context = _core_context(
+        historical_operating_series=list(_OPERATING_PAIRS_A),
+        historical_net_series=list(_NET_PAIRS_A),
+    )
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
+    assert result.assumptions["scenario_operating_margin_spread"] == \
+        pytest.approx(_EXPECTED_DISPERSION_A)
+    assert result.assumptions["scenario_net_margin_spread"] == \
+        pytest.approx(_EXPECTED_DISPERSION_A)
+
+
+# --- G. No legacy constant is ever a production spread -------------------------
+
+def test_retired_constants_are_detected_and_never_applied():
+    context = _core_context()
+    context["model_parameters"] = {
+        "scenario_revenue_growth_spread": 0.05,
+        "scenario_operating_margin_spread": 0.02,
+        "scenario_net_margin_spread": 0.01,
+        "scenario_financial_growth_spread": 0.05,
+    }
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_revenue_growth_spread"] is None
+    assert result.assumptions["scenario_operating_margin_spread"] is None
+    assert result.assumptions["scenario_net_margin_spread"] is None
+    assert result.assumptions["scenario_financial_growth_spread"] is None
+    for key in ("revenue", "financial", "operating_margin", "net_margin"):
+        assert result.assumptions["scenario_spread_bases"][key] == \
+            "INSUFFICIENT_HISTORICAL_EVIDENCE"
+        assert result.assumptions["scenario_spread_evidence_notes"][key] == \
+            "RETIRED_SPREAD_CONSTANT_IGNORED"
+    detail = result.assumptions["scenario_spread_details"]["revenue"]
+    assert detail["method"] == "SAMPLE_STD_N_MINUS_1"
+    assert detail["observation_count"] == 0
+
+
+# --- H. Financial Growth protection ---------------------------------------------
+
+def test_financial_spread_is_never_aliased_to_revenue_growth():
+    context = _core_context(
+        historical_revenue_series=list(_REVENUE_LEVELS_A))
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_revenue_growth_spread"] == \
+        pytest.approx(_EXPECTED_DISPERSION_A)
+    assert result.assumptions["scenario_financial_growth_spread"] is None
+    assert result.assumptions["scenario_spread_bases"]["financial"] == \
+        "INSUFFICIENT_HISTORICAL_EVIDENCE"
+
+
+def test_short_financial_series_leaves_the_spread_unavailable():
+    context = _core_context(
+        historical_financial_series=[0.08, 0.10, 0.12])
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_financial_growth_spread"] is None
+    assert result.assumptions["scenario_spread_bases"]["financial"] == \
+        "INSUFFICIENT_HISTORICAL_EVIDENCE"
+
+
+def test_metric_specific_financial_series_supplies_the_spread():
+    context = _core_context(
+        historical_financial_series=list(_FINANCIAL_GROWTHS_A))
+    result = _core_forecast(context)
+    assert result.assumptions["scenario_financial_growth_spread"] == \
+        pytest.approx(_EXPECTED_DISPERSION_A)
+    assert result.assumptions["scenario_spread_bases"]["financial"] == \
+        "HISTORICAL_DISPERSION"
+    detail = result.assumptions["scenario_spread_details"]["financial"]
+    assert detail["series_key"] == "historical_financial_series"
+    assert detail["observation_count"] == 5
+
+
+# --- I. Determinism ---------------------------------------------------------------
+
+def test_dispersion_spreads_are_deterministic():
+    first = _core_forecast(_dispersed_context())
+    second = _core_forecast(_dispersed_context())
+    for key in ("scenario_revenue_growth_spread",
+                "scenario_operating_margin_spread",
+                "scenario_net_margin_spread",
+                "scenario_financial_growth_spread"):
+        assert first.assumptions[key] == second.assumptions[key]
+    assert first.assumptions["scenario_spread_details"] == \
+        second.assumptions["scenario_spread_details"]
+    for left, right in zip((first.scenario_forecasts.bear,
+                            first.scenario_forecasts.base,
+                            first.scenario_forecasts.bull),
+                           (second.scenario_forecasts.bear,
+                            second.scenario_forecasts.base,
+                            second.scenario_forecasts.bull)):
+        assert left.revenue == right.revenue
+        assert left.net_profit == right.net_profit
+        assert left.eps == right.eps
+
+
+# --- J. Scenario construction: Low = B - S, Base = B, High = B + S ---------------
+
+def test_side_scenarios_are_baseline_plus_minus_spread():
+    result = _core_forecast(_dispersed_context())
+    spread = result.assumptions["scenario_revenue_growth_spread"]
+    margin_spread = result.assumptions["scenario_operating_margin_spread"]
+    chains = result.scenario_forecasts
+    assert chains.base.revenue == pytest.approx(10000.0 * 1.10)
+    assert chains.bear.revenue == pytest.approx(10000.0 * (1.10 - spread))
+    assert chains.bull.revenue == pytest.approx(10000.0 * (1.10 + spread))
+    assert chains.bear.operating_margin == pytest.approx(
+        0.20 - margin_spread, abs=1e-6)
+    assert chains.base.operating_margin == pytest.approx(0.20)
+    assert chains.bull.operating_margin == pytest.approx(
+        0.20 + margin_spread, abs=1e-6)
+    assert chains.bear.eps < chains.base.eps < chains.bull.eps
+
+
+# --- Production path: a single seeded period cannot disperse -----------------------
+
+def test_production_path_with_single_period_fails_side_scenarios_closed(
+        production_db):
+    forecast = generate_and_persist_forecast(
+        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    assert forecast.assumptions["scenario_spread_methodology_version"] == \
+        "HISTORICAL_DISPERSION_V1"
+    assert forecast.assumptions["scenario_spread_min_observations"] == 5
+    assert forecast.assumptions["scenario_revenue_growth_spread"] is None
+    base = forecast.scenario_forecasts.base
+    assert base.revenue == pytest.approx(SEEDED_REVENUE, rel=1e-6)
+    for chain in (forecast.scenario_forecasts.bear,
+                  forecast.scenario_forecasts.bull):
+        assert chain.method == "INSUFFICIENT_DATA"
+        assert chain.assumptions["reason"] == "insufficient_scenario_spread"

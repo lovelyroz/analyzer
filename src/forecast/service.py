@@ -201,6 +201,54 @@ def _stage1_derived_context(
     return derived, refs
 
 
+def _stage1_dispersion_series(
+    periods: Sequence[Tuple[int, Any, Dict[str, float], List[ForecastInputRef]]],
+) -> Dict[str, Any]:
+    """Historical observation series for Methodology v1 dispersion.
+
+    Built from the same PIT-restricted period read as every other Stage 1
+    derivation, so each element cleared the cutoff before it could enter a
+    series. Revenue carries levels — the engine reads growth off consecutive
+    pairs through its own zero-safe rule. Margins carry ``(profit, revenue)``
+    pairs per period. A period missing a fact contributes a None placeholder
+    rather than being dropped, so a gap breaks revenue adjacency instead of
+    silently joining the periods around it.
+
+    Each element is paired with its own period provenance under the matching
+    ``*_refs`` key, so the engine's audit detail can name the eligible
+    observation basis. There is no NII/NAV history in the Stage 1 read, so
+    no financial series is built: the financial spread fails closed.
+    """
+    series: Dict[str, Any] = {}
+    if not periods:
+        return series
+    revenue_levels: List[Any] = []
+    revenue_refs: List[Any] = []
+    operating_pairs: List[Any] = []
+    operating_refs: List[Any] = []
+    net_pairs: List[Any] = []
+    net_refs: List[Any] = []
+    for _period_id, _end_date, facts, period_refs in periods:
+        by_key = {ref.fact_key: ref for ref in period_refs}
+        revenue = facts.get("REVENUE")
+        revenue_levels.append(revenue)
+        revenue_refs.append(by_key.get("REVENUE"))
+        operating = facts.get("OPERATING_PROFIT")
+        operating_pairs.append((operating, revenue))
+        operating_refs.append(
+            [by_key.get("OPERATING_PROFIT"), by_key.get("REVENUE")])
+        net = facts.get("NET_PROFIT")
+        net_pairs.append((net, revenue))
+        net_refs.append([by_key.get("NET_PROFIT"), by_key.get("REVENUE")])
+    series["historical_revenue_series"] = revenue_levels
+    series["historical_revenue_series_refs"] = revenue_refs
+    series["historical_operating_series"] = operating_pairs
+    series["historical_operating_series_refs"] = operating_refs
+    series["historical_net_series"] = net_pairs
+    series["historical_net_series_refs"] = net_refs
+    return series
+
+
 def _latest_publication(refs: Sequence[ForecastInputRef], *fact_keys: str
                         ) -> Optional[datetime]:
     """Latest publication time among the facts used to derive a value."""
@@ -308,6 +356,7 @@ def generate_and_persist_forecast(
         metric_codes=DEFAULT_FACT_METRICS,
     )
     derived, derived_refs = _stage1_derived_context(periods)
+    dispersion = _stage1_dispersion_series(periods)
     input_refs = [*input_refs, *derived_refs]
 
     history, actions = load_share_history(
@@ -322,6 +371,9 @@ def generate_and_persist_forecast(
     # them, so a caller's explicit declaration still wins and the derivation
     # only ever fills a gap Stage 1 can itself close.
     financial_context.update(derived)
+    # Methodology v1 dispersion reads the Stage 1 series by default; a caller
+    # series declared through ``extra_facts`` still wins, like every override.
+    financial_context.update(dispersion)
     if extra_facts:
         financial_context.update(extra_facts)
     if model_parameters:

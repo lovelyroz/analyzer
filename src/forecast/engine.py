@@ -27,14 +27,19 @@ NET_PROFIT_HIERARCHY = (
 )
 
 
-# The scenario spreads are declared Stage 5 model parameters. They are not
-# derived from Stage 4's ±2% direction band, from momentum, from the
-# Fundamental Score, from an arbitrary percentage of the forecast, or from a
-# volatility estimate the engine invented out of a missing observation. Each
-# one names its own basis on the record so an auditor can see it came from the
-# declared model and not from an evidence stream the spec isolates (spec §16,
-# §21, §23). The four keys below are the complete vocabulary of scenario
-# uncertainty in this engine: a spread that is not one of them does not exist.
+# Scenario Spread Methodology v1 (Stage 5 model-governance decision).
+#
+# Each spread is the sample standard deviation (n-1 denominator) of all
+# eligible PIT-valid historical observations of its own driver, in the
+# driver's native units. No rolling window, no weighting, no clipping, no
+# floor. Fewer than MIN_OBSERVATIONS valid observations means the spread is
+# unavailable and the scenario path fails closed — never a legacy constant.
+#
+# The four keys below are the complete vocabulary of scenario uncertainty in
+# this engine: a spread that is not one of them does not exist. None of them
+# is derived from Stage 4's ±2% direction band, from momentum, from the
+# Fundamental Score, from P/NAV, or from an arbitrary percentage (spec §16,
+# §21, §23). Each one names its own basis on the record.
 SCENARIO_SPREAD_KEYS = (
     "scenario_revenue_growth_spread",
     "scenario_operating_margin_spread",
@@ -42,12 +47,25 @@ SCENARIO_SPREAD_KEYS = (
     "scenario_financial_growth_spread",
 )
 
-DEFAULT_MODEL_PARAMETERS = {
-    "trend_adjustments": {},
+SCENARIO_SPREAD_METHODOLOGY_VERSION = "HISTORICAL_DISPERSION_V1"
+
+SCENARIO_SPREAD_MIN_OBSERVATIONS = 5
+
+SCENARIO_SPREAD_INSUFFICIENT = "INSUFFICIENT_HISTORICAL_EVIDENCE"
+
+# Retired Methodology v0 constants. These fixed values were never derived
+# from historical dispersion and hold no authority under Methodology v1.
+# They survive only so a stale caller declaration can be detected and
+# reported, never applied. Production never reads them as spreads.
+RETIRED_SCENARIO_SPREAD_DEFAULTS = {
     "scenario_revenue_growth_spread": 0.05,
     "scenario_operating_margin_spread": 0.02,
     "scenario_net_margin_spread": 0.01,
     "scenario_financial_growth_spread": 0.05,
+}
+
+DEFAULT_MODEL_PARAMETERS = {
+    "trend_adjustments": {},
     # Operating margin moves on its own evidence, not on revenue growth. The
     # base level is read from the margin hierarchy; this is the scenario spread
     # around it.
@@ -312,9 +330,9 @@ class ForecastEngine:
     # ------------------------------------------------------------------
 
     # Dispersion is never invented from a missing volatility observation: the
-    # engine names the evidence it actually used, and reports the absence when
-    # there is none. The defaults below are the already-established Stage 5
-    # model parameters, not new arbitrary spreads.
+    # engine names the dispersion it actually computed, and reports the
+    # absence when the historical evidence is short. The keys below are a
+    # retired Methodology v0 channel; they no longer move any spread.
     _UNCERTAINTY_EVIDENCE_KEYS = (
         "revenue_volatility",
         "historical_revenue_volatility",
@@ -324,74 +342,277 @@ class ForecastEngine:
 
     @classmethod
     def _uncertainty_evidence(cls, context: Dict[str, Any]) -> Optional[float]:
-        """An observed dispersion figure the caller declared, or nothing.
+        """A caller-declared volatility observation, or nothing.
 
-        Stage 5 never manufactures dispersion from thin air and never derives a
-        spread from missing data. ``None`` means the evidence is unavailable and
-        the caller must accept the model's declared default spread as the only
-        dispersion there is.
+        Retained only so the audit trail can record what the caller declared.
+        Under Methodology v1 it never becomes a spread and never scales one:
+        ``None`` means the observation is unavailable, and a present value is
+        inert without a dispersion basis.
         """
         return cls._baseline_value(context, *cls._UNCERTAINTY_EVIDENCE_KEYS)
+
+    @staticmethod
+    def _sample_std(values: List[float]) -> Optional[float]:
+        """Sample standard deviation (n-1 denominator), or None when empty.
+
+        Deterministic: pure arithmetic over the given order, no clock, no
+        randomness, no row ordering. A single observation has no dispersion
+        to estimate, so it yields None and the caller applies the minimum
+        evidence rule. Identical observations yield exactly 0.0.
+        """
+        n = len(values)
+        if n == 0:
+            return None
+        if n == 1:
+            return None
+        mean = sum(values) / n
+        variance = sum((v - mean) ** 2 for v in values) / (n - 1)
+        return float(variance ** 0.5) if variance > 0 else 0.0
+
+    # Each spread disperses only its own series key: revenue history can
+    # never produce a margin spread, and nothing produces the financial
+    # spread unless a metric-specific financial series was declared.
+    _SPREAD_SERIES_KEYS = {
+        "scenario_revenue_growth_spread": "historical_revenue_series",
+        "scenario_operating_margin_spread": "historical_operating_series",
+        "scenario_net_margin_spread": "historical_net_series",
+        "scenario_financial_growth_spread": "historical_financial_series",
+    }
+
+    @classmethod
+    def _series_refs(cls, entry: Any) -> List[ForecastInputRef]:
+        """Provenance attached to one series element, if any.
+
+        An entry is undeclared (provenance is opt-in, the element stands),
+        one ref or mapping, or a list of them — a margin pair names both its
+        profit and its revenue. Anything else declares nothing.
+        """
+        if entry is None:
+            return []
+        if isinstance(entry, ForecastInputRef):
+            return [entry]
+        if isinstance(entry, dict):
+            try:
+                return [ForecastInputRef.from_mapping(entry)]
+            except KeyError:
+                return []
+        if isinstance(entry, (list, tuple)):
+            refs: List[ForecastInputRef] = []
+            for item in entry:
+                refs.extend(cls._series_refs(item))
+            return refs
+        return []
+
+    @classmethod
+    def _element_refs(cls, series: List[Any], ref_entries: Any
+                      ) -> List[List[ForecastInputRef]]:
+        """One ref list per series element, in series order."""
+        if not isinstance(ref_entries, (list, tuple)):
+            return [[] for _ in series]
+        element_refs: List[List[ForecastInputRef]] = []
+        for i, _entry in enumerate(series):
+            if i < len(ref_entries):
+                element_refs.append(cls._series_refs(ref_entries[i]))
+            else:
+                element_refs.append([])
+        return element_refs
+
+    @staticmethod
+    def _series_element_pit_valid(refs: List[ForecastInputRef],
+                                  cutoff: datetime) -> bool:
+        """A series element stands unless its own provenance is post-cutoff.
+
+        The scalar PIT guard's semantics, applied per element: undeclared
+        provenance is left in place, a declared publication later than the
+        cutoff excludes the element. Reuses ForecastInputRef and
+        normalize_datetime — no second PIT implementation.
+        """
+        for ref in refs:
+            if ref.available_at is not None and \
+                    normalize_datetime(ref.available_at) > normalize_datetime(cutoff):
+                return False
+        return True
+
+    @classmethod
+    def _revenue_growth_observations(
+        cls, levels: List[Any], pit_valid: List[bool]
+    ) -> List[float]:
+        """Valid historical revenue-growth observations, in series order.
+
+        The series carries revenue *levels*; each consecutive pair of
+        PIT-valid levels is read through ``_safe_growth_rate``, so a
+        transition the forecast path refuses to compute — missing endpoint,
+        zero base, sign change — never enters dispersion either. A level
+        excluded by PIT excludes both transitions touching it.
+        """
+        observations: List[float] = []
+        for i in range(len(levels) - 1):
+            if not pit_valid[i] or not pit_valid[i + 1]:
+                continue
+            prior = levels[i] if isinstance(levels[i], (int, float)) else None
+            current = levels[i + 1] if isinstance(levels[i + 1], (int, float)) \
+                else None
+            growth = cls._safe_growth_rate(prior, current)
+            if growth is not None:
+                observations.append(growth)
+        return observations
+
+    @staticmethod
+    def _margin_observations(pairs: List[Any],
+                             pit_valid: List[bool]) -> List[float]:
+        """Valid historical margin observations, in series order.
+
+        Each item is a ``(profit, revenue)`` pair for one historical period;
+        only PIT-valid pairs with present profit over present non-zero revenue
+        contribute — the same profit-over-revenue reading the margin
+        hierarchy uses.
+        """
+        observations: List[float] = []
+        for item, valid in zip(pairs, pit_valid):
+            if not valid:
+                continue
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                continue
+            profit, revenue = item
+            if not isinstance(profit, (int, float)) or \
+                    not isinstance(revenue, (int, float)):
+                continue
+            if revenue == 0:
+                continue
+            observations.append(profit / revenue)
+        return observations
 
     @classmethod
     def _scenario_spread(
         cls,
-        params: Dict[str, Any],
         key: str,
-        fallback_key: str,
         evidence: Optional[float],
         context: Dict[str, Any],
-    ) -> tuple[float, str, Optional[str]]:
-        """Resolve one scenario spread and name where it came from.
+        cutoff: Optional[datetime] = None,
+    ) -> tuple[Optional[float], str, Optional[str], Dict[str, Any]]:
+        """Resolve one scenario spread from historical dispersion.
 
-        The value follows the established resolution unchanged: the caller's
-        declared model parameter when it names this key, otherwise the model's
-        own value for the slot. What this method adds is a truthful basis:
-        ``MODEL_PARAMETER`` only when the caller declared a value for this
-        key, ``MODEL_DEFAULT`` when the model's own default stands. No Stage
-        4 ±2% direction band, no momentum reading and no Fundamental Score is
-        consulted at any point (spec §16, §21, §23).
+        Methodology v1: the spread is the sample standard deviation of the
+        metric's own eligible PIT-valid historical observations, read from
+        that metric's own series key only (``_SPREAD_SERIES_KEYS``) — never
+        inherited, never aliased. Revenue carries levels, margins carry
+        ``(profit, revenue)`` pairs, and the financial spread disperses only
+        a declared metric-specific financial-growth series. No Stage 4 ±2%
+        direction band, no momentum reading, no Fundamental Score and no
+        P/NAV is consulted at any point (spec §16, §21, §23).
 
-        A declared volatility observation may widen or narrow either base —
-        through the caller's own declared sensitivity, never through an
-        invented multiplier — and missing evidence leaves the base untouched
-        rather than being filled with a fabricated dispersion estimate.
+        Series elements may carry their own provenance: a parallel
+        ``historical_<metric>_series_refs`` list of refs, mappings or ref
+        lists (one entry per series element, margin pairs naming both legs).
+        An element whose own provenance is post-cutoff is excluded from
+        dispersion — the caller's declared PIT semantics, applied per
+        element rather than reimplemented.
 
-        Returns the spread, its basis, and the evidence stream that did *not*
-        contribute, so a stored record can always say which of the model's own
-        parameters a scenario moved away from and which isolated inputs it
-        ignored.
+        Returns the spread (None when unavailable), its basis, a note, and
+        an audit detail dict (methodology version, series key, observation
+        count, eligible basis, cutoff).
+        Bases: ``HISTORICAL_DISPERSION`` when n >= 5 observations disperse,
+        ``INSUFFICIENT_HISTORICAL_EVIDENCE`` when evidence is short — the
+        spread is None and the caller fails closed. A caller-declared
+        ``model_parameters`` entry naming this key is never applied as a
+        production spread; when it carries a retired Methodology v0 constant
+        it is reported as ``RETIRED_SPREAD_CONSTANT_IGNORED`` so a stale
+        declaration is visible rather than silently honoured.
+
+        The legacy volatility-scaling channel is closed under Methodology v1:
+        a caller ``volatility_sensitivity`` without a dispersion basis cannot
+        move the spread, and is reported as
+        ``VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY`` only when no
+        dispersion basis exists to name instead.
         """
         if key not in SCENARIO_SPREAD_KEYS:
             raise ValueError(f"unknown scenario spread parameter: {key!r}")
-        fallback = float(params.get(fallback_key, 0.0))
-        parameter = params.get(key)
-        if parameter is None or not isinstance(parameter, (int, float)):
-            # No usable value for this key, so the model's own value for the
-            # slot stands. Nothing else is consulted: no Stage 4 band, no
-            # momentum reading and no Fundamental Score can fill that slot.
-            return fallback, "MODEL_DEFAULT", None
-        # The merged dict always carries the model's own default, so a usable
-        # merged value alone cannot prove the caller declared it. Only raw
-        # caller membership makes a MODEL_PARAMETER; an inherited default
-        # stands as MODEL_DEFAULT. Evidence scaling is unaffected: it moves
-        # whichever base stands, and names itself.
+        series_key = cls._SPREAD_SERIES_KEYS[key]
         raw = context.get("model_parameters")
         raw_value = raw.get(key) if isinstance(raw, dict) else None
-        caller_declared = isinstance(raw_value, (int, float))
+        retired_note = None
+        if isinstance(raw_value, (int, float)) and (
+            RETIRED_SCENARIO_SPREAD_DEFAULTS.get(key) == raw_value
+        ):
+            retired_note = "RETIRED_SPREAD_CONSTANT_IGNORED"
+        detail: Dict[str, Any] = {
+            "method": "SAMPLE_STD_N_MINUS_1",
+            "methodology_version": SCENARIO_SPREAD_METHODOLOGY_VERSION,
+            "series_key": series_key,
+            "cutoff": cutoff.isoformat() if cutoff is not None else None,
+            "minimum_observations": SCENARIO_SPREAD_MIN_OBSERVATIONS,
+        }
+        series = context.get(series_key)
+        ref_entries = context.get(series_key + "_refs")
+        observations: List[float] = []
+        eligible = 0
+        if isinstance(series, (list, tuple)):
+            series_list = list(series)
+            element_refs = cls._element_refs(series_list, ref_entries)
+            pit_valid = [
+                cls._series_element_pit_valid(refs, cutoff)
+                if cutoff is not None else True
+                for refs in element_refs
+            ]
+            eligible = sum(1 for valid in pit_valid if valid)
+            if key == "scenario_revenue_growth_spread":
+                observations = cls._revenue_growth_observations(
+                    series_list, pit_valid)
+            elif key in ("scenario_operating_margin_spread",
+                         "scenario_net_margin_spread"):
+                observations = cls._margin_observations(series_list, pit_valid)
+            else:
+                observations = [
+                    float(item) for item, valid in zip(series_list, pit_valid)
+                    if valid and isinstance(item, (int, float))
+                ]
+        detail["eligible_observations"] = eligible
+        detail["observation_count"] = len(observations)
+        detail["observations"] = list(observations)
+        detail["series_provenance"] = [
+            {
+                "pit_valid": valid,
+                "refs": [
+                    {"fact_key": ref.fact_key,
+                     "report_version_id": ref.report_version_id,
+                     "available_at": ref.available_at.isoformat()
+                     if ref.available_at is not None else None,
+                     "source": ref.source}
+                    for ref in refs
+                ],
+            }
+            for refs, valid in zip(element_refs, pit_valid)
+        ] if isinstance(series, (list, tuple)) else []
+        if len(observations) >= SCENARIO_SPREAD_MIN_OBSERVATIONS:
+            spread = cls._sample_std(observations)
+            if spread is not None:
+                detail["spread"] = spread
+                return spread, "HISTORICAL_DISPERSION", retired_note, detail
+        # No dispersion basis: a caller volatility observation can never
+        # substitute for one. The note names why it stayed inert.
         if evidence is None:
-            if caller_declared:
-                return float(parameter), "MODEL_PARAMETER", None
-            return float(parameter), "MODEL_DEFAULT", None
+            return None, SCENARIO_SPREAD_INSUFFICIENT, retired_note, detail
         sensitivity = ForecastEngine._number(context, "volatility_sensitivity")
-        if not isinstance(sensitivity, (int, float)) or sensitivity <= 0:
-            if caller_declared:
-                return float(parameter), "MODEL_PARAMETER", \
-                    "VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY"
-            return float(parameter), "MODEL_DEFAULT", \
-                "VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY"
-        return float(parameter) * float(sensitivity) * float(evidence), \
-            "VOLATILITY_EVIDENCE", None
+        if isinstance(sensitivity, (int, float)) and sensitivity > 0:
+            note = retired_note or "VOLATILITY_EVIDENCE_IGNORED_UNDER_V1"
+        else:
+            note = (retired_note
+                    or "VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY")
+        return None, SCENARIO_SPREAD_INSUFFICIENT, note, detail
+
+    @staticmethod
+    def _insufficient_scenario(missing_spreads: List[str]) -> SingleForecastChain:
+        """A side scenario refused for lack of dispersion evidence.
+
+        The base needs no spread, so it stands on its own; bear and bull
+        cannot be drawn without one. The chain names the missing spreads
+        rather than collapsing silently.
+        """
+        return SingleForecastChain(
+            method="INSUFFICIENT_DATA",
+            assumptions={"reason": "insufficient_scenario_spread",
+                         "missing_spreads": list(missing_spreads)},
+        )
 
     # ------------------------------------------------------------------
     # Operational FX (spec §30)
@@ -877,23 +1098,24 @@ class ForecastEngine:
                 "would be dated before the information it claims to see"
             )
 
-        scenario_spread, spread_basis, spread_note = self._scenario_spread(
-            params, "scenario_revenue_growth_spread", "scenario_revenue_growth_spread",
-            self._uncertainty_evidence(context), context)
-        financial_spread, financial_basis, financial_note = self._scenario_spread(
-            params, "scenario_financial_growth_spread",
-            "scenario_revenue_growth_spread", self._uncertainty_evidence(context),
-            context)
-        margin_spread, margin_basis, margin_note = self._scenario_spread(
-            params, "scenario_operating_margin_spread",
-            "scenario_operating_margin_spread", None, context)
-        net_margin_spread, net_margin_basis, net_margin_note = self._scenario_spread(
-            params, "scenario_net_margin_spread", "scenario_net_margin_spread",
-            None, context)
+        scenario_spread, spread_basis, spread_note, revenue_detail = \
+            self._scenario_spread(
+                "scenario_revenue_growth_spread",
+                self._uncertainty_evidence(context), context, cutoff)
+        financial_spread, financial_basis, financial_note, financial_detail = \
+            self._scenario_spread(
+                "scenario_financial_growth_spread",
+                self._uncertainty_evidence(context), context, cutoff)
+        margin_spread, margin_basis, margin_note, margin_detail = \
+            self._scenario_spread(
+                "scenario_operating_margin_spread", None, context, cutoff)
+        net_margin_spread, net_margin_basis, net_margin_note, net_detail = \
+            self._scenario_spread(
+                "scenario_net_margin_spread", None, context, cutoff)
         # Each spread carries its own basis, so an auditor never has to infer
-        # which model parameter a scenario moved away from. The keys are the
-        # model's complete spread vocabulary: anything not named here was never
-        # consulted.
+        # where a scenario's dispersion came from. The keys are the model's
+        # complete spread vocabulary: anything not named here was never
+        # consulted. Methodology is HISTORICAL_DISPERSION_V1 or nothing.
         spread_bases = {
             "revenue": spread_basis,
             "financial": financial_basis,
@@ -907,6 +1129,12 @@ class ForecastEngine:
                 ("operating_margin", margin_note),
                 ("net_margin", net_margin_note),
             ) if note is not None
+        }
+        spread_details = {
+            "revenue": revenue_detail,
+            "financial": financial_detail,
+            "operating_margin": margin_detail,
+            "net_margin": net_detail,
         }
         margin_adjustment = float(params.get("operating_margin_adjustment", 0.0))
 
@@ -938,14 +1166,14 @@ class ForecastEngine:
             "fx_ladder": self._fx_ladder_snapshot(context, resolved_fx),
             "uncertainty_evidence": self._uncertainty_evidence(context),
             "uncertainty_basis": spread_basis,
+            "scenario_spread_methodology_version": SCENARIO_SPREAD_METHODOLOGY_VERSION,
+            "scenario_spread_min_observations": SCENARIO_SPREAD_MIN_OBSERVATIONS,
             "scenario_revenue_growth_spread": scenario_spread,
             "scenario_financial_growth_spread": financial_spread,
             "scenario_operating_margin_spread": margin_spread,
             "scenario_net_margin_spread": net_margin_spread,
             "scenario_spread_bases": spread_bases,
-            "scenario_spread_model_parameters": {
-                key: params.get(key) for key in SCENARIO_SPREAD_KEYS
-            },
+            "scenario_spread_details": spread_details,
             "scenario_spread_evidence_notes": spread_notes,
             # The evidence streams Stage 5 must never read as a spread. Naming
             # them here means a reviewer can confirm they were ignored rather
@@ -1050,8 +1278,6 @@ class ForecastEngine:
                         else "FLAT_NO_DECLARED_GROWTH")
 
                 base_growth += trend_adj
-                bear_growth = base_growth - scenario_spread
-                bull_growth = base_growth + scenario_spread
 
                 scenario_context = dict(context)
                 scenario_context.update({
@@ -1068,13 +1294,29 @@ class ForecastEngine:
                 if low_base_control:
                     scenario_context["low_base"] = True
 
-                bear = self._non_financial_scenario(scenario_context, baseline_revenue, baseline_method, bear_growth,
-                                                    -margin_spread, -net_margin_spread, "BEAR", trend_adj)
                 base = self._non_financial_scenario(scenario_context, baseline_revenue, baseline_method, base_growth,
                                                     0.0, 0.0, "BASE", trend_adj,
                                                     margin_adjustment_base=margin_adjustment)
-                bull = self._non_financial_scenario(scenario_context, baseline_revenue, baseline_method, bull_growth,
-                                                    margin_spread, net_margin_spread, "BULL", trend_adj)
+                # Bear and bull need every spread the branch disperses: the
+                # base needs none, so it stands on its own. Missing dispersion
+                # refuses the side scenario rather than inventing one.
+                missing: List[str] = []
+                if scenario_spread is None:
+                    missing.append("scenario_revenue_growth_spread")
+                if margin_spread is None:
+                    missing.append("scenario_operating_margin_spread")
+                if net_margin_spread is None:
+                    missing.append("scenario_net_margin_spread")
+                if missing:
+                    bear = self._insufficient_scenario(missing)
+                    bull = self._insufficient_scenario(missing)
+                else:
+                    bear_growth = base_growth - scenario_spread
+                    bull_growth = base_growth + scenario_spread
+                    bear = self._non_financial_scenario(scenario_context, baseline_revenue, baseline_method, bear_growth,
+                                                        -margin_spread, -net_margin_spread, "BEAR", trend_adj)
+                    bull = self._non_financial_scenario(scenario_context, baseline_revenue, baseline_method, bull_growth,
+                                                        margin_spread, net_margin_spread, "BULL", trend_adj)
                 scenarios = ScenarioForecastResult(
                     replace(bear, scenario="BEAR", forecast_horizon=horizon),
                     replace(base, scenario="BASE", forecast_horizon=horizon),
@@ -1094,7 +1336,7 @@ class ForecastEngine:
             if nii_growth is None:
                 nii_growth = 0.0
             nii_growth += trend_adj
-            bear_g, base_g, bull_g = nii_growth - financial_spread, nii_growth, nii_growth + financial_spread
+            base_g = nii_growth
             bank_conversion = self._number(
                 context, "bank_net_profit_nii_conversion")
             bank_forecast_np = self._number(context, "forecast_net_profit")
@@ -1126,11 +1368,20 @@ class ForecastEngine:
                     eps=eps,
                 )
 
-            scenarios = ScenarioForecastResult(
-                _bank_chain(bear_g, "BEAR"),
-                _bank_chain(base_g, "BASE"),
-                _bank_chain(bull_g, "BULL"),
-            )
+            if financial_spread is None:
+                scenarios = ScenarioForecastResult(
+                    self._insufficient_scenario(
+                        ["scenario_financial_growth_spread"]),
+                    _bank_chain(base_g, "BASE"),
+                    self._insufficient_scenario(
+                        ["scenario_financial_growth_spread"]),
+                )
+            else:
+                scenarios = ScenarioForecastResult(
+                    _bank_chain(base_g - financial_spread, "BEAR"),
+                    _bank_chain(base_g, "BASE"),
+                    _bank_chain(base_g + financial_spread, "BULL"),
+                )
 
         else:
             baseline_method = "HOLDING_SPECIALIZED"
@@ -1141,7 +1392,7 @@ class ForecastEngine:
             if nav_growth is None:
                 nav_growth = 0.00
             nav_growth += trend_adj
-            bear_g, base_g, bull_g = nav_growth - financial_spread, nav_growth, nav_growth + financial_spread
+            base_g = nav_growth
             shares = self._share_count(context)
             conversion = self._number(context, "holding_net_profit_nav_conversion")
             holding_forecast_np = self._number(context, "forecast_net_profit")
@@ -1169,11 +1420,20 @@ class ForecastEngine:
                     eps=eps,
                 )
 
-            scenarios = ScenarioForecastResult(
-                _holding_chain(bear_g, "BEAR"),
-                _holding_chain(base_g, "BASE"),
-                _holding_chain(bull_g, "BULL"),
-            )
+            if financial_spread is None:
+                scenarios = ScenarioForecastResult(
+                    self._insufficient_scenario(
+                        ["scenario_financial_growth_spread"]),
+                    _holding_chain(base_g, "BASE"),
+                    self._insufficient_scenario(
+                        ["scenario_financial_growth_spread"]),
+                )
+            else:
+                scenarios = ScenarioForecastResult(
+                    _holding_chain(base_g - financial_spread, "BEAR"),
+                    _holding_chain(base_g, "BASE"),
+                    _holding_chain(base_g + financial_spread, "BULL"),
+                )
 
         # Scenario identity and horizon are recorded on every chain so a frozen
         # record can state which scenario it belongs to without external state.

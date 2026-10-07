@@ -2995,3 +2995,44 @@ H1 UNRESOLVED — Stage 5 remains NOT FROZEN.
    magnitudes regardless of their correct MODEL_DEFAULT treatment.
 
 H1 UNRESOLVED — Stage 5 remains NOT FROZEN.
+====================================================================
+
+## H1 Implementation — Scenario Spread Methodology v1 (Historical Dispersion)
+
+This section records a Stage 5 model-governance decision taken to resolve H1. It does NOT claim the repository previously contained this methodology: the prior H1 remediation section above established that no authoritative spread basis existed (outcome C), and this section establishes one now, by decision, implementation, and test.
+
+1. Methodology specification (HISTORICAL_DISPERSION_V1)
+
+   - Spread = sample standard deviation of all eligible PIT-valid historical observations of the driver, s = sqrt(Σ(xi − x̄)² / (n − 1)), in the driver's native units. No probability, no distributional assumption.
+   - No rolling window. No recency weighting. No arbitrary weighting. No winsorization, no clipping, no ad-hoc outlier removal. No spread floor.
+   - Minimum evidence: n ≥ 5 valid observations. n < 5 → the spread is unavailable (INSUFFICIENT_HISTORICAL_EVIDENCE); the base scenario stands (it needs no spread) and bear/bull fail closed as INSUFFICIENT_DATA with reason "insufficient_scenario_spread" and the missing spread keys named. Fail closed rather than invent evidence.
+   - Metric-specific series, never aliased: scenario_revenue_growth_spread ← historical_revenue_series (levels; consecutive PIT-valid pairs read through the engine's own zero-safe growth rule, so missing endpoints, zero bases, and sign changes never enter dispersion); scenario_operating_margin_spread ← historical_operating_series ((profit, revenue) pairs, profit over non-zero revenue); scenario_net_margin_spread ← historical_net_series (same pair rule); scenario_financial_growth_spread ← historical_financial_series only (a declared metric-specific financial-growth series). No series is inherited, reused, or synthesized from another metric. Financial Growth is never aliased to Revenue Growth.
+   - PIT: each series element is gated by its own provenance (parallel historical_<metric>_series_refs), reusing ForecastInputRef and normalize_datetime — the existing scalar PIT guard semantics applied per element, no second PIT implementation. Undeclared provenance stands; declared post-cutoff provenance excludes the element (for revenue, a level excluded by PIT excludes both transitions touching it). The Stage 1 period read feeding the series is itself cutoff-restricted.
+   - Scenario construction: Low = Baseline − Spread, Base = Baseline, High = Baseline + Spread (absolute native-unit offsets, not relative multipliers). Margin legs apply the margin spreads symmetrically around the baseline margins.
+   - Retired Methodology v0 constants: 0.05 / 0.02 / 0.01 / 0.05 survive only as RETIRED_SCENARIO_SPREAD_DEFAULTS for detection — a caller declaration carrying one is reported as RETIRED_SPREAD_CONSTANT_IGNORED, never applied. The legacy volatility-scaling channel is closed: volatility evidence with or without a declared sensitivity cannot move any spread (reported VOLATILITY_EVIDENCE_IGNORED_UNDER_V1 / VOLATILITY_EVIDENCE_WITHOUT_DECLARED_SENSITIVITY).
+   - Determinism: pure arithmetic over given order; no clock, no randomness, no row ordering.
+   - Auditability: every forecast records scenario_spread_methodology_version, scenario_spread_min_observations, scenario_spread_details (per spread: method SAMPLE_STD_N_MINUS_1, methodology version, series key, cutoff, minimum/eligible/observation counts, the observations themselves, the spread, per-element series provenance), scenario_spread_bases, and scenario_spread_evidence_notes. Excluded inputs (Stage 4 ±2% band, momentum, Fundamental Score, P/NAV) are named as excluded.
+
+2. Production implementation
+
+   - src/forecast/engine.py: SCENARIO_SPREAD_KEYS vocabulary, SCENARIO_SPREAD_METHODOLOGY_VERSION, SCENARIO_SPREAD_MIN_OBSERVATIONS = 5, RETIRED_SCENARIO_SPREAD_DEFAULTS, _sample_std, _SPREAD_SERIES_KEYS, _series_refs / _element_refs / _series_element_pit_valid, _revenue_growth_observations, _margin_observations, rewritten _scenario_spread (4-tuple: spread, basis, note, audit detail), _insufficient_scenario; all four call sites rewired; volatility channel retired; base-always-stands / sides-fail-closed construction for non-financial, bank, and holding branches.
+   - src/forecast/service.py: _stage1_dispersion_series builds the revenue-level and margin-pair series with per-period provenance from the same PIT-restricted read; no financial series exists in the Stage 1 read, so the financial spread fails closed on the production path by construction.
+   - DEFAULT_MODEL_PARAMETERS no longer carries any scenario spread; the production Scenario Spread path obtains its spread exclusively from Historical Dispersion.
+
+3. Tests
+
+   - 27 pre-existing tests encoding retired v0 semantics updated to v1 (fail-closed sides, None spreads, retired-constant detection, margin-leg tolerances); late-NII test now distinguishes the base's own missing_nii_driver gate from the sides' insufficient_scenario_spread refusal.
+   - 16 new H1 methodology tests (A–J): sample-SD n−1 value, n<5 vs n≥5 boundary, zero dispersion (exactly 0.0, chains stand), per-element PIT exclusion (7 levels → 4 observations), zero-base/sign-change exclusion via the zero-safe rule, metric isolation (three tests), retired-constant detection on all four keys, Financial Growth protection (three tests: never aliased, short series unavailable, metric-specific series supplies), determinism, Low=B−S/Base=B/High=B+S construction, and a production-path test proving a single seeded period fails the side scenarios closed.
+   - Results: Stage 5 file 332 passed; full suite 695 passed, 2 skipped (pre-existing env skips), 0 failed.
+
+4. Stage 4 firewall
+
+   - No Stage 4 file modified (git status confirms: only src/forecast/engine.py, src/forecast/service.py, src/tests/test_stage5_forecast.py changed). Stage 4 remains adapter-only; its ±2% band is named in scenario_spread_excluded_inputs and covered by isolation tests.
+
+5. Completion criteria (all 11 met)
+
+   (1) Methodology documented here and in code comments. (2) Production uses it at all four call sites. (3) Old defaults are retired, detected, never applied — no silent fallback. (4) PIT preserved and extended per element with existing machinery. (5) Metric isolation enforced by _SPREAD_SERIES_KEYS and tested. (6) Financial Growth never inherits; fails closed without its own series. (7) n<5 fails closed with named reason. (8) Tests A–J committed. (9) 332 Stage 5 + 695 full-suite green. (10) Stage 4 untouched. (11) No unrelated behavior changed (diff limited to the three files above).
+
+H1 Scenario Spread Authority: RESOLVED — Historical Dispersion Methodology v1.
+
+Stage 5 Freeze Status: NOT FROZEN — this task resolves H1; it does not itself authorize skipping the final independent Stage 5 freeze validation.
