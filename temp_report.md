@@ -3189,3 +3189,187 @@ last Stage 4 change predates H1; git diff HEAD --stat -- src/trend/ is empty; th
 STAGE 5 FROZEN
 ====================================================================
 
+# REPORT — Stage 6 Prompt 17
+**Preflight + Methodology Authority Audit — `analyzer` — READ-ONLY، بدون هیچ تغییری در کد**
+
+## ۱. وضعیت فعلی پیاده‌سازی Stage 6
+
+پیاده‌سازی موجود است ولی **ناقص و بدون persistence** است:
+
+| مسیر | وضعیت |
+|---|---|
+| [src/evaluation/schema.py](src/evaluation/schema.py) | موجود — دو dataclass درون‌حافظه‌ای: `ForecastEvaluationResult` و `ReliabilityAssessment` |
+| [src/evaluation/metrics.py](src/evaluation/metrics.py) | موجود — توابع error/MAPE/Bias/regime/confidence/score |
+| [src/evaluation/engine.py](src/evaluation/engine.py) | موجود — `ForecastEvaluationEngine` با `build_evaluation`، `select_point_in_time_actual`، `seasonal_naive_forecast`، `evaluate_forecasts`، `calibration_model_version` |
+| [src/evaluation/__init__.py](src/evaluation/__init__.py) | موجود ولی exportهایش قدیمی است (`calculate_pe` و...) و با importهای تست هم‌خوان نیست |
+| [src/tests/test_stage6_evaluation.py](src/tests/test_stage6_evaluation.py) | موجود — **۱۱ تست، هر ۱۱ پاس** (فقط ۳ هشدار `utcnow` که طبق handoff بلاکر نیست) |
+
+موارد **غایب**:
+1. هیچ مدل/مایگریشن دیتابیسی برای نتایج evaluation وجود ندارد (در `src/models` و `src/migrations` هیچ matchای برای evaluation نیست — فقط جدول `forecast_versions` متعلق به Stage 5 در [src/models/forecast.py](src/models/forecast.py) هست).
+2. هیچ اتصالی به خروجی Stage 5 نیست — هیچ مصرف‌کننده‌ای برای `ForecastRecord` / `ForecastVersionRepository` وجود ندارد.
+3. هیچ لایه‌ی query برای خواندن Actual از دیتابیس نیست (`select_point_in_time_actual` فقط candidateهای آماده از caller می‌گیرد).
+4. هیچ سازنده‌ی تاریخچه برای baseline نیست (`seasonal_naive_forecast` فقط history آماده + lag از caller می‌گیرد).
+5. هیچ handlingای برای data-quality states در کل `src/evaluation/` نیست (grep برای MISSING/ESTIMATED/SUSPICIOUS/UNMAPPED/RESTATED → صفر match).
+6. هیچ OOS runner یا persistence برای calibration نیست.
+
+## ۲. زیرساخت قابل‌استفاده مجدد (REUSABLE INFRASTRUCTURE)
+
+از Stage 5 و Stage 1، فقط به‌صورت read-only و بدون تغییر Stage 5:
+- `CompanyForecastResult` / `ForecastRecord` (رکورد immutable با `data_cutoff_datetime`، `input_refs`، `key()`) — [src/forecast/schema.py](src/forecast/schema.py)
+- `ForecastRecordRepository` (DB-backed روی جدول `forecast_versions`، با `read_at_cutoff`، `pit_violations`، `revision_trend`) و `ForecastVersionStore` درون‌حافظه‌ای
+- `ForecastInputRef` + `normalize_datetime` + `filter_pit_inputs` — الگوی PIT آماده
+- `load_financial_fact_periods` / `load_financial_facts` / `load_share_history` در [src/forecast/queries.py](src/forecast/queries.py) — خوانش PIT-restricted حقایق (`publication_datetime <= cutoff`) که برای سمت Actual قابل بازاستفاده است
+
+## ۳. ماتریس Methodology Authority
+
+### A. Forecast → Actual semantics
+
+| Item | طبقه‌بندی | توضیح |
+|---|---|---|
+| Mapping key (Company+Metric+Period+Horizon+Version+Cutoff) | AUTHORITATIVE | Spec §4 صریح |
+| Error = Actual − Forecast | AUTHORITATIVE | Spec §6؛ پیاده شده |
+| Actualِ منتشرشده بعد از cutoff همان outcome مورد ارزیابی است؛ PIT فقط ورودی‌ها را محدود می‌کند نه خود Actual | PARTIAL | نمودار §5 صریح است («Later Publication of Actual → Actual → Evaluation») ولی جمله‌ی Rule 9 («هیچ اطلاعاتی که بعد از Forecast Cutoff منتشر شده... در ارزیابی استفاده نشود») دوپهلوست و نیاز به تفسیر معتبر دارد که Rule 9 ناظر به ورودی‌هاست نه خود Actual |
+| ReportVersion identity / tie-break هنگام چند نسخه‌ی معتبر برای یک پریود (restatement) | UNRESOLVED METHODOLOGY AUTHORITY | §4 فقط می‌گوید «از ReportVersion معتبر» — کدام نسخه؟ آخرین؟ اولین؟ قانون انتخاب مشخص نیست |
+| تفکیک Forecast Cutoff / Timestamp / Period / Publication | AUTHORITATIVE | Rule 10 در handoff + فیلدهای §39 |
+| شرط تساوی انتشار دقیقاً برابر cutoff | UNRESOLVED | پیاده‌سازی `select_point_in_time_actual` از `>` اکید استفاده می‌کند (مساوی حذف می‌شود) — این انتخاب پیاده‌سازی است نه authority |
+
+### B. Error و regimeهای متریک
+
+| Item | طبقه‌بندی | توضیح |
+|---|---|---|
+| Error / Percentage Error / APE / MAPE / Bias | AUTHORITATIVE + IMPLEMENTED | §§6–10؛ فرمول‌ها پیاده شده‌اند |
+| ZERO_BASE / LOSS_TO_PROFIT / PROFIT_TO_LOSS / SIGN_CHANGE با MAPE=NULL | AUTHORITATIVE + IMPLEMENTED | §§9، 12؛ `classify_regime` پیاده شده |
+| NULL در برابر صفر؛ حفظ absolute error در regimeها | AUTHORITATIVE + IMPLEMENTED | §12 + invariant جهانی NULL≠0 |
+| رفتار Actual=0 با Forecast≠0 | UNRESOLVED | Spec فقط Forecast=0 را ذکر کرده؛ پیاده‌سازی APE=100% می‌دهد بدون authority |
+| هندلینگ invalid/suspicious/unmapped/restated Actual | UNRESOLVED METHODOLOGY AUTHORITY | §41 فقط به «قواعد Data Foundation» ارجاع می‌دهد بدون قاعده‌ی سرانه برای هر state (جزئیات در G) |
+| اصطلاح «Percentage Bias» در §12 در برابر «Bias» در §10 | سؤال معماری | ناهماهنگی واژگانی در خود spec |
+
+### C. Observation sufficiency
+
+| Item | طبقه‌بندی | توضیح |
+|---|---|---|
+| باندهای ‎<5 / 5–7 / 8–11 / ≥12 | AUTHORITATIVE + IMPLEMENTED | §§14، 26؛ `observation_confidence` پیاده شده |
+| گروه‌بندی Company+Metric+Horizon+Model Version | AUTHORITATIVE + IMPLEMENTED | §14؛ فیلتر + dedupe پیاده شده |
+| الزام non-duplicate بودن | AUTHORITATIVE (الزام) / PARTIAL (مکانیک) | §14 «غیرتکراری» را الزام می‌کند ولی تعریف کلید duplicate را نمی‌دهد؛ کلید شش‌تایی پیاده‌سازی انتخاب پیاده‌ساز است |
+| شمرده شدن observationهای regime-NULL یا PIT-invalid در باندها | UNRESOLVED METHODOLOGY AUTHORITY | §9 از «Observationهای معتبر» حرف می‌زند ولی §14 می‌گوید فقط معتبرِ غیرتکراری وارد Evaluation می‌شوند — پیاده‌سازی همه (حتی regime) را در count می‌شمرد؛ authority ندارد |
+
+### D. Seasonal Naive baseline — حسابرسی بحرانی
+
+| Item | طبقه‌بندی | توضیح |
+|---|---|---|
+| نام baseline «Seasonal Naive» و الزام PIT بودن آن | AUTHORITATIVE | §16 + Rules 7–8 |
+| فرمول بهبود نسبی | AUTHORITATIVE + IMPLEMENTED | §17؛ پیاده شده |
+| seasonal period/frequency برای هر metric/horizon | UNRESOLVED METHODOLOGY AUTHORITY | هیچ‌جا تعریف نشده |
+| فرمول دقیق Seasonal Naive | UNRESOLVED METHODOLOGY AUTHORITY | Spec هیچ فرمولی نمی‌دهد؛ `history[-lag]` انتخاب پیاده‌ساز است نه rule |
+| حداقل تاریخچه‌ی لازم | UNRESOLVED METHODOLOGY AUTHORITY | تعریف نشده |
+| رفتار insufficient-history و fallback | UNRESOLVED METHODOLOGY AUTHORITY | هیچ fallbackای مجاز اعلام نشده — نباید اختراع شود |
+| ارزیابی baseline روی همان مجموعه‌ی eligible | PARTIAL | §17 «قابل‌مقایسه» را الزام می‌کند ولی same-set بودن صریح نیست |
+| آستانه‌ی «پایدار» در MODEL_UNDERPERFORMS_BASELINE | UNRESOLVED METHODOLOGY AUTHORITY | §18 «به‌طور پایدار» بدون عدد؛ `count>=5` در پیاده‌سازی invented است |
+
+### E. Reliability
+
+| Item | طبقه‌بندی | توضیح |
+|---|---|---|
+| مقیاس 0–100 و معماری Performance→Confidence→Reliability | AUTHORITATIVE | §§19–20 |
+| وزن‌های 50% / 20% / 30% | AUTHORITATIVE (وزن‌ها) | §21 — ولی به‌تنهایی authority برای mappingها نیست |
+| تابع MAPE→AccuracyScore | UNRESOLVED METHODOLOGY AUTHORITY | §22 عمداً آستانه را به پارامتر versioned واگذار کرده و مقدار اولیه/پیش‌فرض نداده؛ خطی با poor=50 در پیاده‌سازی invented است |
+| تابع Bias→Bias Score | UNRESOLVED METHODOLOGY AUTHORITY | فقط جهت (§23) معتبر است؛ unacceptable=25 invented است |
+| تابع Baseline Advantage mapping | UNRESOLVED METHODOLOGY AUTHORITY | §24 فقط مثال 25% می‌زند؛ full_advantage=0.50 invented است |
+| تابع Confidence Adjustment | UNRESOLVED METHODOLOGY AUTHORITY | الزام adjustment معتبر (§§25–26) ولی ضرایب 0/0.6/0.8/1.0 invented هستند |
+| رفتار componentهای unavailable (MAPE NULL و...) | UNRESOLVED METHODOLOGY AUTHORITY | نامشخص؛ score=0.0 در پیاده‌سازی invented است |
+| versioned بودن همه‌ی پارامترها + clamp شدن در 0–100 | AUTHORITATIVE | §§21، 27 |
+| عدم تغییر مستقیم Forward P/E + فرمول‌های ممنوعه | AUTHORITATIVE | §§35–36 |
+
+### F. Calibration
+
+| Item | طبقه‌بندی | توضیح |
+|---|---|---|
+| شرط bias سیستماتیکِ تکرارشونده؛ ممنوعیت single-observation | AUTHORITATIVE | §§28، 34 |
+| سه state و scope محدود و نسخه‌ی جدید و OOS و ماندگاری baseline | AUTHORITATIVE | §§29–33 |
+| تعریف «پایدار»: حداقل N، آستانه‌ی magnitude، consecutive در برابر cumulative | UNRESOLVED METHODOLOGY AUTHORITY | هیچ عددی در spec نیست؛ min=5 و threshold=5% در پیاده‌سازی/تست invented است — **تست پاس‌شده authority نیست** |
+| گذار candidate→calibrated و معیار قبولی/ردی نسخه‌ی جدید | UNRESOLVED METHODOLOGY AUTHORITY | `holdout_passed` در پیاده‌سازی بولی خام از caller است؛ تعریف pass نامشخص |
+| جداسازی evidence/train در برابر holdout/OOS | UNRESOLVED METHODOLOGY AUTHORITY | ساختار §32 معتبر ولی مکانیک دوره‌ها تعریف نشده |
+| فرم پارامتر calibration | UNRESOLVED | §31 فقط دستکاری مستقیم را ممنوع می‌کند؛ فرم مجاز تعریف نشده |
+
+### G. Data-quality eligibility
+
+| Item | طبقه‌بندی | توضیح |
+|---|---|---|
+| الزام تفسیر MISSING/ESTIMATED/SUSPICIOUS/UNMAPPED/RESTATED و عدم ورود Actual نامعتبر به MAPE/Bias مثل معتبر | AUTHORITATIVE (الزام) | §41 |
+| قاعده‌ی سرانه‌ی مشارکت/عدم‌مشارکت هر state | UNRESOLVED METHODOLOGY AUTHORITY | هیچ‌جا تعریف نشده؛ قواعد Stage 3 (مثلاً SUSPICIOUS unscored) بدون authority به Stage 6 قابل‌انتقال نیست |
+| پیاده‌سازی | غایب | صفر خط handling در `src/evaluation/` |
+
+## ۴. بلاکرها (تصمیم‌هایی که باید پیش از هر پرامپت پیاده‌سازی حل شوند)
+
+- **B1.** Seasonal period/frequency برای هر metric/horizon + فرمول دقیق + حداقل تاریخچه + رفتار insufficient-history (بدون fallback اختراعی).
+- **B2.** توابع mapping اولیه‌ی Reliability (MAPE→Score، Bias→Score، Advantage→Score، Confidence Adjustment) به‌عنوان پارامترهای versioned — با مقداردهی اولیه‌ی معتبر، نه پیش‌فرض پیاده‌ساز.
+- **B3.** تعریف «پایدار» برای bias (حداقل N، آستانه‌ی magnitude، consecutive یا cumulative).
+- **B4.** معیار گذار candidate→calibrated، تعریف holdout pass، و آستانه‌ی accept/reject نسخه‌ی کالیبره‌شده.
+- **B5.** قانون انتخاب ReportVersion برای Actual (tie-break و restatement).
+- **B6.** قاعده‌ی سرانه‌ی هر data-quality state.
+- **B7.** رفتار componentهای unavailable (MAPE NULL → Score چه می‌شود؟).
+- **B8.** الزام same-set بودن baseline و آستانه‌ی persistence برای underperformance.
+- **B9.** تعریف کلید duplicate و وضعیت شمرده‌شدن observationهای regime-NULL در باندها + شفاف‌سازی Rule 9 در برابر نمودار §5.
+
+## ۵. سؤالات/تعارض‌های معماری
+
+1. نام‌گذاری §39 در برابر پیاده‌سازی: `forecast_timestamp` در برابر `calculation_timestamp`، و `data_cutoff_datetime` در برابر `forecast_cutoff_datetime` — دریفت نام‌گذاری.
+2. «Percentage Bias» (§12) در برابر «Bias» (§10) — ناهماهنگی واژگانی spec.
+3. `select_point_in_time_actual` انتشارِ دقیقاً برابر cutoff را حذف می‌کند (`>`) — authority ندارد.
+4. پیش‌فرض‌های `horizon="12M"` و `model_version="UNKNOWN"` در `evaluate_forecasts` هنگام خالی بودن — fallback اختراعی.
+5. فیلد `duplicate_key` در schema هست ولی engine آن را set نمی‌کند — کد مرده/ناتمام.
+6. `__init__.py` مجموعه‌ی export قدیمی دارد و با importهای تست هم‌خوان نیست — دریفت جزئی.
+7. مرز Stage 5: مصرف `ForecastRecord` و queryهای PIT برای Actual نیاز به adapter صریح Stage 6 دارد (بازسازی فرمول Stage 5/Stage 1 در Stage 6 ممنوع)؛ Actual باید از حقایق Stage 1 با انتخاب ReportVersion معتبر بیاید که خودش به B5 گره خورده است.
+8. هیچ یافته‌ای در این audit نقصی در Stage 5 اثبات نمی‌کند — **Stage 5 دست‌نخورده می‌ماند**.
+
+## ۶. مشاهده‌ی مرزی Stage 5
+
+Stage 6 می‌تواند بدون تغییر Stage 5 مصرف کند: `ForecastRecord` (cutoff + input_refs + never-overwrite)، `ForecastRecordRepository.read_at_cutoff` / `pit_violations`، و queryهای PIT-restricted سمت Actual. تنها وابستگی باز، قانون انتخاب Actual (B5) است که در سمت Stage 6 باید حل شود نه Stage 5.
+
+---
+
+یافته‌ی کلیدی: اسکلت Stage 6 (فرمول‌های error، regimeها، باندها، وزن‌ها، ساختار calibration) دارای authority است، ولی **همه‌ی توابع تصمیم‌گیرنده** (seasonal period/formula، هر چهار mapping، تعریف persistence، معیار accept/reject، انتخاب ReportVersion، قواعد data-quality) فاقد authority هستند و مقادیر فعلی در `src/evaluation/` انتخاب‌های پیاده‌ساز‌اند — **تست پاس‌شده authority محسوب نمی‌شود** و نباید به rule مالی تبدیل شود.
+
+`Stage 6 is NOT declared frozen.`
+
+STOP.
+=================================================================
+
+# REPORT — Stage 6 Prompt 18
+**Evaluation Data Foundation — AUTHORITATIVE-only, no scores**
+
+## 1. Files changed
+
+| File | Change |
+|---|---|
+| [src/evaluation/schema.py](src/evaluation/schema.py) | +96 lines: `ActualObservation`, `EvaluationInputRef`, `ACTUAL_DATA_QUALITY_STATES`, `REGIME_STATUSES`, `_normalize_datetime` — the pre-existing dataclasses (`ForecastEvaluationResult` / `ReliabilityAssessment`) untouched |
+| [src/evaluation/observation.py](src/evaluation/observation.py) | new: `EvaluationKey` + `evaluation_key_for` (§4), `EvaluationObservation` + `bind_actual`, `detect_pit_leakage` / `missing_provenance`, `build_observation`, `flag_duplicates`, `evaluation_metadata` |
+| [src/tests/test_stage6_evaluation_foundation.py](src/tests/test_stage6_evaluation_foundation.py) | new: 28 P18 tests |
+| [temp_report.md](temp_report.md) | this report |
+
+No changes to Stage 5, Stages 1–4, `metrics.py`, `engine.py`, or `__init__.py`.
+
+## 2. Contracts honored (P17 AUTHORITATIVE material only)
+
+- **§4 key**: Company + Metric + Period + Horizon + Model Version + Cutoff — horizon and model version isolate series from each other (isolation tests).
+- **PIT CONTRACT**: an Actual published after the cutoff is the outcome and binds; leakage is checked over *input refs* only (`detect_pit_leakage` never sees the Actual). `available_at=None` is a gap (`missing_provenance`), neither leakage nor cleanliness.
+- **Blockers B5/B6 isolated, not decided**: ReportVersion selection (which Actual is authoritative) belongs to the caller holding that authority — `bind_actual` performs no eligibility check; participation of data-quality states in MAPE/Bias is left to whatever step P17 authorizes — states are carried verbatim.
+- **B9**: `flag_duplicates` only flags (shared `duplicate_key`); no observation is dropped, merged, or preferred.
+- **NULL != 0**: a missing Actual/forecast is always `None`, never zero.
+- **P18 forbidden items absent**: grepping `observation.py` for mape/bias/reliability/calibrat/valuation returns only docstring matches (the "never computes" statements) — no error or score formula exists in the new code.
+
+## 3. Test results
+
+- `pytest src/tests/test_stage6_evaluation_foundation.py -q` → **28 passed** in 0.69s
+- `pytest src/tests/test_stage6_evaluation.py -q` → **11 passed** (3 pre-existing `utcnow` warnings, not a blocker per the handoff) — legacy regression green
+- Stage 6 total: **39 passed, 0 failures**
+
+## 4. Remaining gaps (out of scope for this prompt, per P17)
+
+Persistence of evaluation results, the Actual-reading query layer, the baseline history builder, and all nine blockers B1–B9 remain open — none were permitted to be implemented in P18.
+
+`Stage 6 is NOT declared frozen.`
+
+STOP.
+=================================================================
+
