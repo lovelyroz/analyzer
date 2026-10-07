@@ -3373,3 +3373,101 @@ Persistence of evaluation results, the Actual-reading query layer, the baseline 
 STOP.
 =================================================================
 
+# REPORT — Stage 6 Prompt 19
+**Evaluation Metrics + Baseline — AUTHORITATIVE-only implementation**
+
+## 1. Files changed
+
+| File | Change |
+|---|---|
+| [src/evaluation/aggregate.py](src/evaluation/aggregate.py) | new — metrics layer: `score_observation`, `aggregate_series`, `aggregate_observations`, `ScoredObservation`, `SeriesEvaluation` |
+| [src/tests/test_stage6_evaluation_metrics.py](src/tests/test_stage6_evaluation_metrics.py) | new — 21 P19 behavioral tests |
+| [temp_report.md](temp_report.md) | this report |
+
+Untouched: Stage 5 and Stages 1–4 (zero edits), and every pre-existing Stage 6 file — [src/evaluation/metrics.py](src/evaluation/metrics.py), [src/evaluation/engine.py](src/evaluation/engine.py), [src/evaluation/schema.py](src/evaluation/schema.py), [src/evaluation/observation.py](src/evaluation/observation.py), [src/evaluation/__init__.py](src/evaluation/__init__.py), and both legacy test files. The existing `ForecastEvaluationEngine`/`ReliabilityAssessment` path is unchanged; the new layer consumes the P18 `EvaluationObservation` carriers instead, and no caller was rewired into it (wiring is P21).
+
+## 2. Exact formulas (spec §§6–10, 17, 14) — all AUTHORITATIVE
+
+| Metric | Formula | Authority |
+|---|---|---|
+| Error | `Actual - Forecast` | §6 AUTHORITATIVE; positive = under-forecast |
+| Percentage Error | `(Actual - Forecast) / abs(Forecast) x 100` | §7 AUTHORITATIVE; sign preserved |
+| APE | `abs(Actual - Forecast) / abs(Forecast) x 100` | §8 AUTHORITATIVE |
+| MAPE | mean of valid APE observations only | §9 AUTHORITATIVE — `None` (never 0) when no valid observation exists |
+| Bias | mean signed percentage error | §10 AUTHORITATIVE; positive = under-forecast, negative = over-forecast |
+| Improvement | `(Baseline Error - Model Error) / Baseline Error` | §17 AUTHORITATIVE |
+| Sufficiency | `<5 INSUFFICIENT_DATA / 5–7 LOW_CONFIDENCE / 8–11 MODERATE_CONFIDENCE / >=12 ADEQUATE` | §14 + §26 AUTHORITATIVE |
+
+Verified: `Error(1100, 1000)=+100`, `PE=+10%`, `APE=+10%`; `MAPE([10,-10,20])=13.33%`; `Bias([10,10,10])=+10%` (test_stage6_metric_definitions, unchanged and still green).
+
+## 3. Regime behavior (spec §§9, 12)
+
+For `ZERO_BASE` (forecast = 0), `LOSS_TO_PROFIT` (forecast < 0 < actual), `PROFIT_TO_LOSS` (forecast > 0 > actual):
+
+* absolute `Error` is retained;
+* `percentage_error`, `ape`, `mape`, `bias` contribution are all `None` — never zero;
+* the observation is **quarantined, not scored**, and its regime is recorded verbatim.
+
+`SIGN_CHANGE` per `classify_regime` matches the four regimes in spec §12 naming; same-sign opposite-magnitude pairs are not a regime and do score.
+
+## 4. Nulls and quarantine rules
+
+`NULL != 0` everywhere: a missing forecast metric is `None`, a MISSING Actual is `None`, a missing baseline is `None`, and missing percentage metrics are `None` rather than 0.
+
+Observations are quarantined (recorded for audit, excluded from every aggregate and from the sufficiency count) for: non-READY status, `DUPLICATE_QUARANTINED` (blocker B9 — no preference, merge, or drop), `MISSING_VALUE`, a §41 data-quality state other than `VALID` (`DATA_QUALITY_QUARANTINED:<state>`, blocker B6), `ZERO_ACTUAL_UNRESOLVED`, and the four regimes.
+
+Every quarantine is reported in `SeriesEvaluation.quarantined` with its reason, so nothing is silently dropped.
+
+## 5. Horizon and model-version isolation
+
+Isolation is structural. `aggregate_observations` groups by `(company_id, metric_code, horizon, model_version)` — the §14 key — before any arithmetic, and never averages across groups (`SeriesEvaluation` carries one horizon and one model version only). Verified: mixing 1M/3M records produces two separate series; V1.0/V2.0 records produce two separate MAPEs.
+
+## 6. Observation sufficiency
+
+The band is computed from the **scored count only** (`observation_count`), not `total_observations`. A series of four valid observations plus one regime observation stays `INSUFFICIENT_DATA` — the quarantined observation does not inflate the band (P17 §C left "whether regime-NULL observations count" UNRESOLVED; the layer refuses to count them, consistent with §14's "valid, nonduplicate observations only").
+
+## 7. Seasonal Naive methodology — NOT IMPLEMENTED (blocker B1)
+
+P17 section D classified every Seasonal Naive decision as **UNRESOLVED METHODOLOGY AUTHORITY**, and P19's precondition forbids inventing methodology. Nothing was implemented:
+
+* no seasonal period is chosen for any metric or horizon;
+* no Seasonal Naive formula is applied;
+* no baseline value is constructed anywhere in the layer;
+* no required-history threshold, insufficient-history behavior, or fallback was defined.
+
+What *was* implemented, because spec §§16–17 are authoritative, is the **baseline comparison**: given caller-supplied baseline values for the same scored observation set, the layer computes `baseline_error`, `baseline_ape`, `baseline_mape`, and `relative_improvement` using the §17 formula. Caller-supplied is the operative constraint — the authority to construct a Seasonal Naive value (seasonal period, formula, history, PIT window) belongs to a later decision, not to this prompt. `baseline_mape` is `None` when no observation has a valid baseline APE; a baseline of 0.0 yields `baseline_error` but no `baseline_ape`, with no fabricated value.
+
+## 8. Baseline behavior (authorized portion)
+
+* same-set policy: `baseline_mape` averages baseline APEs over the **scored set only** — quarantined observations never widen or shift either aggregate; verified (5 valid + 1 regime + 1 leaked → `observation_count=5`, both MAPEs from those 5);
+* model better than baseline → `relative_improvement > 0`; model worse → `< 0`; either side missing → `None`;
+* `MODEL_UNDERPERFORMS_BASELINE` is **not set** — P17 blocker B8 leaves "persistently" without a threshold, so no persistence flag exists in this layer.
+
+## 9. Tests
+
+`pytest src/tests/test_stage6_evaluation_metrics.py src/tests/test_stage6_evaluation.py src/tests/test_stage6_evaluation_foundation.py -q`
+→ **60 passed** (21 new P19 + 11 legacy + 28 P18), 0 failures, 3 pre-existing `utcnow` deprecation warnings (unrelated, unchanged since P18).
+
+P19 coverage: error sign (under/over), zero denominators (forecast 0 and baseline 0), zero/sign-change regimes, horizon mixing, model-version mixing, duplicate collisions, PIT leakage, later-published Actual as outcome, invalid Actual states, missing values, invalid baseline inputs, baseline/model comparison (better and worse), insufficient baseline history (same-set policy), sufficiency bands, and absence assertions proving the layer contains no Seasonal Naive construction and no Reliability/Calibration/underperformance surface.
+
+## 10. Unresolved methodology-authority gaps carried forward
+
+| Blocker | Status |
+|---|---|
+| B1 Seasonal Naive period/formula/history/insufficient-history/fallback | **OPEN — not implemented.** Baseline value construction blocked; comparison mechanics implemented from caller-supplied values |
+| B6 per-state data-quality participation | **OPEN — quarantined conservatively.** Only `VALID` scores; §41 forbids invalid Actuals entering MAPE/Bias like valid ones, so refusal to score is the only non-inventive reading |
+| B8 "persistently" underperformance threshold | **OPEN — no flag emitted**; `relative_improvement` only |
+| B9 duplicate-key definition | **OPEN — wholesale quarantine**; no preference/merge/drop (P18 behavior preserved) |
+| Actual=0 with Forecast!=0 | **OPEN — quarantined as `ZERO_ACTUAL_UNRESOLVED`**; spec names only Forecast=0 |
+| B5 ReportVersion tie-break | unchanged from P17/P18; selection belongs to the caller |
+| B2/B3/B4/B7 Reliability + Calibration | untouched by P19 (P20 scope) |
+
+## 11. Stage boundaries
+
+Stage 1–5 unmodified (verified: no edits outside `src/evaluation/aggregate.py` and the new test file). The layer consumes Stage 5's `ForecastRecord` and Stage 1's `ActualObservation` read-only. No Stage 7 logic, no Valuation, no P/E, no new forecasts.
+
+`Stage 6 is NOT declared frozen.`
+
+STOP.
+
+================================================================
