@@ -2874,3 +2874,124 @@ Stage 5 is NOT declared frozen.
 9. Freeze-gate eligibility: **no**. P21 criteria 8–10 remain FAIL on H1 alone; all other criteria unaffected.
 
 H1 UNRESOLVED — Stage 5 remains NOT FROZEN.
+---
+
+## H1 Remediation — Scenario-Spread Authority Basis
+
+1. Investigation result: **NO AUTHORITATIVE BASIS EXISTS**
+
+   Neither an authoritative calculation methodology (A) nor an authoritative
+   financial assumption sanctioning these magnitudes (B) was found within the
+   explicit H1 scope. The prior P21 classification C is confirmed and deepened
+   by the Historical Dispersion / Model Uncertainty investigation below. No
+   numbers were changed, no methodology was invented, no calibration formula
+   was introduced.
+
+2. Per-spread determination
+
+   Current values (src/forecast/engine.py DEFAULT_MODEL_PARAMETERS, unchanged):
+   - Revenue Growth: `scenario_revenue_growth_spread = 0.05` — no authority.
+     The spec states no numeric value; the handoff doc calls the defaults
+     arbitrary; missing evidence leaves 0.05 standing with
+     uncertainty_evidence None (committed test).
+   - Operating Margin: `scenario_operating_margin_spread = 0.02` — no authority.
+     Same basis as above; margins receive evidence None by construction, so the
+     default always stands absent a caller override.
+   - Net Margin: `scenario_net_margin_spread = 0.01` — no authority. Same basis.
+   - Financial Growth: `scenario_financial_growth_spread = 0.05` — no authority.
+     Same basis; additionally its fallback slot is the revenue key, so it is not
+     an independently calibrated figure even within the model.
+
+   Not A: no spec passage, prompt, or config defines a spread calculation that
+   yields these values. Not B: no authoritative source sanctions these four
+   defaults as intentional assumptions — PROJECT_HANDOFF_INSTRUCTIONS.md states
+   explicitly that they are arbitrary and not derived from historical
+   dispersion, and the `MODEL_DEFAULT` label is provenance honesty, not
+   financial authorization. Not D: no stated value is contradicted (§16
+   mechanism complies: overridable parameters, honest labeling, caller override
+   respected).
+
+3. Historical Dispersion
+
+   - Defined: **no**. Spec §22 (line 587) names Historical Dispersion once as the
+     no-driver range basis but defines no observation window, no dispersion
+     statistic, no minimum observation count, no dispersion-to-spread
+     transformation, and no insufficient-history rule. Spec-wide sweeps for
+     standard deviation, variance, percentile, window, and minimum-count
+     methodology return nothing; data-sufficiency language ("داده کافی") is
+     qualitative only. The sole percentage figures in the spec are the §20
+     prohibition of fully arbitrary percentages such as ±20% (line 549) and a
+     momentum-illustration example (lines 405–406) — neither is a spread.
+   - Required data exists: **partially, but insufficiently**. Stage 1 PIT reads
+     can return multiple periods and the production path already loads the full
+     period series — but the engine receives only point observations
+     (historical_operating_margin, historical_net_margin, prior/current
+     revenue, beginning equity), never a series, and no dispersion is computed
+     anywhere in src/forecast (the only "dispersion" mentions are comments
+     stating dispersion is never invented from missing observations). Even
+     where raw periods exist, with no authoritative window, statistic, or
+     transform, no auditable production value can be calculated.
+   - Methodology authoritative: **no**. Any choice of std-dev, MAD, percentile
+     range, or window would be an invention, which the brief forbids.
+   - Sufficient to calculate a production value: **no**.
+   - Per metric: Revenue Growth — multi-period revenue facts exist in Stage 1
+     reads but no window/statistic/transform is specified → insufficient.
+     Operating Margin — single historical point only → insufficient. Net Margin
+     — single historical point only → insufficient. Financial Growth — no
+     dedicated history → insufficient.
+
+4. Model Uncertainty
+
+   - Quantitative definition: **none**. The phrase occurs exactly once in the
+     spec (§22, line 587) as a concept alongside Historical Dispersion. No
+     formula, no calibration source, no uncertainty parameter, no confidence
+     level, no historical error distribution, no model-risk adjustment exists.
+   - Calibration mechanism: only the future Stage 6 Forecast-vs-Actual loop
+     (§16 line 430; §26 line 717), which would calibrate parameters from
+     forecast error. It does not exist as a Stage 5 input today and defines no
+     uncertainty magnitude. The live VOLATILITY_EVIDENCE path
+     (parameter × caller-declared sensitivity × caller-declared evidence) is
+     deterministic and auditable but requires caller declarations — it is not a
+     standing authoritative methodology for the defaults.
+   - Can it establish the four magnitudes: **no**.
+
+5. Changes
+
+   - Files changed: `temp_report.md` only (this section appended).
+   - Files not changed: no production code (`src/forecast/engine.py` untouched —
+     the four numbers stand as `MODEL_DEFAULT`), no tests, no spec, no handoff
+     doc, no Stage 4, no persistence, no PIT/EPS/ROE/BANK/HOLDING logic.
+   - Production code changed: **no**. Tests changed: **no**.
+
+6. Tests
+
+   Focused spread-authority set actually executed:
+   `-k "spread or scenario_spread or authoritative or model_default or
+   model_parameter or uncertainty or dispersion or volatility"` →
+   **27 passed, 289 deselected**. This confirms the mechanism/provenance
+   behavior (MODEL_DEFAULT vs MODEL_PARAMETER vs VOLATILITY_EVIDENCE labeling;
+   ±2%/momentum/score/P-NAV isolation; no dispersion fabricated from absent
+   evidence) is intact — it does not and cannot establish magnitude authority.
+   No broad re-run: no code changed, and both suites were green at P21
+   (316 focused; 679 passed + 2 env skips). No new tests added: none are
+   required for a C outcome, and inventing a passing threshold for an
+   unauthorized magnitude would be false authority.
+
+7. Freeze impact
+
+   H1 remains unresolved.
+   Stage 5 remains NOT FROZEN.
+   No replacement numerical values were invented.
+   A financial/model authority decision is required.
+
+   The smallest sufficient authority decision, if Historical Dispersion is
+   selected: (a) eligible historical observations per metric, (b) PIT/cutoff
+   rule, (c) observation window, (d) dispersion statistic, (e) minimum
+   observations, (f) dispersion-to-spread transformation, (g)
+   insufficient-history treatment. If Model Uncertainty is selected: (a)
+   uncertainty source, (b) quantitative methodology, (c) calibration period,
+   (d) minimum evidence, (e) insufficient-evidence treatment. Until one route is
+   decided with all its parameters, the four defaults remain unjustified
+   magnitudes regardless of their correct MODEL_DEFAULT treatment.
+
+H1 UNRESOLVED — Stage 5 remains NOT FROZEN.
