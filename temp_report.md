@@ -2841,3 +2841,36 @@ remains — every behavioral invariant is pinned, every past survival is
 resolved, both suites are green, and the production tree is clean.
 
 Stage 5 is NOT declared frozen.
+---
+
+## H1 Scenario-Spread Authority Resolution
+
+1. Classification: **C — Unresolved Financial Authority** (all four defaults).
+
+2. Exact values investigated (src/forecast/engine.py DEFAULT_MODEL_PARAMETERS, lines 45–55):
+   - revenue growth spread: `scenario_revenue_growth_spread = 0.05`
+   - operating margin spread: `scenario_operating_margin_spread = 0.02`
+   - net margin spread: `scenario_net_margin_spread = 0.01`
+   - financial growth spread: `scenario_financial_growth_spread = 0.05`
+
+3. Authoritative source: **none found**. Evidence swept (all read-only, in scope):
+   - Stage 5 spec (05_Stage5_Forecast_Engine.md): no numeric spread value anywhere (full grep: sole percentage hit is the §20 prohibition of fully arbitrary percentages such as ±20%). §16 permits adjustment ranges stored as Model Parameter (not fixed architecture constants) and assigns calibration to Stage 6 — mechanism permission, no magnitudes. §22 sets the no-driver range by Historical Dispersion and Model Uncertainty — but no dispersion is computed (missing evidence leaves 0.05 standing with uncertainty_evidence None, proven by test) and "Model Uncertainty" is unnamed and unquantified.
+   - PROJECT_HANDOFF_INSTRUCTIONS.md "Scenario spread": explicit REAL GAP — "the default values are arbitrary and not derived from historical dispersion… Do not replace these blindly with another arbitrary constant."
+   - Implementation prompt (prompts/05_Stage5_Implementation_Prompt.md): contains no spread values.
+   - Git history (read-only): values hard-coded since introduction (commit e2fb409, Sep 15) with no documented rationale in the commit.
+   - stage5prompt1-2report.md item 9: recommends spreads be computed from historical std-dev *instead of* 0.05 — confirming 0.05 was already recognized as non-authoritative.
+   - Other architecture docs (00_*, 01_*, 04_*): no numeric spread authority.
+
+4. Reasoning: not A (no source states these values); not B (no spec passage defines these four defaults as intentional sanctioned assumptions — the project docs call them arbitrary, and §22's dispersion route is uncomputed); not D (no stated value is contradicted; §16 mechanism complies — overridable params, honest MODEL_DEFAULT labeling, caller override respected). Therefore C. Materiality unchanged from P21: spreads enter bear/bull construction directly (bear_growth = base − spread; bull_growth = base + spread; margin offsets ±spread), so an inappropriate magnitude ships green — no committed test constrains financial appropriateness, by design.
+
+5. Per-value status: all four — **unresolved** (not authoritative, not sanctioned assumption, not contradicted).
+
+6. Changes made: **none** — no production code change, no documentation change, no test change. Tree verified clean (`git status --short` empty). Per the minimal-implementation rule and the C-classification prohibitions, inventing replacement numbers or a new calibration methodology would itself violate the brief.
+
+7. Tests executed: focused spread-authority set (`-k "spread or scenario_spread or authoritative or model_default or model_parameter or uncertainty"`): **24 passed, 292 deselected in 0.78s**. Confirms mechanism/provenance behavior (MODEL_DEFAULT vs MODEL_PARAMETER vs VOLATILITY_EVIDENCE labeling; ±2%/momentum/score/P-NAV isolation) is intact — it does not and cannot establish magnitude authority. No broad re-run: no code changed, and both suites were green at P21 (316 focused; 679 passed + 2 env skips).
+
+8. H1 resolved: **no**.
+
+9. Freeze-gate eligibility: **no**. P21 criteria 8–10 remain FAIL on H1 alone; all other criteria unaffected.
+
+H1 UNRESOLVED — Stage 5 remains NOT FROZEN.
