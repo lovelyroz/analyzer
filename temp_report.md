@@ -3707,3 +3707,69 @@ test created, modified, weakened, or bypassed.
 STOP.
 
 ================================================================
+
+# REPORT — Stage 6 Prompt 22
+**Independent Final Audit — `analyzer` — READ-ONLY, no code/test/git changes**
+
+## 1. Files inspected
+
+* Spec: `06_Stage6_Forecast_Evaluation.md` §§1–45 (full read, both halves).
+* Prior reports: `temp_report.md` P17–P21 (lines 3192–3709).
+* Implementation (full read, all 8): `src/evaluation/schema.py`, `observation.py`, `aggregate.py`, `reliability.py`, `pipeline.py`, `metrics.py`, `engine.py`, `__init__.py`.
+* Tests: `test_stage6_evaluation.py` (legacy, full read), `test_stage6_production_pipeline.py` (full read), P18/P19/P20 suites via reports + targeted reads.
+* Boundary dependency: `src/forecast/schema.py` imports only (`ForecastRecord`, `ForecastInputRef` — read-only dataclasses, never mutated, never written back).
+
+## 2. Production path (traced independently, not trusted from prior reports)
+
+`run_evaluation_pipeline` (pipeline.py:106) → `build_observation` (observation.py:210; PIT check over `input_refs` only) → `aggregate_observations` (aggregate.py:260; `flag_duplicates` → `score_observation` → group by §14 key) → `govern_aggregates` (reliability.py:406; per-series, no components on-path) → one `SeriesPipelineVerdict` per (company, metric, horizon, version); wrappers `evaluate_holdout_oos` / `prove_forward_pe_untouched`.
+
+Independently verified by source read + grep: records never mutated (observations built as new objects); zero DB/write tokens in `src/evaluation/` (`ForecastRecordRepository|forecast_versions|session.add|session.commit|INSERT` → NO_MATCHES); no non-test callers of pipeline/aggregate/reliability/observation outside the package itself (only `test_stage6_production_pipeline.py`). No evaluation-results persistence exists anywhere (no models/migrations — P18 §4 gap still open).
+
+## 3. Methodology-authority audit (re-verified, not inherited)
+
+**New path (observation/aggregate/reliability/pipeline): CLEAN.** Independent grep for `poor_mape|unacceptable_bias|full_advantage|minimum_observations|bias_threshold|holdout_passed|confidence_multiplier|detect_persistent_bias|accuracy_score_from_mape` → zero matches. No seasonal period/formula/history/fallback constructed (baselines caller-keyed). Reliability always `WithheldReliability(reliability=None)`. `CALIBRATION_CANDIDATE`/`CALIBRATED` unconstructible (`__post_init__` raises). `derive_calibrated_version_name` returns None for every reachable verdict. P/E is identity only.
+
+**Legacy path (engine.py + metrics.py helpers + `__init__` exports): STILL EXECUTABLE + TEST-PINNED.** `accuracy_score_from_mape(poor=50)`, `bias_score(unacceptable=25)`, `baseline_advantage_score(full=50)`, `confidence_multiplier` 0/0.6/0.8/1.0, `detect_persistent_bias(min=5, threshold=5%)`, `is_underperforming_baseline(count>=5)` (engine.py:173), `select_point_in_time_actual` strict `>` (engine.py:103), `seasonal_naive_forecast` = `history[-lag]` (engine.py:108–114), `evaluate_forecasts` numeric Reliability + `CALIBRATION_CANDIDATE` (engine.py:175–186), `calibration_model_version` minting `V1.CAL1` on a raw `holdout_passed` bool (engine.py:214–222). Legacy tests assert them as correct: `CALIBRATION_CANDIDATE` + `reliability<performance` (test line 84–115), poor=50 mapping (185–188), min=5 persistence (191–193), `MODEL_UNDERPERFORMS_BASELINE` (156–175), `V1.CAL1` (178–182), `history[-lag]` (69–72). The P20 "engine imports neither reliability nor aggregate" pin proves isolation, not de-authorization. A green suite therefore certifies invented numbers as correct — exactly what P17 forbade ("test passing is not authority").
+
+## 4. Invariant audit (28 required areas)
+
+BEHAVIORALLY PROVEN on the new path: (1) §4 six-component key + duplicate flagging; (2) later-published Actual binds as outcome (MAPE 10% test); (3) input-only PIT check; (5) horizon isolation (4 horizons, disjoint identities); (6) version isolation (V1/V2 separate MAPEs); (7) ZERO_BASE/LOSS_TO_PROFIT/PROFIT_TO_LOSS/SIGN_CHANGE quarantined with error retained, pct None; Actual=0 quarantined as ZERO_ACTUAL_UNRESOLVED (conservative, documented, no authority claimed); (8) MAPE = mean of valid APEs, None when empty; (9) signed Bias, sign preserved both directions; (10-comparison) same-set baseline comparison; (11) improvement </> 0, None when either side missing; (12) bands on scored count only (4/6/9/12 parametrized); (16) UNAVAILABLE:* named per component, never 0.0; (17) even 10×+30% unanimous bias stays NO_CALIBRATION; (18–20) CALIBRATED unreachable, no version minted, no overwrite surface; (21) overlap/inversion raise, unknown periods dropped; (22) TTM conservation accounting (`ttm_accounted`, key-uniqueness, collision quarantines both — structural; no TTM identity rule exists, documented limit); (23) Actual never inspected for leakage; (24) per-key verdicts, TTM scored once in own group; (25) records byte-identical before/after, no write tokens; (28) P/E identity (18.5→18.5), no forecast-touching function in reliability/pipeline.
+
+STRUCTURALLY VERIFIED: (4) cutoff-vs-publication equality — new path treats at-cutoff inputs as clean (probed: `detect_pit_leakage` equal → no leak), legacy `select_point_in_time_actual` rejects at-cutoff Actuals (probed: equal-ts → None) — DIVERGENT boundary, legacy side is the outlier; (13) Accuracy≠Bias separate fields; (14) Performance/Reliability distinct frozen types; (15) `parameters_version` on every verdict; (27) ReportVersion/publication carried on every Actual + tallied quarantines (no DB-backed trail — persistence gap open).
+
+NOT PROVEN (refused by design — refusals proven, methodology absent): B1 Seasonal construction; B2/B7 numeric values; B3/B4 transitions. Legacy-path behaviors are TEST-PINNED BUT UNAUTHORIZED and must not be read as proof.
+
+Note: `calculate_mape` applies `abs()` to inputs (defensive; callers pass APEs) — harmless, pinned by legacy test line 20.
+
+## 5. Adversarial challenges (all 17)
+
+Future-info-before-cutoff → quarantined ✓. Later-Actual-rejected → scores ✓. Invalid ReportVersion → no selection, caller-owned, bound verbatim (B5 boundary) ✓. Duplicates → wholesale quarantine ✓. NULL-vs-zero → MISSING_VALUE/PENDING_ACTUAL, MAPE None never 0.0 ✓. Zero/sign-change → quarantined ✓. Mixed horizons/versions → separate series ✓. Baseline leakage → baselines are caller floats without provenance: UNVERIFIABLE by construction — residual risk (B1 authority must bind the supplier to PIT). Unavailable component → named, never defaulted ✓. Unresolved-forced-numeric → refused on new path, FORCED ON LEGACY PATH ✗ (blocker). Holdout contamination → rejected ✓. Old-version overwrite → no surface ✓. Reliability→P/E → identity ✓.
+
+## 6. Focused result (Layer 5a)
+
+`pytest` on the five Stage 6 files → **130 passed** (11 legacy + 28 P18 + 21 P19 + 32 P20 + 38 P21), 0 failures, 3 pre-existing `utcnow` warnings from legacy `ReliabilityAssessment.calculation_timestamp` (cosmetic, unrelated).
+
+## 7. Full result (Layer 5b)
+
+`pytest src/tests` → **814 passed, 2 skipped** (both pre-existing environmental: Codal sample PDF, openpyxl). Consistent with P21 (776+38). Read-only audit: nothing weakened, bypassed, or rewritten; no git operations performed.
+
+## 8. Blockers
+
+* **B-LEGACY (new, implementation defect):** unauthorized numeric methodology executable and test-pinned in `engine.py` / `metrics.py` / `__init__.py`, contradicting the fail-closed production path. Affected: methodology-authority check; spec §§22–29, 31–32. Material: any consumer importing `ForecastEvaluationEngine` receives `CALIBRATION_CANDIDATE` + numeric Reliability with zero authority, certified by a green suite. Evidence: engine.py:82–89, 103–114, 156–222; metrics.py:82–153; test_stage6_evaluation.py:69–72, 84–115, 156–193; `__init__.py` legacy-only exports (P17 drift item 6 still open).
+* **B1–B9 (carried, methodology-authority gaps):** no authority decisions since P19. Fail-closed posture is correct, but Stage 6 is functionally incomplete (no Reliability number, no calibration, no Seasonal Naive, no persistence) — freezing requires either the authority decisions or an explicit architectural ruling that fail-closed IS the V1 scope (itself needing authority).
+* Minor: cutoff-equality divergence (legacy vs new path); `utcnow` deprecation; no evaluation persistence/query layers; baseline-supplier PIT unverifiable (residual risk, §5).
+
+## 9. Unresolved risks
+
+Caller-supplied baselines/Actuals carry no PIT proof (layer trusts caller — B1/B5 by design). No TTM identity rule (structural conservation only). Legacy tests may be mistaken for methodology authority by future readers.
+
+## 10. Proof-status classification
+
+BEHAVIORALLY PROVEN: areas 1, 2 (new path), 3, 5, 6, 7, 8, 9, 10-comparison, 11, 12, 16, 17–20 (as refusals), 21, 22 (structural), 23, 24, 25, 28. STRUCTURALLY VERIFIED: 4 (Actual-side equality), 13, 14, 15, 27. NOT PROVEN: B1 construction, B2/B7 values, B3/B4 transitions (no methodology exists to prove; refusals are proven instead). Legacy numeric behaviors: TEST-PINNED BUT UNAUTHORIZED — excluded from proof.
+
+`FAIL — REMEDIATION REQUIRED`
+
+`Stage 6 is NOT declared frozen.`
+
+STOP.
+================================================================
