@@ -356,16 +356,14 @@ def test_full_path_observation_to_governance():
     assert verdict.evaluation_timestamp.tzinfo is not None
 
 
-def test_legacy_engine_path_untouched():
-    import src.evaluation.engine as engine
+def test_legacy_engine_path_removed():
+    # P23: the legacy engine is deleted, not merely isolated — there is
+    # no path left that could bypass the fail-closed production verdicts.
+    import importlib.util
 
-    assert hasattr(engine.ForecastEvaluationEngine, "evaluate_forecasts")
-    assert hasattr(engine.ForecastEvaluationEngine, "calibration_model_version")
-    import inspect
-
-    source = inspect.getsource(engine)
-    assert "src.evaluation.reliability" not in source
-    assert "src.evaluation.aggregate" not in source
+    assert importlib.util.find_spec("src.evaluation.engine") is None
+    with pytest.raises(ImportError):
+        import src.evaluation.engine  # noqa: F401
 
 
 def test_module_exports_no_numeric_mapping():

@@ -1106,3 +1106,522 @@ Otherwise:
 `Stage 6 is NOT declared frozen.`
 
 Do not implement anything in this prompt.
+======================================================
+
+Stage 6 Prompt 23 - Legacy Methodology De-Authorization
+
+You are continuing as the primary engineering agent for the repository:
+
+`analyzer`
+
+This is a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of explicit methodology boundaries are more important than implementation speed.
+
+## Stage 6 Context
+
+Stage 6 is the Forecast Evaluation layer.
+
+Stage 5 is FROZEN and MUST NOT be modified.
+
+Stage 4 is FROZEN and MUST NOT be modified.
+
+Stage 7 is outside the current scope and MUST NOT be modified.
+
+The current Stage 6 production path introduced in Prompts 18–21 is intentionally fail-closed where methodology is not yet authorized.
+
+Prompt 22 performed an independent final audit and identified one implementation blocker:
+
+### B-LEGACY — Unauthorized Legacy Stage 6 Methodology Remains Executable
+
+The new Stage 6 path behaves correctly and fails closed where methodology is unresolved.
+
+However, older Stage 6 implementation paths remain executable and expose unauthorized methodology, including:
+
+* `accuracy_score_from_mape(...)`
+* `bias_score(...)`
+* `baseline_advantage_score(...)`
+* `confidence_multiplier(...)`
+* `detect_persistent_bias(...)`
+* `is_underperforming_baseline(...)`
+* legacy Seasonal Naive behavior using `history[-lag]`
+* legacy numeric Reliability calculation
+* `CALIBRATION_CANDIDATE`
+* creation of `V1.CAL1`
+* related exports and tests that still treat these behaviors as valid methodology
+
+The problem is NOT merely missing tests.
+
+The problem is that unauthorized methodology remains executable.
+
+This prompt exists ONLY to remove/de-authorize those legacy executable paths.
+
+---
+
+# 1. HARD CONTEXT FIREWALL
+
+You MUST obey all of the following:
+
+* Work ONLY in the local working tree.
+* Do NOT access GitHub.
+* Do NOT use GitHub CLI/API.
+* Do NOT fetch.
+* Do NOT pull.
+* Do NOT push.
+* Do NOT modify remotes.
+* Do NOT create/delete/rename branches.
+* Do NOT commit.
+* Do NOT inspect Git history.
+* Do NOT perform repository-wide audits.
+* Do NOT scan the entire repository.
+* Do NOT search unrelated Stage 1–5 or Stage 7 code.
+* Do NOT reopen frozen stages.
+
+The user handles Git operations separately.
+
+If you encounter a required dependency outside the explicitly allowed scope below, STOP and report it rather than expanding the scope automatically.
+
+---
+
+# 2. PRIMARY OBJECTIVE
+
+Remove or de-authorize the executable Legacy Stage 6 methodology identified by Prompt 22.
+
+The objective is:
+
+> After this prompt, no executable Stage 6 production path may calculate or expose unauthorized Reliability, Calibration Candidate, or legacy score methodology.
+
+The new P18–P21 fail-closed production path MUST remain intact.
+
+Do NOT invent replacement methodology.
+
+Do NOT solve the unresolved Stage 6 methodology blockers B1–B9.
+
+Do NOT freeze Stage 6.
+
+---
+
+# 3. EXPLICITLY ALLOWED INSPECTION SCOPE
+
+Do NOT explore the repository broadly.
+
+Start from the exact implementation/report references identified by Prompt 22 and inspect only the files containing these legacy symbols or their directly connected Stage 6 exports/tests.
+
+Target symbols:
+
+### Legacy score functions
+
+* `accuracy_score_from_mape`
+* `bias_score`
+* `baseline_advantage_score`
+* `confidence_multiplier`
+
+### Legacy bias/calibration logic
+
+* `detect_persistent_bias`
+* `is_underperforming_baseline`
+* `CALIBRATION_CANDIDATE`
+* `V1.CAL1`
+
+### Legacy evaluation behavior
+
+* numeric Reliability calculation
+* legacy Seasonal Naive implementation using `history[-lag]`
+* related legacy Calibration construction
+
+### Related exports/tests
+
+Only inspect exports/imports/tests directly referencing the above symbols or behaviors.
+
+Do NOT search for generic names such as `score`, `reliability`, `calibration`, or `baseline` across the whole repository.
+
+Use targeted symbol/reference searches only.
+
+---
+
+# 4. FIRST STEP — TARGETED DISCOVERY ONLY
+
+Before changing code:
+
+1. Locate the exact definitions of the listed legacy symbols.
+2. Locate their direct call sites.
+3. Locate their direct exports/imports.
+4. Locate tests that explicitly assert these legacy behaviors as valid.
+5. Identify whether each symbol is:
+
+   * production-executable,
+   * test-only,
+   * exported API,
+   * or dead/unreachable.
+
+Do NOT perform broader architecture exploration.
+
+Do NOT inspect unrelated modules merely because they mention Stage 6 concepts.
+
+Produce a short internal scope map before implementation.
+
+If removing a symbol would require touching an unrelated module outside this explicit scope, STOP and report the dependency instead of expanding the task.
+
+---
+
+# 5. REQUIRED IMPLEMENTATION
+
+For every confirmed legacy executable path:
+
+## A. Remove or de-authorize unauthorized numeric scoring
+
+The following MUST NOT remain executable as authoritative Stage 6 methodology:
+
+* `accuracy_score_from_mape(...)`
+* `bias_score(...)`
+* `baseline_advantage_score(...)`
+* `confidence_multiplier(...)`
+
+Remove them from the production Stage 6 execution path.
+
+If complete deletion is safe within the explicitly allowed scope, delete them.
+
+If deletion would break unrelated infrastructure, de-authorize them so they cannot be used by the production Stage 6 path.
+
+Do NOT replace them with invented mappings.
+
+Do NOT create new numeric thresholds.
+
+---
+
+## B. Remove/de-authorize legacy persistent-bias thresholds
+
+The following MUST NOT remain authoritative:
+
+* `detect_persistent_bias(min=5, threshold=5%)`
+* `is_underperforming_baseline(count>=5)`
+
+These numeric criteria were not authorized by the locked Stage 6 methodology.
+
+They MUST NOT determine Calibration state or Reliability.
+
+Do NOT replace them with alternative thresholds.
+
+Do NOT infer new persistence criteria.
+
+---
+
+## C. Remove/de-authorize legacy Calibration Candidate path
+
+The following legacy behavior MUST no longer be executable as authoritative Stage 6 behavior:
+
+* `CALIBRATION_CANDIDATE`
+* automatic creation of `V1.CAL1`
+* `holdout_passed` being sufficient to create a calibrated model/version
+* any automatic calibration transition based on the unauthorized legacy thresholds
+
+The authorized Stage 6 path currently supports:
+
+* `NO_CALIBRATION`
+
+while calibration methodology remains unresolved.
+
+Preserve that fail-closed behavior.
+
+Do NOT implement the missing calibration methodology in this prompt.
+
+Do NOT create a new Calibration Candidate algorithm.
+
+---
+
+## D. Remove/de-authorize legacy numeric Reliability
+
+The old path MUST NOT produce numeric Reliability using unauthorized mappings or thresholds.
+
+The production behavior must remain:
+
+* Reliability unavailable / `None` where the methodology is unresolved.
+
+Do NOT substitute:
+
+* `Performance Score`
+* `Accuracy`
+* `Bias`
+* any other component
+
+as Reliability.
+
+Do NOT invent a fallback.
+
+---
+
+## E. Legacy Seasonal Naive
+
+The legacy Seasonal Naive implementation using:
+
+`history[-lag]`
+
+MUST NOT remain an independently executable authoritative Stage 6 baseline if its seasonal period/history/PIT methodology is not explicitly authorized.
+
+Do NOT invent a seasonal period.
+
+Do NOT choose a fallback lag.
+
+Do NOT create numeric expected values for the unresolved Seasonal Naive methodology.
+
+If the new P19/P21 path already fails closed correctly, preserve that behavior.
+
+Only remove/de-authorize the legacy executable path that bypasses the current methodology gate.
+
+---
+
+# 6. PRESERVE THE NEW P18–P21 PATH
+
+This is critical.
+
+Do NOT modify the architecture or behavior established by:
+
+* Prompt 18 — Evaluation Data Foundation
+* Prompt 19 — Metrics + Baseline
+* Prompt 20 — Reliability + Calibration Governance
+* Prompt 21 — Production Integration
+
+The following behavior MUST remain intact:
+
+* Forecast → Actual identity
+* Actual may be published after Forecast Cutoff
+* PIT applies to forecast/evaluation inputs, not the Actual outcome
+* invalid ReportVersion is rejected
+* horizon isolation
+* model-version isolation
+* duplicate handling
+* NULL != 0
+* invalid/suspicious/unmapped/restated handling
+* exact Error semantics
+* MAPE/Bias fail-closed behavior
+* unresolved Seasonal Naive methodology remains unavailable
+* unresolved Reliability methodology remains unavailable
+* Calibration remains `NO_CALIBRATION` unless explicitly authorized
+* no Forecast × (1 + Bias)
+* no Reliability → Forward P/E
+* no Stage 5 modification
+
+---
+
+# 7. TEST MIGRATION
+
+Legacy tests that currently assert unauthorized methodology as correct MUST be changed.
+
+They must NOT simply be deleted without replacement where doing so would leave the de-authorization unprotected.
+
+Convert them into tests that prove the legacy methodology is no longer executable/authoritative.
+
+Examples of acceptable assertions:
+
+* legacy numeric scoring is no longer callable from the production Stage 6 path;
+* legacy Calibration Candidate cannot be produced;
+* unauthorized threshold logic cannot determine Calibration;
+* legacy numeric Reliability cannot be produced;
+* unresolved Seasonal Naive methodology fails closed;
+* new production path remains unaffected.
+
+Do NOT create numeric expected values for unresolved methodology.
+
+Do NOT preserve old tests merely because they are green.
+
+A test passing is not methodology authority.
+
+---
+
+# 8. SIX-LAYER TESTING REQUIREMENT
+
+Use the Stage 6 multi-layer testing doctrine.
+
+## Layer 1 — Unit / Formula
+
+Verify removal/de-authorization of the targeted legacy functions and behaviors.
+
+## Layer 2 — Contract / Boundary
+
+Verify that unauthorized legacy methodology cannot cross into the Stage 6 production contract.
+
+## Layer 3 — Production-Path / Integration
+
+Exercise the actual Stage 6 production path and prove that:
+
+* Reliability remains unavailable where methodology is unresolved;
+* Calibration remains fail-closed;
+* legacy score functions cannot affect the result.
+
+## Layer 4 — Adversarial / Negative
+
+Explicitly test attempts to trigger:
+
+* legacy numeric Reliability;
+* `CALIBRATION_CANDIDATE`;
+* `V1.CAL1`;
+* old persistent-bias thresholds;
+* old baseline-underperformance threshold;
+* legacy Seasonal Naive fallback.
+
+These attempts must fail closed or be unreachable.
+
+## Layer 5 — Regression
+
+Run the relevant Stage 6 regression suite.
+
+Then run:
+
+`pytest src/tests -v`
+
+Do not modify unrelated failing tests.
+
+## Layer 6 — Independent Audit
+
+Before completion, perform a narrow independent check of the exact legacy symbols listed in this prompt.
+
+Confirm they are either:
+
+* removed,
+* unreachable from production Stage 6,
+* explicitly de-authorized,
+* or test-only with no production authority.
+
+Do not perform a repository-wide audit.
+
+---
+
+# 9. EXPLICITLY FORBIDDEN IN THIS PROMPT
+
+Do NOT:
+
+* solve B1 Seasonal Naive methodology;
+* solve B2 Reliability mappings;
+* solve B3 persistence definition;
+* solve B4 Calibration transition methodology;
+* solve B5 ReportVersion tie-break methodology;
+* solve B6 data-state participation;
+* solve B7 unavailable Reliability methodology;
+* solve B8 baseline-underperformance persistence;
+* solve B9 duplicate-key methodology;
+* solve `ZERO_ACTUAL_UNRESOLVED`;
+* introduce new thresholds;
+* introduce new score mappings;
+* introduce new confidence multipliers;
+* introduce new Calibration rules;
+* introduce new Reliability fallback logic;
+* modify Stage 5;
+* modify Stage 4;
+* modify Stage 7;
+* modify valuation/P/E logic;
+* modify Forecast Engine logic;
+* redesign Stage 6 architecture.
+
+This prompt is ONLY legacy de-authorization/removal.
+
+---
+
+# 10. STOP CONDITIONS
+
+STOP immediately and report if:
+
+1. A required dependency is outside the explicitly allowed Stage 6 legacy files/symbols.
+2. Removing a legacy symbol would require changing Stage 5, Stage 4, or Stage 7.
+3. The new P18–P21 production path would need architectural modification to complete the task.
+4. A methodology decision is required that is not explicitly authorized by the Stage 6 specification.
+5. You discover that the legacy behavior is actually required by the new production path.
+6. You would need to invent a threshold, score mapping, seasonal period, persistence rule, or fallback.
+
+Do NOT solve the blocker by expanding scope.
+
+Report the exact dependency and stop.
+
+---
+
+# 11. REQUIRED FINAL REPORT
+
+At the end, report:
+
+### A. Legacy paths found
+
+List the exact legacy symbols/behaviors discovered.
+
+### B. De-authorized/removed
+
+For each one, state exactly what changed.
+
+### C. Preserved
+
+Confirm that P18–P21 behavior remains intact.
+
+### D. Tests
+
+Report:
+
+* Layer 1 result
+* Layer 2 result
+* Layer 3 result
+* Layer 4 result
+* Layer 5 result
+* Layer 6 result
+* focused Stage 6 test count
+* full `pytest src/tests -v` result
+
+### E. Remaining methodology blockers
+
+Explicitly state that this prompt did NOT resolve:
+
+* B1
+* B2
+* B3
+* B4
+* B5
+* B6
+* B7
+* B8
+* B9
+* ZERO_ACTUAL_UNRESOLVED
+
+unless a later authorized prompt resolves them.
+
+### F. Stage 6 freeze status
+
+The final status MUST remain:
+
+**STAGE 6 NOT FROZEN**
+
+Do NOT declare Stage 6 freeze eligibility from this prompt alone.
+
+The purpose of this prompt is only to remove the B-LEGACY implementation blocker so that a later independent audit can reassess the remaining methodology blockers.
+
+---
+
+# 12. FINAL STOP CONDITION
+
+After completing the targeted implementation and tests:
+
+STOP.
+
+Do not continue into methodology design.
+
+Do not continue into a new Stage 6 prompt.
+
+Do not modify any other stage.
+
+Do not commit or push anything.
+
+-----File Writing Rules (Critical — to prevent validation errors)-----
+When using the Write tool, follow these rules strictly:
+
+Never write a file all at once. Write a maximum of 150 lines per Write call.
+
+Always complete the structure. The parameters file_path and content must both be sent as complete strings. If the content is long, split it into multiple parts and continue with the Edit tool.
+
+Follow this pattern:
+
+First: Write with the file header, imports, and main skeleton (maximum 100 lines).
+
+Then: Edit to add each subsequent section (100–150 lines per call).
+
+Finally: Edit to close the file and complete the remaining functions.
+
+Before every Write, check whether the intended content exceeds 150 lines. If yes, divide it into logical chunks.
+
+If a Write call fails, do not immediately retry. First check which parameter was incomplete, then continue with a smaller Write or use Edit.
+
+For Python files: First write only the imports and def main(), then add functions one by one using Edit.
+===========================================================
+

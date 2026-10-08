@@ -3773,3 +3773,110 @@ BEHAVIORALLY PROVEN: areas 1, 2 (new path), 3, 5, 6, 7, 8, 9, 10-comparison, 11,
 
 STOP.
 ================================================================
+
+# REPORT — Stage 6 Prompt 23
+**Legacy Methodology De-Authorization — `analyzer` — local working tree only, no commits**
+
+## A. Legacy paths found
+
+Prompt 22 §8 identified B-LEGACY: the new P18–P21 path fails closed correctly, but older
+Stage 6 paths remained executable and test-pinned as authoritative. Targeted discovery
+confirmed every listed symbol lived in the explicitly allowed P23 scope:
+
+* `accuracy_score_from_mape`, `bias_score`, `baseline_advantage_score`,
+  `confidence_multiplier` — defined in `src/evaluation/metrics.py`.
+* `detect_persistent_bias(min=5, threshold=5%)`,
+  `is_underperforming_baseline(count>=5)` — defined in `src/evaluation/engine.py`.
+* Numeric Reliability + `CALIBRATION_CANDIDATE` via `evaluate_forecasts`,
+  `V1.CAL1` via `calibration_model_version(holdout_passed)` — `engine.py`
+  (`ForecastEvaluationEngine`), exported from `src/evaluation/__init__.py`.
+* Legacy carriers `ForecastEvaluationResult` / `ReliabilityAssessment`
+  (`schema.py`); legacy Seasonal Naive `history[-lag]` (`engine.py`).
+* Tests asserting them as correct in `src/tests/test_stage6_evaluation.py`.
+
+No dependency outside the allowed scope was encountered; no STOP condition triggered.
+
+## B. De-authorized / removed
+
+* `src/evaluation/engine.py` — **deleted** (222 lines). All six score/threshold
+  functions, `ForecastEvaluationEngine`, `select_point_in_time_actual`,
+  `seasonal_naive_forecast`, `evaluate_forecasts`, `calibration_model_version`
+  are gone.
+* `src/evaluation/metrics.py` — the four legacy score/threshold helpers removed;
+  only authorized P19 helpers remain
+  (`calculate_error`, `calculate_percentage_error`, `calculate_ape`,
+  `classify_regime`, `calculate_mape`, `calculate_bias`,
+  `observation_confidence`, `calculate_relative_improvement`,
+  `calculate_pe` alias).
+* `src/evaluation/schema.py` — legacy carriers `ForecastEvaluationResult` /
+  `ReliabilityAssessment` removed; P23 NOTE documents the authorized carriers.
+* `src/evaluation/__init__.py` — top-level exports removed; package exports
+  nothing. The only remaining legacy mentions are de-authorization comments.
+* Tests migrated per P23 §7 (not deleted-without-replacement):
+  `test_stage6_evaluation.py` rewritten as de-authorization proofs
+  (legacy symbols not importable, engine module unfindable,
+  no legacy token in any production source, pipeline still fail-closed);
+  `test_stage6_reliability_governance.py::test_legacy_engine_path_removed`
+  asserts deletion rather than isolation.
+
+Deliberately preserved (NOT legacy, verified): `VersionedComponentScores`
+caller-supplied fields (P20 authorized assembly, not mappings);
+`CALIBRATION_CANDIDATE`/`CALIBRATED` as refused literals
+(`reliability.py` `__post_init__` raises, `refuse_calibration_transition`
+records refusal); the `.CAL1` mint line guarded behind unreachable
+`state == CALIBRATED` (always returns None today — refusal coverage, not a path).
+
+## C. Preserved (P18–P21 intact)
+
+* Observation → aggregate → governance → verdict chain untouched;
+  `pipeline.py` imports only fail-closed governance functions.
+* Reliability always `WithheldReliability(reliability=None)`;
+  Calibration always `NO_CALIBRATION` with B3/B4 named.
+* `CALIBRATED` unconstructible; `derive_calibrated_version_name` None for every
+  reachable verdict; no version minted; P/E identity; records never mutated.
+* Cutoff-vs-publication semantics, horizon/version isolation, duplicate
+  wholesale quarantine, NULL != 0, TTM conservation, holdout/OOS rejection —
+  all re-proven by the untouched P18/P19/P21 suites (107 tests, 0 changed).
+* No Stage 4/5/7 file touched. No threshold, mapping, multiplier, period,
+  persistence rule, or fallback invented.
+
+## D. Tests (six-layer doctrine)
+
+* Layer 1 (unit): 7 de-authorization tests in `test_stage6_evaluation.py` —
+  each legacy symbol gone from its home module. PASS.
+* Layer 2 (contract/boundary): no legacy token in any of the six production
+  sources; package surface exports no legacy methodology. PASS.
+* Layer 3 (production-path): authorized pipeline still withholds Reliability
+  and stays `NO_CALIBRATION` after surgery (38 P21 tests). PASS.
+* Layer 4 (adversarial): legacy scoring, legacy Seasonal Naive minting,
+  `CALIBRATION_CANDIDATE`, `V1.CAL1`, old thresholds — all fail closed or
+  unreachable. PASS.
+* Layer 5 (regression): focused 126 passed (7 P23 + 28 P18 + 21 P19 + 32 P20 +
+  38 P21) in ~1s; full `pytest src/tests` → **810 passed, 2 skipped**
+  (both skips pre-existing environmental: Codal sample PDF, openpyxl).
+  No unrelated test created, modified, weakened, or bypassed.
+* Layer 6 (independent audit): narrow re-check of every P23-listed symbol —
+  none defined in `src/` production code; `engine.py` absent from disk;
+  `history[-` zero matches; `CALIBRATION_CANDIDATE` only as refused literal;
+  `.CAL1` only behind unreachable guard; `ForecastEvaluationEngine` only in
+  de-authorization comments. **B-LEGACY resolved.**
+
+## E. Remaining methodology blockers (NOT resolved by this prompt)
+
+B1 (Seasonal Naive construction), B2 (four Reliability mappings), B3
+(persistence definition), B4 (candidate→calibrated transition), B5
+(ReportVersion tie-break), B6 (per-state participation), B7
+(unavailable-component rule), B8 (baseline-underperformance persistence), B9
+(duplicate-key definition), ZERO_ACTUAL_UNRESOLVED — all carried unchanged.
+Fail-closed posture holds for each; none bypassed, none invented.
+
+## F. Stage 6 freeze status
+
+**STAGE 6 NOT FROZEN**
+
+This prompt removed the B-LEGACY implementation blocker only. A later
+independent audit must reassess the remaining methodology blockers B1–B9
+before any freeze decision.
+
+STOP.
+================================================================

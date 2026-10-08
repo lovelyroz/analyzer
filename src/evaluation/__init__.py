@@ -1,16 +1,10 @@
 """
-Forecast Evaluation & Calibration Module (Stage 6)
+Forecast Evaluation (Stage 6).
+
+P23 — legacy de-authorization: this package exports nothing at the top
+level. The unauthorized legacy path (``ForecastEvaluationEngine``,
+legacy score/threshold helpers, legacy carriers) was removed. The
+authorized P18–P21 production path lives in the ``observation``,
+``aggregate``, ``reliability``, and ``pipeline`` submodules and is
+imported directly from those modules.
 """
-
-from src.evaluation.schema import ForecastEvaluationResult, ReliabilityAssessment
-from src.evaluation.metrics import calculate_pe, calculate_mape, detect_persistent_bias
-from src.evaluation.engine import ForecastEvaluationEngine
-
-__all__ = [
-    "ForecastEvaluationResult",
-    "ReliabilityAssessment",
-    "calculate_pe",
-    "calculate_mape",
-    "detect_persistent_bias",
-    "ForecastEvaluationEngine",
-]
