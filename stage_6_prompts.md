@@ -1625,3 +1625,564 @@ If a Write call fails, do not immediately retry. First check which parameter was
 For Python files: First write only the imports and def main(), then add functions one by one using Edit.
 ===========================================================
 
+Stage 6 Prompt 24 - Independent Post-P23 De-authorization Audit
+
+You are performing **Stage 6 Prompt 24** for the repository:
+
+`lovelyroz/analyzer`
+
+This is a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of explicit methodology boundaries are more important than implementation speed.
+
+## 1. PURPOSE
+
+Prompt 23 removed the unauthorized Legacy Stage 6 methodology identified by Prompt 22.
+
+Prompt 23 reported:
+
+* `src/evaluation/engine.py` deleted;
+* legacy scoring functions removed;
+* legacy numeric Reliability path removed;
+* legacy Seasonal Naive path removed;
+* legacy Calibration Candidate path removed;
+* legacy exports removed;
+* legacy tests migrated to de-authorization tests;
+* focused Stage 6: 126 passed;
+* full suite: 810 passed, 2 skipped;
+* B-LEGACY resolved.
+
+This prompt is an **independent, READ-ONLY post-remediation audit**.
+
+Its purpose is to independently verify that:
+
+1. B-LEGACY is actually resolved;
+2. no unauthorized Legacy Stage 6 executable path remains;
+3. Prompt 23 did not accidentally weaken or bypass the P18–P21 production path;
+4. the six-layer testing doctrine still holds;
+5. the remaining B1–B9 methodology gaps are correctly classified and have NOT been silently converted into implementation rules.
+
+This prompt MUST NOT implement any methodology.
+
+This prompt MUST NOT modify code.
+
+This prompt MUST NOT modify tests.
+
+This prompt MUST NOT modify `temp_report.md`.
+
+Do NOT freeze Stage 6 unless every required condition explicitly passes.
+
+---
+
+# 2. HARD FIREWALL
+
+Work locally only.
+
+Do NOT:
+
+* access GitHub;
+* use GitHub CLI/API;
+* fetch;
+* pull;
+* push;
+* modify remotes;
+* create/delete/switch branches;
+* commit;
+* inspect Git history;
+* perform repository-wide exploration.
+
+Stage 1–5 are frozen.
+
+Stage 4 MUST NOT be modified.
+
+Stage 5 MUST NOT be modified.
+
+Stage 7 MUST NOT be modified.
+
+Do not inspect unrelated repository areas.
+
+Do not perform a broad architecture review.
+
+---
+
+# 3. REQUIRED INPUTS
+
+Read:
+
+1. `06_Stage6_Forecast_Evaluation.md`
+2. `temp_report.md`
+3. the Prompt 22 report
+4. the Prompt 23 report
+
+Then inspect only the directly relevant current Stage 6 files.
+
+The audit MUST be based on the current working tree, not merely on the claims in the Prompt 23 report.
+
+Do not trust Prompt 23's conclusions without independently verifying them.
+
+---
+
+# 4. EXPLICIT AUDIT SCOPE
+
+The primary audit scope is the current Stage 6 package and the exact legacy symbols/paths previously identified.
+
+Inspect only the files necessary to verify:
+
+### Legacy scoring
+
+* `accuracy_score_from_mape`
+* `bias_score`
+* `baseline_advantage_score`
+* `confidence_multiplier`
+
+### Legacy persistence/bias
+
+* `detect_persistent_bias`
+* `is_underperforming_baseline`
+
+### Legacy evaluation
+
+* `ForecastEvaluationEngine`
+* `evaluate_forecasts`
+* `select_point_in_time_actual`
+* `seasonal_naive_forecast`
+* legacy numeric Reliability calculation
+
+### Legacy calibration
+
+* `CALIBRATION_CANDIDATE`
+* `CALIBRATED`
+* `calibration_model_version`
+* `V1.CAL1`
+* `holdout_passed`
+
+### Legacy carriers/exports
+
+* `ForecastEvaluationResult`
+* `ReliabilityAssessment`
+* package-level exports from `src/evaluation/__init__.py`
+
+### New production path
+
+Verify only the directly relevant P18–P21 path:
+
+* `observation.py`
+* `aggregate.py`
+* `reliability.py`
+* `pipeline.py`
+* `schema.py`
+* directly relevant Stage 6 tests
+
+Do NOT search the whole repository for generic words such as:
+
+* `reliability`
+* `calibration`
+* `score`
+* `baseline`
+
+Use targeted symbol/reference checks.
+
+---
+
+# 5. INDEPENDENT B-LEGACY VERIFICATION
+
+Independently determine whether each of the following remains executable in production Stage 6:
+
+| Legacy behavior                           | Required result            |
+| ----------------------------------------- | -------------------------- |
+| `accuracy_score_from_mape`                | absent / non-executable    |
+| `bias_score`                              | absent / non-executable    |
+| `baseline_advantage_score`                | absent / non-executable    |
+| `confidence_multiplier`                   | absent / non-executable    |
+| `detect_persistent_bias`                  | absent / non-executable    |
+| `is_underperforming_baseline`             | absent / non-executable    |
+| `ForecastEvaluationEngine`                | absent / non-executable    |
+| `evaluate_forecasts`                      | absent / non-executable    |
+| `select_point_in_time_actual`             | absent / non-executable    |
+| `seasonal_naive_forecast`                 | absent / non-executable    |
+| old numeric Reliability                   | absent                     |
+| legacy `CALIBRATION_CANDIDATE` transition | unreachable                |
+| `V1.CAL1` creation                        | unreachable                |
+| `holdout_passed` → calibration            | not authoritative          |
+| legacy result carriers                    | absent / non-authoritative |
+| legacy package exports                    | absent                     |
+
+Do NOT interpret a comment containing an old token as an executable implementation.
+
+Distinguish:
+
+* executable code;
+* test-only code;
+* comments/documentation;
+* intentionally refused state literals.
+
+---
+
+# 6. CRITICAL CALIBRATION NUANCE
+
+The current Stage 6 architecture may still contain:
+
+* `CALIBRATION_CANDIDATE`
+* `CALIBRATED`
+* refusal states
+* `derive_calibrated_version_name`
+* `.CAL1` references
+
+These are NOT automatically blockers.
+
+The question is:
+
+> Can an unresolved methodology currently cause a real production transition into CALIBRATION_CANDIDATE or CALIBRATED?
+
+Verify behaviorally.
+
+Acceptable current behavior while B3/B4 remain unresolved:
+
+```text
+NO_CALIBRATION
+```
+
+and/or an explicit refusal/unavailable state.
+
+Unacceptable behavior:
+
+```text
+bias threshold
+→ CALIBRATION_CANDIDATE
+→ CALIBRATED
+→ new model version
+```
+
+without authoritative methodology.
+
+Do not remove legitimate refusal-state representations merely because their names exist.
+
+---
+
+# 7. CRITICAL RELIABILITY NUANCE
+
+The current Stage 6 path intentionally withholds numeric Reliability while B2/B7 remain unresolved.
+
+Verify that:
+
+```text
+Reliability = None
+```
+
+or equivalent explicit unavailable state remains the production result where the methodology is unresolved.
+
+Verify that the system does NOT silently use:
+
+* Performance Score;
+* Accuracy;
+* Bias;
+* Observation Confidence;
+* Baseline Improvement;
+* arbitrary constants
+
+as Reliability.
+
+Do not invent a numeric expected Reliability.
+
+---
+
+# 8. NEW PRODUCTION PATH INTEGRITY
+
+Independently trace:
+
+```text
+Forecast
+→ Actual
+→ PIT
+→ Error
+→ Accuracy/MAPE
+→ Bias
+→ Baseline Comparison
+→ Observation Sufficiency
+→ Reliability Governance
+→ Calibration Governance
+→ OOS
+```
+
+Verify that Prompt 23 did not break:
+
+* later-published Actual semantics;
+* PIT input protection;
+* invalid ReportVersion handling;
+* horizon isolation;
+* Model Version isolation;
+* duplicate quarantine;
+* NULL != 0;
+* zero/sign-change quarantine;
+* MAPE;
+* Bias;
+* observation sufficiency;
+* baseline comparison;
+* OOS contamination protection;
+* Forward P/E identity protection.
+
+Do not redesign anything.
+
+---
+
+# 9. SIX-LAYER INDEPENDENT TEST AUDIT
+
+Prompt 23 reported all six layers.
+
+Independently inspect whether the tests actually prove the claims.
+
+## Layer 1 — Unit / Formula
+
+Verify that de-authorization tests actually establish absence/non-executability.
+
+Do not accept a test that merely checks a comment or source string.
+
+## Layer 2 — Contract / Boundary
+
+Verify that removed legacy functionality cannot enter the public Stage 6 production contract through imports/exports.
+
+## Layer 3 — Production Path
+
+Verify that the actual `run_evaluation_pipeline` path remains fail-closed.
+
+Do not accept helper-only tests as production proof.
+
+## Layer 4 — Adversarial
+
+Independently challenge attempts to trigger:
+
+* legacy scoring;
+* legacy numeric Reliability;
+* legacy Seasonal Naive;
+* `CALIBRATION_CANDIDATE`;
+* `CALIBRATED`;
+* `V1.CAL1`;
+* old persistence thresholds;
+* old baseline-underperformance threshold.
+
+Expected result: absent, unreachable, or explicit fail-closed behavior.
+
+## Layer 5 — Regression
+
+Run:
+
+```text
+pytest <focused Stage 6 suite> -v
+```
+
+Then, only if focused tests pass:
+
+```text
+pytest src/tests -v
+```
+
+Do not modify tests.
+
+Do not weaken tests.
+
+Do not fix failures during this audit.
+
+If tests fail, classify the failure and STOP.
+
+## Layer 6 — Independent Audit
+
+This prompt itself constitutes the independent audit layer.
+
+Do not rely on Prompt 23's Layer 6 conclusion.
+
+---
+
+# 10. METHODOLOGY-AUTHORITY AUDIT
+
+Confirm independently that Prompt 23 did NOT accidentally introduce any of the following:
+
+* new numeric thresholds;
+* new score mappings;
+* new Reliability mappings;
+* new confidence multipliers;
+* new persistence criteria;
+* new Calibration transition rules;
+* new seasonal periods;
+* new Seasonal Naive fallback rules;
+* new ReportVersion tie-break rules;
+* new data-state scoring rules;
+* new duplicate-key rules;
+* new baseline-selection rules.
+
+Existing unresolved blockers remain:
+
+* B1 — Seasonal Naive construction;
+* B2 — Reliability mappings;
+* B3 — persistence definition;
+* B4 — Calibration transition;
+* B5 — ReportVersion tie-break;
+* B6 — data-state participation;
+* B7 — unavailable Reliability components;
+* B8 — baseline-underperformance persistence;
+* B9 — duplicate-key definition;
+* `ZERO_ACTUAL_UNRESOLVED`.
+
+Do NOT solve them.
+
+Classify each as:
+
+* RESOLVED
+* UNRESOLVED METHODOLOGY AUTHORITY
+* IMPLEMENTATION DEFECT
+
+Do not classify an unresolved methodology as resolved merely because the system fails closed.
+
+---
+
+# 11. STAGE 5 / STAGE 7 BOUNDARY CHECK
+
+Verify that Prompt 23 did not modify:
+
+* Stage 5 implementation;
+* Stage 5 persistence;
+* Stage 5 ForecastEngine;
+* Stage 4 adapter/evidence logic;
+* Stage 7 valuation;
+* Forward P/E calculation.
+
+This is a boundary verification only.
+
+Do not reopen those stages.
+
+---
+
+# 12. REQUIRED PROOF CLASSIFICATION
+
+For each major audit item classify exactly one:
+
+* **BEHAVIORALLY PROVEN**
+* **STRUCTURALLY VERIFIED**
+* **NOT PROVEN**
+
+Important:
+
+A green test alone does NOT make methodology authoritative.
+
+A deleted function may be structurally verified as absent.
+
+A production-path behavior should be behaviorally proven only when the actual path is exercised.
+
+An unresolved methodology must remain NOT PROVEN even if fail-closed behavior is proven.
+
+---
+
+# 13. BLOCKER RULE
+
+If ANY of the following is discovered:
+
+1. an executable unauthorized Legacy Stage 6 path remains;
+2. Prompt 23 broke the P18–P21 production path;
+3. a new unauthorized methodology was introduced;
+4. Stage 5/Stage 4/Stage 7 was modified;
+5. a methodology gap was silently converted into a numeric rule;
+6. a regression failure is caused by Prompt 23;
+
+then:
+
+**STOP.**
+
+Do not fix anything.
+
+Report the exact blocker and classify it as:
+
+* implementation defect;
+* methodology-authority gap;
+* regression;
+* boundary violation.
+
+---
+
+# 14. FREEZE DECISION
+
+Do NOT freeze Stage 6 merely because B-LEGACY is resolved.
+
+For this prompt, the maximum acceptable result is:
+
+### `PASS — B-LEGACY REMEDIATION VERIFIED`
+
+This means:
+
+* B-LEGACY independently verified as resolved;
+* P18–P21 path preserved;
+* no new unauthorized methodology;
+* all six testing layers independently verified;
+* remaining B1–B9 / ZERO_ACTUAL_UNRESOLVED remain explicitly unresolved.
+
+If any of those conditions fail:
+
+### `FAIL — REMEDIATION VERIFICATION FAILED`
+
+Stage 6 remains NOT FROZEN.
+
+Even a PASS in this prompt does NOT freeze Stage 6.
+
+---
+
+# 15. REQUIRED REPORT
+
+Append to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 24`
+
+Include:
+
+1. files inspected;
+2. independent B-LEGACY verification;
+3. legacy symbol status table;
+4. new production-path verification;
+5. six-layer testing audit;
+6. methodology-authority audit;
+7. Stage 5/Stage 7 boundary verification;
+8. focused test result;
+9. full regression result;
+10. proof-status classification;
+11. remaining blockers;
+12. final classification.
+
+The report MUST end with:
+
+`Stage 6 is NOT declared frozen.`
+
+---
+
+# 16. FINAL STOP
+
+This is a READ-ONLY audit.
+
+Do not:
+
+* modify code;
+* modify tests;
+* modify specifications;
+* modify Stage 5;
+* modify Stage 4;
+* modify Stage 7;
+* implement B1–B9;
+* commit;
+* push.
+
+After writing the report, STOP.
+-----File Writing Rules (Critical — to prevent validation errors)-----
+When using the Write tool, follow these rules strictly:
+
+Never write a file all at once. Write a maximum of 150 lines per Write call.
+
+Always complete the structure. The parameters file_path and content must both be sent as complete strings. If the content is long, split it into multiple parts and continue with the Edit tool.
+
+Follow this pattern:
+
+First: Write with the file header, imports, and main skeleton (maximum 100 lines).
+
+Then: Edit to add each subsequent section (100–150 lines per call).
+
+Finally: Edit to close the file and complete the remaining functions.
+
+Before every Write, check whether the intended content exceeds 150 lines. If yes, divide it into logical chunks.
+
+If a Write call fails, do not immediately retry. First check which parameter was incomplete, then continue with a smaller Write or use Edit.
+
+For Python files: First write only the imports and def main(), then add functions one by one using Edit.
+===========================================================

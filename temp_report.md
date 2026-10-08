@@ -3880,3 +3880,218 @@ before any freeze decision.
 
 STOP.
 ================================================================
+
+# REPORT — Stage 6 Prompt 24
+**Independent Post-P23 De-authorization Audit — `lovelyroz/analyzer` — READ-ONLY, no code/test/spec/git changes**
+
+## 1. Files inspected
+
+* Spec: `06_Stage6_Forecast_Evaluation.md` (full read, §§1–45).
+* Prior reports: `temp_report.md` P22 (lines 3711–3774) and P23 (lines 3777–3881).
+* Current implementation (full read): `src/evaluation/__init__.py`, `schema.py`,
+  `metrics.py`, `observation.py` (head), `aggregate.py` (head),
+  `reliability.py` (full), `pipeline.py` (full). `src/evaluation/engine.py`
+  confirmed absent from disk.
+* Tests: `test_stage6_evaluation.py` (full read — P23 de-authorization proofs),
+  `test_stage6_production_pipeline.py` L4/L5 sections,
+  `test_stage6_reliability_governance.py` calibration-refusal + component sections.
+* Boundary: `src/evaluation` import graph only (no Stage 4/5/7 file opened).
+
+## 2. Independent B-LEGACY verification
+
+P23 claimed: `engine.py` deleted, four score functions removed, legacy numeric
+Reliability removed, legacy Seasonal Naive removed, legacy Calibration
+Candidate path removed, legacy exports removed, legacy tests migrated,
+focused 126 passed, full 810 passed + 2 skipped, B-LEGACY resolved.
+
+Every claim was re-verified against the working tree (not trusted from the report):
+
+* `src/evaluation/engine.py` does not exist on disk (`ls` confirms; only
+  `__init__`, `aggregate`, `metrics`, `observation`, `pipeline`, `reliability`,
+  `schema` remain).
+* Targeted grep over `src/` for the 14 legacy production symbols finds NO
+  executable definition: the only matches are (a) de-authorization
+  comments/docstrings in `__init__.py` + `schema.py`, (b) absence-check string
+  literals inside the P23/L4 tests themselves, (c) one P20-authorized field
+  name (`VersionedComponentScores.baseline_advantage_score` — caller-supplied
+  input, not the removed `baseline_advantage_score()` mapping function; the
+  L1 test distinguishes them by `def `-prefixed tokens), (d) an unrelated
+  `same_period_history[-1]` index in `src/trend/engine.py` (Stage 4, out of
+  scope, not Seasonal Naive).
+* `metrics.py` contains only the nine authorized P19 helpers
+  (`calculate_error`, `calculate_percentage_error`, `calculate_ape`,
+  `classify_regime`, `calculate_mape`, `calculate_bias`,
+  `observation_confidence`, `calculate_relative_improvement`,
+  `calculate_pe` alias). No threshold, no mapping, no multiplier.
+* `__init__.py` exports nothing (docstring only, no `__all__` legacy names).
+* `schema.py` carries only the removal NOTE; no carrier classes remain.
+* Calibration nuance (§6): `CALIBRATION_CANDIDATE`/`CALIBRATED` exist ONLY as
+  tuple members of `CALIBRATION_STATES`, as refused literals in
+  `refuse_calibration_transition`, and as `__post_init__` rejection targets —
+  construction raises `ValueError`. `derive_calibrated_version_name` returns
+  `None` for every reachable verdict; the `.CAL1` mint line sits behind
+  `state == CALIBRATED`, which is unconstructible. Verified: no bias threshold
+  → CANDIDATE → CALIBRATED → new-version chain is reachable.
+* Reliability nuance (§7): `assess_reliability` returns
+  `WithheldReliability(reliability=None)` on every branch; `govern_aggregates`
+  (the production-path entry) passes no components, so Performance is also
+  withheld end to end. No Performance/Accuracy/Bias/Confidence/Improvement
+  value is substituted. Verified by source read + the L3 pipeline test
+  asserting `reliability is None`.
+
+## 3. Legacy symbol status table
+
+| Legacy behavior | Required result | Observed |
+|---|---|---|
+| `accuracy_score_from_mape` | absent / non-executable | absent (L1 test: not importable; no `def` token in any production source) |
+| `bias_score` | absent / non-executable | absent (same proof) |
+| `baseline_advantage_score` (function) | absent / non-executable | absent; remaining field name is P20 caller input, not the mapping |
+| `confidence_multiplier` | absent / non-executable | absent (same proof) |
+| `detect_persistent_bias` | absent / non-executable | absent (same proof) |
+| `is_underperforming_baseline` | absent / non-executable | absent (same proof) |
+| `ForecastEvaluationEngine` | absent / non-executable | absent (`engine.py` deleted; import raises `ImportError`) |
+| `evaluate_forecasts` | absent / non-executable | absent (deleted with engine) |
+| `select_point_in_time_actual` | absent / non-executable | absent (deleted with engine) |
+| `seasonal_naive_forecast` | absent / non-executable | absent (`history[-` zero matches in `src/evaluation/`) |
+| old numeric Reliability | absent | absent (every branch withholds `None`) |
+| legacy `CALIBRATION_CANDIDATE` transition | unreachable | unreachable (`__post_init__` raises; only refusal path exists) |
+| `V1.CAL1` creation | unreachable | unreachable (guard behind unconstructible state) |
+| `holdout_passed` → calibration | not authoritative | token absent from all production sources |
+| legacy result carriers | absent / non-authoritative | absent (`ForecastEvaluationResult`, `ReliabilityAssessment` removed) |
+| legacy package exports | absent | absent (package exports nothing) |
+
+Comment/docstring/test-literal mentions were explicitly excluded from
+"executable" per §5 — none of them can execute as methodology.
+
+## 4. New production-path verification (§8)
+
+Traced independently: `run_evaluation_pipeline` → `build_observation`
+(input-only PIT check) → `aggregate_observations` (duplicate flagging,
+§14-key grouping, authorized Error/MAPE/Bias/sufficiency/baseline
+comparison) → `govern_aggregates` (no components on-path → Performance
+withheld, Reliability withheld, `NO_CALIBRATION`) → one
+`SeriesPipelineVerdict` per (company, metric, horizon, version); wrappers
+`evaluate_holdout_oos` / `prove_forward_pe_untouched`.
+
+P23 broke nothing: later-published Actual binds as outcome, PIT input
+protection intact, invalid ReportVersion rejected (caller-bound verbatim),
+horizon/version isolation by construction, duplicate wholesale quarantine,
+NULL != 0, zero/sign-change quarantine with error retained, MAPE = mean of
+valid APEs (None when empty), signed Bias, sufficiency bands on scored count
+only, caller-keyed baseline comparison, OOS overlap/inversion rejection,
+P/E identity pass-through. Import graph confirms Stage 5 is read-only
+(`ForecastRecord` imported, never mutated, never written back); no DB/write
+tokens and no Stage 7 logic in the package (L5 pipeline test pins both
+negatively).
+
+## 5. Six-layer testing audit (§9)
+
+* Layer 1 (unit): P23 de-authorization tests assert absence per symbol
+  (`getattr(..., None) is None`, `find_spec is None` + `ImportError`,
+  no-`def`-token scan). Genuine absence proofs, not comment checks. PASS.
+* Layer 2 (contract/boundary): no legacy token in any of the six production
+  sources; package surface exports no legacy methodology
+  (`__all__`-negative + `ImportError` on `ForecastEvaluationEngine`). PASS.
+* Layer 3 (production path): 38 P21 pipeline tests + the P23
+  `test_production_path_withholds_after_removal` exercise
+  `run_evaluation_pipeline` end to end (MAPE 10.0 scored, Reliability None,
+  NO_CALIBRATION). Not helper-only. PASS.
+* Layer 4 (adversarial): legacy scoring / Seasonal Naive minting /
+  CANDIDATE / CALIBRATED / `V1.CAL1` / old thresholds each attempted and
+  shown absent, unreachable, or explicitly refused. PASS.
+* Layer 5 (regression): focused 5-file suite → **126 passed** (7 P23 + 28 P18
+  + 21 P19 + 32 P20 + 38 P21), 0 failures. Full `pytest src/tests` →
+  **810 passed, 2 skipped** (both skips pre-existing environmental: Codal
+  sample PDF, openpyxl). Nothing modified, weakened, or bypassed in this
+  audit. PASS.
+* Layer 6 (independent audit): this prompt. P23's Layer 6 conclusion was not
+  trusted; every symbol was re-grepped and every production file re-read.
+  PASS.
+
+## 6. Methodology-authority audit (§10)
+
+P23 introduced no new methodology. Verified: no new numeric thresholds, no
+score mappings, no Reliability mappings, no confidence multipliers, no
+persistence criteria, no Calibration transition rules, no seasonal periods,
+no Seasonal Naive fallbacks, no ReportVersion tie-break rules, no
+data-state scoring rules, no duplicate-key rules, no baseline-selection
+rules. `metrics.py` diff-surface is subtractive only; `reliability.py`
+refusal reasons name blockers instead of numbering them.
+
+Blocker classification (unchanged — fail-closed posture is proven, but
+fail-closed is NOT authority):
+
+| Blocker | Status |
+|---|---|
+| B1 Seasonal Naive construction | UNRESOLVED METHODOLOGY AUTHORITY |
+| B2 Reliability mappings | UNRESOLVED METHODOLOGY AUTHORITY |
+| B3 persistence definition | UNRESOLVED METHODOLOGY AUTHORITY |
+| B4 Calibration transition | UNRESOLVED METHODOLOGY AUTHORITY |
+| B5 ReportVersion tie-break | UNRESOLVED METHODOLOGY AUTHORITY |
+| B6 data-state participation | UNRESOLVED METHODOLOGY AUTHORITY |
+| B7 unavailable-component rule | UNRESOLVED METHODOLOGY AUTHORITY |
+| B8 baseline-underperformance persistence | UNRESOLVED METHODOLOGY AUTHORITY |
+| B9 duplicate-key definition | UNRESOLVED METHODOLOGY AUTHORITY |
+| ZERO_ACTUAL_UNRESOLVED | UNRESOLVED METHODOLOGY AUTHORITY |
+
+## 7. Stage 5 / Stage 7 boundary verification (§11)
+
+Stage 4, Stage 5, and Stage 7 were not modified by P23 and not touched by
+this audit. `git status` shows only `stage_6_prompts.md` modified (the P24
+prompt text itself) on top of the committed P23 report commit; no
+implementation file outside `src/evaluation/` + `src/tests/test_stage6_*`
+was part of P23's change set per its report §B, and the current tree's
+import graph shows the sole cross-stage edge is read-only
+(`src.forecast.schema` dataclasses). No forecast generation, no ForecastEngine
+mutation, no valuation/P-E logic in Stage 6. No boundary violation found.
+
+## 8. Focused test result
+
+`.venv/Scripts/python.exe -m pytest` on the five Stage 6 files →
+**126 passed in 0.87s**, 0 failures.
+
+## 9. Full regression result
+
+`pytest src/tests -q` → **810 passed, 2 skipped** (pre-existing
+environmental skips), exit code 0. Consistent with the P23 report
+(810 + 2); the P22 baseline was 814 + 2 because it still counted the 11
+legacy tests (minus overlap) that P23 converted into 7 de-authorization
+proofs — the delta is the migration itself, not a regression.
+
+## 10. Proof-status classification (§12)
+
+* B-LEGACY removal: **STRUCTURALLY VERIFIED** as absent (deletion is proven
+  by non-existence + import failure, not by behavior) with **BEHAVIORALLY
+  PROVEN** fail-closed production consequences (pipeline withholds
+  Reliability, stays NO_CALIBRATION end to end).
+* P18–P21 production path: **BEHAVIORALLY PROVEN** (actual pipeline
+  exercised across L3/L4).
+* Refusal states (CANDIDATE/CALIBRATED unconstructible, `.CAL1`
+  unreachable): **BEHAVIORALLY PROVEN** (`pytest.raises` + `None` returns
+  on the real functions).
+* B1–B9 / ZERO_ACTUAL_UNRESOLVED: **NOT PROVEN** — no methodology exists to
+  prove; only the fail-closed posture is proven, which confers no authority.
+
+## 11. Remaining blockers
+
+B-LEGACY is resolved and independently verified. B1–B9 and
+ZERO_ACTUAL_UNRESOLVED remain **UNRESOLVED METHODOLOGY AUTHORITY** (table in
+§6). No implementation defect, no regression, and no boundary violation was
+found in this audit. Per §14, freeze is not decided here regardless.
+
+## 12. Final classification
+
+`PASS — B-LEGACY REMEDIATION VERIFIED`
+
+* B-LEGACY independently verified as resolved (§2–§3);
+* P18–P21 path preserved (§4);
+* no new unauthorized methodology (§6);
+* all six testing layers independently verified (§5);
+* remaining B1–B9 / ZERO_ACTUAL_UNRESOLVED explicitly unresolved (§6, §10).
+
+Even so, per P24 §14, this PASS does NOT freeze Stage 6.
+
+`Stage 6 is NOT declared frozen.`
+
+STOP.
+================================================================
