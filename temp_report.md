@@ -3471,3 +3471,132 @@ Stage 1–5 unmodified (verified: no edits outside `src/evaluation/aggregate.py`
 STOP.
 
 ================================================================
+
+# REPORT — Stage 6 Prompt 20
+**Reliability + Calibration Governance — AUTHORITATIVE-only, fail-closed**
+
+## 1. Authority verdict (precondition)
+
+P17 classified every Reliability mapping (B2: MAPE→Score, Bias→Score,
+Advantage→Score, Confidence Adjustment), the unavailable-component rule
+(B7), the persistence definition (B3), and the candidate→calibrated
+transition (B4) as **UNRESOLVED METHODOLOGY AUTHORITY**, and no decision
+since P19 has resolved any of them. P20's own testing requirement forbids
+numeric expected values for B2/B7/B3/B4 while unresolved: the required
+behavior is fail-closed plus an explicit report of the missing authority.
+This prompt therefore implements a **governance layer, not a scoring
+layer** — no Reliability 0–100 is computed anywhere.
+
+## 2. Files changed
+
+| File | Change |
+|---|---|
+| [src/evaluation/reliability.py](src/evaluation/reliability.py) | new — fail-closed governance: Performance assembly, WithheldReliability, NO_CALIBRATION-only calibration, OOS split validation, P/E guard |
+| [src/tests/test_stage6_reliability_governance.py](src/tests/test_stage6_reliability_governance.py) | new — 32 P20 tests across Layers 1–4 |
+| [temp_report.md](temp_report.md) | this report |
+
+Untouched: Stage 1–5 (zero edits), and every pre-existing Stage 6 file —
+`metrics.py`, `engine.py`, `schema.py`, `observation.py`, `aggregate.py`,
+`__init__.py`, and all three legacy/new test files. The legacy
+`ForecastEvaluationEngine.evaluate_forecasts` / `ReliabilityAssessment`
+path is unchanged (a test pins that the engine imports neither
+`reliability` nor `aggregate`); the new layer consumes P19
+`SeriesEvaluation` read-only, never mutating it (pinned by test).
+
+## 3. Architecture (spec §§20–21 AUTHORITATIVE portions only)
+
+* **Weights 50% / 20% / 30% — AUTHORITATIVE.** `assemble_performance_score`
+  multiplies caller-supplied versioned component scores by the §21 weights.
+  The weights authorize the assembly; they do NOT authorize the mappings,
+  so the three 0–100 inputs must arrive with a `parameters_version` naming
+  their mapping authority. Bounds 0–100 are structural (§21), not
+  methodology.
+* **Performance Score ≠ Reliability — structural.** Separate frozen types;
+  `Performance Score = Reliability` is inexpressible, not merely
+  discouraged. A test pins that their product is a bare float carrying no
+  authority.
+* **Reliability — WITHHELD (B2/B7).** `assess_reliability` always returns
+  `WithheldReliability(reliability=None)` with `withheld_because` naming
+  the exact missing decisions (`B2:*` ×4 always; `UNAVAILABLE:<name>` +
+  `B7` per missing component). Withheld is never zero, never the
+  Performance Score. Confidence level travels verbatim for audit — never
+  applied as a multiplier.
+* **Calibration — NO_CALIBRATION only (B3/B4).** `CalibrationAssessment`
+  rejects CANDIDATE/CALIBRATED construction; `refuse_calibration_transition`
+  records the refusal with B3/B4 named. Even 10 unanimous under-forecasts
+  (bias +30%) stay NO_CALIBRATION (pinned by test) — suggestive evidence is
+  not a persistence definition. Single-observation calibration stays
+  forbidden per §§28/34.
+* **Versioning (§§27, 31, 34).** `derive_calibrated_version_name` returns
+  None for every reachable verdict — no new version minted, current version
+  never overwritten. Every verdict carries `parameters_version` so a future
+  authorized mapping set arrives as a new version, never a silent default.
+* **OOS separation (§32).** `EvidenceHoldoutSplit` rejects overlapping or
+  inverted periods as contamination by construction; `oos_observations`
+  projects only holdout-side entries (unknown periods dropped, never
+  assigned). Holdout outcomes can never qualify the calibration evaluated
+  on that same holdout.
+* **P/E guard (§§35–36).** `forward_pe_untouched_by_reliability` is the
+  identity — Reliability reaches Stage 7 as a confidence label only. No
+  function in the module touches a forecast value (pinned per-function by
+  test); the forbidden `Forecast × (1+Bias)` has no surface to live on.
+
+## 4. Exact authorized formulas/parameters
+
+* `PerformanceScore = 0.50·Accuracy + 0.20·BiasControl + 0.30·Advantage`
+  (§21 — the ONLY numeric formula in this prompt).
+* Everything else is a named refusal: B2 ×4, B7, B3, B4 (see §6).
+
+## 5. Tests — multi-layer doctrine
+
+* **L1 unit/formula:** weight constants, exact weighted sum (80/70/60 →
+  72.0), component bounds, empty version rejected, type separation.
+* **L2 contract/boundary:** later-published Actual governs (8 READY,
+  count 8); horizon/version isolation survives governance; NULL/regime/PIT
+  quarantines flow through with counts and bands unchanged; regime-only
+  series names MAPE unavailable; `govern_series` never mutates P19 input.
+* **L3 production-path:** P18 observations → P19 aggregates →
+  `govern_aggregates` end to end (8 obs → MODERATE_CONFIDENCE, Performance
+  withheld on-path, NO_CALIBRATION); legacy engine path untouched (import
+  + source pinned); module exports no numeric mapping surface.
+* **L4 adversarial:** Performance×confidence is a float, not Reliability;
+  no forecast-scaling surface per-function; no invented numeric defaults
+  in source (`poor_mape`/`unacceptable_bias`/`full_advantage`/
+  `minimum_observations`/`bias_threshold`/`holdout_passed` all absent);
+  overlapping/inverted holdout rejected; OOS projection leaks no evidence;
+  old version preserved; P/E identity; invalid states rejected.
+* **L5 regression:** focused Stage 6 suite **92 passed**
+  (32 new P20 + 21 P19 + 28 P18 + 11 legacy), then full
+  `pytest src/tests` → **776 passed, 2 skipped** (both skips pre-existing
+  environmental: Codal sample PDF, openpyxl). No unrelated test touched.
+* **L6** belongs to Prompt 22 (independent audit), not this prompt.
+
+Proof status: AUTHORITATIVE portions (weights, type separation, PIT,
+isolation, quarantine flow, OOS rejection, P/E guard) are BEHAVIORALLY
+PROVEN on the production path. Withheld portions (B2/B7/B3/B4) are proven
+as refusals — the tests assert the absence of invented values, which is
+the only proof available until authority exists.
+
+## 6. Unresolved methodology gaps (blockers carried, none created)
+
+| Blocker | P20 status |
+|---|---|
+| B1 Seasonal Naive construction | unchanged — untouched by P20 |
+| B2 four Reliability mappings | **WITHHELD — no numeric Reliability exists** |
+| B7 unavailable-component rule | **WITHHELD — named per component, never 0.0** |
+| B3 persistence definition | **REFUSED — even unanimous bias stays NO_CALIBRATION** |
+| B4 candidate→calibrated transition | **REFUSED — CALIBRATED unconstructible** |
+| B5 ReportVersion tie-break | unchanged (caller-owned, P18 carrier) |
+| B6 per-state participation | unchanged (VALID-only scoring, P19 quarantine) |
+| B8 underperformance persistence | unchanged (no flag, P19 improvement-only) |
+| B9 duplicate-key definition | unchanged (wholesale quarantine, P18 flag) |
+| Actual=0 / Forecast≠0 | unchanged (P19 `ZERO_ACTUAL_UNRESOLVED`) |
+
+No Stage 7 logic, no Valuation, no P/E adjustment, no new forecasts, no
+Stage 5 modification.
+
+`Stage 6 is NOT declared frozen.`
+
+STOP.
+
+================================================================
