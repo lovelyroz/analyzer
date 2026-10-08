@@ -3600,3 +3600,110 @@ Stage 5 modification.
 STOP.
 
 ================================================================
+
+# REPORT — Stage 6 Prompt 21
+**Production Integration + Behavioral Matrix — AUTHORITATIVE-only, fail-closed**
+
+## 1. Integrated production path
+
+New `src/evaluation/pipeline.py` — one auditable entry point:
+
+`run_evaluation_pipeline(records, metric_codes, actuals, baselines, ttm_observations)`
+→ `EvaluationPipelineResult` with one `SeriesPipelineVerdict` per
+(Company + Metric + Horizon + Model Version) series.
+
+Chain on-path (never helpers alone):
+
+* Stage 5 `ForecastRecord` objects consumed **read-only** (never mutated,
+  never written back — pinned by test comparing record list before/after).
+* P18 `build_observation`: construction-time PIT check over `input_refs`
+  only; a later-published Actual binds as the outcome, never as leakage.
+* P19 `aggregate_observations`: Error / APE / MAPE / Bias, sufficiency
+  bands on the scored count only, baseline *comparison* from
+  caller-supplied values keyed by `EvaluationKey.as_tuple()`.
+* P20 `govern_aggregates`: Performance withheld without versioned
+  components; Reliability always withheld with B2/B7 reasons named;
+  calibration always NO_CALIBRATION with B3/B4 named.
+* OOS boundary `evaluate_holdout_oos` (overlap/inversion rejected as
+  contamination by construction) and P/E identity guard
+  `prove_forward_pe_untouched` (spec Sections 35-36).
+
+Untouched: Stage 1-5 (zero edits — `git status` shows only the two new
+files), legacy `ForecastEvaluationEngine` path, all four pre-existing
+Stage 6 modules and test files. No Stage 7 logic, no Valuation, no P/E
+adjustment, no new forecasts, no Stage 5 modification.
+
+## 2. Behavioral matrix coverage (38 new tests, L1-L4 on the path)
+
+Every row runs through `run_evaluation_pipeline` (or the OOS / P-E
+wrappers), not helpers alone:
+
+* normal / under-forecast (+bias, error +300) / over-forecast (-bias);
+* zero forecast → `ZERO_BASE` quarantine, percentage metrics None;
+* zero actual / nonzero forecast → `ZERO_ACTUAL_UNRESOLVED` (UNRESOLVED
+  per P17 Section B — quarantined, never scored as APE=100%);
+* LOSS_TO_PROFIT / PROFIT_TO_LOSS / SIGN_CHANGE quarantined (name pinned);
+* each horizon independently over overlapping periods (4 series, object
+  identities disjoint — no shared observation across horizons);
+* V1.0 / V2.0 never mix;
+* sufficiency bands parametrized 4 / 6 / 9 / 12 on-path;
+* baseline better (improvement > 0) / worse (< 0) / zero-error (None, not
+  0) / missing (None);
+* isolated single-bias and unanimous 10-observation +30% bias both stay
+  NO_CALIBRATION with B3/B4 named (suggestive evidence is not a
+  persistence definition);
+* PIT-leaking input quarantined; later-published Actual scores (MAPE 10%);
+  unbound forecast → PENDING_ACTUAL; SUSPICIOUS / UNMAPPED / RESTATED /
+  ESTIMATED quarantined verbatim; duplicates quarantine wholesale (2/2);
+  NULL != 0 (MISSING_VALUE + PENDING_ACTUAL, MAPE None, never 0.0);
+* TTM conservation: 2 TTM observations scored exactly once each
+  (`ttm_accounted == 2`, 5 unique keys); same-period TTM collision
+  quarantines both (no silent preference, no double count);
+* OOS: holdout-only projection; overlapping and inverted splits rejected;
+* regime-only series names UNAVAILABLE:MAPE / UNAVAILABLE:BIAS + B7;
+* P/E identity; records never mutated; absence assertions pin that the
+  pipeline source contains no invented-methodology tokens and no
+  Stage-5-write / Stage-7 tokens.
+
+## 3. Focused test result
+
+`pytest` on the five Stage 6 files → **130 passed**
+(11 legacy + 28 P18 + 21 P19 + 32 P20 + 38 P21), 0 failures,
+3 pre-existing `utcnow` deprecation warnings (unchanged since P18).
+
+## 4. Full-suite result (Layer 5)
+
+`pytest src/tests -q` → **814 passed, 2 skipped**
+(both skips pre-existing environmental: Codal sample PDF, openpyxl).
+Consistent with the P20 baseline (776 + 38 new = 814). No unrelated
+test created, modified, weakened, or bypassed.
+
+## 5. Unresolved issues (blockers carried, none created, none bypassed)
+
+| Blocker | P21 production-path boundary |
+|---|---|
+| B1 Seasonal Naive construction | no value constructed; comparison from caller-supplied values only |
+| B2 four Reliability mappings | withheld with reasons, never zero, never Performance Score |
+| B7 unavailable-component rule | named per component (UNAVAILABLE:*), never 0.0 |
+| B3 persistence definition | unanimous bias stays NO_CALIBRATION |
+| B4 candidate→calibrated transition | CALIBRATED unreachable; no version minted |
+| B5 ReportVersion tie-break | caller-owned; path binds verbatim |
+| B6 per-state participation | VALID-only scoring; others quarantined verbatim |
+| B8 underperformance persistence | improvement only, no flag |
+| B9 duplicate-key definition | wholesale quarantine, no preference |
+| Actual=0 / Forecast!=0 | ZERO_ACTUAL_UNRESOLVED quarantine |
+
+## 6. Proof limitations
+
+* TTM non-double-counting is proven structurally (key-uniqueness plus
+  quarantine accounting) — no TTM-identity rule was written because no
+  spec authority exists for one.
+* B5 remains caller-owned by design; the path proves verbatim binding,
+  not selection correctness.
+* Layer 6 independent audit belongs to Prompt 22, not this prompt.
+
+`Stage 6 is NOT declared frozen.`
+
+STOP.
+
+================================================================
