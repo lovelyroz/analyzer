@@ -3645,3 +3645,160 @@ If the evidence does not resolve a decision, stop at that conclusion rather than
 Summarize the decisions resolved by existing authority, the decisions still requiring owner approval, the exact file changed, and confirmation that no implementation or tests were changed or run.
 
 `Stage 6 remains NOT FROZEN.`
+================================================================
+# Stage 6 Prompt 29 — Owner Decision Gate and Approval Record
+
+You are working locally in the `lovelyroz/analyzer` repository, a financial-data application.
+
+## Objective
+
+Prepare a concise, auditable owner-decision record for the unresolved Stage 6 methodology questions identified in:
+
+* `REPORT — Stage 6 Prompt 27`
+* `REPORT — Stage 6 Prompt 28`
+
+The authority trace is complete enough to establish which rules exist and which decisions remain unresolved. Do not repeat repository-wide discovery or attempt to resolve policy questions through implementation.
+
+This prompt is a decision-preparation task only. It does not authorize any methodology choice, specification amendment, or code change.
+
+## 1. Scope
+
+Inspect only:
+
+* `PROJECT_HANDOFF_INSTRUCTIONS.md`
+* `06_Stage6_Forecast_Evaluation.md`, limited to the relevant sections already identified in Prompt 28
+* The Prompt 27 and Prompt 28 reports in `temp_report.md`
+
+Do not reopen the authority search unless a specific contradiction between those reports makes it strictly necessary.
+
+## 2. Produce an owner decision record
+
+Append exactly one section to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 29: Owner Decision Gate`
+
+The section must contain the following decision groups.
+
+### D1 — Actual selection and restatements (B5 + Q8)
+
+Present the mutually distinct options:
+
+* First-known outcome for historical forecast evaluation.
+* Latest-restated outcome.
+* Two separately versioned objectives: first-known accuracy and latest-restated evaluation.
+
+Explain that the existing authority supports preserving historical point-in-time states and prohibits silently rewriting history, but does not fully define the selection policy or republication convention.
+
+For each option, identify:
+
+* What question it answers.
+* The treatment of later restatements.
+* Whether a new version-pinned evaluation artifact is needed.
+* The required audit trail.
+* Any unresolved specification change.
+
+Do not select an option.
+
+### D2 — Data-quality participation (B6)
+
+Separate the decisions for:
+
+* `SUSPICIOUS` and `UNMAPPED`: proposed confirmation of quarantine from scoring, consistent with the existing Data Foundation boundary.
+* `ESTIMATED`: score normally, score with mandatory quality flags and sensitivity analysis, or exclude from primary scoring.
+* `RESTATED`: define its participation and provenance jointly with D1.
+
+Do not treat Data Foundation classification as automatic authorization to score a value.
+
+Do not select an option.
+
+### D3 — Scenario evaluation (B9)
+
+Present:
+
+* A: separate Bear/Base/Bull evaluation series.
+* B: shared reporting with a formally defined event-level anti-inflation and aggregation rule.
+* C: score one designated scenario and retain the others as descriptive outputs.
+
+For each option, identify consequences for sample sufficiency, MAPE, Bias, baseline comparison, Reliability, and auditability.
+
+Do not select an option or invent aggregation weights.
+
+### D4 — Actual-zero policy
+
+Present the alternatives:
+
+* Exclude Actual-zero observations from MAPE, with a distinct reason code and auditable absolute error.
+* Evaluate them in a separate zero-Actual metric that is never pooled with ordinary MAPE.
+
+In either case, explicitly require owner-approved rules for:
+
+* Forecast > 0 and Actual = 0.
+* Forecast < 0 and Actual = 0.
+* Forecast = 0 and Actual = 0.
+* Forecast = 0 and Actual ≠ 0.
+* Missing Actual versus numerical zero.
+* Sign-change cases and whether MAPE-null observations count toward sufficiency.
+
+Do not assume arithmetic computability establishes statistical validity.
+
+Do not select an option.
+
+### D5 — Sufficiency rule (Q7)
+
+Present the alternatives:
+
+* Count only observations eligible for the relevant MAPE metric.
+* Count all otherwise valid, nonduplicate forecast outcomes, while reporting the effective MAPE sample size separately.
+
+Explain that this choice must be consistent with the scenario policy and zero-Actual policy.
+
+Do not select an option.
+
+## 3. Cross-decision dependencies
+
+Explicitly identify these dependencies:
+
+* D1 and D2 are coupled through the selection and provenance of RESTATED observations.
+* D3 determines the identity and denominator of evaluation series and therefore affects D5.
+* D4 affects MAPE, Bias interpretation, baseline comparison, and D5.
+* D1 must preserve historical artifacts and specify how any later evaluation version is identified and audited.
+* Reliability remains withheld until its authorized mappings and calculation method are resolved.
+* B1, B2, B3, B4, B7, and B8 remain outside this task and unresolved unless prior evidence explicitly proves otherwise.
+
+## 4. Approval protocol
+
+For each decision, provide:
+
+* Decision ID.
+* Available options.
+* Existing authoritative constraints.
+* Consequences of each option.
+* Required owner approval.
+* A blank `OWNER DECISION: NOT YET APPROVED` field.
+
+Clearly distinguish:
+
+* Existing binding constraints.
+* Proposed options.
+* Decisions requiring explicit owner approval.
+
+Do not interpret silence, existing code, test results, or an earlier proposal as approval.
+
+Do not use a recommendation as a substitute for approval.
+
+## 5. Restrictions
+
+* Read-only with respect to source code, tests, locked specifications, schemas, migrations, and configuration.
+* Append only the required report section to `temp_report.md`.
+* Do not execute tests.
+* Do not implement any option.
+* Do not declare Stage 6 frozen.
+* No GitHub, GitHub CLI/API, remote operations, commits, pushes, pulls, or branch changes.
+* Do not expand into a repository-wide audit.
+
+## 6. Final response
+
+Summarize the decision groups prepared, confirm that no owner decision was silently selected, state the exact file modified, and confirm that no source code or tests were changed or run.
+
+`Stage 6 remains NOT FROZEN.`
+=====================================================================
