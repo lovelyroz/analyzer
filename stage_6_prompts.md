@@ -4312,3 +4312,231 @@ No runtime tests are expected because this prompt is read-only. Do not claim any
 * Do not declare Stage 6 frozen.
 
 Append the report, stop, and summarize the unresolved owner decisions.
+=================================================================
+# Stage 6 Prompt 33 — Apply Delegated Methodology Decisions and Amend the Locked Specification
+
+You are working on the financial-data repository `analyzer`.
+
+The user has explicitly delegated the remaining technical methodology choices to ChatGPT, requesting the technically correct and optimal choices rather than further questions. Treat the decisions explicitly enumerated below as authorized decisions for this prompt. Do not stop to ask the user to select among these options.
+
+## 1. Mission
+
+Resolve the bounded Stage 6 methodology blockers identified in:
+
+* `temp_report.md` — Stage 6 Prompt 27 through Prompt 32 reports
+* `06_Stage6_Forecast_Evaluation.md` — current locked specification and Prompt 31 amendments
+
+Record the authorized decisions, amend the locked specification additively, and perform a strict documentation/contract audit.
+
+This is a **methodology and specification amendment prompt only**. Do not implement evaluation logic, change schemas, create migrations, modify application code, or claim runtime validation.
+
+Stage 6 must remain **NOT FROZEN**.
+
+## 2. Scope and operational restrictions
+
+Inspect only:
+
+1. `06_Stage6_Forecast_Evaluation.md`
+2. The exact Prompt 27–32 reports in `temp_report.md`
+3. The smallest directly referenced schema/output-contract definitions needed to establish whether scenario identity already has a persistence location
+
+Do not scan the repository broadly. Do not inspect unrelated stages or files unless a specific dependency is explicitly referenced and strictly necessary.
+
+Stages 1–5 are frozen. Do not modify them.
+
+No GitHub, GitHub CLI/API, remote operations, push, pull, commit, branch changes, or other Git mutations.
+
+Append the final report to `temp_report.md`; do not overwrite previous reports.
+
+## 3. Authorized decisions
+
+### D1 — Scenario identity and separation (RB-1)
+
+Approved policy:
+
+* Bear, Base, and Bull are independent evaluation series.
+* Scenario identity must be retained in evaluation keys, persisted evaluation/audit records, and returned scenario-specific outputs.
+* MAPE, Bias, eligible observation counts, MAPE-effective counts, baseline comparisons, and any future Reliability result must not pool scenarios.
+* Report both general valid-observation sufficiency and effective MAPE sample sufficiency separately for each scenario.
+* One forecast event represented by three scenarios must never be counted as three observations in a shared series.
+
+Inspect only the directly relevant existing schema/output definitions to determine whether the contract can support this without a migration.
+
+Do not perform a migration. If a migration appears necessary, report the evidence and the smallest required contract change. Do not infer that a migration is required merely because §39 currently lacks a named scenario field.
+
+### D2 — Bias eligibility and Actual-zero cases (RB-2)
+
+Keep the existing authorized Bias formula:
+
+`Bias = mean((Actual - Forecast) / abs(Forecast))`
+
+Do not invent another formula, denominator, epsilon, or arbitrary adjustment.
+
+Apply these rules:
+
+1. `Forecast != 0` and `Actual = 0`: Bias is mathematically defined and remains eligible for Bias, subject to all other validity and pairing rules. Its term is exactly `-1` for a positive forecast and `+1` for a negative forecast.
+2. `Forecast = 0` and `Actual = 0`: Bias is undefined. Exclude it from Bias with an explicit status/reason code. Retain Absolute Error and provenance.
+3. `Forecast = 0` and `Actual != 0`: percentage Bias is undefined because its denominator is zero. Return NULL with the applicable ZERO_BASE status/reason. Retain Absolute Error and provenance.
+4. Actual-zero exclusion from ordinary MAPE does not automatically exclude an observation from Bias.
+5. Bias eligibility is independent of MAPE eligibility. Keep separate Bias-eligible and MAPE-effective observation counts.
+6. Model and baseline Bias must use the same paired, Bias-eligible events within the same company, metric, horizon, model version, and scenario.
+7. Preserve the distinction between absolute error, percentage error, APE, MAPE, and Bias. Never silently reuse one metric's eligibility predicate for another.
+8. If the specification uses both “Bias” and “Percentage Bias,” clarify terminology without changing the authorized formula or behavior.
+
+### D3 — Baseline comparison (RB-3)
+
+Preserve the authorized Seasonal Naive baseline definition in §16. Do not replace it, invent a new benchmark, or change its forecasting formula.
+
+Apply these rules:
+
+1. Model and baseline comparisons must use the same eligible, paired forecast/actual events for the metric being compared, with scenario separation preserved.
+2. MAPE comparison uses the same MAPE-effective event set for model and baseline.
+3. Bias comparison uses the same Bias-eligible event set for model and baseline.
+4. Keep absolute errors and other valid diagnostics available when MAPE is undefined.
+5. If baseline MAPE is NULL, relative baseline improvement is NULL with an explicit non-computable reason.
+6. If baseline MAPE is zero, relative baseline improvement is NULL with an explicit zero-denominator reason. Do not divide by zero, add epsilon, or substitute an arbitrary denominator.
+7. If there are no eligible paired events, return the applicable NULL/status result rather than manufacturing a score.
+8. These rules govern comparison eligibility and reporting only. They do not change the Seasonal Naive baseline forecast itself.
+9. Do not invent weighting, interpolation, or fallback rules.
+
+Preserve the existing relative-improvement formula whenever its denominator is valid.
+
+### D4 — Reliability remains withheld (RB-4)
+
+Reliability must remain **WITHHELD / NULL** until a separately authorized methodology defines:
+
+* The complete Reliability formula
+* Input-to-score mappings
+* Bias and baseline-advantage mappings
+* Observation-confidence handling
+* Aggregation and scenario-specific calculation
+* Calibration eligibility and mapping
+* Required versioning and audit provenance
+
+Do not create these formulas or mappings in this prompt. Do not infer them from performance weights alone.
+
+Reliability must never numerically alter Forward P/E. Scenario separation must be preserved if Reliability is authorized in a later phase.
+
+### D5 — Evaluation reruns, immutable artifacts, and sensitivity (RB-5)
+
+Amend the specification to require the following invariants:
+
+1. Every published evaluation result must have a stable, unique evaluation-artifact identity and version.
+2. A rerun must create a separately identifiable artifact and must never overwrite or silently rescore an already published historical artifact.
+3. A rerun must link to the artifact it supersedes or re-evaluates, where applicable.
+4. Record the applicable Stage 6 specification/methodology version and data-quality-policy version.
+5. Record exact Actual provenance, including `actual_report_version` and the Actual publication timestamp when applicable. Do not confuse publication timestamp with the forecast data cutoff.
+6. Preserve candidate selection, exclusion, and quality flags with explicit reason codes.
+7. Keep primary results and ESTIMATED-excluded sensitivity results independently identifiable and reproducible.
+8. ESTIMATED observations may participate in the primary result only with an explicit quality flag and mandatory sensitivity recomputation excluding ESTIMATED observations.
+9. RESTATED Actuals follow the approved first-known Actual policy for the primary historical evaluation. A later restatement must not rewrite a previously published historical state.
+10. A rerun must be reproducible from its pinned inputs, policies, and versions. Where deterministic reproduction cannot be guaranteed, the limitation must be explicit.
+11. Keep field names, version-string formats, storage representation, and linkage mechanics implementation-neutral unless existing authoritative contracts already define them. Do not invent an existing convention.
+
+Label each contract requirement as one of:
+
+* **EXISTING AND VERIFIED** — cite the exact existing field/section.
+* **REQUIRED, CONTRACT AMENDMENT** — the requirement is authorized but the existing contract does not yet establish it.
+* **IMPLEMENTATION DETAIL, DELEGATED** — the invariant is mandatory, while the representation is left to a later implementation prompt.
+
+Do not claim an existing schema field or mechanism without inspecting the exact relevant definition.
+
+## 4. Insufficient-history and MAPE-effective counts
+
+Preserve the already approved minimum-observation thresholds:
+
+* Fewer than 5 valid non-duplicate observations: insufficient
+* 5–7: low
+* 8–11: moderate
+* 12 or more: adequate
+
+Keep the general valid-observation count separate from the metric-specific effective count.
+
+For each scenario series, report at least:
+
+* General valid-observation count
+* Bias-eligible count
+* MAPE-effective count
+
+Do not count a MAPE-ineligible observation as MAPE-effective. Do not assume that a single count is sufficient for every metric.
+
+Do not invent new Reliability sufficiency mappings. Reliability remains withheld.
+
+## 5. Required specification work
+
+Make only additive, internally consistent amendments to `06_Stage6_Forecast_Evaluation.md`.
+
+Update the appropriate existing sections, including the relevant sections among §§9, 10, 12, 14, 16, 17, 37, 39, 40, and 41. Do not blindly insert duplicated or contradictory rules.
+
+Ensure that the specification unambiguously distinguishes:
+
+* Scenario-specific evaluation identity
+* Actual selection and immutability
+* MAPE eligibility
+* Bias eligibility
+* Model-versus-baseline event pairing
+* Zero or NULL baseline MAPE
+* General versus metric-effective sample counts
+* Primary versus sensitivity results
+* Published artifacts versus rerun artifacts
+* Reliability withholding
+
+Preserve all previously approved D1–D5 policies from Prompt 31. Do not reopen them.
+
+If a detail cannot be resolved without inventing a policy, leave it explicitly blocked and explain why. Do not let an unresolved implementation detail invalidate an already approved methodological invariant.
+
+## 6. Mandatory six-layer validation
+
+After editing, validate the resulting specification using all six layers:
+
+1. **Formula/domain validation:** Check the exact Bias formula, zero-denominator cases, MAPE eligibility, baseline improvement, and NULL behavior.
+2. **Contract/boundary validation:** Verify scenario identity, output fields, audit provenance, artifact identity, and versioning requirements.
+3. **Production-path validation:** Trace how the written requirements would flow from Forecast and Actual matching through Error, metrics, baseline comparison, and outputs. This is a documentation trace only; do not implement it.
+4. **Adversarial validation:** Explicitly check:
+
+   * Positive forecast / zero actual
+   * Negative forecast / zero actual
+   * Zero forecast / zero actual
+   * Zero forecast / nonzero actual
+   * Baseline MAPE NULL
+   * Baseline MAPE zero
+   * No eligible paired events
+   * Three scenarios sharing the same company, metric, horizon, and model version
+   * ESTIMATED inclusion versus exclusion sensitivity
+   * Later restatement after an evaluation artifact was published
+   * Rerun versus original artifact identity
+5. **Regression/invariant validation:** Confirm all Prompt 31 decisions, PIT correctness, frozen Stages 1–5, no scenario pooling, no TTM/horizon/model-version mixing, no future-data leakage, and no Reliability-to-Forward-P/E effect remain intact.
+6. **Independent audit:** Re-read the amended sections and the final diff after the changes. Identify contradictions, duplicate rules, accidental scope expansion, and any unsupported claim that a contract field already exists.
+
+Do not report a layer as PASS unless its check was actually performed.
+
+## 7. Report requirements
+
+Append this exact heading to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 33: Delegated Methodology Decisions and Specification Amendment`
+
+The report must include:
+
+* Authorized decisions applied
+* Exact specification sections changed
+* Existing versus newly required contract elements
+* Scenario/migration findings, based only on the bounded inspection
+* The six-layer validation result, with evidence
+* Remaining implementation blockers
+* Confirmation that no application code, tests, schema, or migration was changed
+* Confirmation that Stages 1–5 remain untouched
+* Confirmation that Reliability remains withheld
+* Confirmation that Stage 6 remains NOT FROZEN
+
+Do not claim runtime tests were run. Do not claim a migration is or is not required unless the bounded inspection establishes that fact.
+
+## 8. Completion criteria
+
+This prompt is successful only if the authorized policies are recorded consistently, the specification is internally coherent, and the report distinguishes established facts from unresolved implementation details.
+
+If an inconsistency cannot be resolved within the approved decisions, document it as a blocker rather than improvising.
+
+Do not implement application logic. Do not freeze Stage 6. Do not perform Git or remote operations.
+
+At the end, provide a concise Persian summary of the work and identify the next smallest implementation-ready step.

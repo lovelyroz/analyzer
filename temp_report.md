@@ -4835,4 +4835,47 @@ RB-1 decision (OQ1–OQ2) → RB-2 + RB-3 decisions together (OQ3–OQ8, consist
 
 Stage 6 remains NOT FROZEN.
 =====================================================================
+REPORT — Stage 6 Prompt 33: Delegated Methodology Decisions and Specification Amendment
+
+Date: 2026-10-09. Authority: (a) owner delegation of technical methodology choices to ChatGPT in the active ChatGPT conversation on 2026-10-09 — owner quote: «راستش را بخواهی من چندان از این سوال های مشابه سر در نمیارم و تو خودت انتخاب های درست و بهینه را بگیر و فقط پرامپت را بده» (owner delegated selection of correct/optimal technical choices; did NOT personally select each formula/option); (b) explicit owner approval of the scenario-separation policy only (Bear/Base/Bull separate throughout keys, records, outputs, counts, comparisons); (c) technical decisions explicitly specified in Prompt 33 §§3-4. Nothing below claims owner authorship of an individual formula or option. Prior D1–D5 provenance caveat (Prompt 31/32 F-0) stands as audit history and is not re-litigated.
+
+1. Authorized decisions applied
+- D1 scenario identity/separation (RB-1): Bear/Base/Bull independent series; scenario identity in keys, persisted audit records, returned outputs; no pooling across MAPE/Bias/counts/baseline/future Reliability; per-scenario general valid + Bias-eligible + MAPE-effective counts; one event never three observations in a shared series.
+- D2 Bias eligibility (RB-2): formula unchanged Bias=mean((Actual-Forecast)/|Forecast|); F!=0/A=0 eligible (terms -1/+1); F=0/A=0 excluded with status, absolute error retained; F=0/A!=0 NULL with ZERO_BASE status; MAPE-exclusion never implies Bias-exclusion; independent Bias vs MAPE counts; paired same-event model+baseline Bias; no silent predicate reuse; Bias/Percentage-Bias terminology clarified without behavior change.
+- D3 baseline comparison (RB-3): §16 Seasonal Naive untouched; same eligible paired events per metric with scenario separation; MAPE set vs MAPE set; Bias set vs Bias set; absolute errors available when MAPE undefined; baseline-NULL → Improvement NULL (non-computable reason); baseline-zero → Improvement NULL (zero-denominator reason); empty set → NULL/status; eligibility+reporting only; no weighting/interpolation/fallback; improvement formula preserved when denominator valid.
+- D4 Reliability (RB-4): REMAINS WITHHELD/NULL; formula, input-to-score/Bias/baseline-advantage mappings, confidence handling, aggregation+scenario method, calibration eligibility+mapping, versioning/provenance all unauthorized; nothing created; Forward P/E invariant preserved.
+- D5 reruns/sensitivity (RB-5): 11 invariants recorded with per-item labels — EXISTING AND VERIFIED (actual_report_version; candidate/exclusion+reason codes; primary/sensitivity distinction; ESTIMATED flag+sensitivity; RESTATED first-known) vs REQUIRED, CONTRACT AMENDMENT (artifact identity/version; rerun-new-artifact; supersede-link; spec/quality-policy versions; cutoff distinction; pinned reproducibility; counts items) vs IMPLEMENTATION DETAIL, DELEGATED (names/formats/storage/linkage mechanics). §4 thresholds (<5 insufficient; 5-7 low; 8-11 moderate; 12+ adequate) VERIFIED EXISTING at locked §14 lines 390-395.
+- Migration: investigated only (bounded §39 inspection: no scenario field in the 30-field list; §39 cites no schema file). Necessity verdict explicitly NOT given; no migration performed or authorized.
+
+2. Exact specification sections changed (all additive, zero deletions)
+- §10 Bias rules block; §12 Bias cross-pointer; §14 scenario-identity-in-key + counts; §17 comparison rules; §37 Reliability-withheld pointer; §39 scenario persistence/output requirement (REQUIRED, CONTRACT AMENDMENT); §40 rerun/sensitivity invariants; §41 counts pointer. Pre-existing Prompt 31 D1–D5 blocks preserved untouched.
+
+3. Existing vs newly required contract elements
+- EXISTING AND VERIFIED: Bias formula; ZERO_BASE rule; §16 baseline; §17 improvement formula (valid denominator); 30-field §39 list concepts incl. actual_report_version, observation_count, calibration_status/version, evaluation_timestamp; thresholds table; exclusion/provenance conventions.
+- REQUIRED, CONTRACT AMENDMENT: scenario dimension in key/records/outputs; artifact identity/version + supersede linkage; spec/quality-policy version recording; publication-timestamp provenance field; Bias-eligibility/status rule + Bias-eligible count; same-event pairing rule + NULL/divide-by-zero convention for relative_baseline_improvement.
+- IMPLEMENTATION DETAIL, DELEGATED: reason-code VALUES; field names; version-string formats; storage/serialization; linkage representation; timestamp precision/timezone; hash/snapshot mechanics.
+
+4. Scenario/migration findings (bounded inspection only)
+- §39 30-field output list contains no scenario field; §14 key is four-part without scenario. Contract amendment required. Whether a schema migration is necessary is NOT established and NOT claimed either way; investigation-only per owner delegation boundary.
+
+5. Six-layer validation result (all performed, evidence above in phase record)
+- L1 formula/domain: PASS. L2 contract/boundary: PASS. L3 production-path doc trace: PASS. L4 adversarial (11 cases): PASS. L5 regression/invariants: PASS. L6 independent audit (re-read + diff): PASS. No runtime tests run or claimed (specification-only prompt).
+
+6. Remaining implementation blockers
+- B1 (missing): reason-code vocabulary for NULL/non-computable/zero-denominator/empty-set statuses.
+- B2 (open): migration-necessity verdict for scenario identity persistence.
+- B3 (open): field-by-field EXISTING-vs-PROPOSAL mapping beyond §39 text (needs authorized schema inspection).
+- B4 (standing): Reliability formula + mappings authorization (future prompt).
+- B1/B2/B3/B4/B7/B8 of Prompt 27 scope: untouched unless explicitly covered above.
+
+7. Confirmations
+- No application code, tests, schema, or migration changed.
+- Stages 1–5 untouched.
+- Reliability remains withheld; no Reliability→Forward-P/E effect.
+- No GitHub/CLI/API, remote, commit, push, pull, or branch operation performed.
+- Frozen-stage and locked-invariant regressions: none.
+- Owner questions OQ1–OQ11 (Prompt 32) status: OQ1 (P1–P5), OQ3–OQ8 (Bias/baseline rules), OQ9 (withholding), OQ10–OQ11 (contract/mechanics) are now COVERED by the delegated decisions above; OQ2 (migration verdict) REMAINS OPEN per §4.
+
+Stage 6 remains NOT FROZEN.
+=====================================================================
 

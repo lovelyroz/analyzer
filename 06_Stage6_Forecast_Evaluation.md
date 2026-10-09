@@ -281,6 +281,8 @@ Errors:
 Bias = +10%
 ```
 
+**Owner-approved pointer (Prompt 33 D2, policy RB-2 — Bias eligibility, approved 2026-10-09, owner-delegated technical choice):** the authorized V1 Bias formula above is unchanged — `Bias = mean((Actual - Forecast) / abs(Forecast))`; no other formula, denominator, epsilon, or arbitrary adjustment is authorized; (1) `Forecast != 0` and `Actual = 0` remains Bias-eligible subject to all other validity and pairing rules with term exactly `-1` for a positive forecast and `+1` for a negative forecast; (2) `Forecast = 0` and `Actual = 0` is Bias-undefined, excluded from Bias with an explicit status/reason code, with Absolute Error and provenance retained; (3) `Forecast = 0` and `Actual != 0` is percentage-Bias-undefined with zero denominator, returned as NULL with the applicable ZERO_BASE status/reason, with Absolute Error and provenance retained; (4) Actual-zero exclusion from ordinary MAPE does not automatically exclude an observation from Bias; (5) Bias eligibility is independent of MAPE eligibility — keep separate Bias-eligible and MAPE-effective observation counts; (6) model and baseline Bias must use the same paired, Bias-eligible events within the same company, metric, horizon, model version, and scenario; (7) never silently reuse one metric's eligibility predicate for another — preserve the distinction between absolute error, percentage error, APE, MAPE, and Bias; (8) terminology clarification only — "Bias" and "Percentage Bias" refer to the same authorized formula and behavior above, with no formula or behavior change.
+
 ---
 
 # 11. تفاوت Accuracy و Bias
@@ -345,6 +347,7 @@ Status = LOSS_TO_PROFIT
 * Epsilon, arbitrary denominators, or constants must never be used to manufacture ordinary percentage error.
 * A null MAPE does not imply null absolute error.
 * This decision confers no authorization to change Bias, baseline formulas, or Reliability mappings. Where the existing specification and this owner approval do not determine a rule, the rule is recorded as unresolved instead of invented — see the Prompt 31 report blockers (Bias treatment of Actual-zero observations; baseline-comparison denominator convention for zero-Actual series).
+* **Owner-approved pointer (Prompt 33 D2, policy RB-2):** Bias eligibility for all zero-base cases follows the eight Bias rules in Section 10 above; Actual-zero exclusion from ordinary MAPE never by itself excludes an observation from Bias.
 
 ---
 
@@ -421,6 +424,8 @@ Model Version
 * Duplicate records must not be counted, and scenarios must not be pooled.
 * Cross-reference: scenario identity per policy D3 above; Actual-zero MAPE eligibility per Section 12 policy D4.
 
+**Owner-approved pointer (Prompt 33 D1, policy RB-1 — scenario identity, approved 2026-10-09, direct owner approval for scenario-separation only):** scenario identity (Bear / Base / Bull) is part of the evaluation series key in Section 14; MAPE, Bias, eligible observation counts, MAPE-effective counts, baseline comparisons, and any future Reliability result must not pool scenarios; for each scenario series report separately the general valid-observation count, the Bias-eligible count, and the MAPE-effective count; one forecast event represented by three scenarios must never be counted as three observations in a shared series.
+
 ---
 
 # 15. Model Version Evaluation
@@ -494,6 +499,8 @@ Improvement = 25%
 ```
 
 اگر مقدار منفی باشد، Model از Baseline ضعیف‌تر بوده است.
+
+**Owner-approved pointer (Prompt 33 policy D3 — baseline comparison RB-3):** Model and baseline must be compared on the same eligible, paired forecast/actual events for the metric being compared, with scenario separation preserved. MAPE comparison uses the same MAPE-effective event set for model and baseline; Bias comparison uses the same Bias-eligible event set for model and baseline. Absolute errors and other valid diagnostics remain available when MAPE is undefined. If baseline MAPE is NULL, relative baseline improvement is NULL with an explicit non-computable reason. If baseline MAPE is zero, relative baseline improvement is NULL with an explicit zero-denominator reason; no division by zero, no epsilon, no substitute denominator. If there are no eligible paired events, return the applicable NULL/status result rather than manufacturing a score. These rules govern comparison eligibility and reporting only and do not change the §16 Seasonal Naive baseline forecast itself. No weighting, interpolation, or fallback rules are authorized. The existing relative-improvement formula is preserved whenever its denominator is valid.
 
 ---
 
@@ -1001,6 +1008,8 @@ Reliability کنار این Forecastها قرار می‌گیرد.
 
 **Owner-approved pointer (policy D3):** Bear, Base, and Bull are separate evaluation series and must not be pooled into one Reliability result. Reliability remains withheld until its authorized formula and mappings are resolved; no Reliability mapping is authorized by the D3 scenario-separation decision.
 
+**Owner-approved pointer (Prompt 33 policy D4 — Reliability withheld RB-4):** Reliability remains WITHHELD/NULL until a separately authorized methodology defines the complete Reliability formula, input-to-score mappings, Bias and baseline-advantage mappings, observation-confidence handling, aggregation and scenario-specific calculation, calibration eligibility and mapping, and required versioning and audit provenance. Nothing in this section creates those formulas or mappings. The Forward P/E invariant is preserved: Reliability never numerically alters Forward P/E. Scenario separation must be preserved if Reliability is authorized in a later phase.
+
 مثلاً:
 
 ```text
@@ -1098,6 +1107,8 @@ evaluation_timestamp
 
 نام فیلدها در Implementation قابل تغییر است، ولی مفهوم آنها نباید تغییر کند.
 
+**Owner-approved pointer (Prompt 33 D1, policy RB-1 — scenario identity persistence, approved 2026-10-09, direct owner approval for scenario-separation only):** REQUIRED, CONTRACT AMENDMENT — persisted evaluation/audit records and returned scenario-specific outputs must retain scenario identity (Bear / Base / Bull); no existing Section 39 field is claimed to carry scenario identity here; no schema change, migration, or runtime validation is performed or authorized in this prompt; migration investigation remains open per owner (investigation only).
+
 ---
 
 # 40. Auditability
@@ -1130,6 +1141,20 @@ Publication Date
 
 **Owner-approved pointer (policies D1/D2):** the audit record must preserve the exact `actual_report_version`, publication timestamp, selection-policy version, candidate and exclusion provenance with reason codes, quality/provenance flags (including ESTIMATED participation and its sensitivity lineage), and, for any authorized rerun, the explicit lineage linking it to the historical artifact it derives from without overwriting that artifact.
 
+**Owner-approved pointer (D5 — evaluation reruns, immutable artifacts, sensitivity, RB-5):**
+* Every published evaluation result must carry a stable, unique evaluation-artifact identity and version — **REQUIRED, CONTRACT AMENDMENT**.
+* A rerun must create a separately identifiable artifact and must never overwrite or silently rescore an already published historical artifact — **REQUIRED, CONTRACT AMENDMENT**.
+* A rerun must link to the artifact it supersedes or re-evaluates, where applicable — **REQUIRED, CONTRACT AMENDMENT**.
+* The audit record must preserve the applicable Stage 6 specification/methodology version and data-quality-policy version — **REQUIRED, CONTRACT AMENDMENT** (the existing D1/D2 pointer above covers selection-policy version only).
+* Actual provenance must record the `actual_report_version` — **EXISTING AND VERIFIED** (see §40 D1/D2 pointer above: "the audit record must preserve the exact `actual_report_version`").
+* Actual publication timestamp must be recorded as distinct from the forecast data cutoff — **REQUIRED, CONTRACT AMENDMENT** (the existing D1/D2 pointer covers "publication timestamp" generally; the cutoff-distinction invariant is new).
+* Candidate selection, exclusion, and quality flags with explicit reason codes must be preserved — **EXISTING AND VERIFIED** (see §40 D1/D2 pointer above: "candidate and exclusion provenance with reason codes"; see also §41 policy D2: "Every exclusion must preserve an auditable exclusion record").
+* Primary results and ESTIMATED-excluded sensitivity results must be independently identifiable and reproducible — **EXISTING AND VERIFIED** in substance (see §41 policy D2: "Primary and sensitivity outputs must be clearly distinguished"), with the reproducibility mechanics as **REQUIRED, CONTRACT AMENDMENT**.
+* ESTIMATED observations participate in the primary result only with an explicit quality flag plus mandatory sensitivity recomputation excluding ESTIMATED observations — **EXISTING AND VERIFIED** (see §41 policy D2: ESTIMATED participation clause).
+* RESTATED Actuals follow the approved first-known Actual policy for the primary historical evaluation; a later restatement must not rewrite a previously published historical state — **EXISTING AND VERIFIED** (see §41 policy D2: "a later restatement cannot displace the first-known Actual in the primary historical evaluation").
+* A rerun must be reproducible from its pinned inputs, policies, and versions; where deterministic reproduction cannot be guaranteed, the limitation must be explicit — **REQUIRED, CONTRACT AMENDMENT** (lineage-linking is verified in the D1/D2 pointer above; pinned-input reproducibility mechanics are new).
+* Field names, version-string formats, storage representation, and linkage mechanics remain **IMPLEMENTATION DETAIL, DELEGATED** unless existing authoritative contracts already define them.
+
 ---
 
 # 41. Data Quality
@@ -1158,6 +1183,13 @@ Actual نامعتبر نباید مانند Actual معتبر وارد MAPE و B
 * Quality eligibility is applied before selecting among Actual candidates.
 * Missing or invalid data must never be converted to numerical zero.
 * Stage 1 quality states are not redefined by this section.
+
+**Owner-approved pointer (D5 §4 — insufficient-history and MAPE-effective counts):**
+* Minimum-observation thresholds are preserved as stated in Prompt 33 §4: fewer than 5 valid non-duplicate observations = insufficient; 5–7 = low; 8–11 = moderate; 12 or more = adequate — **REQUIRED, CONTRACT AMENDMENT** (stated as already-approved in Prompt 33 §4; the existing section establishing them was not inspected in this phase — cross-check with the owning phase before claiming EXISTING AND VERIFIED).
+* The general valid-observation count must be kept separate from metric-specific effective counts — **REQUIRED, CONTRACT AMENDMENT**.
+* For each scenario series, report at least three counts: general valid-observation count, Bias-eligible count, MAPE-effective count — **REQUIRED, CONTRACT AMENDMENT** (partially consistent with §41 policy D2, which already excludes `SUSPICIOUS`/`UNMAPPED` Actuals from sufficiency counts, but the three-count reporting structure itself is new).
+* A MAPE-ineligible observation must never be counted as MAPE-effective — **REQUIRED, CONTRACT AMENDMENT**.
+* No new Reliability sufficiency mappings are introduced; Reliability remains withheld — **REQUIRED, CONTRACT AMENDMENT** (restates the Prompt 33 §4 prohibition; no mapping invented).
 
 ---
 
