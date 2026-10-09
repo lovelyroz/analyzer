@@ -2968,3 +2968,273 @@ Do not design Seasonal Naive.
 Do not freeze Stage 6.
 
 Do not commit or push.
+======================================================================
+
+stage 6 Prompt 6 - Independent Post 25 Methodology and Behavioral Audit.
+
+You are the primary engineering agent for the repository:
+
+`analyzer`
+
+This is a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of explicit financial invariants take priority over implementation speed.
+
+# Stage 6 Prompt 26 — Independent Post-P25 Methodology and Behavioral Audit
+
+## 1. Objective
+
+Perform an **independent, read-only audit** of the Prompt 25 implementation.
+
+Prompt 25 changed Actual selection, ReportVersion handling, data-quality eligibility, duplicate identity, scenario identity, and zero-Actual handling. These changes affect the foundation of every downstream Stage 6 result.
+
+Your task is to determine whether each change is:
+
+* explicitly authorized by the locked Stage 6 specification;
+* consistent with the intended financial meaning of forecast evaluation;
+* deterministic and auditable;
+* behaviorally proven through the required testing layers;
+* safe for downstream metrics, baseline comparison, Reliability, and Calibration governance.
+
+**Do not implement fixes. Do not declare Stage 6 frozen.** If an issue is found, document the precise evidence and stop at the audit result.
+
+## 2. Mandatory execution firewall
+
+* Work only in the existing local working tree.
+* Do not use GitHub, GitHub CLI/API, network access, fetch, pull, push, remotes, commits, branches, or Git history.
+* Do not perform a repository-wide audit.
+* Do not inspect unrelated stages or files.
+* Do not modify source files, tests, specifications, or configuration.
+* Do not run formatters or auto-fix tools.
+* Do not treat a passing test, current implementation, existing constant, or prior report as proof of methodological authority.
+* Do not infer approval from the fact that Prompt 25 implemented a rule.
+* If evidence needed to authorize a decision is absent, classify it as an unresolved methodology-authority issue rather than inventing a rule.
+
+## 3. Strict inspection scope
+
+Read only the following:
+
+1. `PROJECT_HANDOFF_INSTRUCTIONS.md`
+2. `06_Stage6_Forecast_Evaluation.md`
+3. The reports for Stage 6 Prompts 17–25 in `temp_report.md`
+4. Current Stage 6 files directly responsible for:
+
+   * Actual selection and ReportVersion validation;
+   * observation construction and identity;
+   * data-quality eligibility;
+   * duplicate detection;
+   * zero/sign-regime classification;
+   * aggregation and production pipeline;
+   * corresponding Stage 6 tests.
+
+Inspect directly referenced dependencies only when necessary to establish a specific claim. Do not expand the scope to Stage 1–5 or Stage 7 implementations. For boundary checks, use targeted evidence and existing tests.
+
+## 4. Audit A — Actual selection and ReportVersion policy (B5)
+
+Prompt 25 introduced:
+
+* `ACTUAL_SELECTION_POLICY = "FIRST_KNOWN_OUTCOME_P25"`
+* selection order `(publication_datetime, report_version_number, report_version_id)`
+* earliest-published valid ReportVersion selection;
+* later-published restatements losing to earlier-published versions.
+
+Independently verify:
+
+1. What the locked Stage 6 specification explicitly requires about the Actual outcome and ReportVersion.
+2. Whether the specification authorizes selecting the earliest-published version as the definitive evaluation outcome.
+3. Whether the intended evaluation target is:
+
+   * the first known published outcome;
+   * the latest eligible/restated outcome;
+   * or another explicitly authorized outcome.
+4. Whether the selected policy distinguishes these possible evaluation objectives instead of silently treating them as equivalent.
+5. Whether tie-breaks by version number and identifier have semantic authority, or merely provide deterministic ordering without proving that the selected outcome is financially correct.
+6. Whether missing, malformed, conflicting, or otherwise invalid ReportVersion metadata fails closed.
+7. Whether list order, database order, surrogate identifiers, or caller order can change the result.
+8. Whether the selected Actual and its complete ReportVersion/publication metadata remain traceable in the final observation and audit chain.
+
+Do not assume that “first published” or “latest restated” is universally correct. Determine whether the locked specification actually authorizes the implemented policy.
+
+**If the intended Actual-outcome policy is not authorized, classify B5 as `UNRESOLVED METHODOLOGY AUTHORITY` or `BLOCKER`. Do not select a replacement policy.**
+
+## 5. Audit B — Data-quality eligibility (B6)
+
+Prompt 25 introduced these participation rules:
+
+* Participating: `VALID`, `ESTIMATED`, `RESTATED`
+* Quarantined: `MISSING`, `SUSPICIOUS`, `UNMAPPED`
+
+It also introduced `is_scoring_eligible(actual)` and the `limited_quality` indicator.
+
+Independently verify:
+
+1. Whether the locked Stage 6 specification authorizes each state to participate or be excluded.
+2. Whether a precedent elsewhere in the application is being mistaken for explicit Stage 6 authority.
+3. Whether `ESTIMATED` and `RESTATED` observations can affect Error, MAPE, Bias, observation sufficiency, and baseline comparison.
+4. Whether `limited_quality` is consistently propagated and cannot be mistaken for a fully validated observation.
+5. Whether the same quality-state policy is applied consistently in every authorized aggregation path.
+6. Whether missing, suspicious, and unmapped observations are excluded from scoring and sufficiency without being silently converted to zero.
+7. Whether quarantine reasons and original data-quality states remain auditable.
+8. Whether invalid ReportVersion handling takes precedence over any scoring eligibility decision that could otherwise admit the observation.
+9. Whether any quality-state combination creates contradictory or ambiguous outcomes.
+
+Passing tests prove implemented behavior, not authority. If the specification does not authorize a consequential participation decision, report the gap instead of inventing a rule.
+
+## 6. Audit C — Observation identity, scenario, and duplicates (B9)
+
+Prompt 25 added `scenario` to `EvaluationKey`, making the observation key a seven-part identity while leaving `SeriesKey` unchanged.
+
+Independently verify:
+
+1. The locked specification’s required evaluation identity and aggregation identity.
+2. Whether scenario is explicitly required or otherwise justified as part of observation identity.
+3. Whether scenario-distinct observations are legitimate distinct observations or could represent multiple alternative outcomes for one forecast that must not be counted together.
+4. Whether placing multiple scenarios into one shared series can inflate observation counts, alter sufficiency bands, or affect MAPE/Bias and baseline comparisons.
+5. Whether the one-Reliability-per-series interpretation is explicitly authorized and behaviorally consistent with the scenario structure.
+6. Whether true duplicates are quarantined wholesale, without averaging, silent overwriting, or arbitrary winner selection.
+7. Whether conflicts in Forecast value, Actual identity, ReportVersion, cutoff, or scenario are detected and handled safely.
+8. Whether `forecast_id` and other surrogate identifiers can accidentally prevent detection of logical duplicates.
+9. Whether TTM and same-period collisions remain protected against double counting.
+10. Whether horizon and model-version isolation remain intact.
+
+Do not change the locked specification or invent a new identity model. Report any unresolved identity or aggregation semantics precisely.
+
+## 7. Audit D — Actual = 0 and sign regimes
+
+Prompt 25 removed `ZERO_ACTUAL_UNRESOLVED` and allows numeric zero Actual values to enter ordinary scoring when the Forecast denominator is valid and no sign-change regime applies.
+
+Independently verify the locked formulas:
+
+* `Error = Actual - Forecast`
+* `Percentage Error = (Actual - Forecast) / abs(Forecast) × 100`
+* `APE = abs(Actual - Forecast) / abs(Forecast) × 100`
+* `MAPE = mean(valid APEs)`
+* `Bias = mean(valid signed percentage errors)`
+
+Check at least these cases through the actual production path:
+
+1. Forecast positive, Actual zero.
+2. Forecast negative, Actual zero.
+3. Forecast zero, Actual zero.
+4. Forecast zero, Actual nonzero.
+5. Loss-to-profit transition.
+6. Profit-to-loss transition.
+7. Other sign-change conditions covered by the specification.
+8. Actual missing (`None`) versus Actual numerically equal to zero.
+9. Mixed eligible and ineligible observations in one series.
+
+Verify that:
+
+* Absolute Error is retained where the specification allows it.
+* Percentage metrics are unavailable where the denominator or regime makes them invalid.
+* A zero Actual is not automatically misclassified as `ZERO_BASE`.
+* A missing Actual is never converted to zero.
+* Invalid percentage metrics do not silently enter MAPE or Bias.
+* Observation sufficiency uses only the authorized valid-observation count.
+* No metric-specific exception is introduced without authority.
+
+Do not merely repeat Prompt 25’s test results. Inspect the current behavior and the relevant assertions independently.
+
+## 8. Audit E — Cross-layer consistency
+
+Trace the actual production path:
+
+`Actual candidates → ReportVersion validation/selection → observation construction → eligibility → duplicate handling → Error and percentage metrics → sufficiency → baseline comparison → Reliability/Calibration governance`
+
+For each transition, determine whether the upstream status and identity survive correctly downstream.
+
+Specifically verify:
+
+* No quarantined observation can affect MAPE, Bias, or sufficiency.
+* `NULL != 0` remains true in all relevant paths.
+* No unresolved Reliability mapping is bypassed.
+* Reliability remains unavailable while its methodology blockers remain unresolved.
+* Calibration cannot transition to an authorized/calibrated state through a legacy or alternate path.
+* No unsupported Seasonal Naive result is produced.
+* Baseline inputs cannot introduce future information.
+* Forecast horizons and model versions are not mixed.
+* TTM is not double-counted.
+* Stage 5 forecast records are not modified.
+* Reliability does not numerically alter Forward P/E.
+* No Stage 4, Stage 5, or Stage 7 source changes are present from this work. Do not inspect those stages broadly; use the narrowest evidence available.
+
+## 9. Mandatory six-layer audit
+
+Apply all six layers to each critical Prompt 25 invariant:
+
+1. **Layer 1 — Unit / Formula:** exact selection ordering, formulas, regime behavior, null handling, and state predicates.
+2. **Layer 2 — Contract / Boundary:** identity, ReportVersion validity, metadata preservation, quality-state contracts, and invalid-input behavior.
+3. **Layer 3 — Production-Path / Integration:** exercise the public Stage 6 evaluation path, not only internal helpers.
+4. **Layer 4 — Adversarial / Negative:** reversed candidate order, tied publication times, malformed metadata, conflicting duplicates, mixed quality states, zero/sign edge cases, and scenario-count contamination.
+5. **Layer 5 — Regression:** run the relevant focused Stage 6 tests, then the full regression suite if the local environment permits.
+6. **Layer 6 — Independent Audit:** independently trace source behavior against the locked specification and confirm that tests genuinely exercise the claimed invariants.
+
+Do not change tests. Record the exact commands and results. If a required test cannot be run, state that limitation explicitly.
+
+A test is not proof of methodology authority. For every critical rule, distinguish:
+
+* `BEHAVIORALLY PROVEN`
+* `STRUCTURALLY VERIFIED`
+* `SPECIFICATION-AUTHORIZED`
+* `UNRESOLVED METHODOLOGY AUTHORITY`
+* `BLOCKER`
+
+Do not use one classification as a substitute for another.
+
+## 10. Explicitly unresolved areas — do not implement or resolve
+
+The following previously reported methodology blockers remain outside this prompt:
+
+* **B1:** Seasonal Naive construction and seasonal-period authority.
+* **B2:** MAPE-to-Accuracy, Bias-to-Bias-Control, and Baseline-Advantage score mappings.
+* **B3:** persistence definition.
+* **B4:** Calibration transition methodology.
+* **B7:** unavailable-component handling in Reliability.
+* **B8:** persistent baseline-underperformance flag methodology.
+
+Do not add formulas, thresholds, fallback values, seasonal periods, Reliability scores, calibration transitions, or persistence criteria for these items.
+
+Reliability must remain withheld while its required methodology is unresolved. Calibration must remain fail-closed.
+
+## 11. Reporting requirements
+
+Append a section to `temp_report.md` titled:
+
+`REPORT — Stage 6 Prompt 26`
+
+Include:
+
+1. Exact files and symbols inspected.
+2. Audit evidence for B5, B6, B9, and zero-Actual behavior.
+3. For every consequential rule, separate:
+
+   * specification authority;
+   * observed implementation behavior;
+   * behavioral test evidence;
+   * unresolved ambiguity.
+4. Results of the six testing layers.
+5. Exact focused and full-suite commands and counts.
+6. Any mismatch between the Prompt 25 report and the current source/tests.
+7. Any defect, authority gap, or possible financial-semantic problem.
+8. Whether each finding is an implementation defect, a specification-authority gap, a test-coverage gap, or a combination.
+9. A concise list of the next blockers in priority order.
+
+Do not report a rule as specification-authorized merely because it is documented in a Prompt 25 report or implemented in source code.
+
+## 12. Stop conditions and final classification
+
+This is an audit-only prompt. Do not remediate anything.
+
+If the audit finds an implementation defect, specification conflict, material identity ambiguity, potential scenario-count contamination, or unauthorized financial methodology, document the evidence and stop.
+
+Use exactly one final classification:
+
+* `PASS — P25 IMPLEMENTATION AND AUTHORITY VERIFIED`
+* `FAIL — REMEDIATION REQUIRED`
+* `BLOCKED — METHODOLOGY AUTHORITY UNRESOLVED`
+
+A PASS is permitted only if the implementation is independently verified **and** each consequential Prompt 25 decision has adequate specification authority. Passing tests alone is insufficient.
+
+Regardless of classification:
+
+`Stage 6 is NOT declared frozen.`
+
+Stop after writing the report and providing a concise summary. Do not propose or implement fixes within this prompt.

@@ -4242,5 +4242,70 @@ reasons; calibration stays `NO_CALIBRATION`; `relative_improvement` only.
 Part B implements exactly the P25-authorized scope (B5/B6/B9/zero-actual);
 B1/B2/B3/B4/B7/B8 remain UNRESOLVED METHODOLOGY AUTHORITY. Per §14, freeze
 is not decided here regardless.
+========================================================================
+
 
 `Stage 6 is NOT declared frozen.`
+
+# REPORT — Stage 6 Prompt 26
+**Independent post-P25 methodology and behavioral audit (B5 / B6 / B9 / zero-Actual) — read-only; no fixes implemented; no freeze declared.**
+
+## 1. Files and symbols inspected
+- `06_Stage6_Forecast_Evaluation.md` (§§4, 5, 9, 12, 14, 37, 39, 41); `PROJECT_HANDOFF_INSTRUCTIONS.md`; `temp_report.md` REPORTs for Stage 6 Prompts 17–25.
+- `src/evaluation/schema.py`: `ACTUAL_SELECTION_POLICY`, `ACTUAL_SELECTION_ORDER`, `PARTICIPATING_QUALITY_STATES`, `QUARANTINED_QUALITY_STATES`, `is_scoring_eligible`, `is_valid_report_version`, `ActualObservation`.
+- `src/evaluation/observation.py`: `EvaluationKey` (7-tuple), `select_actual`, `build_observation`, `flag_duplicates`.
+- `src/evaluation/aggregate.py`: `score_observation`, `aggregate_series`, `SeriesKey` (4-tuple), `ScoredObservation.data_quality_state`, `SeriesEvaluation.limited_quality`.
+- `src/evaluation/pipeline.py` (candidate-to-selection-to-observation path), `src/evaluation/metrics.py` (`classify_regime`), `src/evaluation/reliability.py` governance (skim only).
+- Tests: `test_stage6_p25_selection.py`, `test_stage6_p25_adversarial.py`, `test_stage6_evaluation_foundation.py`, `test_stage6_evaluation_metrics.py`, `test_stage6_production_pipeline.py`.
+- Boundary only: `src/scoring/engine.py` (cited precedent), `git status --short` / `git diff --stat` (no Stage 1–5/7 source changes; only the `stage_6_prompts.md` prompt tracker modified).
+
+## 2. B5 — Actual selection and ReportVersion policy
+- **Specification authority: UNRESOLVED METHODOLOGY AUTHORITY.** §4 requires the Actual be chosen from a valid ReportVersion with a known publication date, and states the Actual is not merely the latest number in the DB. This forbids naive latest-in-DB but authorizes neither earliest-published as definitive, nor latest/restated, nor version-number/id tie-breaks. Tie-breaks carry determinism only, no semantic authority.
+- **Observed behavior: BEHAVIORALLY PROVEN.** `select_actual` filters by `is_valid_report_version` (id AND publication non-None) then takes the min by (publication, version_number-or-0, id); order-independent; all-invalid yields None (`PENDING_ACTUAL`); an invalid attached Actual freezes `INVALID_REPORT_VERSION`, is carried for audit, and never scores (non-READY quarantined before duplicates/eligibility).
+- **Test evidence:** selection suite (earliest-wins, both tie-breaks, None-number-sorts-as-zero, invalid filtering, all-invalid-to-None, 6-permutation order independence) + adversarial p25_01/02/03/04 incl. restatement-loses-to-first-known through the real pipeline.
+- **Ambiguity:** no §39 `actual_report_version` output field exists in series output (provenance travels only via the attached Actual object) — minor test-coverage gap.
+
+## 3. B6 — Data-quality eligibility
+- **Specification authority: UNRESOLVED METHODOLOGY AUTHORITY.** §41 defers state interpretation to Data Foundation rules (none quoted anywhere in Stage 6 scope) and only forbids an invalid Actual entering MAPE/Bias like a valid one. ESTIMATED/RESTATED full participation in MAPE/Bias/sufficiency/baseline rests on the Stage 3 scoring-layer precedent, which is Stage 3 authority mistaken for Stage 6 authority.
+- **Observed behavior: BEHAVIORALLY PROVEN.** Single predicate `is_scoring_eligible`; order non-READY → duplicate → eligibility → MISSING_VALUE → regime; quarantine reasons verbatim (`DATA_QUALITY_QUARANTINED:<state>`, `INVALID_REPORT_VERSION`, `DUPLICATE_QUARANTINED`, `MISSING_VALUE`); no quarantined observation contributes to MAPE/Bias/counts (`aggregate_series` filters on scored); `limited_quality` set iff a scored observation carries ESTIMATED/RESTATED, with verbatim state on every scored observation — STRUCTURALLY VERIFIED, consistent and unmistakable.
+- **Test evidence:** per-state eligibility pins (all 6 states), p25_05/06/07/08, restated-series `limited_quality` test, pipeline split-quality pins.
+
+## 4. B9 — Observation identity, scenario, duplicates
+- **Specification authority: UNRESOLVED METHODOLOGY AUTHORITY.** No section authorizes scenario in observation identity. §14 fixes the series as Company+Metric+Horizon+Model Version (scenario absent); §37 keeps one Reliability beside three scenario tracks without defining observation identity. Real unanswered coherence question: scenario-distinct observations share one 4-tuple series, so 3 scenarios × N forecasts = 3N scored observations drive one series' count/sufficiency/MAPE/Bias — never acknowledged.
+- **Observed behavior: BEHAVIORALLY PROVEN.** 7-tuple keys (scenario appended LAST, default BASE); `SeriesKey` stays 4-tuple; duplicates flagged by full 7-tuple and quarantined wholesale with no averaging/preference; baselines keyed by 7-tuple; TTM conservation and horizon/version isolation intact.
+- **Test evidence:** 7-tuple/scenario-distinct/forecast-id pins; p25_09 (wholesale, count 0, tally 2) /10/11/12; pipeline surrogate-collision and scenario non-collision pins. Missing: multi-scenario shared-series sufficiency test (test-coverage gap).
+
+## 5. Actual = 0 and sign regimes
+- **Specification authority: UNRESOLVED METHODOLOGY AUTHORITY.** §12 lists "Forecast = 0" but never "Actual = 0"; §9 excludes ZERO_BASE/LOSS_TO_PROFIT/PROFIT_TO_LOSS/SIGN_CHANGE from MAPE, which does not cover A=0/F!=0. The |Forecast| denominator is arithmetically defined here, but §9 computes MAPE over valid observations — and the validity of A=0 observations is what no sentence establishes.
+- **Observed behavior: BEHAVIORALLY PROVEN** through `score_observation` + `classify_regime`: F>0/A=0 scores (error −1000, PE −100, APE 100); F<0/A=0 scores (PE 100, APE 100); F=0/A=0 and F=0/A!=0 stay ZERO_BASE with percentages None and absolute error kept; None actual → MISSING_VALUE (NULL != 0, never coerced); loss↔profit transitions still quarantine via regime; `ZERO_ACTUAL_UNRESOLVED` fully deleted. Note: F<0/A=0 scores — an unaddressed loss-to-zero boundary.
+- **Test evidence:** p25_13/14/15/16/17 with exact values; foundation NULL-vs-0 pins.
+
+## 6. Cross-layer consistency
+Production path traced end-to-end: candidates → ReportVersion validation/selection → observation → eligibility → duplicates → metrics → sufficiency → baseline → Reliability/Calibration governance. No quarantined observation leaks into MAPE/Bias/sufficiency; NULL != 0 holds on all paths; Reliability stays withheld (always `WithheldReliability(reliability=None)`); Calibration fail-closed (non-NO_CALIBRATION rejected); no Seasonal Naive produced; no future information in baseline inputs; horizons/versions unmixed; no TTM double-count; Stage 5 records unmodified; Reliability never touches Forward P/E; no Stage 4/5/7 source changes.
+
+## 7. Six layers
+L1 unit (selection suite) · L2 contract/boundary (foundation) · L3 production path (metrics + pipeline + evaluation + reliability) · L4 adversarial (18 P25 cases + restated `limited_quality`) · L5 regression (commands below) · L6 independent re-trace of source vs locked spec. Behavior, structure, and authority classified separately throughout; no test treated as authority.
+
+## 8. Exact test commands and counts
+- `.venv/Scripts/python.exe -m pytest src/tests/test_stage6*.py -q` → **166 passed, 0 failed, 0 skipped**
+- `.venv/Scripts/python.exe -m pytest src/tests -q` → **850 passed, 2 skipped** (pre-existing environmental skips), exit 0
+- Both counts match the Prompt 25 report exactly. No test modified.
+
+## 9. Mismatches vs the Prompt 25 report
+(i) `test_stage6_evaluation_metrics.py` module docstring still states Actual=0/Forecast!=0 is "UNRESOLVED — quarantined, not scored", and `test_zero_actual_is_unresolved_not_scored` keeps its stale name — both contradict the new scored behavior (documentation defects only; assertions are correct). (ii) The scenario-multiplicity sufficiency-inflation consequence is never acknowledged. (iii) Rules framed as "P25-authorized" confer zero methodology authority — only the locked specification does.
+
+## 10. Findings by type
+- Specification-authority gaps: B5 earliest-rule + tie-breaks; B6 ESTIMATED/RESTATED Stage 6 participation; B9 scenario identity + series inflation; zero-actual percentage validity.
+- Test-coverage gaps (minor): `actual_report_version` output pin; multi-scenario shared-series sufficiency test.
+- Implementation-documentation defects (minor): stale test name + module docstring.
+- No behavioral implementation defects found in the four audited areas. B1/B2/B3/B4/B7/B8 untouched by design.
+
+## 11. Next blockers (priority order)
+1. Spec amendment for B5 (earliest vs latest/restated + tie-break semantics). 2. Quote the Data Foundation rule or amend §41 (B6). 3. Authorize scenario identity and rule on series-count inflation (B9). 4. Amend §12 to cover Actual = 0. 5. Fix stale name/docstring; add provenance + scenario-sufficiency pins. 6. B1/B2/B3/B4/B7/B8 remain untouched.
+
+## 12. Final classification
+BLOCKED — METHODOLOGY AUTHORITY UNRESOLVED
+
+`Stage 6 is NOT declared frozen.`
+========================================================================
+
