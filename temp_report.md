@@ -4307,5 +4307,185 @@ L1 unit (selection suite) · L2 contract/boundary (foundation) · L3 production 
 BLOCKED — METHODOLOGY AUTHORITY UNRESOLVED
 
 `Stage 6 is NOT declared frozen.`
+
+---
+
+# REPORT — Stage 6 Prompt 27: Methodology Decision Package for P25 Blockers (B5 / B6 / B9 / ZERO_ACTUAL)
+
+**Status: PROPOSED — NOT APPROVED. Read-only analysis. This report confers zero methodology authority; only a locked-spec amendment by the owner does.**
+
+## 0. Scope and method
+
+Read-only decision package. No source, test, spec, or config file was modified (confirmation in §13); no tests were run. All behavior cited derives from the evidence base in the task brief (Prompt 25 implementation + Prompt 26 verdict, 166 stage-6 / 850 total tests passing), not from new execution. Each analysis below separates three levels: (a) **computability** (what the arithmetic/code can produce), (b) **comparability** (whether the numbers can be meaningfully compared), (c) **authority** (whether the locked spec authorizes the reading — the only level that unblocks Stage 6).
+
+## 1. Exact files inspected
+
+Evidence base (prior verified read-only collection; no new source reads this prompt except the `temp_report.md` tail used as append anchor):
+
+- `D:\winprojects\analyzer\06_Stage6_Forecast_Evaluation.md` — locked spec, 1243 lines / 45 sections; operative sections #4, #5, #9, #12, #14, #37, #39, #40, #41, #42.
+- `D:\winprojects\analyzer\src\evaluation\observation.py` — `select_actual`, `ACTUAL_SELECTION_POLICY=FIRST_KNOWN_OUTCOME_P25`, order key `(publication_datetime, report_version_number, report_version_id)`.
+- `D:\winprojects\analyzer\src\evaluation\schema.py` — `is_scoring_eligible`, PARTICIPATING={VALID, ESTIMATED, RESTATED}, QUARANTINED={MISSING, SUSPICIOUS, UNMAPPED}.
+- `D:\winprojects\analyzer\src\evaluation\aggregate.py` — `EvaluationKey` 7-tuple (scenario last, default BASE); `SeriesKey` unchanged 4-tuple.
+- `D:\winprojects\analyzer\src\evaluation\metrics.py` — `classify_regime` (returns None when `f*a=0`), `|Forecast|` denominator for Actual=0.
+- `D:\winprojects\analyzer\src\evaluation\pipeline.py` — production scoring path.
+- `D:\winprojects\analyzer\src\tests\test_stage6_evaluation.py`, `test_stage6_evaluation_foundation.py`, `test_stage6_evaluation_metrics.py` (contains stale `test_zero_actual_is_unresolved_not_scored` name + stale module docstring), `test_stage6_p25_selection.py`, `test_stage6_p25_adversarial.py`, `test_stage6_production_pipeline.py`, `test_stage6_reliability_governance.py`.
+- `D:\winprojects\analyzer\temp_report.md` — tail only (Prompt 26 closing block, used as Edit anchor).
+
+## 2. B5 — Actual-selection policy (which ReportVersion supplies Actual)
+
+Spec §4 authorizes: Actual must come from a valid ReportVersion with known publication date; Actual is NOT merely latest-in-DB. It authorizes **neither** earliest, **nor** latest/restated, **nor** any tie-break. Hence all three options below are behaviorally implementable but none is currently authorized.
+
+### 2.1 Options
+
+- **O5.1 First-known outcome (status quo implementation).** Winner = earliest eligible version by `(publication_datetime, report_version_number, report_version_id)`. Rationale: PIT purity — the first print is the only information knowable at the horizon; restatements are hindsight and must not judge past forecasts. Cost: a first print later proven erroneous still judges the forecast; corrections are audit-visible but score-invisible, which can look perverse when the error is large.
+- **O5.2 Latest-restated.** Winner = most recent eligible version. Rationale: accuracy against best-known truth; restatements exist to correct, and scoring against known-false data mismeasures skill. Cost: hindsight bias — forecasts are graded on information unavailable at the horizon; late restatements force rescoring of already-published evaluations.
+- **O5.3 Separate objectives (dual reporting).** Maintain both: first-known series for forecast-accuracy and latest-restated series for calibration/revision analysis, reported side by side, never blended into one MAPE/Bias. Rationale: dissolves the trade-off by refusing to mix questions. Cost: doubled outputs, two sufficiency counts, consumer confusion risk, and every downstream rule (§§9/12/14/37/39) must be parameterized by objective.
+
+### 2.2 Tie, missing-version, and invalid-timestamp handling (required under any option)
+
+- **Tie** (identical `publication_datetime` + `report_version_number`, distinct values): the implemented `report_version_id` break is deterministic but semantically arbitrary (surrogate key). It is acceptable **only** as an explicitly authorized determinism device, and every tie must set an audit `tie_flag` with the tied candidate list. No semantic meaning may be attached to "lower id wins."
+- **Missing version data** (null version number or null publication date): the candidate is unordered, so it can participate in **neither** earliest **nor** latest selection. Verdict: quarantine as UNMAPPED with reason `UNORDERED_VERSION`, audit-logged, never selected. (Selecting it would silently reintroduce latest-in-DB semantics through the back door.)
+- **Invalid timestamp** (unparseable, or future-dated beyond tolerance): not eligible as Actual under any option. Future-dated versions are the acute risk for O5.2 (a bad future print would always win "latest"). Verdict: quarantine with reason `INVALID_TIMESTAMP`, audit-logged.
+
+### 2.3 Reproducibility (invariant, option-independent)
+
+The ordering key must be a **total order** over eligible candidates. Each scored observation must record: `selection_policy_id`, `actual_report_version`, ordered candidate list (or winner + runner-up + candidate count), and `tie_flag`. Reruns pinned to the same inputs must be bit-reproducible; any nondeterminism from unordered store fetches is a defect under all options.
+
+### 2.4 Distinguishing tests (behavioral pins, not authority)
+
+- **T5.1 restatement duel:** two eligible versions, same key, values V1 then V2≠V1. Under O5.1 the signed error uses V1; under O5.2 it uses V2. Each option's test fails under the rival policy by construction.
+- **T5.2 unordered candidate:** version with null publication date and the "right" value. Assert it is quarantined (`UNORDERED_VERSION`) under every option — fails if any policy selects it.
+- **T5.3 future-dated latest:** a future-dated version with a value matching the forecast. Assert exclusion under O5.2 — fails if "latest" is naive.
+- **T5.4 tie determinism:** tied `(datetime, number)` pair; assert a deterministic winner **and** `tie_flag` set with both candidates logged — fails if ties resolve silently or nondeterministically.
+
+## 3. B6 — Data-quality participation matrix
+
+Current rule (behavioral only): PARTICIPATING={VALID, ESTIMATED, RESTATED}, QUARANTINED={MISSING, SUSPICIOUS, UNMAPPED}. Stage 6 authority for ESTIMATED/RESTATED participation is missing (Stage 3 precedent is not Stage 6 authority). Dimensions: (1) select-as-Actual, (2) absolute Error, (3) PE/APE, (4) MAPE/Bias, (5) sufficiency count, (6) baseline, (7) audit metadata, (8) post-restatement behavior.
+
+| State | (1) Actual? | (2) Error | (3) PE/APE | (4) MAPE/Bias | (5) Count? | (6) Baseline? | (7) Audit | (8) Post-restatement |
+|---|---|---|---|---|---|---|---|---|
+| VALID | Yes | Yes | Yes | Yes | Yes | Yes | standard provenance | superseded per B5 policy |
+| ESTIMATED | Yes (current; **unauthorized**) | Yes | Yes | Yes | Yes | Yes | must carry `quality=ESTIMATED` + method | same as VALID |
+| MISSING (incl. NULL actual → MISSING_VALUE) | No | No | No | Excluded | No | Excluded | absence + reason recorded | n/a |
+| SUSPICIOUS | No | No | No | Excluded | No (counts only toward quality rates) | Excluded | flag + reason, audit-visible | n/a |
+| UNMAPPED (incl. unordered versions, §2.2) | No | No | No | Excluded | No | Excluded | mapping-failure reason | n/a |
+| RESTATED (as candidate) | Per B5 policy (see below) | If selected | If selected | If selected | If selected | If selected | must carry `quality=RESTATED` + supersedes/superseded-by links | under O5.1 frozen once winner chosen; under O5.2 rescore trigger; superseded versions excluded-but-auditable |
+
+RESTATED is a **version relation, not intrinsic quality**: row 6 splits into (a) RESTATED as winning Actual — scores only with RESTATED provenance under the flagged alternatives below; (b) superseded versions — always excluded-but-auditable once a winner is chosen. Note the B5×B6 interaction: under O5.1 a RESTATED candidate wins only if it is itself earliest, so "RESTATED participates" is nearly vacuous; under O5.2 RESTATED systematically wins. **B6 cannot be decided independently of B5.**
+
+ESTIMATED / RESTATED alternatives:
+
+- **Alt I6.1 full participation (status quo):** scores identically to VALID. Trade-off: maximal sample size; contamination risk — measurement error in ESTIMATED values becomes forecaster error, and RESTATED provenance is invisible downstream.
+- **Alt I6.2 flagged participation:** scores, but every observation carries its quality flag into MAPE/Bias/sufficiency/baseline outputs, and a sensitivity analysis excluding ESTIMATED (and RESTATED-winning) observations is mandatory. Trade-off: preserves N while making contamination visible and removable; reporting complexity rises.
+- **Alt I6.3 exclusion:** ESTIMATED joins the quarantine set (audit-only). Trade-off: purest accuracy signal; shrinks eligible N, interacts with §14 sufficiency (thinner series fail minimums), and discards information where estimates are the only Actuals.
+
+## 4. B9 — Scenario identity and series inflation (3 scenarios × N forecasts = 3N scored observations, one shared series)
+
+Current rule (behavioral only): `EvaluationKey` 7-tuple with scenario last (default BASE); `SeriesKey` stays a 4-tuple (Company+Metric+Horizon+Model Version, no scenario — §14). Consequence never acknowledged: 3N scenario-distinct observations drive **one** series count, one sufficiency verdict, one MAPE, one Bias. Dimensions: (1) observation identity, (2) series identity / sufficiency denominator, (3) MAPE aggregation, (4) Bias aggregation, (5) baseline comparability, (6) Reliability representation (§37), (7) audit traceability, (8) gaming robustness, (9) implementation/reporting complexity.
+
+- **Option A — scenario-separated series.** `SeriesKey` gains scenario (or scenario-indexed sub-series): three MAPEs, three sufficiencies, three Bias figures. (1)(7): cleanest identity. (2): no inflation — each series counts its own N. (6): either three Reliabilities or one Reliability with an explicit per-scenario rule (amend §37). (8): robust — adding scenarios cannot inflate any single series. (9): heaviest — triple outputs, per-scenario minimums may starve Bear/Bull series.
+- **Option B — scenario-aware identity with anti-inflation rule.** Keep shared series, but sufficiency counts distinct forecast events — e.g., distinct (Company, Metric, Horizon, Model Version, Actual) — so 3N observations from N events count N. MAPE/Bias are either event-weighted pooled figures or per-scenario figures plus a disclosed pooled figure with weights. (2): inflation neutralized by rule rather than identity. (8): robust if the rule is normative. (9): moderate — weighting rule must be specified exactly.
+- **Option C — one designated evaluation scenario.** Only BASE (or another designated scenario) scores; Bear/Bull are descriptive tracks, never MAPE/Bias/sufficiency inputs. (1)(2)(3)(4): trivially consistent. (8): maximally robust. Cost: discards scored information about distributional skill; scenario-forecasting effort becomes unevaluated; §37's three-tracks-beside-one-Reliability needs the smallest amendment (Reliability follows the designated scenario).
+
+ILLUSTRATIVE EXAMPLE (explicitly FAKE values — not from any database — to show the sufficiency-band mechanism only): suppose §14 minimum is 10 observations; 4 genuine forecast events × 3 scenarios = 12 scored observations sharing one series. Genuine-event count 4 < 10 → INSUFFICIENT; scored-observation count 12 ≥ 10 → SUFFICIENT under the current rule: a pure band flip from scenario multiplicity. Take Actual=100 each event; fake APEs Base {5,8,6,9} (mean 7.0), Bear {40,42,38,45}, Bull {30,28,33,31}: pooled MAPE over 12 ≈ 26.3 versus Base-only MAPE 7.0 — the same forecasts read as "accurate" or "poor" depending on an unauthorized pooling choice. Under Option A this becomes three honest series (each N=4, each insufficient); under B the series counts 4 events (insufficient); under C the series counts 4 BASE observations (insufficient). All three options agree here — which is precisely why the current rule's SUFFICIENT verdict is suspect.
+
+Reliability representation (§37: three scenario tracks beside one Reliability, no observation identity): under A, authorize either per-scenario Reliabilities or one Reliability with a stated scenario rule; under B, Reliability is computed on the anti-inflated event set with disclosed weights; under C, Reliability follows the designated scenario only. Each requires its own §37 amendment line.
+
+## 5. ZERO_ACTUAL — zero and sign-boundary cases
+
+Spec §§9/12 cover Forecast=0 only, never Actual=0; the null-MAPE set {ZERO_BASE, LOSS_TO_PROFIT, PROFIT_TO_LOSS, SIGN_CHANGE} has no Actual=0 member. The implemented `|Forecast|` denominator for A=0/F≠0 is arithmetically defined but unauthorized. Table verdicts use three levels: **computable** (arithmetic yields a number) vs **comparable** (the number can be ranked against other cases) vs **authorized** (the spec permits scoring it).
+
+| Case | Error | PE | APE | MAPE | Bias | Regime | Count / verdict |
+|---|---|---|---|---|---|---|---|
+| Z1 F>0, A=0 | computable (\|F\|) | computable via \|F\| denom, **not comparable** to standard PE | always exactly 100% for any miss — computable, **information-destroying** | defined-but-degenerate; pooling with nonzero APEs is incommensurable | sign positive | None (`f*a=0`) | currently scored — **authority missing** |
+| Z2 F<0, A=0 (loss-to-zero) | computable | same device, opposite economics | likewise always 100% | same degeneracy | sign negative | None — yet economically a regime event (predicted loss, realized break-even) | currently scored — **authority missing; boundary unaddressed** |
+| Z3 F=0, A=0 | 0, computable | 0/0 undefined — needs explicit convention | recommend APE=0 by convention (exact hit) if scored at all | 0 contribution | none | None | convention + authority both missing |
+| Z4 F=0, A≠0 | computable | spec-covered (ZERO_BASE → null MAPE) | nulled per §§9/12 | excluded from MAPE | per Bias rule | per `classify_regime` | **authorized** — note asymmetry: F=0 nulls, A=0 scores |
+| Z5 F>0, A<0 | computable | computable, large magnitude | computable | nulled (PROFIT_TO_LOSS / SIGN_CHANGE) | per Bias rule | sign-change family | **authorized** |
+| Z6 F<0, A>0 | computable | computable | computable | nulled (LOSS_TO_PROFIT / SIGN_CHANGE) | per Bias rule | sign-change family | **authorized** |
+| Z7 Actual None | n/a | n/a | n/a | excluded | excluded | n/a | quarantine MISSING_VALUE — **authorized pattern** (invalid Actual never enters MAPE/Bias, §41) |
+| Z8 zero-involving Actual with non-VALID quality | quality gate applies **first** | — | — | — | — | — | only VALID/ESTIMATED/RESTATED-per-B6 zero Actuals ever reach Z1–Z3 logic; SUSPICIOUS/UNMAPPED/MISSING zero Actuals quarantine regardless of value |
+
+Core findings: (i) every A=0 nonzero-miss scores APE ≡ 100% under the `|F|` device, so Z1/Z2 observations cannot be ordered by accuracy among themselves and cannot be pooled with standard APEs without distortion — computable but not comparable; (ii) Z1 and Z2 are arithmetically identical yet economically opposite (hit-zero from above vs predicted-loss-realized-zero), and Bias signs differ while APEs coincide — the device conflates what Bias separates; (iii) Z2 falls through **every** null-MAPE rule (not LOSS_TO_PROFIT since A=0≯0; not ZERO_BASE since F≠0; not SIGN_CHANGE since product is 0, and `classify_regime` returns None) — the most ambiguous case is the least covered; (iv) Z4-vs-Z1 asymmetry (Forecast-zero nulls, Actual-zero scores) has no stated rationale and must be either justified or removed by amending §§9/12 together.
+
+## 6. Alternatives and trade-offs (cross-cutting)
+
+Null-MAPE extension (add ZERO_ACTUAL / LOSS_TO_ZERO to the null set) versus segregated scoring (score A=0 with the `|F|` device but report zero-actual MAPE separately, never pooled): nulling is comparable-safe but loses the "predicted ±X, realized 0" signal and shrinks N; segregation preserves signal but doubles MAPE outputs and needs a pooling prohibition with teeth. Dual-objective O5.3 versus single-policy O5.1/O5.2: O5.3 preserves both questions at the cost of doubling every downstream artifact. Flagged participation I6.2 versus full/excluded: flagged participation is the only alternative that preserves N while keeping contamination removable — at the cost of mandatory sensitivity reporting. Option B versus A/C on scenarios: B preserves a single headline series (cheapest for consumers) at the cost of a weighting rule that itself needs authority; A is the most honest but triples sparse-series failures; C is simplest but abandons evaluating distributional skill.
+
+## 7. Cross-policy consistency
+
+- **ReportVersion-vs-quality:** fix order of operations as filter-then-select (only eligible-quality candidates compete in the B5 ordering). Select-then-validate would let a quarantined-quality version win and then void the observation — silent N loss. Invariant under all options.
+- **Restatement-vs-zero/sign:** a restatement can move Actual across zero or sign boundaries (e.g., +2 → −1), flipping the Z-case and null-MAPE status retroactively. Under O5.2 this changes published MAPE; the frozen-history-vs-rescore rule (Q8) must be decided jointly with B5.
+- **Scenario-vs-sufficiency:** the 3N inflation decision (B9) gates the §14 amendment — sufficiency thresholds mean different things under A/B/C. Must be amended as one package.
+- **Zero-vs-MAPE/Bias/baseline/confidence:** the 100%-APE degeneracy contaminates MAPE, Bias direction, baseline deltas, and any Reliability/confidence derived from errors. The zero policy gates all four; none may be amended alone.
+- **Excluded-but-auditable:** every quarantine path (MISSING, SUSPICIOUS, UNMAPPED, NULL actual, invalid timestamp, unordered version, MAPE-nulled) emits an audit record with a reason code (§40 schema). Invariant under all options.
+- **Output-field meaning:** `actual_report_version` (currently missing pin), `selection_policy_id`, `quality_flag`, `scenario`, `tie_flag`, `null_reason` — exact semantics depend on the chosen options; §39 amendment (§8, AM-39).
+- **Determinism:** total order + recorded inputs ⇒ reproducible reruns, under every option. Nondeterminism is a defect, never a policy.
+
+## 8. Proposed spec amendments (all PROPOSED — NOT APPROVED; normative SHALL language for owner review)
+
+**Invariants — recommended for approval as stated (ratification only):**
+- **AM-4inv (§4):** "Actual selection SHALL apply a total order over eligible-quality candidates and SHALL record `selection_policy_id`, `actual_report_version`, candidate count, and `tie_flag` on every scored observation. Unordered versions (missing publication date or version number) and invalid timestamps SHALL be quarantined as UNMAPPED/INVALID_TIMESTAMP and SHALL never be selected."
+- **AM-39 (§39):** pin `actual_report_version` plus `selection_policy_id`, `quality_flag`, `scenario`, `tie_flag`, `null_reason` on every evaluation output row.
+- **AM-40 (§40):** every quarantine path SHALL emit an audit record with a reason code from a closed enumeration.
+- **AM-ops:** quality filtering SHALL precede version selection (filter-then-select).
+
+**Owner decisions — alternative text blocks (NO RECOMMENDATION; pick at most one per target):**
+- **AM-4A (§4, goes with O5.1):** "The Actual SHALL be the earliest eligible ReportVersion by `(publication_datetime, report_version_number)`; exact ties SHALL break by lowest `report_version_id` as a pure determinism device with `tie_flag` set."
+- **AM-4B (§4, goes with O5.2):** "The Actual SHALL be the most recent eligible ReportVersion by `(publication_datetime, report_version_number)`; exact ties break as in AM-4A. Future-dated versions beyond tolerance SHALL be ineligible."
+- **AM-4C (§4, goes with O5.3):** "Two evaluation objectives SHALL be maintained — first-known accuracy and latest-restated calibration — each with its own MAPE/Bias/sufficiency outputs; blending across objectives is prohibited."
+- **AM-9 (§9, zero APE):** Alt AM-9null: "Observations with Actual=0 SHALL null MAPE (new `ZERO_ACTUAL` reason; loss-to-zero `F<0/A=0` likewise nulled)." Alt AM-9seg: "Actual=0 observations SHALL score APE=100% for any nonzero miss (0% for exact hits) and SHALL be reported as a segregated zero-actual MAPE, never pooled with standard MAPE."
+- **AM-12 (§12):** extend sign/zero taxonomy to Actual=0, define the F<0/A=0 loss-to-zero boundary explicitly, and state the Z1-vs-Z4 rationale (or remove the asymmetry via AM-9null).
+- **AM-14 (§14):** Alt AM-14A (scenario-separated series/sufficiencies); Alt AM-14B (shared series with event-level anti-inflation counting rule + disclosed weights); Alt AM-14C (designated-scenario counting only). Each SHALL also state whether MAPE-nulled observations count toward minimums (see Q7).
+- **AM-37 (§37):** Reliability rule matching the chosen B9 option (per-scenario, event-weighted, or designated-scenario).
+- **AM-41 (§41):** normative B6 participation matrix (§3 table) with the chosen ESTIMATED/RESTATED alternative (I6.1 full / I6.2 flagged + mandatory sensitivity / I6.3 excluded), quoting or incorporating the Data Foundation rule for each state.
+
+## 9. Decision table
+
+| Decision ID | Issue | Recommended option | Evidence | Main trade-off | Owner approval required? |
+|---|---|---|---|---|---|
+| D1 | B5 selection policy (O5.1 / O5.2 / O5.3) | NO RECOMMENDATION — OWNER DECISION REQUIRED | §4 authorizes neither earliest nor latest; PIT purity vs best-truth (§2.1) | Hindsight bias vs judging against known-false prints | Yes — substantive |
+| D2 | B5 tie-break + unordered/invalid handling | Deterministic id-break with `tie_flag`; quarantine unordered/invalid | Reproducibility invariant; §4 "known publication date" excludes unordered | Surrogate-id arbitrariness (mitigated by flagging) | Yes — ratification |
+| D3 | B6 ESTIMATED participation (I6.1 / I6.2 / I6.3) | NO RECOMMENDATION — OWNER DECISION REQUIRED | No Stage 6 authority; Stage 3 precedent insufficient (§3) | Sample size vs measurement-error contamination | Yes — substantive |
+| D4 | B6 RESTATED semantics | NO RECOMMENDATION — OWNER DECISION REQUIRED (coupled to D1) | B5×B6 interaction: RESTATED participation is vacuous under O5.1, systematic under O5.2 | Frozen history vs rescoring on restatement | Yes — substantive |
+| D5 | B6 quarantine set {MISSING, SUSPICIOUS, UNMAPPED} | Confirm current set + excluded-but-auditable | §41 pattern: invalid Actual never enters MAPE/Bias | None material; purity preserved | Yes — ratification |
+| D6 | B9 scenario identity (A / B / C) | NO RECOMMENDATION — OWNER DECISION REQUIRED | 3N inflation unacknowledged; §14 series has no scenario; fake-value band flip (§4) | Honesty (A) vs single headline (B) vs simplicity (C) | Yes — substantive |
+| D7 | B9 Reliability representation | Follows D6 (per-scenario / event-weighted / designated) | §37: three tracks beside one Reliability, no identity | Complexity vs correctness of confidence | Yes — substantive (with D6) |
+| D8 | ZERO_ACTUAL validity (null vs segregated-100%) | NO RECOMMENDATION — OWNER DECISION REQUIRED | §§9/12 cover F=0 only; 100%-APE degeneracy; Z1-vs-Z4 asymmetry (§5) | Signal loss (null) vs distortion risk (segregated) | Yes — substantive |
+| D9 | Loss-to-zero boundary (F<0/A=0) | Explicit rule required; no recommendation on content | Falls through every null-MAPE rule; `classify_regime` None (§5) | Boundary-event visibility vs taxonomy growth | Yes — substantive |
+| D10 | Z3 (F=0/A=0) convention | APE=0 exact-hit convention, if scored | 0/0 undefined; only exact-hit reading is defensible | Trivial case, needs one line | Yes — ratification |
+| D11 | Output pins (`actual_report_version` et al.) | Approve AM-39 as stated | Missing pin blocks provenance (§39 concept exists) | Small implementation cost | Yes — ratification |
+| D12 | MAPE-nulled observations in sufficiency counts | NO RECOMMENDATION — OWNER DECISION REQUIRED (see Q7) | §14 silent; interacts with D6 and D8 | Strictness vs series viability | Yes — substantive |
+
+## 10. Six-layer validation plan (per policy: each layer fields a test that fails under a competing policy)
+
+- **L1 unit (selection suite):** T5.1 restatement duel + T5.4 tie determinism + Z3 convention pin. Each asserts the approved policy's winner/value; all fail under the rival policy (wrong version selected / flag missing / APE≠0).
+- **L2 contract/boundary (foundation):** quality-gate tests quoting the Data Foundation rule per state (filter-then-select order; unordered-version quarantine; NULL→MISSING_VALUE). Fail if any quarantine state scores or any participating state is dropped.
+- **L3 production path (metrics + pipeline + evaluation + reliability):** end-to-end fixture with multi-scenario forecasts and one zero-Actual: asserts approved pooling/counting/MAPE/Bias/Reliability figures exactly. Fails under any rival B9 or zero option (different N, different MAPE).
+- **L4 adversarial (18 P25 cases + extensions):** restated-`limited_quality`, loss-to-zero, future-dated-version, unordered-version, zero-with-SUSPICIOUS-quality. Each adversarial case names the competing policy it would pass under and must fail it.
+- **L5 regression (exact commands):** `.venv/Scripts/python.exe -m pytest src/tests/test_stage6*.py -q` (baseline 166 passed) and `.venv/Scripts/python.exe -m pytest src/tests -q` (baseline 850 passed, 2 pre-existing environmental skips). After approval, updated baselines are recorded; any policy change must move counts in the predicted direction — an unchanged count after a semantic policy change is treated as a missing-test defect.
+- **L6 independent re-trace (spec-to-code):** a reviewer with no implementation knowledge maps each normative SHALL in the amended §§4/9/12/14/37/39/40/41 to exactly one code site + one test. "Fails" = any SHALL with zero or multiple contradictory sites, or any behavior (e.g., `|Forecast|` denominator, scenario pooling) with no SHALL anchor — which is the current state of all four blockers.
+
+## 11. Unresolved owner questions (explicit)
+
+- **Q1:** B5 policy: O5.1 first-known, O5.2 latest-restated, or O5.3 dual objectives?
+- **Q2:** Is the surrogate-id tie-break with mandatory `tie_flag` acceptable, and is UNMAPPED/`UNORDERED_VERSION` the right bucket for unordered versions?
+- **Q3:** ESTIMATED: full (I6.1), flagged + mandatory sensitivity (I6.2), or excluded (I6.3)?
+- **Q4:** RESTATED: does the winning Actual keep RESTATED provenance visibly, and do superseded versions stay excluded-but-auditable under all B5 options?
+- **Q5:** Scenarios: separated series (A), anti-inflation rule (B), or designated scenario (C) — and the matching Reliability rule?
+- **Q6:** Actual=0: null MAPE (extend null set, incl. loss-to-zero) or segregated 100%-APE scoring — plus the Z3 exact-hit convention?
+- **Q7:** Do MAPE-nulled observations (ZERO_BASE, sign-change, possibly ZERO_ACTUAL) count toward §14 minimum sufficiency?
+- **Q8:** On restatement arrival: frozen history (never rescore) or rescore with version-pinned reruns (and republication of affected MAPE/Bias)?
+
+## 12. Priority order for next steps after approval
+
+1. Owner decides D1/Q1+Q8 (B5 + rescore rule) — gates everything. 2. Decide D3/D4 (B6; coupled to D1). 3. Decide D6/D7 (B9 + Reliability). 4. Decide D8/D9/D12 (zero validity, loss-to-zero, nulled-in-sufficiency). 5. Draft the §8 amendments verbatim into the locked spec through the owner's amendment process. 6. Implement approved behavior deltas (if any) + AM-39 output pins + fix stale `test_zero_actual_is_unresolved_not_scored` name and module docstring + add multi-scenario sufficiency test. 7. Run L1–L6 validation; record new baselines. 8. Revisit freeze vote. B1/B2/B3/B4/B7/B8 remain untouched throughout.
+
+## 13. Modification confirmation
+
+This prompt modified exactly one file: appended this report to `D:\winprojects\analyzer\temp_report.md`. No source, test, spec, or config file was created, modified, renamed, or deleted. No tests, formatters, or linters were run. All code behavior cited comes from the task-brief evidence base (Prompts 25/26), not from new execution.
+
+`Stage 6 is NOT declared frozen.`
+========================================================================
 ========================================================================
 

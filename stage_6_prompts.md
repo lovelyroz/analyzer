@@ -3238,3 +3238,302 @@ Regardless of classification:
 `Stage 6 is NOT declared frozen.`
 
 Stop after writing the report and providing a concise summary. Do not propose or implement fixes within this prompt.
+====================================================================
+
+stage 6 Prompt 27 - Methodology Decision Package for P25 Blocker
+
+You are the primary engineering agent for the repository:
+
+`analyzer`
+
+This is a financial-data application. Financial correctness, auditability, point-in-time correctness, determinism, and explicit methodology authority take priority over implementation speed.
+
+# Stage 6 Prompt 27 — Methodology Decision Package for P25 Blockers
+
+## 1. Objective
+
+Prepare a rigorous, evidence-based methodology decision package for the unresolved issues identified by the independent Prompt 26 audit.
+
+This is a **read-only analysis and proposal task**. It is not an implementation task and does not authorize any methodology change.
+
+The objective is to help the project owner make explicit, informed decisions about:
+
+* B5 — Actual outcome and ReportVersion selection;
+* B6 — Stage 6 data-quality-state participation;
+* B9 — Scenario identity, observation counting, and aggregation;
+* ZERO_ACTUAL — Actual equal to zero and percentage-metric eligibility.
+
+For each issue, explain the available choices, financial/statistical implications, failure modes, interactions with other Stage 6 rules, and exact proposed specification amendments.
+
+Do not choose a policy merely because it matches the current implementation. Do not silently resolve ambiguities.
+
+## 2. Mandatory execution firewall
+
+* Work only in the local working tree.
+* No GitHub, GitHub CLI/API, network access, fetch, pull, push, remotes, commits, branches, or Git history.
+* No repository-wide exploration.
+* Do not modify source code, tests, the locked specification, configuration, or any other existing file.
+* Do not run formatters or auto-fix tools.
+* Do not implement, authorize, or activate a proposed policy.
+* Do not treat a passing test, existing implementation, precedent from another stage, or prior report as methodology authority.
+* Do not declare Stage 6 frozen.
+* If the evidence does not establish a defensible answer, state exactly what remains unknown and what decision is required from the project owner.
+
+## 3. Strict inspection scope
+
+Read only:
+
+1. `PROJECT_HANDOFF_INSTRUCTIONS.md`
+2. `06_Stage6_Forecast_Evaluation.md`
+3. The Stage 6 Prompt 17–26 reports in `temp_report.md`
+4. The current Stage 6 implementation and tests directly related to B5, B6, B9, and ZERO_ACTUAL.
+
+Inspect directly referenced dependencies only when necessary to support a specific claim.
+
+Do not inspect unrelated stages. Do not expand the task into B1, B2, B3, B4, B7, or B8.
+
+## 4. Decision package A — B5: Actual outcome and ReportVersion selection
+
+The Prompt 26 audit found that the locked specification requires a valid ReportVersion and known publication date but does not explicitly authorize either earliest-published or latest/restated Actual selection.
+
+Analyze the following possible policies without implementing any of them:
+
+**Option A — First-known outcome**
+
+Select the earliest eligible published Actual and preserve that outcome as the evaluation target.
+
+**Option B — Latest eligible restated outcome**
+
+Select the latest eligible published Actual under an explicit, deterministic ReportVersion policy.
+
+**Option C — Separate evaluation objectives**
+
+Keep first-known outcome and latest-restated outcome as distinct evaluation targets, with explicit labels and non-mixing rules.
+
+If another policy is more defensible, present it as an additional option and explain why.
+
+For every option, analyze:
+
+1. What forecasting question it answers.
+2. Whether it measures performance against information first available to users or against a subsequently revised financial outcome.
+3. How restatements affect forecast error, MAPE, Bias, model comparison, and historical comparability.
+4. How it interacts with Point-in-Time correctness without incorrectly excluding later-published Actual outcomes.
+5. How ReportVersion ties, missing version numbers, conflicting metadata, and invalid publication timestamps should be handled.
+6. Whether the policy supports reproducible historical evaluations when new ReportVersions arrive.
+7. What information must be retained to reconstruct the exact evaluation outcome.
+8. What tests would distinguish the options behaviorally.
+
+Do not claim that either first-known or latest-restated is universally correct.
+
+End this section with:
+
+* a recommendation, if the evidence supports one;
+* the reasons and trade-offs;
+* the exact unresolved decision that requires owner approval.
+
+## 5. Decision package B — B6: Data-quality-state participation
+
+Prompt 25 implemented:
+
+* Participating: `VALID`, `ESTIMATED`, `RESTATED`
+* Quarantined: `MISSING`, `SUSPICIOUS`, `UNMAPPED`
+
+The Prompt 26 audit found that the locked Stage 6 specification does not explicitly authorize this complete policy.
+
+Analyze each state individually:
+
+* `VALID`
+* `ESTIMATED`
+* `MISSING`
+* `SUSPICIOUS`
+* `UNMAPPED`
+* `RESTATED`
+
+For every state, provide a decision matrix covering:
+
+1. Eligibility to serve as the selected Actual.
+2. Eligibility for absolute Error.
+3. Eligibility for Percentage Error and APE.
+4. Eligibility for MAPE and Bias.
+5. Contribution to observation sufficiency.
+6. Eligibility for baseline comparison.
+7. Required audit metadata and quality flags.
+8. Expected behavior when the state changes after a later ReportVersion becomes available.
+
+Distinguish carefully between:
+
+* an Actual that can be retained as evidence;
+* an Actual that can be selected as the evaluation outcome;
+* an observation whose absolute error can be calculated;
+* an observation eligible for percentage metrics;
+* an observation eligible to count toward sufficiency and downstream evaluation.
+
+Do not assume that all these permissions must be identical.
+
+Do not borrow Stage 3 scoring rules as Stage 6 authority without explicit evidence that the rules are applicable.
+
+Provide plausible policy alternatives for `ESTIMATED` and `RESTATED`, including the impact of including them with a quality flag versus excluding them from primary scoring.
+
+If quality states cannot be resolved without an authoritative Data Foundation rule, state that limitation explicitly.
+
+## 6. Decision package C — B9: Scenario identity and observation counting
+
+Prompt 25 added `scenario` to the observation key but kept the aggregation series keyed by Company, Metric, Horizon, and Model Version.
+
+The Prompt 26 audit identified a material risk: multiple scenarios may enter one shared series, inflate its observation count, and influence MAPE, Bias, and confidence bands.
+
+Analyze at least these alternatives:
+
+**Option A — Scenario-separated evaluation series**
+
+Aggregate and evaluate each scenario independently. Explain how Reliability should be represented if the locked specification expects one Reliability value alongside multiple scenarios.
+
+**Option B — Scenario-aware observation identity with controlled series aggregation**
+
+Retain scenario as observation identity but define an explicit rule preventing scenario alternatives for the same underlying forecast target from inflating independent observation counts or being treated as independent evidence.
+
+**Option C — One designated evaluation scenario**
+
+Specify which scenario, if any, is eligible for primary historical evaluation and how other scenarios are retained without contaminating primary performance statistics.
+
+If none is defensible from the existing specification, present the unresolved choice rather than inventing a policy.
+
+For each alternative, analyze:
+
+1. Observation identity and duplicate detection.
+2. Whether Bear/Base/Bull outcomes represent independent observations or alternative outcomes for the same target.
+3. Observation-count inflation and its effect on `<5`, `5–7`, `8–11`, and `≥12` sufficiency bands.
+4. MAPE and Bias aggregation.
+5. Baseline identity and comparability.
+6. Model-version and horizon isolation.
+7. TTM double-counting risks.
+8. The relationship between per-scenario evaluation and Reliability.
+9. Auditability and reconstruction of results.
+
+Use a small, explicitly illustrative example to demonstrate how one underlying forecast target with three scenario forecasts could affect observation count and sufficiency under different policies. Label all example values as illustrative; do not present them as project data or methodology constants.
+
+Conclude with a recommended policy only if supported by the specification and defensible reasoning. Identify the exact specification sections that must be amended.
+
+## 7. Decision package D — Actual equal to zero
+
+Prompt 25 allows `Actual = 0` to score when `Forecast != 0`, while retaining zero-denominator and sign-change exclusions.
+
+The locked specification explicitly discusses `Forecast = 0` and sign-change regimes, but does not clearly state the treatment of every `Actual = 0` case.
+
+Analyze these cases independently:
+
+1. `Forecast > 0`, `Actual = 0`.
+2. `Forecast < 0`, `Actual = 0`.
+3. `Forecast = 0`, `Actual = 0`.
+4. `Forecast = 0`, `Actual != 0`.
+5. Positive Forecast with negative Actual.
+6. Negative Forecast with positive Actual.
+7. Missing Actual (`None`).
+8. Actual zero with a non-`VALID` data-quality state.
+
+For each case, distinguish:
+
+* absolute Error validity;
+* Percentage Error validity;
+* APE validity;
+* MAPE eligibility;
+* Bias eligibility;
+* regime classification;
+* observation-count eligibility.
+
+Explain why mathematical computability alone does not necessarily establish statistical comparability or methodology authorization.
+
+Pay particular attention to the negative-Forecast/zero-Actual boundary: do not silently assume it is equivalent to every other zero-Actual case.
+
+Recommend an explicit policy matrix and exact specification text. If a choice depends on the intended financial interpretation of a metric, identify the required owner decision.
+
+## 8. Cross-policy consistency
+
+Analyze the interactions among B5, B6, B9, and ZERO_ACTUAL.
+
+The package must explicitly consider:
+
+* whether a ReportVersion-selection policy changes which quality state is evaluated;
+* whether a restatement can change the selected Actual and thereby change zero/sign classification;
+* whether multiple scenarios can inflate sufficiency even if each observation individually passes eligibility;
+* whether zero-Actual observations can alter MAPE, Bias, baseline comparison, or confidence bands;
+* whether excluded observations remain auditable without entering scoring;
+* whether any proposed rule changes the meaning of existing Stage 6 output fields;
+* whether all decisions remain deterministic and reproducible.
+
+Do not finalize each policy in isolation if their interaction creates an inconsistency.
+
+## 9. Proposed specification amendments
+
+For each issue, provide proposed replacement or insertion text for `06_Stage6_Forecast_Evaluation.md`.
+
+Requirements:
+
+* Use precise, normative language suitable for a locked technical specification.
+* Identify the exact existing section where the amendment would belong.
+* Separate unconditional invariants from owner decisions that remain open.
+* Do not edit the actual specification file.
+* Do not present a proposed amendment as already approved.
+* If multiple options remain viable, provide separate alternative text blocks instead of combining incompatible rules.
+
+Include a concise decision table:
+
+| Decision ID | Issue | Recommended option | Evidence | Main trade-off | Owner approval required? |
+| ----------- | ----- | ------------------ | -------- | -------------- | ------------------------ |
+
+If the recommendation is uncertain, use `NO RECOMMENDATION — OWNER DECISION REQUIRED`.
+
+## 10. Validation and evidence standard
+
+This prompt does not authorize code changes. Do not create tests or modify existing tests.
+
+Nevertheless, specify the future six-layer validation plan for each proposed policy:
+
+1. Unit/formula tests.
+2. Contract/boundary tests.
+3. Production-path/integration tests.
+4. Adversarial/negative tests.
+5. Regression tests.
+6. Independent audit.
+
+Every proposed policy must have at least one concrete test that would fail under a plausible competing policy. Avoid tests that merely reproduce the current implementation.
+
+Passing tests must never be presented as proof of methodology authority.
+
+## 11. Required output and report
+
+Append a new section to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 27`
+
+Include:
+
+1. Exact files inspected.
+2. Separate analyses for B5, B6, B9, and ZERO_ACTUAL.
+3. Alternative policies and their trade-offs.
+4. Cross-policy consistency analysis.
+5. Proposed specification amendments, clearly marked **PROPOSED — NOT APPROVED**.
+6. The decision table.
+7. Future six-layer validation plans.
+8. Explicit unresolved questions requiring owner approval.
+9. A concise priority order for the next implementation steps after decisions are approved.
+10. A statement confirming that no source, test, specification, or configuration files were modified.
+
+Do not append proposed policies to the locked specification itself. The report is the only file you may modify.
+
+## 12. Stop conditions
+
+Stop without implementation if:
+
+* the available evidence does not support a definitive policy;
+* two or more alternatives remain materially defensible;
+* a proposed decision conflicts with the locked specification;
+* the financial meaning of a metric cannot be established from available authoritative material.
+
+Do not resolve B1, B2, B3, B4, B7, or B8 in this prompt.
+
+Final status must explicitly state:
+
+`Stage 6 is NOT declared frozen.`
+
+Stop after appending the report and providing a concise summary of the decisions that require owner approval.
