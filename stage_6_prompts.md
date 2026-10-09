@@ -3979,3 +3979,168 @@ Include:
 
 Make only the bounded specification amendment and the required report append. Then stop and report the result concisely.
 ===============================================================
+
+
+# Stage 6 Prompt 31 — Record Explicit Owner Approval and Amend the Locked Specification
+
+You are the primary engineering agent for `analyzer`, a financial-data application. Financial correctness, point-in-time integrity, deterministic behavior, auditability, and preservation of historical evaluation artifacts take priority over implementation speed.
+
+## 1. Binding owner approval — supplied directly in this prompt
+
+The project owner explicitly approved all five methodology policies D1–D5 in the active ChatGPT conversation on 2026-10-09, in response to the question asking whether those five proposed policies should be approved as the owner's methodology decisions.
+
+The owner's answer was: **"موافقم"** ("I agree").
+
+This direct owner approval is authoritative for this task. The approval does not need to have been recorded in an earlier repository report to be valid. Prompt 29's unapproved decision table reflects the state before this subsequent owner approval; it must not be treated as evidence that the owner has not approved the policies.
+
+Prompt 30 was blocked because it relied solely on the older repository decision table. Its report accurately documents that no files were amended under Prompt 30, but its conclusion that owner approval is absent is superseded by the explicit owner approval supplied above.
+
+Do not ask the owner to approve D1–D5 again. Do not fabricate a GitHub approval record, commit, signature, or approval timestamp other than the date supplied above. Record the source of approval as: **direct owner approval in the active ChatGPT conversation, 2026-10-09**.
+
+## 2. Scope restrictions
+
+Inspect only:
+
+1. `PROJECT_HANDOFF_INSTRUCTIONS.md` for operational constraints.
+2. `06_Stage6_Forecast_Evaluation.md`, limited to the sections governing Actual selection, error metrics, evaluation-series identity, sufficiency, baseline comparison, Reliability, data-quality states, auditability, and historical immutability.
+3. The Prompt 27–30 reports in `temp_report.md`, using them as historical records rather than overriding the direct owner approval above.
+
+Do not perform repository-wide exploration. Do not inspect unrelated modules or stages.
+
+## 3. Approved methodology policies
+
+Apply the following five owner-approved policies to `06_Stage6_Forecast_Evaluation.md`.
+
+### D1 — First-known Actual and historical immutability
+
+* Historical evaluation uses the earliest eligible, valid Actual report version with a known publication timestamp under the approved first-known policy.
+* Later restatements must not silently replace the selected Actual or overwrite a previously published evaluation artifact.
+* Preserve exact `actual_report_version`, publication timestamp, and selection-policy version in the audit record.
+* Preserve candidate and exclusion provenance, with reason codes.
+* If multiple eligible candidates share the earliest publication timestamp and authoritative sources provide no defensible ordering, mark selection ambiguous and fail closed. Do not break ties using arbitrary database IDs or an unapproved ordering.
+* Any authorized rerun must be a separately identified, version-pinned evaluation artifact with explicit lineage. Historical artifacts must not be overwritten.
+* Do not interpret first-known as latest database row or highest version number.
+
+### D2 — Actual data quality
+
+* `SUSPICIOUS` and `UNMAPPED` Actuals are excluded from Actual selection, scored metrics, baseline comparison, and sufficiency counts. Preserve auditable exclusion records.
+* `ESTIMATED` Actuals may participate only with explicit quality/provenance flags and mandatory sensitivity analysis that recomputes the relevant outputs excluding `ESTIMATED` observations.
+* Clearly distinguish primary and sensitivity outputs.
+* `RESTATED` handling must follow D1. A later restatement cannot displace the first-known Actual in the primary historical evaluation.
+* Apply quality eligibility before selecting among Actual candidates.
+* Never convert missing or invalid data to numerical zero.
+* Do not redefine Stage 1 quality states.
+
+### D3 — Scenario-separated evaluation series
+
+* Bear, Base, and Bull are separate evaluation series.
+* Scenario identity must be present in the evaluation key and retained in audit/output records.
+* Do not pool scenarios into a single MAPE, Bias, sufficiency count, baseline comparison, or Reliability result.
+* Apply minimum-observation thresholds independently to each scenario-specific series.
+* Do not count three scenarios for one forecast event as three independent observations in a shared series.
+* If the current schema or output contract cannot preserve scenario identity, document the exact blocker. Do not change schemas or migrations in this prompt.
+
+### D4 — Actual-zero treatment
+
+* Numerical Actual zero is not missing data.
+* Exclude Actual-zero observations from ordinary MAPE with a dedicated status/reason code; retain absolute error and its provenance.
+* Explicitly document the relevant cases:
+
+  1. Forecast > 0, Actual = 0.
+  2. Forecast < 0, Actual = 0.
+  3. Forecast = 0, Actual = 0.
+  4. Forecast = 0, Actual ≠ 0.
+  5. Actual missing.
+  6. Sign-change and zero-base regimes.
+* Preserve already-authorized zero-Forecast and sign-change handling unless the specification contains a genuine contradiction requiring a documented blocker.
+* Never use epsilon, an arbitrary denominator, or a constant to manufacture ordinary percentage error.
+* A null MAPE does not imply null absolute error.
+* Do not infer authorization to change Bias, baseline formulas, or Reliability mappings from the Actual-zero decision. Where the existing specification and owner approval do not determine a rule, document the unresolved rule instead of inventing it.
+
+### D5 — Sufficiency and effective MAPE sample size
+
+* General sufficiency counts valid, nonduplicate forecast outcomes after Actual selection and quality eligibility, including outcomes that are not eligible for ordinary MAPE.
+* Report the general eligible outcome count and effective MAPE-eligible count separately.
+* Apply existing locked sufficiency thresholds to the general eligible outcome count, unless an authoritative specification explicitly says otherwise.
+* Never label general sufficiency as the number of MAPE-scored observations.
+* Apply these counts independently to each scenario, horizon, metric, and model version.
+* Do not count duplicate records or pool scenarios.
+
+## 4. Resolve cross-cutting requirements conservatively
+
+Preserve:
+
+* Historical point-in-time integrity and immutable published evaluation artifacts.
+* ReportVersion/publication timestamp provenance and reproducible version-pinned reruns.
+* `NULL` is not numerical zero.
+* Forecast and Actual must match the same metric definition and financial period.
+* No mixing of horizons, model versions, or scenarios.
+* Reliability remains withheld until its authorized formula and mappings are resolved.
+* Stage 6 must not generate forecasts or use later Actuals as historical Stage 5 forecast inputs.
+* Reliability must not numerically adjust Forward P/E.
+* Stages 1–5 remain frozen and unchanged.
+
+If a technical detail is not determined by the approved policies and authoritative specification, do not invent a rule. Record the exact blocker and its downstream impact.
+
+Do not reopen the broad authority search. Prompts 27–30 provide sufficient bounded context.
+
+## 5. Required execution sequence
+
+1. Read the latest Prompt 27–30 report sections and the relevant locked specification sections within the stated scope.
+2. Append a short owner-approval clarification to `temp_report.md` explaining that D1–D5 were approved directly in the active ChatGPT conversation on 2026-10-09. Explicitly distinguish this approval from the still-unapproved technical details.
+3. Amend `06_Stage6_Forecast_Evaluation.md` to encode the five approved policies as normative requirements. Preserve document structure and use minimal, targeted edits.
+4. Re-read every modified specification section from disk.
+5. Perform the six-layer validation below.
+6. Append the final Prompt 31 report to `temp_report.md`.
+
+Do not stop solely because Prompt 29's old decision table says `NOT YET APPROVED`. That table predates the direct owner approval. Update or supersede its decision status only through a clear, append-only clarification; do not erase the historical record.
+
+## 6. Six-layer validation — mandatory
+
+This is a specification-only task. Perform and document all six layers:
+
+1. **Formula/definition audit:** Actual selection, error metrics, MAPE eligibility, and sample-count definitions.
+2. **Contract/boundary audit:** scenario identity, quality states, zero-versus-missing, and Forecast/Actual matching.
+3. **Production-path consistency audit:** cross-references among all relevant locked Stage 6 sections.
+4. **Adversarial-case audit:** tied publication timestamps, invalid/missing timestamps, later restatements, ESTIMATED/SUSPICIOUS/UNMAPPED data, all Actual-zero combinations, duplicates, and three scenarios sharing one event.
+5. **Regression audit:** no contradiction with unchanged locked requirements or frozen Stages 1–5.
+6. **Independent audit:** re-read the actual modified file and check for omissions, contradictions, accidental broad edits, and claims exceeding owner approval.
+
+Do not claim runtime tests passed. No application code is being changed, so do not run or report application tests as if they validate this documentation-only task.
+
+## 7. Reporting
+
+Append the following section to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 31: Owner Approval Recorded and Specification Amendment`
+
+Include:
+
+* Direct owner approval source and date.
+* Confirmation that D1–D5 are approved, while technical details not covered by that approval remain subject to evidence or explicit blocker reporting.
+* Exact sections of `06_Stage6_Forecast_Evaluation.md` changed.
+* Summary of each D1–D5 amendment.
+* Results of all six validation layers.
+* Remaining methodology, schema, or output-contract blockers.
+* Confirmation that Stages 1–5 were not changed.
+* Confirmation that no source code, tests, schemas, migrations, or configuration were changed.
+* Confirmation that no runtime tests were run.
+* Final status:
+
+  * `SPECIFICATION AMENDED — READY FOR IMPLEMENTATION REVIEW` only if the amended specification is internally consistent and no implementation-blocking ambiguity remains; or
+  * `SPECIFICATION AMENDED — IMPLEMENTATION BLOCKED` if unresolved blockers remain.
+* Explicit statement: `Stage 6 is NOT FROZEN.`
+
+## 8. Prohibited actions
+
+* No source-code or test changes.
+* No schema or migration changes.
+* No changes to Stages 1–5.
+* No repository-wide exploration.
+* No GitHub, GitHub CLI/API, remote operations, commits, pushes, pulls, or branch changes.
+* No runtime implementation.
+* No unauthorized Reliability mappings or calibration behavior.
+* Do not declare Stage 6 frozen.
+
+Make only the targeted specification amendment and the required append-only report entries, then stop and report the outcome concisely.
+============================================================

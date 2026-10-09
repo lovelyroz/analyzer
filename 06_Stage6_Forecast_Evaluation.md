@@ -107,6 +107,15 @@ Actual باید:
 
 Actual صرفاً «آخرین عدد موجود در دیتابیس» نیست.
 
+**Owner-approved policy D1 — First-known Actual and historical immutability (approved 2026-10-09, direct owner approval in the active ChatGPT conversation):**
+
+* Historical evaluation uses the earliest eligible, valid Actual report version with a known publication timestamp under the first-known policy.
+* Later restatements must not silently replace the selected Actual or overwrite a previously published evaluation artifact.
+* The audit record must preserve the exact `actual_report_version`, publication timestamp, and selection-policy version, plus candidate and exclusion provenance with reason codes.
+* If multiple eligible candidates share the earliest publication timestamp and authoritative sources provide no defensible ordering, selection is marked ambiguous and fails closed. Ties must not be broken using arbitrary database IDs or any unapproved ordering.
+* Any authorized rerun must be a separately identified, version-pinned evaluation artifact with explicit lineage. Historical artifacts must not be overwritten.
+* First-known must not be interpreted as the latest database row or the highest version number.
+
 ---
 
 # 5. Point-in-Time Evaluation
@@ -237,6 +246,8 @@ MAPE = NULL
 Status = Appropriate Regime / Data Status
 ```
 
+**Owner-approved D4 pointer (see §12 policy D4):** Actual-zero observations are likewise excluded from ordinary MAPE under a dedicated Actual-zero status/reason code; absolute error and its provenance are retained.
+
 ---
 
 # 10. Bias
@@ -325,6 +336,16 @@ Status = LOSS_TO_PROFIT
 
 خطای Absolute می‌تواند همچنان نگهداری شود.
 
+**Owner-approved policy D4 — Actual-zero treatment (approved 2026-10-09, direct owner approval in the active ChatGPT conversation):**
+
+* Numerical Actual zero is not missing data.
+* Actual-zero observations are excluded from ordinary MAPE with a dedicated status/reason code; absolute error and its provenance are retained.
+* The relevant cases are explicitly documented: (1) Forecast > 0, Actual = 0; (2) Forecast < 0, Actual = 0; (3) Forecast = 0, Actual = 0; (4) Forecast = 0, Actual ≠ 0; (5) Actual missing; (6) sign-change and zero-base regimes.
+* Already-authorized zero-Forecast and sign-change handling is preserved unless the specification contains a genuine contradiction requiring a documented blocker.
+* Epsilon, arbitrary denominators, or constants must never be used to manufacture ordinary percentage error.
+* A null MAPE does not imply null absolute error.
+* This decision confers no authorization to change Bias, baseline formulas, or Reliability mappings. Where the existing specification and this owner approval do not determine a rule, the rule is recorded as unresolved instead of invented — see the Prompt 31 report blockers (Bias treatment of Actual-zero observations; baseline-comparison denominator convention for zero-Actual series).
+
 ---
 
 # 13. Forecast Horizons
@@ -382,6 +403,24 @@ Horizon
 Model Version
 ```
 
+**Owner-approved policy D3 — Scenario-separated evaluation series (approved 2026-10-09, direct owner approval in the active ChatGPT conversation):**
+
+* Bear, Base, and Bull are separate evaluation series. Scenario identity must be present in the evaluation key and retained in audit/output records.
+* Scenarios must not be pooled into a single MAPE, Bias, sufficiency count, baseline comparison, or Reliability result.
+* Minimum-observation thresholds apply independently to each scenario-specific series.
+* Three scenarios for one forecast event must not be counted as three independent observations in a shared series.
+* Blocker recorded under this prompt (no schema/migration change authorized here): the current Section 39 output field list and the Section 14 series key above do not yet carry a scenario field; until the output contract is extended through the authorized amendment process, scenario-separated counting is normative but its persistence in outputs is an unresolved implementation blocker.
+
+**Owner-approved policy D5 — Sufficiency and effective MAPE sample size (approved 2026-10-09, direct owner approval in the active ChatGPT conversation):**
+
+* General sufficiency counts valid, non-duplicate forecast outcomes after Actual selection and quality eligibility, including outcomes that are not eligible for ordinary MAPE.
+* The general eligible outcome count and the effective MAPE-eligible count must be reported separately.
+* Existing locked sufficiency thresholds apply to the general eligible outcome count, unless an authoritative specification explicitly says otherwise.
+* General sufficiency must never be labeled as the number of MAPE-scored observations.
+* These counts apply independently to each scenario, horizon, metric, and model version.
+* Duplicate records must not be counted, and scenarios must not be pooled.
+* Cross-reference: scenario identity per policy D3 above; Actual-zero MAPE eligibility per Section 12 policy D4.
+
 ---
 
 # 15. Model Version Evaluation
@@ -434,6 +473,8 @@ Baseline
     ↓
 MAPE + Bias
 ```
+
+**Owner-approved pointer (policies D2/D3/D4):** the baseline comparison uses the same eligible observation set as the primary evaluation — SUSPICIOUS/UNMAPPED excluded, scenarios never pooled, Actual-zero observations excluded from ordinary MAPE. Where the existing specification and these approvals do not determine a denominator or weighting rule, the rule is recorded as an unresolved blocker (see Prompt 31 report), not invented.
 
 بهبود نسبی:
 
@@ -958,6 +999,8 @@ Bull EPS → Bull Forward P/E
 
 Reliability کنار این Forecastها قرار می‌گیرد.
 
+**Owner-approved pointer (policy D3):** Bear, Base, and Bull are separate evaluation series and must not be pooled into one Reliability result. Reliability remains withheld until its authorized formula and mappings are resolved; no Reliability mapping is authorized by the D3 scenario-separation decision.
+
 مثلاً:
 
 ```text
@@ -1085,6 +1128,8 @@ Publication Date
 
 هیچ Reliability نباید بدون امکان بازسازی محاسبه تولید شود.
 
+**Owner-approved pointer (policies D1/D2):** the audit record must preserve the exact `actual_report_version`, publication timestamp, selection-policy version, candidate and exclusion provenance with reason codes, quality/provenance flags (including ESTIMATED participation and its sensitivity lineage), and, for any authorized rerun, the explicit lineage linking it to the historical artifact it derives from without overwriting that artifact.
+
 ---
 
 # 41. Data Quality
@@ -1104,6 +1149,15 @@ RESTATED
 باید طبق قواعد Data Foundation تفسیر شوند.
 
 Actual نامعتبر نباید مانند Actual معتبر وارد MAPE و Bias شود.
+
+**Owner-approved policy D2 — Actual data quality (approved 2026-10-09, direct owner approval in the active ChatGPT conversation):**
+
+* `SUSPICIOUS` and `UNMAPPED` Actuals are excluded from Actual selection, scored metrics, baseline comparison, and sufficiency counts. Every exclusion must preserve an auditable exclusion record.
+* `ESTIMATED` Actuals may participate only with explicit quality/provenance flags and mandatory sensitivity analysis that recomputes the relevant outputs excluding `ESTIMATED` observations. Primary and sensitivity outputs must be clearly distinguished.
+* `RESTATED` handling follows owner-approved policy D1: a later restatement cannot displace the first-known Actual in the primary historical evaluation.
+* Quality eligibility is applied before selecting among Actual candidates.
+* Missing or invalid data must never be converted to numerical zero.
+* Stage 1 quality states are not redefined by this section.
 
 ---
 

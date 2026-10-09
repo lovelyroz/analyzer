@@ -4683,4 +4683,80 @@ Owner must record explicit decisions on D1 (with Q1+Q8 republication convention)
 This prompt modified exactly one file: appended this section to `D:/winprojects/analyzer/temp_report.md`. No source, test, spec, config, migration, or schema file was created, modified, renamed, or deleted. No tests, formatters, or linters were run. No GitHub, GitHub CLI/API, remote, commit, push, pull, or branch operation was performed. No option was selected and no freeze is declared.
 
 Stage 6 remains NOT FROZEN.
+========================================================================
+
+CLARIFICATION — Stage 6 Prompt 31: Direct Owner Approval of D1–D5 (2026-10-09)
+
+- Source of approval: direct owner approval in the active ChatGPT conversation, 2026-10-09. Owner answer: "موافقم" ("I agree") to the question asking whether the five proposed methodology policies D1–D5 should be approved as the owner's methodology decisions.
+- Scope approved: D1 first-known Actual and historical immutability; D2 Actual data-quality eligibility; D3 scenario-separated evaluation series; D4 Actual-zero treatment; D5 sufficiency and effective MAPE sample size — exactly as stated in Stage 6 Prompt 31 §3.
+- Relation to history (append-only, no erasure): the Prompt 29 decision-gate table (all OWNER DECISION: NOT YET APPROVED) and the Prompt 30 blocked report remain accurate records of the repository state before this approval. They are superseded on the approval question only and must not be treated as evidence that the owner has not approved D1–D5.
+- What is NOT approved: technical details not covered by the five policies remain subject to evidence or explicit blocker reporting — including the Reliability formula/mappings, any Bias/baseline formula change, schema/migration/output-contract changes, and any rule not determined by the approved policies plus authoritative specification (recorded as blockers, never invented).
+- No GitHub approval record, commit, signature, or approval timestamp beyond the date above is claimed or fabricated.
+- Technical details NOT covered by this approval (still subject to evidence or blocker reporting): Reliability formula/mappings, any Bias/baseline formula change, schema/migration/output-contract changes, and any rule not determined by D1–D5 plus authoritative specification.
+========================================================================
+
+REPORT — Stage 6 Prompt 31: Owner Approval Recorded and Specification Amendment
+
+**Status: SPECIFICATION AMENDED — IMPLEMENTATION BLOCKED (unresolved blockers below gate implementation). Stage 6 is NOT FROZEN.**
+
+## 1. Direct owner approval source and date
+
+- Source: direct owner approval in the active ChatGPT conversation, 2026-10-09. Owner answer: "موافقم" ("I agree") to whether the five proposed methodology policies D1–D5 should be approved as the owner's methodology decisions.
+- This approval is authoritative per Prompt 31 §1 and does not need a prior repository record. The Prompt 29 decision-gate table (all NOT YET APPROVED) and the Prompt 30 blocked report remain accurate pre-approval history, superseded on the approval question only; neither was edited or erased (append-only clarification added above).
+- No GitHub approval record, commit, signature, or approval timestamp beyond the date above is claimed or fabricated.
+
+## 2. Confirmation: D1–D5 approved; other technical details not approved
+
+- Approved: D1 first-known Actual + historical immutability; D2 quality eligibility (SUSPICIOUS/UNMAPPED excluded; ESTIMATED flagged + sensitivity; RESTATED per D1); D3 scenario-separated series; D4 Actual-zero treatment (six cases, MAPE-excluded with reason code, absolute error retained); D5 sufficiency + effective MAPE-N — exactly per Prompt 31 §3.
+- NOT approved (still subject to evidence or explicit blocker reporting, never invented): Reliability formula/mappings; any Bias or baseline formula change; schema/migration/output-contract changes; any rule not determined by D1–D5 plus authoritative specification.
+
+## 3. Exact sections of 06_Stage6_Forecast_Evaluation.md changed
+
+- §4 Forecast → Actual Mapping: D1 normative block added (L110-117).
+- §9 MAPE: D4 cross-reference pointer added (L249).
+- §12 Zero Base و Sign Change: D4 normative block added (L339-347).
+- §14 Minimum Observation: D3 normative block + D5 normative block added (L406-424).
+- §17 Baseline Comparison: D2/D3/D4 eligibility pointer added (L477).
+- §37 Scenario + Reliability: D3 no-pooling pointer added (L1002).
+- §40 Auditability: D1/D2 provenance pointer added (L1131).
+- §41 Data Quality: D2 normative block added (L1153+).
+- No existing specification sentence was altered or deleted; all edits are additive blocks. Document structure preserved.
+
+## 4. Summary of each D1–D5 amendment
+
+- D1: earliest eligible valid Actual with known publication timestamp; no silent restatement replacement; audit pins (actual_report_version, timestamp, policy version, candidate/exclusion provenance + reason codes); tied-earliest with no defensible ordering fails closed (no DB-ID tie-breaks); reruns are separately identified version-pinned artifacts; first-known is not latest-row/highest-version.
+- D2: SUSPICIOUS/UNMAPPED excluded from selection, scored metrics, baseline, sufficiency (auditable exclusions); ESTIMATED only with flags + mandatory excluding-sensitivity analysis, primary vs sensitivity distinguished; RESTATED per D1; quality eligibility before selection; missing/invalid never zero; Stage 1 states not redefined.
+- D3: Bear/Base/Bull are separate series; scenario identity in evaluation key and audit/output records; no pooling across MAPE/Bias/sufficiency/baseline/Reliability; per-scenario thresholds; three scenarios for one event are not three shared-series observations.
+- D4: Actual zero is not missing; zero-Actual excluded from ordinary MAPE with dedicated reason code, absolute error retained; all six cases documented (F>0/A=0, F<0/A=0, F=0/A=0, F=0/A≠0, missing Actual, sign-change/zero-base); authorized zero-Forecast handling preserved; no epsilon/substitute denominators; null MAPE ≠ null absolute error; no Bias/baseline/Reliability change authorized.
+- D5: general sufficiency counts valid non-duplicates after selection + quality eligibility (including MAPE-ineligible outcomes); general count and effective MAPE-N reported separately; locked thresholds apply to the general count; never label general sufficiency as MAPE-scored N; per scenario/horizon/metric/model-version; no duplicates, no pooling.
+
+## 5. Six-layer validation results
+
+1. Formula/definition audit — PASS. Selection rule, MAPE eligibility, and dual counts are mutually consistent: D5's general count explicitly includes D4 MAPE-excluded outcomes, so no definition clash.
+2. Contract/boundary audit — PASS. Scenario identity, quality-state boundaries (Stage 1 states untouched), zero-vs-missing distinction, and same-metric/same-period Forecast/Actual matching (§4, untouched) all hold.
+3. Production-path consistency audit — PASS. §4→§9→§12→§14→§17→§37→§39→§40→§41 chain cross-references; §39 output list still carries actual_report_version (supports D1 audit). Gap: §39/§14 key carry no scenario field — recorded as blocker RB-1, not edited (schema change unauthorized).
+4. Adversarial-case audit — PASS (policy-determined cases): tied earliest timestamps fail closed; null-timestamp candidates ineligible (no known publication timestamp); later restatements frozen with separate-identified reruns; ESTIMATED/SUSPICIOUS/UNMAPPED per D2; all six zero combinations per D4; duplicates excluded; 3-scenarios-1-event not triple-counted.
+5. Regression audit — PASS. No contradiction with unchanged locked requirements or frozen Stages 1–5: zero-Forecast/sign-change handling preserved; PIT (§5), NULL≠zero, Reliability-withheld, Forward-P/E non-adjustment (§§35–36) untouched; Stages 1–5 files untouched.
+6. Independent audit — PASS. All modified sections re-read from disk; edits are additive only; no omissions (D1–D5 each encoded once normatively plus narrow pointers); no contradictions; no claims exceeding owner approval (undetermined rules recorded as blockers RB-1–RB-4, not invented).
+
+## 6. Remaining methodology, schema, and output-contract blockers
+
+- RB-1 (output contract / schema): §39 field list and §14 series-key text carry no scenario field; scenario-separated counting is normative but its persistence in outputs is an unresolved implementation blocker. Requires authorized output-contract amendment (schema/migration out of scope — none made).
+- RB-2 (Bias): Bias treatment of Actual-zero observations undetermined by approval + spec (Bias formula uses |Forecast| denominator) — excluded-from-MAPE does not settle scored-vs-nulled bias components.
+- RB-3 (baseline): denominator/weighting convention for per-scenario baseline comparison over zero-excluded series undetermined.
+- RB-4 (Reliability, pre-existing): formula and mappings still unauthorized; Reliability remains withheld. D3 confers no mapping.
+- RB-5 (mechanics for implementation review): version-pinned rerun artifact identity/linking mechanics; ESTIMATED sensitivity-analysis reporting mechanics.
+
+## 7. Confirmations
+
+- Stages 1–5 were not changed (no edits outside 06_Stage6_Forecast_Evaluation.md and temp_report.md).
+- No source code, tests, schemas, migrations, or configuration were changed.
+- No runtime tests were run (specification-only task; none claimed).
+- No GitHub/CLI/API, remote, commit, push, pull, or branch operation was performed.
+- B1/B2/B3/B4/B7/B8 untouched.
+- No freeze declared or authorized.
+
+**Final status: SPECIFICATION AMENDED — IMPLEMENTATION BLOCKED (RB-1–RB-4 gate implementation).**
+
+Stage 6 is NOT FROZEN.
 
