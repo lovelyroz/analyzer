@@ -4144,3 +4144,171 @@ Include:
 
 Make only the targeted specification amendment and the required append-only report entries, then stop and report the outcome concisely.
 ============================================================
+
+
+# Stage 6 Prompt 32 — Bounded Resolution Package for Remaining Implementation Blockers
+
+You are the primary engineering agent for `analyzer`, a financial-data application. Financial correctness, point-in-time integrity, deterministic behavior, auditability, and preservation of historical artifacts take priority over implementation speed.
+
+## 1. Current authoritative state
+
+Stage 6 Prompt 31 amended `06_Stage6_Forecast_Evaluation.md` with the owner-approved policies D1–D5. Its report is:
+
+`REPORT — Stage 6 Prompt 31: Owner Approval Recorded and Specification Amendment`
+
+The report records:
+
+* D1–D5 are approved by the owner.
+* Specification changes were made and all six documentation-validation layers passed.
+* Stage 6 remains NOT FROZEN.
+* Implementation is blocked by RB-1 through RB-5.
+* Reliability formula/mappings remain unauthorized.
+* B1, B2, B3, B4, B7, and B8 remain unresolved unless separately evidenced as resolved.
+
+Treat Prompt 31's report and the current locked specification as the starting state. Do not repeat completed work or re-litigate D1–D5.
+
+## 2. Purpose
+
+Prepare a compact, evidence-grounded resolution package for the remaining blockers before runtime implementation.
+
+This is a read-only methodology and contract analysis. It must not make owner decisions, implement behavior, or change the locked specification.
+
+## 3. Strict inspection scope
+
+Inspect only:
+
+1. `06_Stage6_Forecast_Evaluation.md`, limited to the amended sections and relevant existing sections governing:
+
+   * §4 Forecast → Actual Mapping;
+   * §§9 and 12 error metrics, MAPE, zero-base and sign-change handling;
+   * §14 series identity and minimum observations;
+   * §17 baseline comparison;
+   * §37 scenario and Reliability;
+   * §§39–41 outputs, auditability, and data quality.
+2. `temp_report.md`, limited to the latest reports for Prompts 27–31.
+3. Only if required to establish the current output contract, inspect the exact existing schema/output definitions already referenced by §39. Do not perform broad schema discovery.
+
+Do not perform repository-wide searches. Do not inspect unrelated stages or modules.
+
+## 4. Analyze these blockers independently
+
+### RB-1 — Scenario identity in the output contract
+
+The approved D3 policy requires separate Bear, Base, and Bull evaluation series, but the Prompt 31 report says §14/§39 do not yet carry scenario identity in the series key/output fields.
+
+Determine, from the bounded evidence:
+
+* The minimum exact fields/keys required to keep scenario identity separate through evaluation, persistence, and returned outputs.
+* Whether this can be satisfied by an existing supported field or whether an output-contract/schema amendment is required.
+* The exact contract boundary that currently prevents implementation.
+* Whether a schema migration is genuinely necessary, or whether that conclusion cannot yet be established without broader inspection.
+
+Do not invent a database field name or claim schema feasibility without evidence. Do not change schemas or migrations.
+
+### RB-2 — Bias when Actual = 0
+
+D4 excludes Actual-zero observations from ordinary MAPE but does not automatically decide their Bias treatment.
+
+Read the exact currently locked Bias formula and identify:
+
+* Whether the formula is mathematically defined for Forecast > 0 / Actual = 0.
+* Whether it is mathematically defined for Forecast < 0 / Actual = 0.
+* What happens for Forecast = 0 / Actual = 0.
+* Whether Forecast = 0 / Actual ≠ 0 is already governed by the existing ZERO_BASE rule.
+* Whether the locked specification defines Bias eligibility independently from MAPE eligibility.
+
+Do not silently assume that excluding an observation from MAPE excludes it from Bias, or vice versa. Do not change the formula, introduce epsilon, or choose a new denominator.
+
+Present only the smallest set of genuinely unresolved owner choices, with consequences for Bias interpretation, sufficiency reporting, and auditability.
+
+### RB-3 — Baseline comparison with MAPE-ineligible outcomes
+
+Inspect the exact baseline-comparison formula and the authorized Seasonal Naive baseline definition.
+
+Determine:
+
+* Whether baseline and model MAPE are calculated on exactly the same eligible forecast events within each scenario-specific series.
+* How Actual-zero and other MAPE-ineligible outcomes affect the baseline's MAPE sample.
+* Whether the current specification defines the baseline denominator and eligibility rules for this case.
+* Whether any proposed change would alter the baseline forecast itself, as opposed to merely defining comparison eligibility.
+
+Do not invent a weighting convention, a replacement baseline, or an improvement formula. Do not assume that a zero baseline error permits arbitrary division or a fabricated improvement percentage.
+
+Present the smallest unresolved decision set needed to ensure a fair, reproducible comparison.
+
+### RB-4 — Reliability
+
+Reliability remains withheld until its formula and mappings are authorized.
+
+Do not design or select a new Reliability formula in this prompt. Determine only which already identified missing authorities still block Reliability and whether any of them can be resolved from the bounded authoritative sources without inventing policy.
+
+Explicitly preserve the invariant that Reliability must not numerically adjust Forward P/E.
+
+### RB-5 — Version-pinned reruns and ESTIMATED sensitivity mechanics
+
+The approved D1/D2 policies require separately identified, version-pinned reruns and mandatory sensitivity analysis excluding ESTIMATED observations.
+
+Determine the minimum implementation contract needed to make these requirements auditable:
+
+* evaluation artifact identity and version;
+* linkage to the superseded artifact, if any;
+* the selection-policy/specification version;
+* the quality-policy version;
+* primary versus ESTIMATED-excluded sensitivity result identity;
+* exact Actual/report provenance;
+* reproducibility and historical immutability.
+
+Use existing authoritative output conventions where available. If a field or convention is missing, identify it as a proposed contract requirement, not as an existing feature. Do not invent names as though they already exist.
+
+Separate essential requirements from optional implementation choices.
+
+## 5. Required output
+
+Append exactly one section to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 32: Remaining Blocker Resolution Package`
+
+Include:
+
+1. A concise evidence table with columns:
+
+   * Blocker;
+   * authoritative text/section;
+   * established facts;
+   * genuinely unresolved question;
+   * downstream risk;
+   * minimum decision or contract amendment required.
+2. For RB-1, the exact proposed series/output contract requirements, clearly labelled PROPOSAL — NOT YET APPROVED.
+3. For RB-2 and RB-3, only the smallest set of owner choices necessary to resolve ambiguity. Explain consequences neutrally; do not select an option.
+4. For RB-4, the missing authority list and confirmation that Reliability remains withheld.
+5. For RB-5, minimum required audit/versioning invariants versus optional mechanics.
+6. Explicit dependencies among RB-1–RB-5.
+7. A final list of exact questions the owner must answer, numbered and answerable without reviewing code.
+8. A recommended execution order, without treating a recommendation as approval.
+
+## 6. Validation and safety requirements
+
+Perform six-layer validation adapted to this read-only analysis:
+
+1. **Formula/definition audit:** verify the actual locked formulas and their mathematical domains.
+2. **Contract/boundary audit:** scenario identity, Actual-zero, MAPE/Bias eligibility, baseline eligibility, versioning.
+3. **Production-path consistency audit:** trace only the bounded references between §14, §17, §37, §39, §40, and §41.
+4. **Adversarial-case audit:** all Forecast/Actual zero combinations, MAPE-ineligible outcomes, three scenarios for one event, baseline perfect-zero-error case, later restatement, and primary versus sensitivity outputs.
+5. **Regression audit:** preserve D1–D5, frozen Stages 1–5, and all previously locked invariants.
+6. **Independent audit:** re-read the appended report and verify that facts, proposals, and owner decisions are clearly distinguished.
+
+No runtime tests are expected because this prompt is read-only. Do not claim any tests passed.
+
+## 7. Prohibited actions
+
+* No source-code or test changes.
+* No changes to `06_Stage6_Forecast_Evaluation.md`.
+* No schema, migration, or configuration changes.
+* No changes to Stages 1–5.
+* No broad repository exploration.
+* No GitHub, GitHub CLI/API, remote operations, commits, pushes, pulls, or branch changes.
+* Do not invent or approve any methodology decision.
+* Do not implement Reliability.
+* Do not declare Stage 6 frozen.
+
+Append the report, stop, and summarize the unresolved owner decisions.
