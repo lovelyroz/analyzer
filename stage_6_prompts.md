@@ -3802,3 +3802,180 @@ Summarize the decision groups prepared, confirm that no owner decision was silen
 
 `Stage 6 remains NOT FROZEN.`
 =====================================================================
+
+# Stage 6 Prompt 30 — Apply Approved Methodology Decisions to the Locked Specification
+
+You are the primary engineering agent for `analyzer`, a financial-data application where financial correctness, point-in-time integrity, deterministic behavior, auditability, and preservation of historical evaluation artifacts take priority over implementation speed.
+
+## 1. Approved authority
+
+The project owner has explicitly approved the five methodology policies proposed in Stage 6 Prompt 29:
+
+* D1: first-known, point-in-time Actual selection; later restatements must not silently rewrite historical evaluation results.
+* D2: quarantine `SUSPICIOUS` and `UNMAPPED`; allow `ESTIMATED` observations only with explicit quality flags and mandatory sensitivity analysis; handle `RESTATED` consistently with D1.
+* D3: maintain separate evaluation series for Bear, Base, and Bull scenarios.
+* D4: Actual-zero observations must not enter ordinary MAPE; retain absolute error and an explicit exclusion reason. Specify the treatment of the relevant forecast/actual zero combinations without conflating numerical zero with missing data.
+* D5: count otherwise valid, nonduplicate forecast outcomes for general sufficiency, and report the effective MAPE-eligible sample size separately.
+
+These are owner-approved policy decisions. They supersede the previously unapproved alternatives in Prompts 27–29. Do not ask the owner to approve these five decisions again.
+
+However, approval of these high-level policies does not authorize inventing missing technical rules. Explicitly distinguish approved policy from technical details that still lack authority.
+
+## 2. Strict scope
+
+Inspect only:
+
+1. `PROJECT_HANDOFF_INSTRUCTIONS.md` for operational constraints.
+2. `06_Stage6_Forecast_Evaluation.md`, limited to the sections governing:
+
+   * Actual selection and point-in-time requirements;
+   * error, percentage error, APE, MAPE, and Bias;
+   * evaluation series identity and sufficiency;
+   * baseline comparison and Reliability;
+   * data-quality states and auditability;
+   * historical immutability and version-pinned evaluation artifacts.
+3. The existing `temp_report.md` sections for Stage 6 Prompts 27, 28, and 29.
+
+Do not perform a repository-wide search or inspect unrelated stages or modules. Use only the evidence in these bounded sources.
+
+## 3. Required task
+
+Amend `06_Stage6_Forecast_Evaluation.md` so the five approved policies become explicit, internally consistent normative requirements.
+
+Preserve the document's existing structure and terminology where possible. Make the smallest defensible edits. Do not rewrite unrelated sections.
+
+### D1 — First-known Actual and historical immutability
+
+Specify that:
+
+* Historical evaluation uses the earliest eligible, valid, known-publication-date Actual report version under the approved first-known policy.
+* A later restatement must not silently replace the Actual or overwrite a previously published evaluation artifact.
+* Every selected Actual must be traceable to its exact `actual_report_version`, publication timestamp, and selection-policy version.
+* Candidate versions that are ineligible, invalid, missing required publication timestamps, or otherwise quarantined must remain auditable with reason codes.
+* If multiple eligible candidates share the earliest publication timestamp and the authoritative sources provide no defensible ordering, do not resolve the tie using arbitrary database IDs or an unapproved tie-break. Mark the selection ambiguous and fail closed for that evaluation observation.
+* Any authorized rerun must be an explicitly identified, version-pinned evaluation artifact with lineage; it must not mutate historical artifacts in place.
+
+Do not imply that first-known means “latest database row” or “highest version number.”
+
+### D2 — Actual data quality
+
+Specify that:
+
+* `SUSPICIOUS` and `UNMAPPED` Actuals are excluded from Actual selection and all scored evaluation paths, including error metrics, baseline comparison, and sufficiency counts. Preserve an auditable exclusion record.
+* `ESTIMATED` Actuals may participate only with explicit quality/provenance flags and a mandatory sensitivity analysis that recomputes the relevant outputs excluding `ESTIMATED` observations.
+* The primary and sensitivity results must remain distinguishable; never silently mix or relabel them.
+* `RESTATED` handling must follow D1. A later restatement must not displace the selected first-known Actual in the primary historical evaluation.
+* Missing, invalid, suspicious, unmapped, and estimated states must never be silently converted to zero.
+* Apply quality eligibility before selecting among Actual candidates.
+
+Do not introduce a new quality state or override Stage 1's data-quality definitions.
+
+### D3 — Scenario-separated series
+
+Specify that Bear, Base, and Bull are distinct evaluation series.
+
+* Scenario identity must be represented in the evaluation series key and retained in audit/output records.
+* Do not pool scenario observations into one MAPE, Bias, sufficiency count, baseline comparison, or Reliability result.
+* Do not count the three scenarios for one forecast event as three independent observations in a shared series.
+* Apply minimum-observation rules independently to each scenario-specific series.
+* If the existing schema or output contract cannot preserve scenario identity, document the exact blocker. Do not silently change unrelated database structures in this prompt.
+
+### D4 — Actual-zero treatment
+
+Specify that:
+
+* An Actual value of numerical zero is not missing data.
+* Actual-zero observations are excluded from ordinary MAPE with a dedicated, explicit reason/status; their absolute error remains available and auditable.
+* Address all relevant combinations explicitly: Forecast > 0 / Actual = 0; Forecast < 0 / Actual = 0; Forecast = 0 / Actual = 0; Forecast = 0 / Actual ≠ 0; and missing Actual.
+* Preserve the existing authorized handling of zero Forecast and sign-change/zero-base regimes unless an explicitly approved amendment is strictly required.
+* Never manufacture an ordinary percentage error by silently substituting an epsilon, arbitrary denominator, or constant.
+* Keep metric-specific eligibility explicit: a null MAPE does not automatically mean that absolute error is null.
+
+Important boundary: the owner's approval explicitly resolves ordinary MAPE treatment for Actual = 0. It does not independently authorize arbitrary changes to Bias, baseline formulas, or Reliability mappings. Preserve their already-authorized formulas where mathematically defined; where the approved policy and existing specification do not determine a behavior, document a precise unresolved rule instead of inventing one.
+
+### D5 — Sufficiency and effective MAPE sample size
+
+Specify that:
+
+* General evaluation sufficiency counts valid, nonduplicate forecast outcomes after Actual selection and data-quality eligibility, even when an outcome is not eligible for ordinary MAPE.
+* Report the general eligible outcome count and the effective MAPE-eligible count separately.
+* Apply the existing locked minimum-observation thresholds to the general eligible outcome count, unless the authoritative specification explicitly states otherwise.
+* Never represent general sufficiency as the number of MAPE-scored observations.
+* Apply these counts independently to each scenario, horizon, metric, and model version according to the locked evaluation-series identity.
+* A single forecast event must not be counted repeatedly within the same series due to duplicated records or scenario pooling.
+
+## 4. Cross-cutting invariants
+
+The amended specification must preserve all of the following:
+
+* Historical point-in-time integrity and immutable published evaluation artifacts.
+* Exact ReportVersion/publication-date provenance and reproducible, version-pinned reruns.
+* `NULL` is not numerical zero.
+* Forecasts and Actuals must match the same metric definition and financial period.
+* No mixing of horizons, model versions, or scenarios within a series.
+* No unauthorized Reliability mapping or calibration behavior. Reliability remains withheld until its formula and mappings receive explicit authority.
+* No Stage 6 forecast generation and no feedback from later Actuals into historical Stage 5 forecast inputs.
+* No direct Reliability adjustment to Forward P/E.
+* No reopening of frozen Stages 1–5.
+* No unapproved schema, migration, or database changes.
+
+## 5. Resolve ambiguities conservatively
+
+Before editing, build a compact internal checklist of the required changes and cross-references.
+
+If the locked specification contains contradictory requirements, or if a technical detail cannot be determined from the approved decisions and authoritative sources:
+
+1. Implement only the unambiguous, approved specification changes.
+2. Do not invent a formula, weighting scheme, threshold, tie-break, or data-selection rule.
+3. Record each remaining issue as a specific blocker, including the affected section, the missing rule, its downstream impact, and the exact decision or schema work still required.
+4. Do not claim the specification is fully resolved or Stage 6 is ready to freeze.
+
+Do not reopen the broad authority search. The targeted authority trace in Prompt 28 and the decision record in Prompt 29 are sufficient context for this bounded task.
+
+## 6. Validation requirements
+
+This is a specification-only prompt; do not implement runtime behavior yet.
+
+Perform six-layer specification validation, adapted to documentation:
+
+1. **Formula/definition audit:** verify definitions of Actual selection, error metrics, MAPE eligibility, and sample counts.
+2. **Contract/boundary audit:** verify scenario identity, data-quality states, zero-versus-missing, and forecast/Actual matching.
+3. **Production-path consistency audit:** trace cross-references between the amended sections and all relevant locked Stage 6 sections.
+4. **Adversarial-case audit:** explicitly reason through tied publication timestamps, invalid timestamps, later restatements, estimated Actuals, suspicious/unmapped Actuals, all Actual-zero combinations, duplicate events, and three scenarios sharing one forecast event.
+5. **Regression audit:** confirm the amendments do not contradict the existing locked Stage 6 rules or frozen Stages 1–5.
+6. **Independent audit:** after editing, re-read the modified sections from the file and check for contradictions, missing cases, accidental broad edits, and claims that exceed owner approval.
+
+Do not count a successful text edit as validation. No application test result may be claimed because runtime code is not being changed.
+
+## 7. Reporting
+
+Append exactly one new section to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 30: Approved Methodology Specification Amendment`
+
+Include:
+
+* Approved decisions applied (D1–D5).
+* Exact specification sections changed.
+* A concise change summary for each decision.
+* Results of each of the six validation layers.
+* Remaining unresolved methodology or schema blockers, if any.
+* Confirmation that Stages 1–5 were not changed.
+* Confirmation that no source code, tests, schemas, migrations, or configuration were changed.
+* Confirmation that no tests were run.
+* Final status: `SPECIFICATION AMENDED — IMPLEMENTATION NOT YET AUTHORIZED` if any implementation-level ambiguity remains; otherwise `SPECIFICATION AMENDED — READY FOR IMPLEMENTATION REVIEW`.
+* Explicit statement: `Stage 6 is NOT FROZEN.`
+
+## 8. Prohibited actions
+
+* No source-code changes.
+* No test changes.
+* No schema or migration changes.
+* No changes to Stages 1–5.
+* No repository-wide exploration.
+* No GitHub, GitHub CLI/API, remote operations, commits, pushes, pulls, or branch changes.
+* Do not implement any runtime behavior in this prompt.
+* Do not declare Stage 6 frozen.
+
+Make only the bounded specification amendment and the required report append. Then stop and report the result concisely.
+===============================================================
