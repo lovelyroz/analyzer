@@ -4244,6 +4244,3 @@ B1/B2/B3/B4/B7/B8 remain UNRESOLVED METHODOLOGY AUTHORITY. Per §14, freeze
 is not decided here regardless.
 
 `Stage 6 is NOT declared frozen.`
-
-STOP.
-================================================================
