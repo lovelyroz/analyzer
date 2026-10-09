@@ -3537,3 +3537,111 @@ Final status must explicitly state:
 `Stage 6 is NOT declared frozen.`
 
 Stop after appending the report and providing a concise summary of the decisions that require owner approval.
+============================================================
+Stage 6 Prompt 28 - Targeted Authority Trace for Unresolved Methodology Decisions
+
+# Stage 6 Prompt 28 — Targeted Authority Trace for Unresolved Methodology Decisions
+
+You are working locally in the `analyzer` repository, a financial-data application.
+
+## Objective
+
+Perform a narrow, read-only authority trace for the unresolved Stage 6 methodology decisions identified in `REPORT — Stage 6 Prompt 27`.
+
+Determine whether existing authoritative project documents explicitly resolve any of these questions:
+
+* **B5:** Actual selection across multiple ReportVersions, including restatements.
+* **B6:** Stage 6 participation rules for VALID, ESTIMATED, RESTATED, MISSING, SUSPICIOUS, and UNMAPPED data-quality states.
+* **B9:** Whether scenario forecasts are separate evaluation series, pooled with an authorized anti-inflation rule, or evaluated using a designated scenario.
+* **ZERO_ACTUAL:** The statistical treatment of Actual = 0, including Forecast < 0 / Actual = 0.
+* **Q7:** Whether observations excluded from MAPE contribute to the minimum-observation sufficiency threshold.
+* **Q8:** Whether previously published evaluation results remain frozen after restatement or must be recalculated.
+
+This is an authority-discovery task, not a design or implementation task.
+
+## 1. Scope restrictions
+
+Read `PROJECT_HANDOFF_INSTRUCTIONS.md`, `06_Stage6_Forecast_Evaluation.md`, and the Prompt 27 report in `temp_report.md` only as needed to establish the unresolved questions and the project's authority rules.
+
+Then inspect only specifically relevant Data Foundation documentation, data-quality specifications, ReportVersion/financial-fact contracts, or existing methodology decision records that can plausibly govern these questions.
+
+Do not conduct a repository-wide audit. Do not enumerate unrelated files. Do not inspect or modify Stage 1–5 implementation unless a specific authoritative document directly requires it; frozen stages must remain untouched.
+
+Do not treat the following as methodology authority by themselves:
+
+* Existing implementation behavior.
+* Passing tests.
+* Comments or docstrings that merely describe implementation.
+* Stage 3 scoring conventions.
+* A previous prompt's proposed option.
+* A database ordering or surrogate-ID convention.
+
+A source is authoritative only if its role and wording support the particular rule being claimed.
+
+## 2. Required analysis
+
+For each unresolved decision, report:
+
+1. The exact source file and section, heading, or line range.
+2. The relevant rule, accurately summarized.
+3. Whether the rule is explicit, implicit, ambiguous, or absent.
+4. Whether it resolves the decision fully, partially, or not at all.
+5. Any conflict with the locked Stage 6 specification.
+6. Whether an owner decision is still required.
+
+Distinguish carefully between:
+
+* Data-quality classification and permission to use a value as an evaluation outcome.
+* A ReportVersion being valid and the policy for choosing between valid versions.
+* Actual-value provenance and the definition of an evaluation observation.
+* Arithmetic computability and authorization to include a result in MAPE, Bias, or sufficiency counts.
+* Reproducibility requirements and substantive statistical policy.
+
+Do not infer that a general data-quality rule automatically authorizes Stage 6 scoring.
+
+## 3. Decision classification
+
+Classify each question into one of these outcomes:
+
+* `RESOLVED_BY_EXISTING_AUTHORITY`
+* `PARTIALLY_RESOLVED`
+* `OWNER_DECISION_REQUIRED`
+* `CONFLICTING_AUTHORITY_FOUND`
+
+For each outcome, explain the evidence and the precise boundary of the conclusion.
+
+If no authoritative rule exists, say so explicitly. Do not fill the gap with a recommendation disguised as an existing rule.
+
+Do not select between competing B5, B6, B9, ZERO_ACTUAL, Q7, or Q8 alternatives on the owner's behalf.
+
+## 4. Deliverable
+
+Append exactly one new section to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 28: Targeted Authority Trace`
+
+The report must include:
+
+* Exact files and sections inspected.
+* A decision-by-decision authority matrix.
+* Supporting evidence and any conflicts.
+* A final list of unresolved owner decisions.
+* The smallest defensible next step based on the findings.
+
+Modify no other files.
+
+## 5. Prohibitions
+
+* No source-code, test, specification, configuration, migration, or schema changes.
+* No test execution is required for this read-only task.
+* No GitHub, GitHub CLI/API, remote operations, commits, pushes, pulls, or branch changes.
+* No Stage 6 freeze declaration.
+* Do not resolve unrelated blockers B1, B2, B3, B4, B7, or B8.
+
+If the evidence does not resolve a decision, stop at that conclusion rather than expanding the investigation indefinitely.
+
+## 6. Final response
+
+Summarize the decisions resolved by existing authority, the decisions still requiring owner approval, the exact file changed, and confirmation that no implementation or tests were changed or run.
+
+`Stage 6 remains NOT FROZEN.`

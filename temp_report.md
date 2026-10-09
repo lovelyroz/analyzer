@@ -4308,7 +4308,7 @@ BLOCKED — METHODOLOGY AUTHORITY UNRESOLVED
 
 `Stage 6 is NOT declared frozen.`
 
----
+==========================================================================
 
 # REPORT — Stage 6 Prompt 27: Methodology Decision Package for P25 Blockers (B5 / B6 / B9 / ZERO_ACTUAL)
 
@@ -4488,4 +4488,37 @@ This prompt modified exactly one file: appended this report to `D:\winprojects\a
 `Stage 6 is NOT declared frozen.`
 ========================================================================
 ========================================================================
+
+REPORT — Stage 6 Prompt 28: Targeted Authority Trace
+
+§0. Task. Narrow read-only authority trace for the six unresolved decisions from REPORT — Stage 6 Prompt 27 (B5, B6, B9, ZERO_ACTUAL, Q7, Q8). Authority-discovery only: no design, no implementation, no alternative selected on the owner's behalf.
+
+§1. Files and sections inspected (exact).
+- D:/winprojects/analyzer/06_Stage6_Forecast_Evaluation.md — §4 (L77-110), §5 (L112-147), §9 (L212-240), §12 (L305-328), §14 (L360-384), §37 (L937-975), §39 (L1008-1058), §40 (L1060-1088), §41 (L1090-1108), §42 (L1110-1120).
+- D:/winprojects/analyzer/01_Stage1_Data_Foundation.md — §3.5 (L152-160), §8 (L291-321), §9 (L324-353), §22 (L704-744), §23 (L747-767), §26 (L831-847), §27 (L851-877).
+- D:/winprojects/analyzer/00_Architecture_Freeze_Point.md — §7 (L264-293).
+- D:/winprojects/analyzer/05_Stage5_Forecast_Engine.md — §§20-21.
+- D:/winprojects/analyzer/00_a_Master_Architecture.md — grepped for scenario/dispersion/sufficiency counting rules: existence and ordering of Bear/Base/Bull only, no counting rule.
+- D:/winprojects/analyzer/12_Database_Architecture_V1.1.md — grepped: schema only, no methodology policy.
+- D:/winprojects/analyzer/PROJECT_HANDOFF_INSTRUCTIONS.md — operational only, zero methodology authority.
+- D:/winprojects/analyzer/temp_report.md L4313-4489 (Prompt 27 report) — question statements only, zero authority (a prior prompt's proposal is not authority).
+Not treated as authority: implementation behavior (src/evaluation/*), passing tests, comments/docstrings, Stage 3 conventions, DB ordering/surrogate-ID conventions.
+
+§2. Authority matrix (decision by decision).
+- B5 Actual selection — PARTIALLY_RESOLVED. Explicit: Stage 1 §3.5/§9/§27 + Freeze-Point §7 require backtests use the version available at the historical date and never rewrite history with later restatements — implicit point-in-time (PIT) support for first-known (O5.1); but "current analysis may use latest" cuts the opposite way. Absent: no document selects O5.1/O5.2/O5.3, and no tie-break, unordered-version bucket, INVALID_TIMESTAMP rule, or total order is defined anywhere. No conflict with locked §4 (it authorizes neither earliest nor latest). Owner decision still required: YES (Q1/Q8 rescore framing).
+- B6 quality-state participation — PARTIALLY_RESOLVED. Explicit: Stage 1 §22 defines all six states; §23 quarantines SUSPICIOUS/UNMAPPED from flowing as valid, and §23 L765 explicitly defers scoring treatment to later stages — a deferral Stage 6 §41 never supplies. Absent: ESTIMATED/RESTATED participation (I6.1 full / I6.2 flagged+sensitivity / I6.3 excluded). No conflict (deferral, not contradiction). Owner decision still required: YES (ESTIMATED/RESTATED only; SUSPICIOUS/UNMAPPED quarantine may be ratified).
+- B9 scenario series identity — OWNER_DECISION_REQUIRED. Ambiguous only: §14 series key has no scenario; §37 places one Reliability beside three tracks (layout, not a rule). Absent: no series-identity, pooling, or anti-inflation rule exists anywhere; Stage 5 §§20-21 and Master Architecture define Bear/Base/Bull existence and ordering only. §42 double-counting ban covers TTM/horizons, not scenarios — no conflict. Owner decision still required: YES (A/B/C + Reliability representation).
+- ZERO_ACTUAL — OWNER_DECISION_REQUIRED. Absent: §§9/12 cover Forecast=0 only; the Actual=0 rule is absent in Stage 6 and Stage 1 (NULL!=0 governs missing values, not zero values). No conflict. Owner decision still required: YES (null-vs-segregated + Z2/Z3 conventions).
+- Q7 nulled-in-sufficiency — OWNER_DECISION_REQUIRED. Ambiguous/absent: §14 counts only "valid non-duplicate observations" but never states whether MAPE-nulled (ZERO_BASE/sign-change) observations are "valid" for that count; no foundation sufficiency rule found. No conflict. Owner decision still required: YES (D12).
+- Q8 freeze-vs-rescore — PARTIALLY_RESOLVED. Explicit: Stage 1 §27 L876 ("Never rewrite the January historical state using Version 2"), §9 L353, Freeze-Point §7 L266 ("must never overwrite history") prohibit overwrite-rescoring of published history. Absent: version-pinned reruns published as new artifacts are unaddressed. No conflict with §40 reproducibility (it supports frozen). Owner decision still required: YES (ratification + republication convention).
+
+§3. Conflicts. None found: every located rule either defers (B6), is silent (B9/ZERO/Q7), or supports the locked spec's direction (B5 PIT toward §4's anti-latest-in-DB stance; Q8 frozen toward §40 reproducibility). No CONFLICTING_AUTHORITY_FOUND classification was warranted.
+
+§4. Final list of unresolved owner decisions (unchanged from Prompt 27, now with authority status). Q1 B5 O5.1/O5.2/O5.3 (partial PIT lean, decision still required); Q2 tie-break + unordered bucket (no authority); Q3 ESTIMATED I6.1/I6.2/I6.3 (no authority); Q4 RESTATED provenance (no authority); Q5 scenario A/B/C + Reliability (no authority); Q6 Actual=0 null vs segregated + Z3 (no authority); Q7 nulled-in-sufficiency (no authority); Q8 frozen vs rescore (frozen-overwrite prohibited by authority; version-pinned republication convention still required).
+
+§5. Smallest defensible next step. Owner ratifies the three PARTIALLY_RESOLVED boundaries (PIT lean for B5 without selecting O5.1; SUSPICIOUS/UNMAPPED quarantine for B6; overwrite-freeze for Q8) and then decides Q1/Q8 first per the Prompt 27 priority order (B5+rescore → B6 → B9 → zero → amend → implement+pins → validate → freeze vote). No further document search is defensible: the trace stopped at conclusion, not expanded indefinitely, per Prompt 28 §5.
+
+This prompt modified exactly one file: appended this report to D:\winprojects\analyzer\temp_report.md.
+
+`Stage 6 remains NOT FROZEN.`
 
