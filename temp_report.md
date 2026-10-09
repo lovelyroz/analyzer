@@ -4095,3 +4095,155 @@ Even so, per P24 §14, this PASS does NOT freeze Stage 6.
 
 STOP.
 ================================================================
+# REPORT — Stage 6 Prompt 25
+**Part B: aggregation + pipeline authorization (B5/B6/B9/ZERO_ACTUAL) — `lovelyroz/analyzer` — implementation + migration + adversarial + regression**
+
+## A. Part A authority (4 rules, verified present before Part B began)
+
+1. `ACTUAL_SELECTION_POLICY = "FIRST_KNOWN_OUTCOME_P25"` with
+   `ACTUAL_SELECTION_ORDER = (publication_datetime, report_version_number,
+   report_version_id)` (schema.py): earliest-published valid ReportVersion
+   is the outcome; publication ties break by version number then id.
+2. `PARTICIPATING_QUALITY_STATES = frozenset({VALID, ESTIMATED, RESTATED})`
+   and `QUARANTINED_QUALITY_STATES = frozenset({MISSING, SUSPICIOUS,
+   UNMAPPED})` with `is_scoring_eligible(actual)` as the single predicate
+   (schema.py); `is_valid_report_version(actual)` requires
+   `report_version_id` and `publication_datetime` both non-None.
+3. `EvaluationKey.scenario` (default `"BASE"`), 7-tuple `as_tuple()` with
+   scenario LAST; `evaluation_key_for` passes `record.scenario`.
+4. `select_actual(candidates)` filters invalid then takes the min by
+   `(publication, version_number or 0, id)`; `build_observation` returns
+   `INVALID_REPORT_VERSION` status (carrying the actual) for invalid actuals.
+
+## B. Part B rationale per rule
+
+* **SeriesKey UNCHANGED (company, metric, horizon, version).** Deterministic:
+  spec §14 defines series without scenario and §37 keeps ONE Reliability
+  beside three scenario tracks — scenario distinguishes observations (no
+  false collision) while series stay §14. Auditable: one verdict per §14 key
+  only; scenario-distinct pairs score inside the shared series without
+  merging identity.
+* **Eligibility via `is_scoring_eligible` (single source of truth).**
+  PIT-safe: no publication-vs-cutoff comparison anywhere in scoring (Rule 9
+  governs inputs only; the outcome Actual is never leakage). Auditable: every
+  quarantine names its cause verbatim (`DATA_QUALITY_QUARANTINED:<state>`,
+  `INVALID_REPORT_VERSION`, `DUPLICATE_QUARANTINED`, `MISSING_VALUE`).
+* **ESTIMATED/RESTATED fully participate, flagged `limited_quality`.**
+  Financially defensible: follows the scoring-layer precedent
+  (`src/scoring/engine.py`) — estimated/restated values are usable outcomes
+  with a quality flag, not silent exclusions; the flag keeps them
+  audit-visible in `ScoredObservation.data_quality_state` and
+  `SeriesEvaluation.limited_quality`.
+* **Zero-Actual scores normally (no metrics.py change).**
+  Financially defensible: `classify_regime(f != 0, 0)` is None since
+  `f*a = 0` is not `< 0`, so no regime fires and PE/APE over `|Forecast|`
+  are valid (A=0/F=1000 → error −1000, APE 100). NULL actuals still
+  quarantine as `MISSING_VALUE` (NULL != 0, never coerced to zero).
+* **Duplicates fail closed wholesale.** Deterministic: scenario is identity,
+  so only same-scenario keys collide; no preference, no averaging, no silent
+  merge — both observations quarantined with `DUPLICATE_QUARANTINED`.
+
+## C. Files and symbols
+
+* `src/evaluation/aggregate.py`: deleted `ZERO_ACTUAL_UNRESOLVED` branch;
+  `!= "VALID"` check replaced with `not is_scoring_eligible(actual)`
+  (imported from schema); order non-READY (covers `INVALID_REPORT_VERSION`
+  verbatim) → duplicate → eligibility → `MISSING_VALUE` → regime scoring;
+  `ScoredObservation.data_quality_state: Optional[str]` populated in
+  `_quarantined` (from actual when present) and both scoring constructors;
+  `SeriesEvaluation.limited_quality: bool = False`, set True when any scored
+  obs has state ESTIMATED/RESTATED; module docstring rewritten (B5/B6/B9 +
+  zero-actual P25-authorized with policy-constant names; B1/B8 unresolved).
+* `src/evaluation/pipeline.py`: `actuals` values accept single
+  `ActualObservation` OR list of candidates (single → bound verbatim; list →
+  `select_actual`; None/all-invalid → `build_observation` without actual =
+  `PENDING_ACTUAL`); docstrings updated (B5/B6/B9/zero resolved, B1/B8
+  caller-owned). No signature renames; `PIPELINE_PARAMETERS_VERSION`
+  unchanged (`STAGE6_V1`). Untouched callers (`test_stage6_evaluation.py`,
+  `test_stage6_reliability_governance.py`) pass singles → verbatim path,
+  unaffected.
+* `src/evaluation/metrics.py`, `schema.py`, `observation.py`,
+  `reliability.py`: NOT touched (metrics already correct; Part A frozen).
+* Tests migrated: `test_stage6_evaluation_foundation.py` (7-tuple pin +
+  `INVALID_REPORT_VERSION` pin + new scenario-isolation identity test),
+  `test_stage6_evaluation_metrics.py` (zero-actual scored pin, split
+  quality-state pin, same-scenario wholesale + scenario-distinct scoring
+  pins), `test_stage6_production_pipeline.py` (8-scored zero-actual pin,
+  split quality pins incl. `limited_quality`, baseline 7-tuple key,
+  forecast_id-surrogate collision + scenario non-collision pins;
+  `test_ttm_same_period_collision` kept unchanged — same-scenario same-key
+  TTM pair still quarantines wholesale under P25, stated reason recorded).
+  No other assertion weakened.
+* Created: `src/tests/test_stage6_p25_adversarial.py` (18 tests: 17 P25 L4
+  cases + 1 restated-series `limited_quality` test).
+
+## D. Flow
+
+Actual → ReportVersion validity (`is_valid_report_version`; invalid →
+`INVALID_REPORT_VERSION`, carried, never scores) → candidate selection
+(`select_actual`: earliest publication, version-number/id tie-break;
+restatement hindsight loses to first-known) → eligibility
+(`is_scoring_eligible`; MISSING/SUSPICIOUS/UNMAPPED quarantine verbatim) →
+duplicate flagging (same 7-tuple collides wholesale; scenario-distinct does
+not) → Error (`Actual − Forecast`, always retained for numeric pairs) →
+MAPE/Bias over valid APEs only (regimes `ZERO_BASE`/`LOSS_TO_PROFIT`/
+`PROFIT_TO_LOSS`/`SIGN_CHANGE` keep absolute error, percentages None) →
+sufficiency band on scored count → caller-keyed baseline comparison →
+`limited_quality` flag when ESTIMATED/RESTATED scored.
+
+## E. Six layers with counts
+
+* L1 unit (Part A, `test_stage6_p25_selection.py`): 14 tests — selection
+  earliest-wins, tie-breaks, invalid filtering, order independence,
+  per-state eligibility pins, 7-tuple/scenario/forecast-id key pins,
+  invalid-version build pin.
+* L2 contract/boundary (foundation, 29 tests): identity, PIT-contract,
+  input-only leakage, invalid-version, isolation, dup-flag survival,
+  NULL-vs-zero, verbatim §41 states, metadata.
+* L3 production path (metrics 19 + pipeline 46 + evaluation 8 +
+  reliability ~32): every matrix row through `run_evaluation_pipeline` or
+  authorized helpers; zero-actual 8-scored, split quality states,
+  scenario non-collision, TTM conservation, OOS, P/E pass-through.
+* L4 adversarial (`test_stage6_p25_adversarial.py`): **18 tests, all pass**
+  — (1) earliest publication wins; (2) version-number/id tie-breaks;
+  (3) restatement loses to first-known (named); (4) invalid version →
+  `INVALID_REPORT_VERSION`, never scores; (5) missing; (6) estimated scores
+  + `limited_quality`; (7)(8) suspicious/unmapped quarantine; (9) dup
+  fail-closed; (10)(11)(12) horizon/version/cutoff non-collision;
+  (13) A=0/F=1000 → error −1000, PE −100, APE 100, scored;
+  (14) A=0/F=−500 → error 500, PE 100, APE 100, scored;
+  (15) A=0/F=0 → `ZERO_BASE`, percentages None, error 0 kept, not scored;
+  (16) F=0/A=500 → `ZERO_BASE`; (17) F>0/A=0 regime None with stated reason
+  (`f*a = 0` is not `< 0`).
+* L5 regression: focused 7-file Stage 6 suite → **166 passed**;
+  full `pytest src/tests` → **850 passed, 2 skipped** (pre-existing
+  environmental skips), exit 0. No unrelated test altered; untouched files
+  (`test_stage6_evaluation.py`, `test_stage6_reliability_governance.py`)
+  pass unmodified.
+* L6 independent re-audit: implementation re-read vs brief — SeriesKey
+  4-tuple unchanged; order non-READY → dup → eligibility → MISSING_VALUE →
+  regime; no `ZERO_ACTUAL_UNRESOLVED` token remains; no `!= "VALID"`
+  remains; no DB-order dependence (selection is min-by-key, input-order
+  independent); no surrogate leakage (forecast_id never in key); no
+  eligibility divergence (single predicate import); no zero→missing
+  conversion (None-check only); no dup averaging (wholesale preserved); no
+  restatement leakage (later publication loses); version constant unchanged;
+  no B1/B2/B3/B4/B7/B8 design attempted.
+
+## F. Still unresolved (no authority claimed)
+
+B1 Seasonal Naive construction, B2 Reliability mappings, B3 persistence
+definition, B4 Calibration transition, B7 unavailable-component rule, B8
+baseline-underperformance persistence flag. Reliability stays withheld with
+reasons; calibration stays `NO_CALIBRATION`; `relative_improvement` only.
+
+## G. Freeze status
+
+Part B implements exactly the P25-authorized scope (B5/B6/B9/zero-actual);
+B1/B2/B3/B4/B7/B8 remain UNRESOLVED METHODOLOGY AUTHORITY. Per §14, freeze
+is not decided here regardless.
+
+`Stage 6 is NOT declared frozen.`
+
+STOP.
+================================================================
