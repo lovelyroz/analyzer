@@ -20,16 +20,23 @@ boundary, never invent a substitute):
   never the Performance Score.
 * Calibration advance (blockers B3/B4): always NO_CALIBRATION; the OOS
   split validator rejects contamination structurally.
-* ReportVersion tie-break (blocker B5): the caller attaches its chosen
-  Actual; this path never prefers among candidates.
-* Per-state data-quality participation (blocker B6): only VALID scores
-  (P19 quarantine); every other Section 41 state is quarantined verbatim.
+* ReportVersion selection (blocker B5) — RESOLVED by Stage 6 Prompt 25
+  (Part A): ``actuals`` values may be a single ``ActualObservation`` or a
+  list of candidates; lists are resolved with the first-known-outcome rule
+  (``select_actual``: earliest valid publication wins, ties by version
+  number then id; all-invalid yields no Actual → ``PENDING_ACTUAL``).
+* Per-state data-quality participation (blocker B6) — RESOLVED by Stage 6
+  Prompt 25 (Part A): VALID/ESTIMATED/RESTATED score
+  (``is_scoring_eligible``; ESTIMATED/RESTATED flag ``limited_quality``),
+  MISSING/SUSPICIOUS/UNMAPPED quarantine verbatim.
 * Underperformance persistence flag (blocker B8): ``relative_improvement``
-  only, no flag.
-* Canonical duplicate key (blocker B9): wholesale quarantine via P18
-  flagging, never a silent preference.
-* Zero Actual with nonzero Forecast: quarantined as ZERO_ACTUAL_UNRESOLVED
-  (P19 behavior preserved verbatim).
+  only, no flag. Still caller-owned / unresolved.
+* Canonical duplicate key (blocker B9) — FAIL-CLOSED and P25-authorized:
+  wholesale quarantine via P18 flagging (scenario is part of identity, so
+  only same-scenario keys collide), never a silent preference.
+* Zero Actual with nonzero Forecast — P25-authorized: scores normally
+  through the authorized formulas (no regime fires since f*a = 0 is not
+  < 0). ``MISSING_VALUE`` still quarantines NULLs (NULL != 0).
 
 No-Double-Counting guards (spec Sections 16, 42 — structural, no invented
 identity rule):
@@ -60,7 +67,11 @@ from src.evaluation.aggregate import (
     SeriesKey,
     aggregate_observations,
 )
-from src.evaluation.observation import EvaluationObservation, build_observation
+from src.evaluation.observation import (
+    EvaluationObservation,
+    build_observation,
+    select_actual,
+)
 from src.evaluation.reliability import (
     EvidenceHoldoutSplit,
     SeriesReliabilityGovernance,
@@ -106,7 +117,7 @@ class EvaluationPipelineResult:
 def run_evaluation_pipeline(
     records: List[ForecastRecord],
     metric_codes: List[str],
-    actuals: Mapping[Tuple[int, int, str], ActualObservation],
+    actuals: Mapping[Tuple[int, int, str], object],
     baselines: Optional[Mapping[tuple, Optional[float]]] = None,
     ttm_observations: Optional[List[EvaluationObservation]] = None,
     parameters_version: str = PIPELINE_PARAMETERS_VERSION,
@@ -116,26 +127,38 @@ def run_evaluation_pipeline(
     * ``records`` — Stage 5 ``ForecastRecord`` objects (read-only; never
       mutated, never written back).
     * ``metric_codes`` — Stage 1 vocabulary codes to evaluate per record.
-    * ``actuals`` — caller-selected Actuals keyed by
-      ``(company_id, financial_period_id, metric_code)``. Selection among
-      candidates (blocker B5) is the caller's authority; this path binds
-      verbatim and never prefers.
+    * ``actuals`` — Actuals keyed by
+      ``(company_id, financial_period_id, metric_code)``. Each value is a
+      single ``ActualObservation`` (bound verbatim) or a list of candidates
+      resolved with the Stage 6 Prompt 25 (Part A) first-known-outcome rule
+      (``select_actual``); all-invalid yields no Actual (``PENDING_ACTUAL``).
+      A bound ``ActualObservation`` already carries its ReportVersion
+      provenance (id / publication / period / company / metric).
     * ``baselines`` — caller-supplied Seasonal Naive values keyed by
       ``EvaluationKey.as_tuple()`` (blocker B1: construction belongs to the
-      caller that owns the seasonal authority).
+      caller that owns the seasonal authority — still caller-owned).
     * ``ttm_observations`` — optional pre-built TTM observations. Each must
       already carry its own key; the path scores each exactly once inside
       its own series group and proves conservation (never double counted,
       never silently dropped).
 
     Returns one verdict per (company, metric, horizon, version) series.
+    Series grouping stays scenario-free per spec §14; scenario isolates
+    observations (no false collision) beside the single series Reliability
+    (§37).
     """
     observations: List[EvaluationObservation] = []
     for record in records:
         for metric_code in metric_codes:
-            actual = actuals.get(
+            raw = actuals.get(
                 (record.company_id, record.forecast_period_id, metric_code)
             )
+            if isinstance(raw, list):
+                # Stage 6 Prompt 25 (Part B): candidate lists resolve via
+                # select_actual; None (all invalid) → build without actual.
+                actual = select_actual(raw)  # type: ignore[arg-type]
+            else:
+                actual = raw  # type: ignore[assignment]
             observations.append(build_observation(record, metric_code, actual))
 
     ttm_accounted: Counter = Counter()

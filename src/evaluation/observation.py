@@ -7,14 +7,13 @@ and timestamp (§39).
 
 What this module does NOT do (deliberately):
 
-* It never *selects* an Actual from candidates. ReportVersion tie-break /
-  restatement choice is blocker B5 (P17 §B) — UNRESOLVED METHODOLOGY
-  AUTHORITY — so no preference rule lives here. The caller that owns that
-  authority attaches its chosen Actual.
-* It never decides whether a data-quality state participates in MAPE/Bias.
-  Per-state participation is blocker B6 (P17 §B) — also unresolved — so the
-  observation records the state verbatim and leaves interpretation to the
-  evaluation step that P17 authorizes.
+* Selection is the Stage 6 Prompt 25 (Part A) first-known-outcome rule
+  (``select_actual``): earliest valid publication wins, ties break by
+  version number then version id. B5 (P17 §B) is thereby RESOLVED — no
+  latest-in-DB hindsight, no caller authority needed.
+* Per-state participation is the Stage 6 Prompt 25 (Part A) B6 predicate
+  (``is_scoring_eligible`` in schema.py); the observation still records the
+  state verbatim and leaves scoring to the evaluation step.
 * It never computes error, scores, reliability, calibration, or valuation.
   P18 explicitly forbids MAPE / Bias / Reliability / Calibration / Valuation.
 
@@ -33,7 +32,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.evaluation.schema import ActualObservation, _normalize_datetime
+from src.evaluation.schema import (
+    ActualObservation,
+    _normalize_datetime,
+    is_valid_report_version,
+)
 from src.forecast.schema import ForecastRecord
 
 # Evaluation lifecycle states carried by the foundation. ``PENDING_ACTUAL``
@@ -47,6 +50,10 @@ EVALUATION_STATUSES = (
     "PIT_INVALID_INPUT",
     "UNRESOLVED_ACTUAL_SELECTION",
     "UNRESOLVED_PARTICIPATION",
+    # Stage 6 Prompt 25 (Part A): the attached Actual fails
+    # ``is_valid_report_version`` — carried for audit, never scores
+    # (aggregation quarantines every non-READY observation).
+    "INVALID_REPORT_VERSION",
 )
 
 
@@ -55,10 +62,15 @@ class EvaluationKey:
     """The Stage 6 §4 mapping key: forecast identity for evaluation.
 
     Company + Metric + Financial Period + Forecast Horizon + Model Version +
-    Forecast Cutoff. Two observations share an evaluation series only when
-    every component agrees — horizon and model version isolate series from
-    each other by construction (the P18 horizon-isolation / model-version
-    isolation tests pin this).
+    Forecast Cutoff + Scenario (Stage 6 Prompt 25, Part A). Scenario is
+    APPENDED LAST: positions 0–5 are unchanged so existing consumers keep
+    their positional reading. Spec §37 keeps ONE Reliability alongside three
+    parallel scenario tracks — scenario therefore belongs in the observation
+    identity, while series aggregation (Part B) stays scenario-free.
+    Two observations share an evaluation series only when every component
+    agrees — horizon, model version, and scenario isolate series from each
+    other by construction (the P18 horizon-isolation / model-version
+    isolation tests pin the first two).
     """
 
     company_id: int
@@ -67,6 +79,7 @@ class EvaluationKey:
     forecast_horizon: str
     model_version: str
     forecast_cutoff_datetime: datetime
+    scenario: str = "BASE"
 
     def as_tuple(self) -> Tuple[Any, ...]:
         return (
@@ -76,6 +89,7 @@ class EvaluationKey:
             self.forecast_horizon,
             self.model_version,
             self.forecast_cutoff_datetime,
+            self.scenario,
         )
 
 
@@ -95,6 +109,34 @@ def evaluation_key_for(
         forecast_horizon=record.forecast_horizon,
         model_version=record.model_version,
         forecast_cutoff_datetime=record.data_cutoff_datetime,
+        scenario=record.scenario,
+    )
+
+
+def select_actual(
+    candidates: List[ActualObservation],
+) -> Optional[ActualObservation]:
+    """Stage 6 Prompt 25 (Part A): first-known-outcome Actual selection.
+
+    Filters candidates with ``is_valid_report_version`` (spec §4: an Actual
+    without a valid ReportVersion is never eligible; the naive latest-in-DB
+    is forbidden), then returns the minimum by
+    ``(publication_datetime, report_version_number or 0,
+    report_version_id)`` — the earliest-published outcome wins, resisting
+    restatement hindsight. Same-id ties are the same ReportVersion, so the
+    result is deterministic regardless of input order. Returns ``None``
+    when no candidate is valid.
+    """
+    valid = [c for c in candidates if is_valid_report_version(c)]
+    if not valid:
+        return None
+    return min(
+        valid,
+        key=lambda c: (
+            c.publication_datetime,
+            c.report_version_number if c.report_version_number is not None else 0,
+            c.report_version_id,
+        ),
     )
 
 
@@ -104,8 +146,9 @@ class EvaluationObservation:
 
     The forecast side is immutable (a Stage 5 ``ForecastRecord`` is itself
     immutable and append-only). The actual side is attached once — either at
-    construction or via ``bind_actual`` — by whichever caller owns the B5
-    selection authority. ``bind_actual`` returns a *new* observation rather
+    construction or via ``bind_actual`` — with the Actual chosen by the
+    Stage 6 Prompt 25 (Part A) first-known-outcome rule (``select_actual``).
+    ``bind_actual`` returns a *new* observation rather
     than mutating, so a bound observation is itself append-only.
 
     Temporal split (Rule 10) is structural: the cutoff/timestamp live on the
@@ -158,8 +201,9 @@ class EvaluationObservation:
 
         No eligibility check on ``publication_datetime`` happens here: an
         Actual published after the cutoff is the outcome being evaluated (PIT
-        CONTRACT), and choosing *which* candidate is authoritative is the
-        caller's B5 decision, not this carrier's.
+        CONTRACT). Choosing *which* candidate is authoritative is the
+        Stage 6 Prompt 25 (Part A) first-known-outcome rule — callers select
+        with ``select_actual`` before binding.
         """
         timestamp = _normalize_datetime(at) or datetime.now(timezone.utc)
         return EvaluationObservation(
@@ -218,7 +262,11 @@ def build_observation(
     Runs the construction-time PIT check over the record's own
     ``input_refs``: any input published after the record's cutoff freezes the
     observation as ``PIT_INVALID_INPUT``. The attached Actual — when given —
-    is *not* part of that check.
+    is *not* part of that check; instead it is validated with
+    ``is_valid_report_version`` (Stage 6 Prompt 25, Part A) — an Actual
+    failing it freezes the observation as ``INVALID_REPORT_VERSION``. The
+    failed Actual is still carried for audit but never scores, because
+    aggregation quarantines every non-READY observation.
     """
     leaked = detect_pit_leakage(record.data_cutoff_datetime, record.input_refs)
     if leaked:
@@ -227,6 +275,15 @@ def build_observation(
             metric_code=metric_code,
             actual=actual,
             evaluation_status="PIT_INVALID_INPUT",
+            evaluation_timestamp=evaluation_timestamp,
+            input_refs=tuple(record.input_refs),
+        )
+    if actual is not None and not is_valid_report_version(actual):
+        return EvaluationObservation(
+            forecast=record,
+            metric_code=metric_code,
+            actual=actual,
+            evaluation_status="INVALID_REPORT_VERSION",
             evaluation_timestamp=evaluation_timestamp,
             input_refs=tuple(record.input_refs),
         )

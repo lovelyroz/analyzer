@@ -2186,3 +2186,785 @@ If a Write call fails, do not immediately retry. First check which parameter was
 
 For Python files: First write only the imports and def main(), then add functions one by one using Edit.
 ===========================================================
+
+Stage 6 Prompt 25 - Actual Outcome & Observation Eligibility Authority
+
+You are performing **Stage 6 Prompt 25** for the repository:
+
+`analyzer`
+
+This is a financial-data application. Financial correctness, point-in-time correctness, auditability, deterministic behavior, and explicit methodology authority are more important than implementation speed.
+
+Stage 6 Prompt 24 independently verified that:
+
+* B-LEGACY is resolved;
+* the unauthorized legacy Stage 6 paths are no longer executable;
+* the P18–P21 production path remains intact;
+* no new unauthorized methodology was introduced;
+* focused Stage 6 tests pass;
+* full regression passes.
+
+Stage 6 is still NOT frozen.
+
+The remaining methodology blockers include:
+
+* B1 — Seasonal Naive construction;
+* B2 — Reliability mappings;
+* B3 — persistence definition;
+* B4 — Calibration transition;
+* B5 — ReportVersion tie-break;
+* B6 — data-state participation;
+* B7 — unavailable-component rule;
+* B8 — baseline-underperformance persistence;
+* B9 — duplicate-key definition;
+* `ZERO_ACTUAL_UNRESOLVED`.
+
+This prompt resolves ONLY:
+
+1. B5 — ReportVersion tie-break;
+2. B6 — data-state participation;
+3. B9 — duplicate-key definition;
+4. `ZERO_ACTUAL_UNRESOLVED`.
+
+Do NOT solve B1, B2, B3, B4, B7, or B8.
+
+---
+
+# 1. HARD CONTEXT FIREWALL
+
+Work ONLY in the local working tree.
+
+Do NOT:
+
+* access GitHub;
+* use GitHub CLI/API;
+* fetch;
+* pull;
+* push;
+* modify remotes;
+* create/delete/switch branches;
+* commit;
+* inspect Git history;
+* perform repository-wide exploration.
+
+Stage 1–5 are frozen.
+
+Do NOT modify Stage 4.
+
+Do NOT modify Stage 5.
+
+Do NOT modify Stage 7.
+
+Do NOT redesign Stage 6.
+
+Do not inspect unrelated repository areas.
+
+Inspect only:
+
+* `06_Stage6_Forecast_Evaluation.md`;
+* the P17–P24 sections of `temp_report.md`;
+* current Stage 6 files directly responsible for:
+
+  * Actual selection;
+  * ReportVersion validation;
+  * observation construction;
+  * duplicate detection;
+  * data-quality state handling;
+  * zero/sign regime classification;
+  * Stage 6 production pipeline;
+  * directly related Stage 6 tests.
+
+Use targeted symbol/reference searches only.
+
+---
+
+# 2. PRIMARY OBJECTIVE
+
+Establish an explicit, auditable, deterministic methodology for:
+
+```text
+Forecast
+→ corresponding Actual
+→ ReportVersion selection
+→ data-state eligibility
+→ duplicate handling
+→ zero/sign regime classification
+```
+
+The resulting rules must be authoritative and versioned/documented within Stage 6.
+
+Then implement ONLY those rules in the Stage 6 production path.
+
+Do not merely document the current implementation.
+
+Do not treat existing behavior as authoritative unless the methodology is explicitly justified and recorded.
+
+---
+
+# 3. METHODOLOGY AUTHORITY RULE
+
+This prompt is allowed to establish methodology authority for ONLY:
+
+* B5;
+* B6;
+* B9;
+* ZERO_ACTUAL_UNRESOLVED.
+
+For these four items, you MUST explicitly define:
+
+* rule;
+* rationale;
+* deterministic ordering;
+* PIT implications;
+* audit metadata;
+* edge cases;
+* tests.
+
+Do NOT use arbitrary thresholds.
+
+Do NOT use convenience-based behavior merely because the existing code already does it.
+
+Every selected rule must be deterministic and financially defensible.
+
+If an essential decision cannot be justified from:
+
+1. the locked Stage 6 specification;
+2. existing Stage 1 data semantics;
+3. existing ReportVersion/publication semantics;
+4. existing explicit project invariants;
+
+then STOP and report the exact unresolved decision.
+
+Do not invent a value merely to make the tests pass.
+
+---
+
+# 4. B5 — REPORTVERSION TIE-BREAK METHODOLOGY
+
+Establish an explicit deterministic rule for selecting the Actual ReportVersion when multiple valid ReportVersions represent the same:
+
+* company;
+* metric;
+* financial period.
+
+The rule MUST address:
+
+### A. Publication time
+
+Determine how `publication_datetime` affects eligibility.
+
+A ReportVersion published after the Forecast Cutoff MAY be used as the Actual outcome.
+
+This is NOT PIT leakage.
+
+PIT protects information used to construct the forecast/evaluation inputs.
+
+The Actual is the eventual outcome.
+
+### B. Restatement / multiple versions
+
+When multiple valid ReportVersions exist for the same financial period, explicitly define which version represents the evaluation Actual.
+
+The rule must prevent silent selection of:
+
+* arbitrary database order;
+* latest database row;
+* surrogate ID merely because it is convenient;
+* a future restatement when the methodology intends the first known outcome.
+
+The selected rule MUST be deterministic.
+
+### C. Recommended authority direction
+
+Prefer an outcome definition that is:
+
+* reproducible;
+* auditable;
+* independent of current database insertion order;
+* resistant to hindsight/restatement leakage;
+* compatible with later-published Actual semantics.
+
+If the specification permits multiple defensible interpretations, document the chosen interpretation explicitly and explain why it is preferable for forecast evaluation.
+
+### D. Audit metadata
+
+The selected Actual MUST remain traceable to:
+
+* ReportVersion identity;
+* publication timestamp;
+* financial period;
+* company;
+* metric.
+
+Do not discard provenance.
+
+---
+
+# 5. B6 — DATA-QUALITY PARTICIPATION METHODOLOGY
+
+Establish explicit participation rules for:
+
+* `MISSING`;
+* `ESTIMATED`;
+* `SUSPICIOUS`;
+* `UNMAPPED`;
+* `RESTATED`.
+
+For each state define exactly:
+
+1. Can it participate in Actual selection?
+2. Can it participate in Error?
+3. Can it participate in MAPE?
+4. Can it participate in Bias?
+5. Can it count toward observation sufficiency?
+6. Can it participate in baseline comparison?
+7. Must it be quarantined?
+8. Must it remain visible for audit purposes even when excluded?
+
+Do NOT silently equate:
+
+* unavailable with zero;
+* suspicious with valid;
+* unmapped with zero;
+* missing with zero.
+
+The methodology MUST distinguish:
+
+### Valid outcome
+
+An Actual that can legitimately be used for forecast evaluation.
+
+### Invalid outcome
+
+An Actual that must be excluded from scoring.
+
+### Audit-visible but excluded outcome
+
+A record that must remain traceable but must not affect evaluation metrics.
+
+The resulting rules must be consistent across the Stage 6 pipeline.
+
+Do not allow different Stage 6 modules to apply different eligibility rules.
+
+---
+
+# 6. ZERO ACTUAL METHODOLOGY
+
+Explicitly resolve:
+
+```text
+Actual = 0
+Forecast ≠ 0
+```
+
+This MUST NOT be treated as missing.
+
+It MUST NOT be silently converted to zero error.
+
+Use the existing Stage 6 definitions:
+
+```text
+Error = Actual - Forecast
+```
+
+Therefore:
+
+```text
+Actual = 0
+Forecast ≠ 0
+Error = -Forecast
+```
+
+The methodology MUST explicitly determine:
+
+### A. Error
+
+Absolute/signed error remains valid.
+
+### B. Percentage Error
+
+Determine whether the percentage-error denominator remains:
+
+```text
+abs(Forecast)
+```
+
+and whether the observation is eligible.
+
+### C. APE / MAPE
+
+Determine whether:
+
+```text
+APE = abs(Actual - Forecast) / abs(Forecast)
+```
+
+remains valid when Actual = 0 and Forecast ≠ 0.
+
+If Forecast ≠ 0, there is no zero denominator in the percentage metric.
+
+Do NOT incorrectly classify Actual=0 as ZERO_BASE merely because the Actual itself is zero.
+
+### D. Sign regime
+
+Explicitly distinguish:
+
+* positive Forecast → zero Actual;
+* negative Forecast → zero Actual;
+* zero Forecast → zero Actual;
+* zero Actual with non-zero Forecast.
+
+Do not use ordinary growth semantics here.
+
+### E. Sufficiency
+
+If the observation is otherwise valid, determine whether it counts toward observation sufficiency.
+
+The rule must be deterministic and consistent.
+
+---
+
+# 7. B9 — DUPLICATE-KEY METHODOLOGY
+
+Establish the exact Stage 6 evaluation observation identity.
+
+The identity MUST be deterministic.
+
+At minimum evaluate the conceptual dimensions:
+
+```text
+Company
+Metric
+Financial Period
+Forecast Horizon
+Model Version
+Forecast Cutoff
+```
+
+and determine whether additional identity fields are required, such as:
+
+* Forecast timestamp;
+* Forecast version/id;
+* scenario;
+* ReportVersion;
+* Actual identity.
+
+Do NOT blindly assume the existing key is authoritative.
+
+Do NOT use a database surrogate ID as the business definition of uniqueness.
+
+Explicitly distinguish:
+
+### True duplicate
+
+Two observations representing the same evaluation event.
+
+### Legitimately distinct observation
+
+Two forecasts that differ in an authorized dimension and therefore must not be collapsed.
+
+### Conflicting duplicate
+
+Two records claim the same evaluation identity but contain different forecast/actual/provenance values.
+
+Conflicting duplicates MUST NOT be silently averaged, overwritten, or selected arbitrarily.
+
+Prefer fail-closed/quarantine behavior.
+
+The rule must be deterministic and auditable.
+
+---
+
+# 8. CROSS-CONSISTENCY REQUIREMENT
+
+After defining B5, B6, B9, and ZERO_ACTUAL:
+
+Verify that they do not conflict.
+
+Specifically verify:
+
+```text
+ReportVersion selection
+        ↓
+Actual eligibility
+        ↓
+Duplicate identity
+        ↓
+Error
+        ↓
+APE/MAPE/Bias
+        ↓
+Observation sufficiency
+```
+
+There must be exactly one coherent interpretation.
+
+Do not allow:
+
+* Actual selection to use one eligibility rule while aggregation uses another;
+* duplicate detection to remove valid distinct forecasts;
+* zero Actual to be treated as missing;
+* excluded observations to count toward sufficiency;
+* invalid data states to affect MAPE/Bias;
+* ReportVersion choice to depend on arbitrary database ordering.
+
+---
+
+# 9. IMPLEMENTATION SCOPE
+
+After the methodology is explicitly established:
+
+Modify ONLY the Stage 6 modules directly responsible for:
+
+* Actual selection;
+* ReportVersion handling;
+* observation construction;
+* duplicate handling;
+* data-state eligibility;
+* zero/sign classification;
+* aggregation where necessary to enforce the new contract.
+
+Do NOT modify:
+
+* Stage 5;
+* Stage 4;
+* Stage 7;
+* Reliability mappings;
+* Calibration methodology;
+* Seasonal Naive;
+* persistence methodology;
+* baseline-underperformance methodology.
+
+Do not create a new forecasting engine.
+
+---
+
+# 10. VERSIONED / AUDITABLE METHODOLOGY
+
+The newly resolved rules MUST be discoverable and auditable.
+
+Do not hide methodology inside arbitrary implementation branches.
+
+Record:
+
+* methodology name/version;
+* B5 rule;
+* B6 state policy;
+* B9 identity;
+* zero-Actual policy.
+
+Use the project's existing methodology/versioning/audit pattern where one exists.
+
+Do NOT invent a large new framework merely to document four rules.
+
+A small explicit constant/enum/documented policy is preferable to duplicated magic behavior.
+
+---
+
+# 11. MULTI-LAYER TESTING — MANDATORY
+
+All six layers are required.
+
+## Layer 1 — Unit / Formula
+
+Test:
+
+* ReportVersion ordering;
+* tie-break;
+* data-state eligibility;
+* duplicate identity;
+* zero Actual;
+* Error;
+* Percentage Error;
+* APE;
+* MAPE;
+* Bias;
+* zero/sign regimes.
+
+Use exact numeric expected values where the methodology is now authoritative.
+
+---
+
+## Layer 2 — Contract / Boundary
+
+Test:
+
+* later-published Actual is accepted;
+* invalid ReportVersion is rejected;
+* ReportVersion tie-break is deterministic;
+* excluded data states cannot enter scoring;
+* duplicate identity is deterministic;
+* conflicting duplicates fail closed;
+* Actual=0 is not treated as missing;
+* NULL != 0.
+
+---
+
+## Layer 3 — Production Path / Integration
+
+Exercise the actual Stage 6 production pipeline.
+
+At minimum prove:
+
+```text
+Actual selection
+→ eligibility
+→ duplicate validation
+→ Error
+→ MAPE/Bias
+→ observation sufficiency
+```
+
+using the real production path.
+
+Helper-only tests are insufficient.
+
+---
+
+## Layer 4 — Adversarial / Negative
+
+Attempt:
+
+1. multiple ReportVersions with different publication times;
+2. multiple ReportVersions with identical publication times;
+3. restated Actual;
+4. invalid ReportVersion;
+5. missing Actual;
+6. estimated Actual;
+7. suspicious Actual;
+8. unmapped Actual;
+9. conflicting duplicates;
+10. duplicate forecasts with different horizons;
+11. duplicate forecasts with different Model Versions;
+12. duplicate forecasts with different Forecast Cutoffs;
+13. Actual=0 / Forecast>0;
+14. Actual=0 / Forecast<0;
+15. Actual=0 / Forecast=0;
+16. Forecast=0 / Actual≠0;
+17. zero Actual combined with a sign-change case.
+
+Every case must have an explicit expected result.
+
+---
+
+## Layer 5 — Regression
+
+Run:
+
+1. focused Stage 6 tests;
+2. only if focused tests pass:
+
+```text
+pytest src/tests -v
+```
+
+Do not weaken or delete unrelated tests.
+
+If a regression appears, classify it.
+
+Do not silently alter unrelated Stage 1–5 tests.
+
+---
+
+## Layer 6 — Independent Audit
+
+Before finalizing:
+
+Independently inspect the implementation and tests AGAIN.
+
+Verify that the implementation actually matches the methodology written in the report.
+
+Specifically challenge:
+
+* database-order dependence;
+* surrogate-ID dependence;
+* hidden fallback selection;
+* state-to-zero conversion;
+* zero Actual → missing conversion;
+* duplicate overwrite;
+* duplicate averaging;
+* restatement leakage;
+* inconsistent eligibility between observation and aggregation.
+
+Do not trust Layer 1 tests alone.
+
+---
+
+# 12. REQUIRED INVARIANTS
+
+The following MUST remain true:
+
+1. `NULL != 0`.
+2. Actual=0 is a valid numeric value unless excluded for an independent reason.
+3. Error remains:
+
+```text
+Actual - Forecast
+```
+
+4. Percentage Error uses the authorized denominator:
+
+```text
+abs(Forecast)
+```
+
+where valid.
+5. No ordinary percentage growth is used for sign changes.
+6. Later-published Actual is allowed as outcome.
+7. Future information MUST NOT enter forecast/evaluation inputs.
+8. Invalid ReportVersion cannot become a valid Actual.
+9. Duplicate conflicts cannot be silently resolved.
+10. Horizon isolation remains intact.
+11. Model Version isolation remains intact.
+12. Stage 5 remains untouched.
+13. Reliability remains unavailable because B2/B7 are unresolved.
+14. Calibration remains fail-closed because B3/B4 are unresolved.
+15. No Seasonal Naive methodology is introduced.
+16. No baseline-underperformance methodology is introduced.
+
+---
+
+# 13. EXPLICITLY FORBIDDEN
+
+Do NOT resolve:
+
+* B1 Seasonal Naive;
+* B2 Reliability mappings;
+* B3 persistence;
+* B4 Calibration transition;
+* B7 unavailable Reliability components;
+* B8 baseline-underperformance persistence.
+
+Do NOT introduce:
+
+* Reliability numbers;
+* Calibration thresholds;
+* Seasonal periods;
+* confidence multipliers;
+* arbitrary observation thresholds;
+* baseline fallback rules;
+* new Forecast Engine behavior;
+* valuation behavior;
+* Forward P/E behavior.
+
+Do NOT modify Stage 5.
+
+Do NOT modify Stage 4.
+
+Do NOT modify Stage 7.
+
+---
+
+# 14. STOP CONDITIONS
+
+STOP immediately if:
+
+1. B5 cannot be resolved deterministically without an unsupported financial assumption.
+2. B6 requires a rule that conflicts with Stage 1 data semantics.
+3. B9 requires an architectural redesign outside Stage 6.
+4. resolving zero Actual would require changing Stage 5 or Stage 7.
+5. an implementation decision would require inventing B1/B2/B3/B4/B7/B8.
+6. a regression indicates an unrelated frozen-stage defect.
+7. the proposed methodology would depend on current database insertion order.
+8. conflicting duplicates cannot be deterministically quarantined.
+
+If a stop condition occurs:
+
+* do not implement a partial workaround;
+* report the exact unresolved decision;
+* classify it;
+* STOP.
+
+---
+
+# 15. REQUIRED REPORT
+
+Append:
+
+`REPORT — Stage 6 Prompt 25`
+
+Include:
+
+### A. Methodology authority
+
+Explicit final rules for:
+
+* B5;
+* B6;
+* B9;
+* ZERO_ACTUAL_UNRESOLVED.
+
+### B. Rationale
+
+Explain why each rule is:
+
+* deterministic;
+* auditable;
+* PIT-safe;
+* financially defensible.
+
+### C. Implementation
+
+List exact files and symbols changed.
+
+### D. Production path
+
+Show how the new rules flow through:
+
+```text
+Actual
+→ ReportVersion
+→ eligibility
+→ duplicate identity
+→ Error
+→ MAPE/Bias
+→ sufficiency
+```
+
+### E. Testing
+
+Report all six layers.
+
+Include:
+
+* focused test count/result;
+* full regression result.
+
+### F. Remaining blockers
+
+Explicitly confirm that:
+
+* B1 remains unresolved;
+* B2 remains unresolved;
+* B3 remains unresolved;
+* B4 remains unresolved;
+* B7 remains unresolved;
+* B8 remains unresolved.
+
+### G. Freeze status
+
+Do NOT freeze Stage 6.
+
+The only acceptable final status is:
+
+`Stage 6 is NOT declared frozen.`
+
+---
+
+# 16. FINAL STOP
+
+After completing this prompt:
+
+STOP.
+
+Do not proceed to B1/B2/B3/B4/B7/B8.
+
+Do not design Reliability.
+
+Do not design Calibration.
+
+Do not design Seasonal Naive.
+
+Do not freeze Stage 6.
+
+Do not commit or push.

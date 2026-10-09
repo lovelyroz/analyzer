@@ -120,8 +120,10 @@ def _run(records, actuals, baselines=None, ttm=None):
 
 
 def _baseline_map(periods, value, horizon="12M", version="V1.0"):
+    # Stage 6 Prompt 25 (Part A): EvaluationKey is a 7-tuple with scenario
+    # ("BASE") appended last.
     return {
-        (7, "REVENUE", period, horizon, version, CUTOFF): value
+        (7, "REVENUE", period, horizon, version, CUTOFF, "BASE"): value
         for period in periods
     }
 
@@ -174,11 +176,15 @@ def test_zero_forecast_quarantined_never_zeroed():
 
 
 def test_zero_actual_unresolved_quarantined():
+    # Stage 6 Prompt 25 (Part B): A=0/F=1000 scores normally end to end —
+    # Error = -1000, APE = 100, all 8 scored.
     records = [_record(forecast_period_id=p) for p in range(101, 109)]
     actuals = _actual_map(list(range(101, 109)), value=0.0)
     verdict = _verdict(_run(records, actuals))
-    assert verdict.series.observation_count == 0
-    assert verdict.series.quarantined == {"ZERO_ACTUAL_UNRESOLVED": 8}
+    assert verdict.series.observation_count == 8
+    assert verdict.series.quarantined == {}
+    assert verdict.series.observations[0].error == -1000.0
+    assert verdict.series.mape == 100.0
 
 
 def test_loss_profit_regimes_quarantined():
@@ -344,12 +350,22 @@ def test_unbound_forecast_never_scores():
 
 @pytest.mark.parametrize(
     "state",
-    ["SUSPICIOUS", "UNMAPPED", "RESTATED", "ESTIMATED"],
+    ["SUSPICIOUS", "UNMAPPED"],
 )
 def test_nonvalid_actual_states_quarantined_verbatim(state):
     verdict = _verdict(_run([_record()], _actual_map([101], state=state)))
     assert verdict.series.observation_count == 0
     assert verdict.series.quarantined == {f"DATA_QUALITY_QUARANTINED:{state}": 1}
+
+
+@pytest.mark.parametrize("state", ["ESTIMATED", "RESTATED"])
+def test_limited_quality_states_score_with_flag(state):
+    # Stage 6 Prompt 25 (Part B): ESTIMATED / RESTATED score and flag
+    # limited_quality on the series.
+    verdict = _verdict(_run([_record()], _actual_map([101], state=state)))
+    assert verdict.series.observation_count == 1
+    assert verdict.series.limited_quality is True
+    assert verdict.series.mape == 10.0
 
 
 def test_duplicate_observations_quarantined_wholesale():
@@ -358,6 +374,26 @@ def test_duplicate_observations_quarantined_wholesale():
     verdict = _verdict(_run([first, second], _actual_map([101])))
     assert verdict.series.observation_count == 0
     assert verdict.series.quarantined == {"DUPLICATE_QUARANTINED": 2}
+
+
+def test_duplicate_forecast_id_only_still_collides():
+    # forecast_id is a surrogate, not identity: same key, different id
+    # still collides wholesale.
+    first = _record(forecast_id=1, forecast_version=1, forecast_period_id=101)
+    second = _record(forecast_id=999, forecast_version=9, forecast_period_id=101)
+    verdict = _verdict(_run([first, second], _actual_map([101])))
+    assert verdict.series.observation_count == 0
+    assert verdict.series.quarantined == {"DUPLICATE_QUARANTINED": 2}
+
+
+def test_duplicate_scenario_differs_does_not_collide():
+    # Scenario is identity: BASE vs BULL is two distinct observations,
+    # each scoring once (SeriesKey stays scenario-free per spec §14).
+    base = _record(forecast_period_id=101, scenario="BASE")
+    bull = _record(forecast_period_id=101, scenario="BULL")
+    verdict = _verdict(_run([base, bull], _actual_map([101])))
+    assert verdict.series.observation_count == 2
+    assert verdict.series.quarantined == {}
 
 
 def test_null_is_never_zero_on_path():

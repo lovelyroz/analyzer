@@ -91,8 +91,16 @@ def _ref(key="REVENUE", at=BEFORE):
 def test_identity_key_carries_full_mapping_key():
     key = evaluation_key_for(_record(), "REVENUE")
     assert key.as_tuple() == (
-        7, "REVENUE", 101, "12M", "V1.0", CUTOFF,
+        7, "REVENUE", 101, "12M", "V1.0", CUTOFF, "BASE",
     )
+
+
+def test_identity_scenario_isolates_observations():
+    assert (
+        evaluation_key_for(_record(scenario="BASE"), "REVENUE").as_tuple()
+        != evaluation_key_for(_record(scenario="BULL"), "REVENUE").as_tuple()
+    )
+    assert evaluation_key_for(_record(scenario="BULL"), "REVENUE").as_tuple()[-1] == "BULL"
 
 
 def test_identity_differs_by_metric():
@@ -179,9 +187,14 @@ def test_restated_actual_carried_not_decided():
 
 
 def test_missing_report_version_carried():
+    # Stage 6 Prompt 25 (Part A): an Actual without a ReportVersion id is
+    # INVALID_REPORT_VERSION — carried (actual attached for audit) but
+    # quarantined downstream, never scored.
     actual = _actual(report_version_id=None)
     assert actual.report_version_id is None
-    assert build_observation(_record(), "REVENUE", actual).evaluation_status == "READY"
+    observation = build_observation(_record(), "REVENUE", actual)
+    assert observation.evaluation_status == "INVALID_REPORT_VERSION"
+    assert observation.actual is actual
 
 
 # --- Horizon / model-version isolation ------------------------------------------

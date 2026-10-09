@@ -153,10 +153,13 @@ def test_sign_change_regimes_quarantined_with_absolute_error():
 
 
 def test_zero_actual_is_unresolved_not_scored():
+    # Stage 6 Prompt 25 (Part B): A=0/F!=0 scores normally — Error =
+    # Actual - Forecast, PE/APE over |Forecast| are valid since no regime
+    # fires (f*a = 0 is not < 0).
     scored = score_observation(_observation(forecast_value=1000.0, actual_value=0.0))
-    assert scored.scored is False
-    assert scored.exclusion_reason == "ZERO_ACTUAL_UNRESOLVED"
-    assert scored.error is None
+    assert scored.scored is True
+    assert scored.error == -1000.0
+    assert scored.ape == 100.0
 
 
 # --- horizon / model-version mixing ------------------------------------------
@@ -198,6 +201,20 @@ def test_duplicate_collision_quarantines_both():
     assert series.quarantined == {"DUPLICATE_QUARANTINED": 2}
 
 
+def test_duplicate_scenario_distinct_pair_scores_separately():
+    # Stage 6 Prompt 25 (Part A): scenario is part of the observation
+    # identity, so BASE vs BULL observations never collide — both score.
+    base = _observation(scenario="BASE")
+    bull = _observation(scenario="BULL")
+    assert base.key.as_tuple() != bull.key.as_tuple()
+    flagged = flag_duplicates([base, bull])
+    assert all(item.duplicate_key is None for item in flagged)
+    results = aggregate_observations([base, bull])
+    series = results[(7, "REVENUE", "12M", "V1.0")]
+    assert series.observation_count == 2
+    assert series.quarantined == {}
+
+
 # --- PIT leakage -------------------------------------------------------------
 
 
@@ -229,7 +246,19 @@ def test_later_published_actual_is_the_scored_outcome():
 
 
 def test_invalid_actual_states_quarantined_verbatim():
-    for state in ("MISSING", "ESTIMATED", "SUSPICIOUS", "UNMAPPED", "RESTATED"):
+    # Stage 6 Prompt 25 (Part B): ESTIMATED / RESTATED score fully (P25 B6
+    # predicate); MISSING / SUSPICIOUS / UNMAPPED quarantine verbatim.
+    for state in ("ESTIMATED", "RESTATED"):
+        observation = build_observation(
+            _record(),
+            "REVENUE",
+            _actual(value=1100.0, data_quality_state=state),
+        )
+        scored = score_observation(observation)
+        assert scored.scored is True
+        assert scored.error == 100.0
+        assert scored.data_quality_state == state
+    for state in ("MISSING", "SUSPICIOUS", "UNMAPPED"):
         observation = build_observation(
             _record(),
             "REVENUE",
@@ -238,6 +267,7 @@ def test_invalid_actual_states_quarantined_verbatim():
         scored = score_observation(observation)
         assert scored.scored is False
         assert scored.exclusion_reason == f"DATA_QUALITY_QUARANTINED:{state}"
+        assert scored.data_quality_state == state
 
 
 def test_missing_values_are_none_not_zero():

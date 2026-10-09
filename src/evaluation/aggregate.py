@@ -1,4 +1,5 @@
-"""Stage 6 Prompt 19 — evaluation metrics layer (spec Sections 6-18, AUTHORITATIVE only).
+"""Stage 6 Prompt 19 layer, Prompt 25 (Part B)-authorized — evaluation metrics
+(spec Sections 6-18, AUTHORITATIVE only).
 
 Consumes P18 ``EvaluationObservation`` carriers and computes the authorized
 metrics: Error, Percentage Error, APE, MAPE, Bias, observation sufficiency,
@@ -15,8 +16,8 @@ Exact formulas (spec Sections 6-10, 14, 17):
   8-11 MODERATE_CONFIDENCE; >=12 ADEQUATE — applied to the scored count.
 * ``Improvement = (Baseline Error - Model Error) / Baseline Error``.
 
-Deliberately absent (P17 UNRESOLVED, P19 precondition — implement only the
-authorized portions, report the rest):
+Deliberately absent (P17 UNRESOLVED — implement only the authorized
+portions, report the rest):
 
 * Seasonal Naive value construction — no seasonal period, formula, required
   history, insufficient-history behavior, or fallback has methodology
@@ -24,16 +25,36 @@ authorized portions, report the rest):
   baseline *values* arrive from the caller that owns that authority.
 * MODEL_UNDERPERFORMS_BASELINE persistence flag — "persistently" has no
   threshold (blocker B8). ``relative_improvement`` is reported; no flag set.
-* Data-quality participation rules (blocker B6) — only ``VALID`` Actuals
-  score. Every other §41 state is quarantined as
-  ``DATA_QUALITY_QUARANTINED:<state>``, whatever its value: spec §41
-  forbids an invalid Actual entering MAPE/Bias like a valid one, and no
-  per-state participation rule has authority, so the conservative refusal
-  to score is the only non-inventive option. States travel verbatim for
-  audit; the quarantine tally names them.
-* Duplicate preference (blocker B9) — every observation sharing a duplicate
-  key is quarantined; none is preferred, dropped, or merged silently.
-* Reliability / Calibration — forbidden by P19 (Prompts 20+ own them).
+* Per-state data-quality participation (blocker B6) — RESOLVED by Stage 6
+  Prompt 25 (Part A): ``is_scoring_eligible`` in schema.py (single source of
+  truth; ``PARTICIPATING_QUALITY_STATES`` =
+  VALID/ESTIMATED/RESTATED, ``QUARANTINED_QUALITY_STATES`` =
+  MISSING/SUSPICIOUS/UNMAPPED) decides. ESTIMATED / RESTATED score fully
+  (Error, APE, MAPE, Bias, sufficiency, baseline) per the scoring-layer
+  precedent, flagged downstream via ``limited_quality``; MISSING /
+  SUSPICIOUS / UNMAPPED are quarantined as
+  ``DATA_QUALITY_QUARANTINED:<state>``, whatever their value: spec §41
+  forbids an invalid Actual entering MAPE/Bias like a valid one. States
+  travel verbatim for audit (``ScoredObservation.data_quality_state``); the
+  quarantine tally names them.
+* Duplicate preference (blocker B9) — FAIL-CLOSED and P25-authorized: every
+  observation sharing a duplicate key is quarantined wholesale
+  (``DUPLICATE_QUARANTINED``); none is preferred, dropped, or merged
+  silently. Scenario is part of the observation identity (Part A 7-tuple),
+  so only same-scenario keys collide; series grouping stays scenario-free
+  per spec §14 (SeriesKey = company, metric, horizon, version — spec §14
+  defines series without scenario and §37 keeps ONE Reliability beside
+  three scenario tracks).
+* Zero-Actual scoring — P25-authorized: ``Actual=0 / Forecast!=0`` scores
+  normally through the authorized formulas (``Error = Actual - Forecast``,
+  PE/APE over ``|Forecast|``) because ``metrics.py`` already handles it
+  correctly: ``classify_regime(f != 0, 0)`` is None since ``f*a = 0`` is not
+  ``< 0``, so no regime fires and percentage metrics are valid. No
+  ``metrics.py`` change was needed. ``F=0 / A=0`` and ``F=0 / A!=0`` stay
+  ``ZERO_BASE`` (``forecast == 0``); NULL actuals still quarantine as
+  ``MISSING_VALUE`` (NULL != 0, never coerced).
+* B1 (Seasonal Naive construction) and B8 (persistence flag) stay
+  UNRESOLVED. Reliability / Calibration — forbidden here (Prompts 20+ own them).
 """
 
 from __future__ import annotations
@@ -58,6 +79,7 @@ from src.evaluation.observation import (
     EvaluationObservation,
     flag_duplicates,
 )
+from src.evaluation.schema import is_scoring_eligible
 
 # Series grouping per spec Section 14: Company + Metric + Horizon + Version.
 SeriesKey = Tuple[int, str, str, str]
@@ -86,6 +108,10 @@ class ScoredObservation:
     baseline_ape: Optional[float]
     scored: bool
     exclusion_reason: Optional[str] = None
+    # Stage 6 Prompt 25 (Part B): verbatim §41 state of the attached Actual
+    # (None when unbound). Scored ESTIMATED / RESTATED observations keep
+    # their state here for audit; quarantined ones do too.
+    data_quality_state: Optional[str] = None
 
 
 def _quarantined(
@@ -93,6 +119,7 @@ def _quarantined(
     reason: str,
     baseline_value: Optional[float] = None,
 ) -> ScoredObservation:
+    actual = observation.actual
     return ScoredObservation(
         key=observation.key,
         forecast_value=observation.forecast_value,
@@ -106,6 +133,7 @@ def _quarantined(
         baseline_ape=None,
         scored=False,
         exclusion_reason=reason,
+        data_quality_state=actual.data_quality_state if actual is not None else None,
     )
 
 
@@ -125,7 +153,14 @@ def score_observation(
     if observation.duplicate_key is not None:
         return _quarantined(observation, "DUPLICATE_QUARANTINED", baseline_value)
 
-    if observation.actual is not None and observation.actual.data_quality_state != "VALID":
+    # Stage 6 Prompt 25 (Part B): single source of truth — the Part A
+    # ``is_scoring_eligible`` predicate (PARTICIPATING_QUALITY_STATES).
+    # Order: non-READY (covers INVALID_REPORT_VERSION verbatim) → duplicate
+    # → eligibility → MISSING_VALUE on None forecast/actual (NULL != 0) →
+    # regime scoring. Zero-Actual (Actual=0 / Forecast!=0) scores normally:
+    # P25-authorized since classify_regime(f != 0, 0) is None (f*a = 0 is
+    # not < 0) and PE/APE over |Forecast| are valid there.
+    if observation.actual is not None and not is_scoring_eligible(observation.actual):
         return _quarantined(
             observation,
             f"DATA_QUALITY_QUARANTINED:{observation.actual.data_quality_state}",
@@ -136,11 +171,6 @@ def score_observation(
     actual = observation.actual_value
     if forecast is None or actual is None:
         return _quarantined(observation, "MISSING_VALUE", baseline_value)
-    if forecast != 0 and actual == 0:
-        # P17 §B leaves Actual=0 / Forecast!=0 UNRESOLVED: the spec names
-        # only Forecast=0 regimes, so scoring APE=100% here would invent
-        # methodology. Quarantine and report instead.
-        return _quarantined(observation, "ZERO_ACTUAL_UNRESOLVED", baseline_value)
 
     regime = classify_regime(forecast, actual)
     error = calculate_error(forecast, actual)
@@ -158,6 +188,8 @@ def score_observation(
         if regime is None:
             baseline_ape = calculate_ape(baseline_value, actual)
 
+    attached = observation.actual
+    state = attached.data_quality_state if attached is not None else None
     if regime is not None:
         return ScoredObservation(
             key=observation.key,
@@ -172,6 +204,7 @@ def score_observation(
             baseline_ape=None,
             scored=False,
             exclusion_reason=regime,
+            data_quality_state=state,
         )
     return ScoredObservation(
         key=observation.key,
@@ -185,6 +218,7 @@ def score_observation(
         baseline_error=baseline_error,
         baseline_ape=baseline_ape,
         scored=True,
+        data_quality_state=state,
     )
 
 
@@ -211,6 +245,10 @@ class SeriesEvaluation:
     baseline_mape: Optional[float] = None
     relative_improvement: Optional[float] = None
     observations: List[ScoredObservation] = field(default_factory=list)
+    # Stage 6 Prompt 25 (Part B): True when any scored observation carries
+    # ESTIMATED / RESTATED quality — they score fully per the scoring-layer
+    # precedent but the series is flagged as limited quality for audit.
+    limited_quality: bool = False
     evaluation_timestamp: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -240,6 +278,10 @@ def aggregate_series(
     quarantined = dict(
         Counter(item.exclusion_reason for item in scored if not item.scored)
     )
+    limited = any(
+        item.scored and item.data_quality_state in ("ESTIMATED", "RESTATED")
+        for item in scored
+    )
     return SeriesEvaluation(
         company_id=company_id,
         metric_code=metric_code,
@@ -254,6 +296,7 @@ def aggregate_series(
         baseline_mape=baseline_mape,
         relative_improvement=improvement,
         observations=list(scored),
+        limited_quality=limited,
     )
 
 
