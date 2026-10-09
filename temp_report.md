@@ -4878,4 +4878,64 @@ Date: 2026-10-09. Authority: (a) owner delegation of technical methodology choic
 
 Stage 6 remains NOT FROZEN.
 =====================================================================
+REPORT — Stage 6 Prompt 34: Contract Audit and Implementation Readiness
+
+Date: 2026-10-09. Authority: (a) owner delegation of technical methodology choices to ChatGPT in the active ChatGPT conversation on 2026-10-09 (owner delegated selection of correct/optimal technical choices; did NOT personally select any formula or option); (b) explicit owner approval of the scenario-separation policy only (Bear/Base/Bull separate throughout keys, records, outputs, counts, comparisons). Nothing below claims owner authorship of any formula or option.
+
+1. Files and definitions inspected
+- 06_Stage6_Forecast_Evaluation.md: §10 Bias rules; §12 D4 Actual-zero + §12 example Status = LOSS_TO_PROFIT; §14 thresholds table + D3/D5 pointers; §17 baseline pointers; §37 D3/D4 pointers; §39 30-field list + line 1108 + RB-1 pointer; §40 rerun/sensitivity pointers; §41 D2 + D5 counts pointer; §45 LOCKED declaration.
+- temp_report.md Prompt 31/32/33 report sections (status language: SPECIFICATION AMENDED / NOT FROZEN).
+- Scenario-persistence definitions per established session evidence: no evaluation-results DB table in src/models/*; forecast_versions persists scenario with BEAR/BASE/BULL check constraint; evaluation verdicts in-memory only; EvaluationKey carries scenario (default BASE); aggregation SeriesEvaluation scenario-free by design.
+
+2. Scenario identity findings and migration conclusion
+- §39 30-field output list contains no scenario field; §14 body key is four-part without scenario (scenario required via D3 pointer only).
+- No evaluation-results persistence table exists, so there is nothing to migrate. Migration necessity is NOT APPLICABLE/UNDETERMINED as framed: no migration claimed required, no migration-free solution claimed either. Limitation: conclusion rests on the inspected model inventory and the §39 text; a future persistence build is outside this prompt.
+- When evaluation persistence is built, scenario identity must be part of its contract per D3. No-pooling preserved: Bear, Base, Bull independent throughout keys, persistence, outputs, counts, Bias, MAPE, baseline comparisons.
+
+3. §45 status correction
+- Contradiction resolved: §45 STATUS = LOCKED versus reports' Stage 6 NOT FROZEN. Additive pointer (line 1332): LOCKED/V1 records locked methodology decisions (D1–D5 + delegated Prompt 33 rules); NOT FROZEN records implementation-incomplete. Distinct states; no freeze declared; D1–D5 preserved; Reliability withheld; Stages 1–5 untouched.
+
+4. Thresholds authority
+- VERIFIED EXISTING at §14 lines 390-395 (<5 INSUFFICIENT_DATA; 5-7 LOW_CONFIDENCE; 8-11 MODERATE_CONFIDENCE; >=12 ADEQUATE); identical table predates Prompts 31-33 per version-1 evidence 6dadbed lines 368-371. §41 caveat removed (line 1190). Three per-scenario counts preserved (general valid, Bias-eligible, MAPE-effective). No new Reliability mappings.
+
+5. Status/reason-code readiness table
+| # | Case | Classification | Basis |
+| 1 | ZERO_BASE (F=0/A!=0 NULL + status) | SEMANTICS COMPLETE | §10 rule 3 + §12; behavior unambiguous; identifier delegated per §39 line 1108 |
+| 2 | Actual-zero MAPE exclusion (F!=0/A=0) | SEMANTICS COMPLETE | §12 D4: dedicated status, absolute error retained, no epsilon |
+| 3 | Undefined Bias (F=0/A=0) | SEMANTICS COMPLETE | §10 rule 2: excluded with explicit status, absolute error retained |
+| 4 | Baseline MAPE NULL → Improvement NULL | SEMANTICS COMPLETE | §17: NULL + non-computable reason, distinct from zero case |
+| 5 | Baseline MAPE zero → Improvement NULL | SEMANTICS COMPLETE | §17: NULL + zero-denominator reason; no epsilon or substitute |
+| 6 | No eligible paired observations | SEMANTICS COMPLETE | §17: NULL/status, never manufacture a score |
+| 7 | SUSPICIOUS/UNMAPPED exclusion | SEMANTICS COMPLETE | §41 D2: excluded with auditable exclusion record |
+| 8 | ESTIMATED primary + sensitivity | SEMANTICS COMPLETE | §41 D2 + §40: flagged participation + mandatory ESTIMATED-excluded recompute; primary/sensitivity distinguished; storage mechanics delegated |
+- Identifier strings, field names, serialization: IMPLEMENTATION DETAIL, DELEGATED (§39 line 1108; §40). No identifier invented; distinct causes stay distinguishable; no formulas or fallbacks invented.
+
+6. Exact specification sections changed (all additive; zero deletions; zero formula or behavior change)
+- §39 line 1112: scenario-persistence evidence pointer (migration NOT APPLICABLE/UNDETERMINED; D3 contract requirement for future persistence).
+- §41 line 1190: thresholds EXISTING AND VERIFIED; contradictory caveat removed.
+- §45 line 1332: methodology-LOCKED vs implementation-NOT-FROZEN distinction.
+- Spec 1328 → 1332 lines (+4).
+
+7. Six-layer validation (all performed; no runtime tests run or claimed)
+- L1 formula/domain: PASS. Diff is pointer-only; Bias formula, MAPE rules, improvement formula, zero-denominator behavior untouched (verified by re-read of §§10/12/17).
+- L2 contract/boundary: PASS. Scenario identity checked against §39 list + §14 key; status/reason semantics checked per §§10/12/17/40/41.
+- L3 production-path trace: PASS. forecast_versions (scenario) → D1 first-known Actual → EvaluationKey (scenario) → Bias/MAPE rules → §17 paired comparison → §39 scenario-specific outputs.
+- L4 adversarial (9 cases): PASS. Three-scenarios-one-event (never three observations in a shared series); missing scenario identity (gap recorded; future persistence must carry it); baseline NULL vs zero (distinct reasons); no eligible events (NULL/status); all six §12 zero cases + eight §10 Bias rules; ESTIMATED sensitivity; later restatement (first-known stands); rerun vs historical artifact (non-overwrite); conflicting status declarations (resolved via §45 pointer).
+- L5 regression/invariants: PASS. D1–D5 texts unaltered; Stages 1–5 untouched; §16 baseline untouched (no leakage, horizon, or model-version mixing); Reliability withheld with Forward P/E invariant intact.
+- L6 independent audit: PASS. Final diff re-read (3 pointer blocks); cross-references §§10/12/14/17/37/39/40/41/45 consistent; authority cites exact lines + 6dadbed; no scope expansion; no claim beyond inspected evidence.
+
+8. Remaining blockers
+- Methodology: none. All formulas, eligibility, pairing, and NULL conventions defined; Reliability withheld by design for a future prompt.
+- Contract-schema: evaluation-persistence contract to be built with scenario identity (artifact identity/version, supersede linkage, spec/quality-policy versions, publication-timestamp field — open as build scope for the bounded implementation prompt); reason-code vocabulary selection (semantics complete; identifiers to be chosen consistently).
+- Implementation-detail: identifier strings, field names, version-string formats, storage/serialization, timestamp precision/timezone, linkage mechanics (delegated).
+
+9. Confirmations
+- No application code, tests, schema, or migration changed.
+- Stages 1–5 untouched.
+- Reliability remains withheld; no Reliability to Forward P/E effect.
+- No Git operations of any kind performed.
+- Stage 6 remains NOT FROZEN.
+- This prompt does not authorize implementation; the next prompt must separately define its implementation scope and require strict six-layer behavioral validation.
+
+READY FOR A BOUNDED IMPLEMENTATION PROMPT
 

@@ -1109,6 +1109,8 @@ evaluation_timestamp
 
 **Owner-approved pointer (Prompt 33 D1, policy RB-1 — scenario identity persistence, approved 2026-10-09, direct owner approval for scenario-separation only):** REQUIRED, CONTRACT AMENDMENT — persisted evaluation/audit records and returned scenario-specific outputs must retain scenario identity (Bear / Base / Bull); no existing Section 39 field is claimed to carry scenario identity here; no schema change, migration, or runtime validation is performed or authorized in this prompt; migration investigation remains open per owner (investigation only).
 
+**Owner-approved pointer (Prompt 34 — scenario persistence evidence, additive clarification only, 2026-10-09):** audit evidence — no evaluation-results persistence table exists in `src/models/*` (models cover industries/companies, financial_periods, reports/report_versions, raw facts/metrics/mapping/normalized/derived, fx, market_daily, share actions, forecast_versions/forecast_input_refs); `forecast_versions` persists scenario with a BEAR/BASE/BULL check constraint; evaluation verdicts are in-memory only; `EvaluationKey` carries scenario (default BASE) while aggregation is scenario-free by design (code-level gap recorded for the future implementation prompt, not changed here). Migration necessity is therefore NOT APPLICABLE/UNDETERMINED as framed — there is no evaluation persistence table to migrate; when evaluation persistence is built, scenario identity must be part of its contract per policy D3, with no cross-scenario pooling.
+
 ---
 
 # 40. Auditability
@@ -1185,7 +1187,7 @@ Actual نامعتبر نباید مانند Actual معتبر وارد MAPE و B
 * Stage 1 quality states are not redefined by this section.
 
 **Owner-approved pointer (D5 §4 — insufficient-history and MAPE-effective counts):**
-* Minimum-observation thresholds are preserved as stated in Prompt 33 §4: fewer than 5 valid non-duplicate observations = insufficient; 5–7 = low; 8–11 = moderate; 12 or more = adequate — **REQUIRED, CONTRACT AMENDMENT** (stated as already-approved in Prompt 33 §4; the existing section establishing them was not inspected in this phase — cross-check with the owning phase before claiming EXISTING AND VERIFIED).
+* Minimum-observation thresholds are preserved as stated in Prompt 33 §4: fewer than 5 valid non-duplicate observations = insufficient; 5–7 = low; 8–11 = moderate; 12 or more = adequate — **REQUIRED, CONTRACT AMENDMENT** (EXISTING AND VERIFIED at §14 lines 390–395; the identical table predates Prompts 31–33 per version-1 evidence `6dadbed` lines 368–371; caveat removed by Prompt 34 audit, 2026-10-09).
 * The general valid-observation count must be kept separate from metric-specific effective counts — **REQUIRED, CONTRACT AMENDMENT**.
 * For each scenario series, report at least three counts: general valid-observation count, Bias-eligible count, MAPE-effective count — **REQUIRED, CONTRACT AMENDMENT** (partially consistent with §41 policy D2, which already excludes `SUSPICIOUS`/`UNMAPPED` Actuals from sufficiency counts, but the three-count reporting structure itself is new).
 * A MAPE-ineligible observation must never be counted as MAPE-effective — **REQUIRED, CONTRACT AMENDMENT**.
@@ -1326,3 +1328,5 @@ Stage 6 اکنون از نظر معماری با:
 سازگار است.
 
 هر تغییر آینده در پارامترهای Accuracy، Reliability یا Calibration باید از طریق **Model Versioning** انجام شود و نباید معماری Locked Stage 6 را بدون بررسی رسمی تغییر دهد.
+
+**Owner-approved pointer (Prompt 34 — status convention, additive clarification only):** `STATUS = LOCKED` / `VERSION = V1` above records that the V1 methodology decisions (D1–D5 and the delegated Prompt 33 rules) are locked as specified; it does not declare Stage 6 implementation-complete or frozen. Stage 6 remains NOT FROZEN until a bounded implementation prompt is executed and validated. Reliability remains withheld. Methodology-locked and implementation-frozen are distinct states; no frozen-stage claim is made here.

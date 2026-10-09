@@ -4540,3 +4540,205 @@ If an inconsistency cannot be resolved within the approved decisions, document i
 Do not implement application logic. Do not freeze Stage 6. Do not perform Git or remote operations.
 
 At the end, provide a concise Persian summary of the work and identify the next smallest implementation-ready step.
+===========================================================
+# Stage 6 Prompt 34 — Bounded Contract Audit, Specification Consistency, and Implementation Readiness
+
+You are working on `analyzer`, a financial-data application where financial correctness, point-in-time integrity, determinism, and auditability take priority over implementation speed.
+
+## 1. Objective
+
+Perform a narrow, evidence-based audit following Stage 6 Prompt 33.
+
+Resolve the following issues before any implementation prompt is authorized:
+
+* Whether scenario identity can be persisted through the existing schema and output contract, or whether a migration investigation is necessary.
+* The inconsistency between Stage 6's reported `NOT FROZEN` status and §45's `STATUS = LOCKED`.
+* The inconsistent claims about whether minimum-observation thresholds are already established.
+* Whether the specification's required status/reason-code semantics are complete enough for implementation without inventing financial methodology.
+
+This is a bounded contract and documentation task. **Do not implement application logic.**
+
+## 2. Strict scope
+
+Inspect only:
+
+1. `06_Stage6_Forecast_Evaluation.md`
+2. The Prompt 31–33 reports in `temp_report.md`
+3. Exact schema, persistence-model, or output-contract definitions directly relevant to the Stage 6 evaluation output and scenario identity
+
+If locating the relevant definition requires exploration, use the smallest targeted search possible. Do not perform a repository-wide audit or reload the entire project.
+
+Do not inspect unrelated financial stages unless an exact referenced authority must be verified.
+
+No GitHub, GitHub CLI/API, remote operations, push, pull, commit, branch changes, or other Git mutations.
+
+Stages 1–5 are frozen and must remain untouched.
+
+## 3. Scenario identity and migration investigation
+
+Inspect the actual relevant schema and output-contract definitions, not merely the list in §39.
+
+Establish with evidence:
+
+1. Where evaluation records are currently represented and persisted.
+2. Whether an existing field or related key already carries scenario identity.
+3. Whether scenario identity can be added compatibly at the authorized contract boundary.
+4. Whether an actual database migration is necessary, optional, or not determinable from the inspected definitions.
+5. Whether persisted records, evaluation keys, returned outputs, and audit records can all preserve scenario identity without pooling Bear, Base, and Bull.
+
+Do not infer migration necessity merely because §39 lacks a scenario field.
+
+Do not perform a migration, schema edit, or application-code change.
+
+If evidence is insufficient, state precisely what is missing. Do not claim a migration-free solution or a migration requirement without evidence.
+
+Preserve the approved policy: Bear, Base, and Bull are independent evaluation series throughout keys, persistence, outputs, observation counts, Bias, MAPE, and baseline comparisons. No cross-scenario pooling is permitted.
+
+## 4. Resolve the specification's contradictory status
+
+Inspect §45 and the exact Stage 6 status language in the Prompt 31–33 reports.
+
+The current report says Stage 6 is `NOT FROZEN`, while §45 declares:
+
+`STATUS = LOCKED`
+
+Determine whether §45 is an obsolete intended final-state declaration or whether another authoritative status convention applies.
+
+Amend the specification so it cannot simultaneously imply that Stage 6 is finally locked and not yet frozen.
+
+Requirements:
+
+* Preserve the locked methodological decisions already authorized.
+* Distinguish a locked specification or approved policy from a frozen, implementation-complete Stage 6.
+* Do not declare Stage 6 frozen.
+* Do not imply that Reliability is available; it remains withheld.
+* Do not reopen Stages 1–5.
+
+Use explicit wording rather than relying on contextual interpretation.
+
+## 5. Minimum-observation thresholds and counts
+
+Trace the exact authority for these thresholds:
+
+* Fewer than 5 valid non-duplicate observations: insufficient
+* 5–7: low
+* 8–11: moderate
+* 12 or more: adequate
+
+Prompt 33 reports these as existing and verified, while §41 also states that their owning-phase authority was not inspected in that phase.
+
+Resolve this inconsistency using the narrowest authoritative source available.
+
+If the thresholds are already established, cite the exact source and section in the report and remove the contradictory caveat.
+
+If their authority cannot be verified within scope, retain them as previously specified but explicitly mark the authority-verification issue unresolved. Do not fabricate an authoritative source.
+
+Preserve distinct per-scenario counts for:
+
+* General valid observations
+* Bias-eligible observations
+* MAPE-effective observations
+
+Do not introduce new Reliability sufficiency mappings.
+
+## 6. Status and reason-code readiness
+
+Audit the rules introduced in Prompt 33 for:
+
+* `ZERO_BASE`
+* Actual-zero exclusion from ordinary MAPE
+* Undefined Bias
+* Baseline MAPE `NULL`
+* Baseline MAPE zero
+* No eligible paired observations
+* Excluded `SUSPICIOUS` or `UNMAPPED` Actuals
+* `ESTIMATED` primary and sensitivity outputs
+
+Determine whether the specification defines the semantic distinctions required for correct reporting, even if exact implementation identifiers remain delegated.
+
+For each case, classify it as:
+
+* **SEMANTICS COMPLETE** — behavior and reason are unambiguous; implementation may select a stable identifier consistent with the contract.
+* **SEMANTICS INCOMPLETE** — the contract leaves a substantive behavior undecided; identify the exact unresolved question.
+* **IMPLEMENTATION DETAIL** — the behavior is defined, but the exact identifier, serialization, or representation is legitimately delegated.
+
+Do not invent new financial formulas or numerical fallbacks.
+
+Do not force every NULL to share one reason. Different causes must remain distinguishable wherever the approved rules require that distinction.
+
+Do not design Reliability formulas or mappings. Reliability remains `NULL`/withheld.
+
+## 7. Specification changes
+
+Make only the smallest additive corrections needed to resolve issues established by evidence.
+
+Permitted:
+
+* Correct the contradictory Stage 6 status declaration.
+* Correct the thresholds-authority inconsistency.
+* Clarify already-authorized status/reason semantics.
+* Clarify the scenario output-contract requirement based on verified schema evidence.
+
+Not permitted:
+
+* Application-code changes
+* Test changes
+* Schema or migration changes
+* New Reliability formulas or mappings
+* Changes to the approved Seasonal Naive baseline
+* Changes to Stages 1–5
+* New weighting, fallback, epsilon, or scoring rules
+* A Stage 6 freeze declaration
+
+Do not duplicate existing rules unnecessarily. Re-read every changed section and its cross-references.
+
+## 8. Mandatory six-layer validation
+
+Complete all six layers and record concrete evidence for each:
+
+1. **Formula/domain:** Confirm that the audit has not changed the approved Bias, MAPE, baseline-improvement, or zero-denominator behavior.
+2. **Contract/boundary:** Verify scenario identity against actual inspected schema/output definitions and verify status/reason semantics.
+3. **Production-path trace:** Trace Forecast → Actual selection → evaluation identity → errors/metrics → baseline comparison → scenario-specific output. Documentation trace only.
+4. **Adversarial cases:** Verify three scenarios for one event; missing scenario identity; Baseline MAPE zero/NULL; no eligible events; every approved zero-Forecast/zero-Actual case; ESTIMATED sensitivity; later Actual restatement; rerun artifact versus historical artifact; and conflicting Stage 6 status declarations.
+5. **Regression/invariants:** Confirm D1–D5 and Prompt 33 policies remain intact, Stages 1–5 are untouched, no future-data leakage or horizon/model-version mixing is introduced, and Reliability cannot change Forward P/E.
+6. **Independent audit:** Re-read the final diff and affected cross-references. Check for contradictions, unsupported authority claims, scope expansion, and claims that exceed the inspected evidence.
+
+A layer may be marked PASS only if the check was actually performed. If any layer fails, fix only the in-scope documentation defect or report it as a blocker.
+
+## 9. Report
+
+Append this exact heading to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 34: Contract Audit and Implementation Readiness`
+
+Include:
+
+* Exact files and definitions inspected
+* Scenario identity findings and migration conclusion, with evidence and limitations
+* The §45 status correction
+* The verified authority, or unresolved authority, for observation thresholds
+* A table of status/reason-code readiness classifications
+* Exact specification sections changed
+* Six-layer validation results and evidence
+* Remaining blockers, each separated into methodology, contract/schema, and implementation-detail categories
+* Confirmation that no application code, tests, schema, or migration changed
+* Confirmation that Stages 1–5 remain untouched
+* Confirmation that Reliability remains withheld
+* Confirmation that Stage 6 remains `NOT FROZEN`
+
+Do not claim runtime tests were run.
+
+## 10. Final decision gate
+
+Conclude with exactly one status:
+
+* `READY FOR A BOUNDED IMPLEMENTATION PROMPT`
+* `BLOCKED — SPECIFICATION OR CONTRACT DECISION REQUIRED`
+
+The first status is permitted only if the relevant scenario contract and status/reason semantics are sufficiently defined for a narrowly scoped implementation prompt without inventing methodology.
+
+Even if ready, this prompt does not authorize implementation. The next prompt must separately define its implementation scope and require strict six-layer behavioral validation: unit/formula, contract/boundary, production-path/integration, adversarial/negative, regression, and independent audit.
+
+Stage 6 must remain NOT FROZEN.
+
+At completion, provide a concise Persian summary of findings and the recommended next step.
