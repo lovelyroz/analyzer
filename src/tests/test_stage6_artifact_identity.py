@@ -260,14 +260,16 @@ def test_cutoff_single_populated():
     assert result.artifact.evaluation_cutoff == CUTOFF
 
 
-def test_cutoff_mixed_none():
+def test_cutoff_mixed_raises_fail_closed():
+    # Stage 6 Prompt 38 (Prompt 38 section 4): mixed distinct non-null
+    # cutoffs fail closed before any scoring or artifact — no partial
+    # successful result.
     records = [
         _record(forecast_id=1, data_cutoff_datetime=CUTOFF),
         _record(forecast_id=2, data_cutoff_datetime=CUTOFF_OTHER),
     ]
-    result = _run(records, {(7, 101, "REVENUE"): _actual()})
-    assert result.artifact is not None
-    assert result.artifact.evaluation_cutoff is None
+    with pytest.raises(ValueError, match="mixed evaluation cutoffs"):
+        _run(records, {(7, 101, "REVENUE"): _actual()})
 
 
 def test_cutoff_empty_records_none():

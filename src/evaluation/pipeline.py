@@ -24,7 +24,8 @@ boundary, never invent a substitute):
   (Part A): ``actuals`` values may be a single ``ActualObservation`` or a
   list of candidates; lists are resolved with the first-known-outcome rule
   (``select_actual``: earliest valid publication wins, ties by version
-  number then id; all-invalid yields no Actual → ``PENDING_ACTUAL``).
+  number only with exact ties failing closed per D1; all-invalid yields
+  no Actual → ``PENDING_ACTUAL``).
 * Per-state data-quality participation (blocker B6) — RESOLVED by Stage 6
   Prompt 25 (Part A): VALID/ESTIMATED/RESTATED score
   (``is_scoring_eligible``; ESTIMATED/RESTATED flag ``limited_quality``),
@@ -34,9 +35,11 @@ boundary, never invent a substitute):
 * Canonical duplicate key (blocker B9) — FAIL-CLOSED and P25-authorized:
   wholesale quarantine via P18 flagging (scenario is part of identity, so
   only same-scenario keys collide), never a silent preference.
-* Zero Actual with nonzero Forecast — P25-authorized: scores normally
-  through the authorized formulas (no regime fires since f*a = 0 is not
-  < 0). ``MISSING_VALUE`` still quarantines NULLs (NULL != 0).
+* Zero Actual with nonzero Forecast — Stage 6 Prompt 38 (spec §9
+  D4-pointer + §12 D4, §10 RB-2): excluded from ordinary MAPE with the
+  dedicated ``ACTUAL_ZERO`` reason code; absolute error retained, Bias
+  term stays eligible. ``MISSING_VALUE`` still quarantines NULLs
+  (NULL != 0).
 
 No-Double-Counting guards (spec Sections 16, 42 — structural, no invented
 identity rule):
@@ -165,7 +168,30 @@ def run_evaluation_pipeline(
     series. Aggregation groups per scenario, so Bear, Base, and Bull never
     pool observations. The result always carries a versioned artifact
     identity with per-series ReportVersion provenance.
+
+    Stage 6 Prompt 38 (Prompt 38 section 4 default conservative rule): one
+    evaluation artifact represents one unambiguous evaluation cutoff. A
+    non-empty invocation mixing distinct non-null cutoffs fails closed
+    with ``ValueError`` BEFORE any scoring or artifact construction — no
+    partial successful result is returned. Empty input keeps
+    ``evaluation_cutoff=None`` as explicitly-empty only.
     """
+    # Fail-closed BEFORE any scoring/artifact: distinct non-null cutoffs
+    # in one non-empty invocation must never produce a single-cutoff
+    # artifact (or a None-cutoff artifact mistakable for an empty one).
+    record_cutoffs = {record.data_cutoff_datetime for record in records}
+    record_cutoffs.discard(None)
+    ttm_cutoffs = {
+        observation.key.forecast_cutoff_datetime
+        for observation in (ttm_observations or [])
+    }
+    ttm_cutoffs.discard(None)
+    distinct = record_cutoffs | ttm_cutoffs
+    if (records or ttm_observations) and len(distinct) > 1:
+        raise ValueError(
+            "mixed evaluation cutoffs in one pipeline invocation: "
+            f"{sorted(distinct)!r}; one artifact requires one cutoff"
+        )
     observations: List[EvaluationObservation] = []
     for record in records:
         for metric_code in metric_codes:
@@ -210,10 +236,13 @@ def run_evaluation_pipeline(
     for series in aggregates.values():
         quarantined.update(series.quarantined)
 
-    # Stage 6 Prompt 36: evaluation cutoff is the single distinct
-    # data_cutoff_datetime across input records — None when records are
-    # empty or cutoffs differ (honest, never fabricated).
+    # Stage 6 Prompt 36 + Prompt 38: evaluation cutoff is the single
+    # distinct non-null cutoff across records (and TTM carriers) — None
+    # only when the input is explicitly empty (honest, never fabricated).
+    # Mixed distinct non-null cutoffs never reach here: the fail-closed
+    # guard at the top of this function raises before any scoring.
     cutoffs = {record.data_cutoff_datetime for record in records}
+    cutoffs.discard(None)
     evaluation_cutoff = next(iter(cutoffs)) if len(cutoffs) == 1 else None
 
     # Stage 6 Prompt 36: per-series provenance from the pre-aggregation

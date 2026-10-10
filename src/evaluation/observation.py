@@ -9,8 +9,10 @@ What this module does NOT do (deliberately):
 
 * Selection is the Stage 6 Prompt 25 (Part A) first-known-outcome rule
   (``select_actual``): earliest valid publication wins, ties break by
-  version number then version id. B5 (P17 §B) is thereby RESOLVED — no
-  latest-in-DB hindsight, no caller authority needed.
+  version number only; exact (publication, version-number) ties fail
+  closed per owner-approved D1 (Prompt 38 D-e) — no database-ID fallback.
+  B5 (P17 §B) is thereby RESOLVED — no latest-in-DB hindsight, no caller
+  authority needed.
 * Per-state participation is the Stage 6 Prompt 25 (Part A) B6 predicate
   (``is_scoring_eligible`` in schema.py); the observation still records the
   state verbatim and leaves scoring to the evaluation step.
@@ -125,23 +127,38 @@ def select_actual(
     Filters candidates with ``is_valid_report_version`` (spec §4: an Actual
     without a valid ReportVersion is never eligible; the naive latest-in-DB
     is forbidden), then returns the minimum by
-    ``(publication_datetime, report_version_number or 0,
-    report_version_id)`` — the earliest-published outcome wins, resisting
-    restatement hindsight. Same-id ties are the same ReportVersion, so the
-    result is deterministic regardless of input order. Returns ``None``
-    when no candidate is valid.
+    ``(publication_datetime, report_version_number or 0)`` — the
+    earliest-published outcome wins, resisting restatement hindsight.
+    Stage 6 Prompt 38 D-e (owner-approved D1, temp_report.md:4727):
+    tied-earliest candidates with no defensible ordering fail closed with
+    ``ValueError`` — there is no arbitrary ``report_version_id`` /
+    database-ID final fallback. Returns ``None`` when no candidate is
+    valid.
     """
     valid = [c for c in candidates if is_valid_report_version(c)]
     if not valid:
         return None
-    return min(
-        valid,
-        key=lambda c: (
+
+    def _order_key(
+        c: ActualObservation,
+    ) -> Tuple[Any, ...]:
+        return (
             c.publication_datetime,
             c.report_version_number if c.report_version_number is not None else 0,
-            c.report_version_id,
-        ),
-    )
+        )
+
+    winner = min(valid, key=_order_key)
+    winner_key = _order_key(winner)
+    tied = [c for c in valid if _order_key(c) == winner_key]
+    if len(tied) > 1:
+        raise ValueError(
+            "tied earliest Actual candidates with no defensible ordering: "
+            f"{len(tied)} candidates share "
+            f"(publication_datetime={winner_key[0]!r}, "
+            f"report_version_number={winner_key[1]!r}); "
+            "D1 forbids arbitrary database-ID tie-breaks"
+        )
+    return winner
 
 
 @dataclass

@@ -9,6 +9,8 @@ as a production path.
 
 from datetime import datetime, timezone
 
+import pytest
+
 from src.evaluation.artifact import (
     ARTIFACT_CONTRACT_VERSION,
     DATA_QUALITY_POLICY_VERSION,
@@ -104,17 +106,34 @@ def test_production_sensitivity_result_carries_valid_artifact():
     )
 
 
-def test_production_mixed_cutoff_result_still_carries_artifact():
+def test_production_mixed_cutoff_fails_closed_with_no_result():
+    # Stage 6 Prompt 38 (Prompt 38 section 4 default conservative rule):
+    # one artifact = one unambiguous cutoff. A non-empty invocation mixing
+    # distinct non-null cutoffs raises BEFORE any scoring or artifact —
+    # no partial successful result is returned.
     records = [
         _record(forecast_id=1, data_cutoff_datetime=CUTOFF),
         _record(forecast_id=2, data_cutoff_datetime=CUTOFF_OTHER),
     ]
-    result = run_evaluation_pipeline(
-        records, ["REVENUE"], {(7, 101, "REVENUE"): _actual()}
-    )
-    assert result.artifact is not None
-    # Honest None cutoff is never fabricated; the artifact is still present.
-    assert result.artifact.evaluation_cutoff is None
+    with pytest.raises(ValueError, match="mixed evaluation cutoffs"):
+        run_evaluation_pipeline(
+            records, ["REVENUE"], {(7, 101, "REVENUE"): _actual()}
+        )
+
+
+def test_production_mixed_cutoff_returns_no_partial_result():
+    # Rejected mixed-cutoff invocations must not leak a partial successful
+    # result: the call raises and no artifact object escapes.
+    records = [
+        _record(forecast_id=1, data_cutoff_datetime=CUTOFF),
+        _record(forecast_id=2, data_cutoff_datetime=CUTOFF_OTHER),
+    ]
+    result = None
+    with pytest.raises(ValueError, match="mixed evaluation cutoffs"):
+        result = run_evaluation_pipeline(
+            records, ["REVENUE"], {(7, 101, "REVENUE"): _actual()}
+        )
+    assert result is None
 
 
 def test_production_rerun_result_carries_artifact_with_supersedes():

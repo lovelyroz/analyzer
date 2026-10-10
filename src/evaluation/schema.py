@@ -8,7 +8,9 @@ from typing import Any, Optional
 # first-known-outcome rule below. A later restatement can only add hindsight,
 # never information the forecaster had — so the earliest-published valid
 # ReportVersion is the outcome, and a publication-time tie prefers the
-# smallest version number / id rather than the latest revision.
+# smallest version number rather than the latest revision. Exact
+# (publication, version-number) ties fail closed per owner-approved D1
+# (Prompt 38 D-e) — no database-ID fallback.
 ACTUAL_DATA_QUALITY_STATES = (
     "MISSING",
     "ESTIMATED",
@@ -18,14 +20,14 @@ ACTUAL_DATA_QUALITY_STATES = (
     "VALID",
 )
 
-# Stage 6 Prompt 25 (Part A): deterministic Actual-selection contract.
+# Stage 6 Prompt 25 (Part A) + Prompt 38 D-e: Actual-selection contract.
 # The policy name is carried explicitly so audit can pin which rule chose the
-# outcome; the order is (publication instant, version number, version id).
+# outcome; the order is (publication instant, version number) with exact
+# ties failing closed per owner-approved D1 — no database-ID fallback.
 ACTUAL_SELECTION_POLICY = "FIRST_KNOWN_OUTCOME_P25"
 ACTUAL_SELECTION_ORDER = (
     "publication_datetime",
     "report_version_number",
-    "report_version_id",
 )
 
 # Stage 6 Prompt 25 (Part A): B6 participation predicate states.

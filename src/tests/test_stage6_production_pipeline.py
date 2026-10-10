@@ -13,7 +13,10 @@ fail-closed boundaries, never numeric defaults):
 * Normal/under/over forecasts score with sign preserved.
 * Zero-forecast and sign-change regimes quarantine (absolute error kept
   for audit, percentage metrics None, never zero).
-* Actual=0 / Forecast!=0 is UNRESOLVED — quarantined, not scored.
+* Actual=0 / Forecast!=0 is excluded from ordinary MAPE with the
+  dedicated ACTUAL_ZERO reason code (Stage 6 Prompt 38, spec §9 D4-pointer
+  + §12 D4); absolute error retained, Bias term stays eligible per §10
+  RB-2.
 * Horizons and model versions never mix, even over overlapping periods.
 * Sufficiency bands apply to the scored count only.
 * Baseline comparison from caller-supplied values; Seasonal Naive
@@ -175,16 +178,21 @@ def test_zero_forecast_quarantined_never_zeroed():
     assert verdict.series.bias is None
 
 
-def test_zero_actual_unresolved_quarantined():
-    # Stage 6 Prompt 25 (Part B): A=0/F=1000 scores normally end to end —
-    # Error = -1000, APE = 100, all 8 scored.
+def test_zero_actual_excluded_from_mape_end_to_end():
+    # Stage 6 Prompt 38 (spec §9 D4-pointer + §12 D4, §10 RB-2): A=0/F=1000
+    # end to end — absolute Error = -1000 retained, Bias term (-100%)
+    # stays eligible, ordinary MAPE is NULL with the ACTUAL_ZERO reason.
     records = [_record(forecast_period_id=p) for p in range(101, 109)]
     actuals = _actual_map(list(range(101, 109)), value=0.0)
     verdict = _verdict(_run(records, actuals))
     assert verdict.series.observation_count == 8
-    assert verdict.series.quarantined == {}
+    assert verdict.series.mape_effective_count == 0
+    assert verdict.series.bias_eligible_count == 8
+    assert verdict.series.quarantined == {"ACTUAL_ZERO": 8}
     assert verdict.series.observations[0].error == -1000.0
-    assert verdict.series.mape == 100.0
+    assert verdict.series.observations[0].mape_exclusion_reason == "ACTUAL_ZERO"
+    assert verdict.series.mape is None
+    assert verdict.series.bias == -100.0
 
 
 def test_loss_profit_regimes_quarantined():

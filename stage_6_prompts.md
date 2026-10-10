@@ -5393,3 +5393,325 @@ Report `SUCCESS` only if the production artifact invariant has been demonstrated
 Otherwise report `BLOCKED`.
 
 Stage 6 must remain **NOT FROZEN**. Do not implement Reliability scoring or proceed to the final Stage 6 freeze.
+==================================================================
+# Stage 6 Prompt 38 — Comprehensive Contract Closure, Remediation, and Final Readiness Gate
+
+You are the primary engineering agent for `analyzer`, a financial-data application.
+
+## 1. Mission: close the remaining work, not merely report it
+
+Perform a comprehensive, evidence-based closure pass over Stage 6. Identify and fix all in-scope implementation defects, contract gaps, integration failures, and missing strict tests in one continuous task. Then rerun validation and independently audit the final result.
+
+**Do not stop after identifying a defect. Do not return a partial report merely because an individual test layer passes.** Continue through diagnosis, implementation, regression testing, correction of failures, and final audit before writing the report.
+
+The user has explicitly delegated technical implementation choices to ChatGPT. Make conservative, financially defensible choices within the locked specification and existing approved decisions. Do not repeatedly ask the user to choose between routine technical alternatives.
+
+However, delegation is not permission to fabricate financial methodology or override an explicitly withheld decision. In particular, Reliability scoring remains unauthorized under the current Stage 6 decisions and must not be invented.
+
+The final outcome must be one of:
+
+* `READY FOR FINAL FREEZE GATE`: all authorized implementation work is complete, all mandatory tests pass, and the only remaining action is the final independent freeze approval.
+* `BLOCKED — EXPLICIT AUTHORITY REQUIRED`: a specific unresolved matter genuinely cannot be decided from the locked specification or delegated technical authority.
+* `BLOCKED — IMPLEMENTATION OR VALIDATION FAILURE`: a technical defect or required validation remains unresolved.
+
+Do not report `SUCCESS`, `READY`, or equivalent while an actionable, authorized defect remains.
+
+Stage 6 must remain **NOT FROZEN** during this task.
+
+## 2. Authority and files to consult
+
+Read the relevant existing authority before changing code:
+
+1. `06_Stage6_Forecast_Evaluation.md`, especially §§10, 12, 14, 16, 17, 37, 39, 40, 41 and 45.
+2. The latest reports in `temp_report.md` for Stage 6 Prompts 31–37, including the approved D1–D5 decisions and their subsequent clarifications.
+3. The current implementation and tests under `src/evaluation/` and the Stage 6 test files under `src/tests/`.
+
+Use the reports as evidence of prior work, not as a substitute for checking the current implementation. Inspect actual source and tests for every important claim.
+
+Do not reload unrelated application areas or conduct an unrestricted repository-wide exploration. First inspect the Stage 6 file list and current call graph; then follow only the directly relevant dependencies.
+
+## 3. Preserve these locked decisions
+
+The following requirements are non-negotiable:
+
+* Stages 1–5 are frozen and must not be changed.
+* Stage 4 remains an adapter/evidence boundary. Stage 5 must not be recalculated or reinterpreted by Stage 6.
+* Only information available at the forecast cutoff may be used as forecast/evaluation inputs. A later-published Actual may be used as the evaluation outcome, under the approved Actual-selection policy.
+* Missing data is not zero. Do not fabricate facts, ReportVersion identifiers, publication timestamps, cutoffs, financial drivers, share counts, equity, provenance or history.
+* First-known Actual selection and historical immutability policy must be preserved.
+* `SUSPICIOUS` and `UNMAPPED` Actuals are excluded under the approved policy. `ESTIMATED` Actuals participate in the primary evaluation under the existing quality rules and are excluded in the separately identifiable sensitivity evaluation.
+* Bear, Base and Bull remain separate through identity, aggregation, counts, Bias, MAPE, baseline comparison and returned results. A shared Actual may be compared with each scenario, but scenario statistics must never be pooled.
+* Keep the existing approved Error, MAPE, APE, Bias, ZERO_BASE, Actual-zero, baseline-improvement and sufficiency rules. Do not invent epsilons, weights, fallbacks or alternative formulas.
+* Keep the Seasonal Naive baseline methodology in §16 unchanged.
+* Keep model versions and horizons separate. Prevent TTM double counting and overlapping-horizon double counting.
+* Keep artifact identity, artifact-contract version, methodology version, quality-policy version, model version and scenario identity as distinct concepts.
+* Reruns must receive distinct artifact identities. Supersession must be explicit; do not infer it. Do not claim durable immutability without persistence.
+* Do not create a database table, migration, storage backend or persistence mechanism as a shortcut.
+* Reliability must remain withheld/NULL until its numeric mappings and methodology receive valid authority. Do not create a substitute score or use Reliability to modify Forward P/E.
+* No changes to valuation formulas or Stage 7 behavior.
+* No GitHub, GitHub CLI/API, remote operations, push, pull, commit, branch changes or other Git operations.
+
+## 4. Close the known mixed-cutoff ambiguity
+
+Prompt 37 confirmed that `run_evaluation_pipeline` can currently accept observations with multiple distinct forecast cutoffs and return an artifact with `evaluation_cutoff=None`.
+
+Do not assume that existing behavior is valid merely because it is implemented.
+
+Inspect the actual observation matching and aggregation path and establish whether observations from different cutoffs can enter the same evaluation artifact.
+
+**Default conservative rule:** one evaluation artifact must represent one unambiguous evaluation cutoff. If a single pipeline invocation mixes distinct non-null cutoffs, fail closed with a clear, stable error before returning any scored result or artifact that could be mistaken for a single-cutoff evaluation.
+
+Apply the following distinctions:
+
+* An empty evaluation may retain `evaluation_cutoff=None` if it is explicitly represented as empty and no cutoff is fabricated.
+* A genuinely mixed-cutoff batch must not be treated as equivalent to an empty batch.
+* Do not automatically partition mixed input into multiple artifacts unless the existing public contract already defines that behavior and the complete implementation can preserve pairing, duplicate handling, scenario separation, provenance and all metrics without ambiguity.
+* If the authoritative specification explicitly contradicts the conservative rule above, follow the specification and document the exact authority. Do not resolve a genuine contradiction by guessing.
+
+Add production-path tests proving that mixed cutoffs cannot silently produce an apparently valid single-cutoff result under the chosen contract. Verify that a rejected invocation returns no partial successful result.
+
+## 5. Perform the comprehensive closure audit
+
+Trace the complete authorized Stage 6 path:
+
+Forecast → Actual matching → eligibility and data-quality handling → Error and percentage metrics → Bias and MAPE aggregation → baseline pairing and comparison → scenario-separated results → artifact identity and provenance → returned result.
+
+For each boundary, verify actual code and behavior, not merely the presence of a field or function.
+
+### A. Actual matching and point-in-time correctness
+
+Verify:
+
+* Forecast/Actual matching follows the locked conceptual key and existing implementation contract.
+* The correct first-known Actual is selected; a later restatement cannot silently replace the historically selected outcome.
+* ReportVersion identity and publication timestamps are preserved when available.
+* Missing or invalid provenance is not fabricated or silently replaced with a newer report.
+* Data-quality states follow the approved eligibility and sensitivity rules.
+* A single Actual shared by several scenarios does not cause their evaluation records to merge.
+* Cutoff validation is enforced at the correct production boundary.
+
+If a real defect is found, fix it within the existing approved policy and add regression tests. Do not redesign the entire data foundation.
+
+### B. Metrics, pairing and aggregation
+
+Verify:
+
+* Error, MAPE, Bias and absolute-error calculations preserve the approved formulas and status conventions.
+* MAPE and Bias use their correct, independently eligible observations and counts.
+* Actual-zero exclusions do not incorrectly remove observations from Bias where the approved rules allow Bias eligibility.
+* ZERO_BASE and other non-computable cases retain their explicit status/reason.
+* Baseline and model comparisons use appropriately paired observations and the same applicable scenario, metric and horizon.
+* Empty sets, undefined denominators and insufficient observations produce the specified NULL/status behavior.
+* No cross-scenario pooling, model-version mixing, horizon mixing, TTM double counting or duplicate-driven inflation of sufficiency counts occurs.
+* Primary and ESTIMATED-excluded sensitivity results remain separately identifiable and reproducible.
+
+Do not alter an approved formula simply to make more observations eligible.
+
+### C. Evaluation artifact contract
+
+Verify the implementation introduced by Prompts 35–37:
+
+* `EvaluationPipelineResult` carries a valid artifact on every successful production return.
+* Any optional artifact field retained for legacy direct constructors is demonstrably not a production bypass.
+* Each execution receives a distinct run identity.
+* Artifact-contract, methodology and quality-policy versions remain separate.
+* Primary and sensitivity artifacts have explicit purposes.
+* Cutoff semantics distinguish empty, single-cutoff and mixed-cutoff inputs.
+* Provenance is based on authoritative matched Actual records.
+* Multi-period provenance retains all applicable distinct ReportVersion identities and publication timestamps.
+* Supersession is explicit and cannot be self-referential.
+* Missing provenance is never disguised as complete provenance.
+* The contract does not claim persistence, durable immutability or reproducibility guarantees it cannot provide.
+* Scenario identity is preserved through the returned artifact and evaluation results.
+
+Fix any defect discovered here and update affected direct callers and tests.
+
+### D. Specification and implementation consistency
+
+Compare implemented behavior against the locked Stage 6 specification and approved decisions. Search for obsolete or contradictory paths **within Stage 6 only**, including any legacy scoring, calibration, baseline, or result-construction path that can still affect production behavior.
+
+Do not restore de-authorized legacy logic. Do not implement Reliability scoring.
+
+Resolve implementation inconsistencies directly where authority exists. If a specification contradiction remains, document the exact clauses and their impact instead of pretending the system is ready.
+
+## 6. Mandatory six-layer validation
+
+Run all six layers as a single closure workflow. If any layer exposes a defect, correct it and repeat the affected layers plus regression validation. Do not stop after the first green run.
+
+### Layer 1 — Unit and mathematical invariants
+
+Verify exact formulas, eligibility, reason/status behavior, artifact identity, version separation, scenario-aware keys, equality/hash behavior, duplicate handling and sufficiency counts.
+
+Use explicit numerical examples for boundary cases. Confirm that existing approved single-scenario metrics remain unchanged.
+
+### Layer 2 — Contract and boundary validation
+
+Test the real public contracts for:
+
+* Forecast/Actual matching.
+* Missing or invalid provenance.
+* Empty and mixed-cutoff inputs.
+* Invalid artifact metadata.
+* Primary versus sensitivity identity.
+* Reruns and explicit supersession.
+* Missing or invalid scenario identity.
+* NULL versus zero.
+* Legacy construction where still supported.
+
+Ensure no boundary silently repairs invalid data by inventing a default.
+
+### Layer 3 — Production-path integration
+
+Use the actual production evaluation pipeline, not only isolated helpers.
+
+Cover representative:
+
+* Valid non-empty single-cutoff evaluation.
+* Empty evaluation.
+* Mixed-cutoff rejection or the exact specification-authorized alternative.
+* Bear/Base/Bull evaluations sharing the same Actual.
+* Primary and ESTIMATED-excluded sensitivity results.
+* Baseline comparisons.
+* Valid and missing provenance.
+* Reruns and explicit supersession.
+
+Assert actual returned values, status codes, artifact fields, scenario separation and counts.
+
+### Layer 4 — Adversarial and negative tests
+
+Include combinations that are easy to miss when testing features independently:
+
+* Three scenarios with identical company, metric, period, horizon and model version.
+* Mixed scenarios plus duplicate observations.
+* Mixed cutoffs plus multiple scenarios.
+* Mixed cutoffs plus partial provenance.
+* Actual-zero cases with independent MAPE and Bias eligibility.
+* Invalid ReportVersion metadata.
+* Reordered and interleaved observations.
+* Missing scenario or invalid artifact metadata.
+* Primary and sensitivity evaluations with identical financial inputs.
+* A rerun with no supersession claim and a rerun with an explicit supersession link.
+* Empty and insufficient-history inputs.
+* Any discovered combination where one individually valid feature can invalidate another feature's assumptions.
+
+For cases that cannot occur through the actual production path, prove why and test the nearest meaningful public boundary instead.
+
+### Layer 5 — Regression and complete test suite
+
+Run the explicit Stage 6 test-file list and the full suite. Use the existing Windows environment:
+
+`.venv/Scripts/python.exe -m pytest src/tests/ -q`
+
+The Stage 6 list must be explicit and include all relevant existing Stage 6 test files, including:
+
+* `test_stage6_artifact_identity.py`
+* `test_stage6_artifact_boundary.py`
+* `test_stage6_evaluation.py`
+* `test_stage6_evaluation_foundation.py`
+* `test_stage6_evaluation_metrics.py`
+* `test_stage6_p25_adversarial.py`
+* `test_stage6_p25_selection.py`
+* `test_stage6_production_pipeline.py`
+* `test_stage6_reliability_governance.py`
+* `test_stage6_scenario_isolation.py`
+
+Add any new Stage 6 test files created during this task to the explicit list.
+
+Record actual collection and execution counts. Do not use a stale expected count. Explain any change in the number of tests relative to Prompt 37 using measured collection evidence.
+
+If tests fail:
+
+1. Inspect the actual failure.
+2. Fix the underlying in-scope defect.
+3. Rerun the failing tests.
+4. Rerun the complete Stage 6 set.
+5. Rerun the full suite.
+
+Never weaken assertions, delete meaningful tests, or exclude a failing test to obtain a green result.
+
+### Layer 6 — Independent final audit
+
+After all implementation and testing are complete, re-read the entire final diff and independently trace the production path again.
+
+Verify that:
+
+* Every identified, authorized defect was fixed or explicitly proved not to be a defect.
+* No production bypass remains for the enforced contracts.
+* No mixed-cutoff artifact can be mistaken for a valid single-cutoff evaluation.
+* No provenance, timestamps, financial values, versions or supersession relationships were fabricated.
+* Scenario isolation is preserved end-to-end.
+* All six validation layers have concrete evidence.
+* Test counts match the actual executed commands.
+* No unrelated change, unauthorized methodology or scope expansion was introduced.
+* Stages 1–5 remain untouched.
+* Reliability remains withheld.
+* No persistence or migration was added.
+
+Do not treat the same initial implementation review as sufficient independent validation. Reinspect the final changed code and test results after remediation.
+
+## 7. Continue until closure; no premature report
+
+**This is a completion task, not a diagnostic-only task.**
+
+Follow this loop internally until it converges:
+
+1. Inspect the relevant contract and production path.
+2. Enumerate the in-scope defects and missing validation.
+3. Implement all corrections that are authorized by the locked specification and delegated technical authority.
+4. Add regression tests for each correction.
+5. Run all six validation layers.
+6. Fix any newly discovered in-scope defect.
+7. Rerun affected tests, the complete Stage 6 set and the full suite.
+8. Re-read the final diff and verify all completion criteria.
+9. Only then append the final report.
+
+Do not append interim reports for intermediate attempts. Do not claim that a task is complete because one subset of tests passes. Do not defer an already identified, authorized fix to a later prompt.
+
+If a true blocker remains, finish all other authorized work first. Then report the exact blocking authority issue, the relevant specification clauses, the attempted resolution, and the minimum decision required. Do not ask the user a series of routine engineering questions.
+
+## 8. Reporting
+
+Append exactly one consolidated section to `temp_report.md` after the final audit. Do not overwrite earlier reports.
+
+Use this heading:
+
+`REPORT — Stage 6 Prompt 38: Comprehensive Contract Closure and Final Readiness Gate`
+
+Include:
+
+1. A concise list of defects found and the fixes completed.
+2. Files changed and why each change was necessary.
+3. The final production call graph and the critical invariants enforced.
+4. Mixed-cutoff decision, its authority, and test evidence.
+5. Actual matching, PIT, provenance and quality-policy findings.
+6. Metrics, baseline, scenario-isolation and artifact-contract findings.
+7. Tests added or changed, including adversarial combinations.
+8. Exact commands, explicit Stage 6 file list, collection counts and actual pass/fail/skip counts.
+9. Evidence for each of the six validation layers.
+10. Independent final-audit findings and remaining limitations.
+11. Explicit confirmation that Stages 1–5 were untouched, Reliability remains withheld, and no persistence/migration was added.
+12. One of the three final statuses specified in §1, with concrete evidence.
+
+The report must distinguish:
+
+* Implemented and tested.
+* Verified already correct.
+* Intentionally withheld by authority.
+* Unresolved technical defect.
+* Unresolved authority issue.
+
+Do not label intentionally withheld Reliability as an implementation success, and do not claim Stage 6 is frozen.
+
+## 9. Final completion gate
+
+`READY FOR FINAL FREEZE GATE` is permitted only when:
+
+* All authorized in-scope defects have been resolved.
+* All six validation layers pass with recorded evidence.
+* The full test suite passes, with any skips explained.
+* The final independent audit finds no actionable authorized defect.
+* The specification and implementation agree on every behavior claimed as complete.
+
+If any authorized defect remains, continue working on it. If an actual authority blocker prevents safe completion, report `BLOCKED — EXPLICIT AUTHORITY REQUIRED` only after completing all other authorized work.
+
+Stage 6 must remain **NOT FROZEN**. Do not implement Reliability scoring, invent methodology, or declare a freeze as part of this task.

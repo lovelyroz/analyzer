@@ -8,7 +8,10 @@ Contracts (spec Sections 4-18, P17 AUTHORITATIVE material only):
 * Horizons and model versions never mix; duplicates quarantine the whole
   collision (blocker B9: no silent preference).
 * PIT leakage and invalid inputs never score.
-* Actual=0 / Forecast!=0 is UNRESOLVED (P17 Section B) — quarantined, not scored.
+* Actual=0 / Forecast!=0 is excluded from ordinary MAPE with the
+  dedicated ACTUAL_ZERO reason code (Stage 6 Prompt 38, spec §9 D4-pointer
+  + §12 D4); absolute error retained, Bias term stays eligible per §10
+  RB-2.
 * Baseline *comparison* (Section 17) from caller-supplied values; Seasonal
   Naive *construction* has no authority (blocker B1) and is not attempted.
 * Baseline MAPE uses the model's scored set; invalid baseline inputs yield
@@ -152,14 +155,27 @@ def test_sign_change_regimes_quarantined_with_absolute_error():
             assert scored.scored is False
 
 
-def test_zero_actual_is_unresolved_not_scored():
-    # Stage 6 Prompt 25 (Part B): A=0/F!=0 scores normally — Error =
-    # Actual - Forecast, PE/APE over |Forecast| are valid since no regime
-    # fires (f*a = 0 is not < 0).
+def test_zero_actual_excluded_from_mape_with_reason_code():
+    # Stage 6 Prompt 38 (spec §9 D4-pointer + §12 D4): A=0/F!=0 is
+    # excluded from ordinary MAPE with the dedicated ACTUAL_ZERO reason
+    # code; absolute error retained, Bias term stays eligible per §10
+    # RB-2 (term exactly -100% for a positive forecast).
     scored = score_observation(_observation(forecast_value=1000.0, actual_value=0.0))
     assert scored.scored is True
     assert scored.error == -1000.0
-    assert scored.ape == 100.0
+    assert scored.ape is None
+    assert scored.mape_exclusion_reason == "ACTUAL_ZERO"
+    assert scored.percentage_error == -100.0
+
+
+def test_zero_actual_negative_forecast_bias_term_is_plus_one():
+    # §10 RB-2 (1): A=0/F<0 stays Bias-eligible with term exactly +1.
+    scored = score_observation(_observation(forecast_value=-500.0, actual_value=0.0))
+    assert scored.scored is True
+    assert scored.error == 500.0
+    assert scored.ape is None
+    assert scored.mape_exclusion_reason == "ACTUAL_ZERO"
+    assert scored.percentage_error == 100.0
 
 
 # --- horizon / model-version mixing ------------------------------------------

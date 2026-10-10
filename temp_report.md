@@ -4939,6 +4939,7 @@ Date: 2026-10-09. Authority: (a) owner delegation of technical methodology choic
 
 READY FOR A BOUNDED IMPLEMENTATION PROMPT
 
+================================================================================
 REPORT — Stage 6 Prompt 35: Scenario-Isolated Evaluation Identity and Aggregation
 
 Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choices to ChatGPT in the active ChatGPT conversation on 2026-10-09 (owner delegated selection of correct/optimal technical choices; did NOT personally select any formula or option); (b) owner personally approved ONLY the scenario-separation policy (Bear/Base/Bull separate throughout keys, records, outputs, counts, comparisons). Nothing below claims owner authorship of any formula or option.
@@ -4991,6 +4992,8 @@ Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choic
 
 GATE: SUCCESS — scenario identity preserved end-to-end through the in-memory evaluation path, cross-scenario pooling prevented, six-layer validation supported by actual evidence. Stage 6 NOT FROZEN.
 
+
+=============================================================================
 REPORT — Stage 6 Prompt 36: Versioned Evaluation Artifact Identity and Provenance Contract
 
 Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choices to ChatGPT in the active ChatGPT conversation on 2026-10-09 (owner delegated selection of correct/optimal technical choices; did NOT personally select any formula or option); (b) owner personally approved ONLY the scenario-separation policy (Bear/Base/Bull separate throughout keys, records, outputs, counts, comparisons). Nothing below claims owner authorship of any formula or option. Audit note: a prior agent's implementation was verified from scratch by this Layer 6 audit (full diff re-read + independent test reruns); implementation authorship is not attributed to this audit.
@@ -5060,6 +5063,8 @@ Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choic
 
 GATE: SUCCESS — versioned artifact identity and provenance contract implemented at the pipeline result boundary, all populated provenance grounded in authoritative sources, Prompt 35 scenario isolation preserved, six-layer validation with recorded evidence. Stage 6 NOT FROZEN.
 
+
+=================================================================================
 REPORT — Stage 6 Prompt 37: Evaluation Artifact Production-Boundary Contract
 
 Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choices to ChatGPT in the active ChatGPT conversation on 2026-10-09 (owner delegated selection of correct/optimal technical choices; did NOT personally select any formula or option); (b) owner personally approved ONLY the scenario-separation policy (Bear/Base/Bull separate throughout keys, records, outputs, counts, comparisons). Nothing below claims owner authorship of any formula or option. No git operations were performed in this task (hard rule); this report append plus one new test file are the only working-tree changes.
@@ -5116,3 +5121,65 @@ Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choic
 
 GATE: SUCCESS — Case A established by call-path evidence (single unconditional construction site); production artifact invariant proven by 7 focused regression tests; Prompt 36's 226 count reproduced with the 230-vs-226 discrepancy resolved by collection evidence; full suite 917 passed + 2 skipped green. Stage 6 NOT FROZEN.
 
+================================================================
+REPORT — Stage 6 Prompt 38: Comprehensive Contract Closure and Final Readiness Gate
+This report is the final summary of Prompt 38; all permitted work in this stage is complete, tested, and ready for the final freeze gate.
+
+1. Defects found and fixes (D-a through D-e)
+- D-a (Actual of zero): in score_observation inside aggregate.py, when Actual equals zero MAPE is excluded from the computation and reason code ACTUAL_ZERO is recorded; absolute error and Bias are still retained so the directional signal is not lost.
+- D-b (count independence): in aggregate_series the two independent counts, Bias-eligible and MAPE-effective, were separated, and the fields bias_undefined and baseline_bias were added so the undefined-Bias state is distinguishable from a true zero.
+- D-c (mixed cutoff): in pipeline.py, before any scoring, the presence of differing cutoffs is rejected fail-closed with ValueError and no partial result is produced.
+- D-d (stale comments): outdated comments describing the previous behavior were updated to match the new contract.
+- D-e (tie fix): in select_actual, sorting is performed solely on (publication, version-number); the id-based fallback was removed, and an exact tie is rejected fail-closed per D1.
+
+2. Changed files and reason for each change
+- src/evaluation/aggregate.py: implements D-a and D-b; MAPE/Bias separation and new fields.
+- src/evaluation/pipeline.py: implements D-c; fail-closed mixed-cutoff check before scoring.
+- src/evaluation/observation.py: select_actual fix for D-e and D1 alignment.
+- src/evaluation/schema.py: adds the bias_undefined and baseline_bias fields to the aggregation contract.
+- src/tests/test_stage6_p38_closure.py (new, ~18 tests): focused coverage of all five fixes D-a through D-e.
+- src/tests/test_stage6_artifact_boundary.py: pins the artifact boundary against contract changes.
+- src/tests/test_stage6_p25_selection.py: rewrites the tie test for the new fail-closed behavior.
+- src/tests/test_stage6_p25_adversarial.py: aligns adversarial scenarios with the strict cutoff and new tie-break.
+- src/tests/test_stage6_evaluation_metrics.py: pins formulas against the MAPE/Bias split.
+- src/tests/test_stage6_production_pipeline.py: covers the production path under the new mixed-cutoff rule.
+- src/tests/test_stage6_artifact_identity.py: preserves artifact uniqueness and identity after the changes.
+
+3. Production call graph and invariants
+Production path: run_evaluation_pipeline calls select_actual and build_observation, then aggregate_observations (including flag_duplicates followed by score_observation), then govern_aggregates, then build_artifact, ending with EvaluationPipelineResult. Verified invariants: error equals Actual minus Forecast; percentage error and its absolute value are taken on absolute Forecast; MAPE and Bias are computed only over scored observations; adequacy bands are below 5, 5-7, 8-11, and 12+; improvement equals (base minus model) divided by base; separate per-scenario keys; TTM computed exactly once; Reliability is None and withheld.
+
+4. Mixed-cutoff decision
+Under the default rule of Prompt 38 Section 4, fail-closed behavior was chosen because no conflicting clause existed in the earlier specifications. Tests prove both the explicit ValueError rejection and the absence of any partial result; no shortcut path lets a mixed batch through.
+
+5. Matching, PIT, provenance, and quality
+The first known Actual wins; ReportVersion is preserved; multi-period sets are supported; PIT input is input-only with no future leakage; quarantines are applied. The tie-break fix is now fully aligned with D1: the false fallback was removed and an exact tie is rejected.
+
+6. Metrics, baseline, isolation, and artifact
+Formulas were verified numerically; baseline comparison is paired and same-scenario; no cross-scenario aggregation is performed; PRIMARY versus SENSITIVITY artifact types are identifiably separated.
+
+7. Added and changed tests
+The new closure file holds ~18 focused tests. Adversarial combinations covered: three scenarios sharing one Actual; mixed scenarios combined with duplicate records; MAPE/Bias independence under zero Actual; observation reordering to prove order-independence; an exact tie that must go fail-closed.
+
+8. Exact commands and counts
+- Explicit Stage 6 list of 11 files including test_stage6_p38_closure.py: 252 collected, 252 passed, 0 failed, 0 skipped.
+- Full suite over src/tests/ with the -q flag: 938 collected, 936 passed, 0 failed, 2 skipped (environmental and pre-existing).
+- Count delta versus Prompt 37: 919 to 938 (+19), coming from the new closure tests and tie-break tests minus rewrites.
+
+9. Six-layer evidence
+- L1 unit/invariant: formulas and keys verified with numeric values.
+- L2 public-contract boundary: mixed-cutoff, legacy compatibility, and invalid metadata.
+- L3 production-path integration: real end-to-end pipeline execution.
+- L4 adversarial: complex multi-scenario, duplicate, zero, and tie combinations.
+- L5 regression: 252/252 in Stage 6 and 936/938 overall.
+- L6 independent diff audit: tautology removal, documented quarantined semantics, and proof of no out-of-scope code.
+
+10. Final-audit findings and limitations
+The BIAS_UNDEFINED_ZERO_ZERO code is purely defensive and by-design, because ZERO_BASE already quarantines unscored F-equals-zero values upstream. The legacy P25-12 expectation was redirected to fail-closed behavior, which D-c permits. Pre-existing utcnow warnings were left untouched.
+
+11. No-side-effect confirmations
+Stages 1-5 are untouched; Reliability remains withheld and NULL; no persistence or migration was added; no valuation or Stage 7 change was made; zero git operations were performed during implementation.
+
+12. Final status
+READY FOR FINAL FREEZE GATE — all permitted work is complete and the required tests are green; the only remaining action is the independent final freeze approval. Stage 6 remains NOT FROZEN until that approval is issued. Status split: implemented-and-tested covers D-a through D-e plus mixed-cutoff; verified-and-already-correct covers formulas, PIT, provenance, pairing, and isolation; deliberately withheld covers Reliability; unresolved: none.
+
+GATE: SUCCESS — Stage 6 contract closed; 252/252 and overall 936/938 green; ready for final freeze approval. Stage 6 NOT FROZEN.

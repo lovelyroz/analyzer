@@ -3,9 +3,10 @@
 L1/L2 tests with exact values:
 
 * ``select_actual``: earliest publication wins; publication ties break by
-  version number then version id; invalid candidates (None id / None
-  publication) are filtered and all-invalid yields None; single candidate
-  passes through; result is independent of input order.
+  version number only; exact (publication, version-number) ties fail closed
+  per owner-approved D1 (no database-ID fallback); invalid candidates
+  (None id / None publication) are filtered and all-invalid yields None;
+  single candidate passes through; result is independent of input order.
 * B6 predicate ``is_scoring_eligible``: exact verdict per quality state.
 * ``EvaluationKey``: 7-tuple exact equality with scenario appended last;
   scenario-distinct keys differ; ``forecast_id`` never affects the key.
@@ -106,7 +107,10 @@ def test_selection_tie_break_by_version_number_then_id():
     assert select_actual([high_version, low_version]) is low_version
 
 
-def test_selection_tie_break_by_id_when_version_number_equal():
+def test_selection_exact_tie_fails_closed_no_id_fallback():
+    # Prompt 38 D-e / owner-approved D1: an exact (publication,
+    # version-number) tie has no defensible ordering — fail closed with
+    # ValueError instead of ordering by database ID.
     high_id = _actual(
         report_version_id=80, report_version_number=4,
         publication_datetime=MID,
@@ -115,7 +119,8 @@ def test_selection_tie_break_by_id_when_version_number_equal():
         report_version_id=12, report_version_number=4,
         publication_datetime=MID,
     )
-    assert select_actual([high_id, low_id]) is low_id
+    with pytest.raises(ValueError, match="no defensible ordering"):
+        select_actual([high_id, low_id])
 
 
 def test_selection_none_version_number_sorts_as_zero():

@@ -7,6 +7,8 @@ through the helpers elsewhere. All expectations are explicit.
 
 from datetime import datetime, timezone
 
+import pytest
+
 from src.evaluation.aggregate import aggregate_observations, score_observation
 from src.evaluation.observation import build_observation
 from src.evaluation.pipeline import run_evaluation_pipeline
@@ -94,7 +96,7 @@ def test_p25_01_multi_rv_earliest_publication_wins():
     assert scored.error == 100.0  # the EARLY candidate's value won
 
 
-# --- (2) same publication: lowest version_number, then id ----------------------
+# --- (2) same publication: lowest version_number wins; exact ties fail closed
 
 
 def test_p25_02_same_publication_tie_break():
@@ -106,6 +108,8 @@ def test_p25_02_same_publication_tie_break():
     result = _run([record], {_key(record): [high, low]})
     assert _verdict(result).series.observations[0].error == 100.0
 
+    # Prompt 38 D-e / owner-approved D1: exact (publication,
+    # version-number) ties fail closed — no database-ID fallback.
     record2 = _record(forecast_period_id=102)
     high_id = _actual(report_version_id=80, report_version_number=4,
                       financial_period_id=102, publication_datetime=MID,
@@ -113,8 +117,8 @@ def test_p25_02_same_publication_tie_break():
     low_id = _actual(report_version_id=12, report_version_number=4,
                      financial_period_id=102, publication_datetime=MID,
                      value=1100.0)
-    result2 = _run([record2], {_key(record2): [high_id, low_id]})
-    assert _verdict(result2).series.observations[0].error == 100.0
+    with pytest.raises(ValueError, match="no defensible ordering"):
+        _run([record2], {_key(record2): [high_id, low_id]})
 
 
 # --- (3) later restatement loses to first-known --------------------------------
@@ -236,24 +240,35 @@ def test_p25_11_dup_key_across_versions_does_not_collide():
 
 
 def test_p25_12_dup_key_across_cutoffs_does_not_collide():
+    # Stage 6 Prompt 38: distinct cutoffs never reach joint scoring — the
+    # pipeline fails closed. The non-collision property itself is proved
+    # at the flag_duplicates level (distinct 7-tuple identity keys).
+    import pytest
+
+    from src.evaluation.observation import flag_duplicates
+
     one = _record(forecast_period_id=101)
     other_cutoff = datetime(2024, 5, 31, tzinfo=timezone.utc)
     two = _record(forecast_period_id=101, data_cutoff_datetime=other_cutoff)
     actuals = {(7, 101, "REVENUE"): _actual()}
-    result = _run([one, two], actuals)
-    # Same 4-tuple SeriesKey → one verdict series, but distinct 7-tuple
-    # identity keys → two observations, each scoring once.
-    assert result.series_count == 1
-    verdict = _verdict(result)
-    assert verdict.series.total_observations == 2
-    assert verdict.series.observation_count == 2
-    assert verdict.series.quarantined == {}
+    flagged = flag_duplicates(
+        [
+            build_observation(one, "REVENUE", _actual()),
+            build_observation(two, "REVENUE", _actual()),
+        ]
+    )
+    assert all(item.duplicate_key is None for item in flagged)
+    with pytest.raises(ValueError, match="mixed evaluation cutoffs"):
+        _run([one, two], actuals)
 
 
 # --- (13) A=0 / F=1000: scores -------------------------------------------------
 
 
 def test_p25_13_zero_actual_positive_forecast_scores():
+    # Stage 6 Prompt 38 (spec §9 D4-pointer + §12 D4): A=0/F=1000 stays
+    # scored with absolute error retained and the Bias term eligible, but
+    # is excluded from ordinary MAPE with the dedicated ACTUAL_ZERO code.
     record = _record(revenue=1000.0)
     scored = score_observation(
         build_observation(record, "REVENUE", _actual(value=0.0))
@@ -261,13 +276,16 @@ def test_p25_13_zero_actual_positive_forecast_scores():
     assert scored.scored is True
     assert scored.error == -1000.0
     assert scored.percentage_error == -100.0
-    assert scored.ape == 100.0
+    assert scored.ape is None
+    assert scored.mape_exclusion_reason == "ACTUAL_ZERO"
 
 
 # --- (14) A=0 / F=-500: scores -------------------------------------------------
 
 
 def test_p25_14_zero_actual_negative_forecast_scores():
+    # Stage 6 Prompt 38 (§10 RB-2 (1)): A=0/F<0 stays Bias-eligible with
+    # term exactly +100%, while MAPE-excluded with ACTUAL_ZERO.
     record = _record(revenue=-500.0)
     scored = score_observation(
         build_observation(record, "REVENUE", _actual(value=0.0))
@@ -275,7 +293,8 @@ def test_p25_14_zero_actual_negative_forecast_scores():
     assert scored.scored is True
     assert scored.error == 500.0
     assert scored.percentage_error == 100.0
-    assert scored.ape == 100.0
+    assert scored.ape is None
+    assert scored.mape_exclusion_reason == "ACTUAL_ZERO"
 
 
 # --- (15) A=0 / F=0: ZERO_BASE -------------------------------------------------
@@ -321,7 +340,10 @@ def test_p25_17_positive_forecast_zero_actual_regime_none():
     assert scored.regime is None
     assert scored.scored is True
     assert scored.error == -1000.0
-    assert scored.ape == 100.0
+    # Prompt 38: MAPE-excluded (ACTUAL_ZERO) but Bias-eligible.
+    assert scored.ape is None
+    assert scored.mape_exclusion_reason == "ACTUAL_ZERO"
+    assert scored.percentage_error == -100.0
 
 
 # --- series-level: restated participation sets limited_quality -----------------

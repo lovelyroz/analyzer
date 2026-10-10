@@ -43,13 +43,16 @@ portions, report the rest):
   silently. Scenario is part of the observation identity (Part A 7-tuple),
   so only same-scenario keys collide; series grouping is per-scenario
   (SeriesKey = company, metric, horizon, version, scenario).
-* Zero-Actual scoring — P25-authorized: ``Actual=0 / Forecast!=0`` scores
-  normally through the authorized formulas (``Error = Actual - Forecast``,
-  PE/APE over ``|Forecast|``) because ``metrics.py`` already handles it
-  correctly: ``classify_regime(f != 0, 0)`` is None since ``f*a = 0`` is not
-  ``< 0``, so no regime fires and percentage metrics are valid. No
-  ``metrics.py`` change was needed. ``F=0 / A=0`` and ``F=0 / A!=0`` stay
-  ``ZERO_BASE`` (``forecast == 0``); NULL actuals still quarantine as
+* Zero-Actual scoring — Stage 6 Prompt 38 (spec §9 D4-pointer + §12 D4,
+  §10 RB-2): ``Actual=0 / Forecast!=0`` is excluded from ordinary MAPE
+  with the dedicated reason code ``ACTUAL_ZERO``; absolute error
+  (``Error = Actual - Forecast``) and provenance are retained. The MAPE
+  exclusion never by itself excludes the observation from Bias: the Bias
+  term (``-100%`` for a positive forecast, ``+100%`` for a negative one)
+  stays eligible and ``ScoredObservation.scored`` stays True. ``F=0 / A=0``
+  stays ``ZERO_BASE`` (``forecast == 0``) and is additionally
+  Bias-undefined (``BIAS_UNDEFINED_ZERO_ZERO``) per §10 RB-2 (2);
+  ``F=0 / A!=0`` stays ``ZERO_BASE``; NULL actuals still quarantine as
   ``MISSING_VALUE`` (NULL != 0, never coerced).
 * B1 (Seasonal Naive construction) and B8 (persistence flag) stay
   UNRESOLVED. Reliability / Calibration — forbidden here (Prompts 20+ own them).
@@ -106,8 +109,19 @@ class ScoredObservation:
     baseline_value: Optional[float]
     baseline_error: Optional[float]
     baseline_ape: Optional[float]
-    scored: bool
+    # Stage 6 Prompt 38 (spec §17 RB-3): paired baseline Bias term
+    # ((Actual - Baseline) / |Baseline| x 100) for the same Bias-eligible
+    # event; None when the baseline is missing/zero or the event is not
+    # Bias-eligible. Absolute baseline error is always retained.
+    baseline_percentage_error: Optional[float] = None
+    scored: bool = True
     exclusion_reason: Optional[str] = None
+    # Stage 6 Prompt 38 (spec §9 D4-pointer + §12 D4): dedicated MAPE-
+    # exclusion reason for scored observations withheld from ordinary MAPE
+    # ("ACTUAL_ZERO" when Actual == 0 with Forecast != 0). None for fully
+    # MAPE-effective observations; quarantine reasons for unscored
+    # observations stay in ``exclusion_reason``.
+    mape_exclusion_reason: Optional[str] = None
     # Stage 6 Prompt 25 (Part B): verbatim §41 state of the attached Actual
     # (None when unbound). Scored ESTIMATED / RESTATED observations keep
     # their state here for audit; quarantined ones do too.
@@ -174,9 +188,8 @@ def score_observation(
     # Order: non-READY (covers INVALID_REPORT_VERSION verbatim) → duplicate
     # → Prompt 36 sensitivity-exclusion (ESTIMATED only, opt-in) → eligibility
     # → MISSING_VALUE on None forecast/actual (NULL != 0) →
-    # regime scoring. Zero-Actual (Actual=0 / Forecast!=0) scores normally:
-    # P25-authorized since classify_regime(f != 0, 0) is None (f*a = 0 is
-    # not < 0) and PE/APE over |Forecast| are valid there.
+    # regime scoring → Prompt 38 Actual-zero MAPE exclusion (ACTUAL_ZERO;
+    # Bias term stays eligible per §10 RB-2).
     if observation.actual is not None and not is_scoring_eligible(observation.actual):
         return _quarantined(
             observation,
@@ -191,19 +204,38 @@ def score_observation(
 
     regime = classify_regime(forecast, actual)
     error = calculate_error(forecast, actual)
+    # Stage 6 Prompt 38 (spec §9 D4-pointer + §12 D4): Actual-zero
+    # (Actual == 0, Forecast != 0) is excluded from ordinary MAPE with the
+    # dedicated reason code, absolute error retained. Per §10 RB-2 (4)-(5)
+    # the MAPE exclusion never by itself excludes the observation from
+    # Bias: the Bias term stays eligible (spec §10: "Forecast != 0 and
+    # Actual = 0 remains Bias-eligible ... with term exactly -1 for a
+    # positive forecast and +1 for a negative forecast") and Scored stays
+    # True so independent Bias/MAPE counts in aggregate_series can see it.
+    actual_zero = actual == 0
+    mape_exclusion: Optional[str] = "ACTUAL_ZERO" if actual_zero else None
     if regime is not None:
         percentage_error: Optional[float] = None
         ape: Optional[float] = None
     else:
         percentage_error = calculate_percentage_error(forecast, actual)
-        ape = calculate_ape(forecast, actual)
+        # Actual-zero is MAPE-excluded: its APE must not feed MAPE means.
+        ape = None if actual_zero else calculate_ape(forecast, actual)
 
     baseline_error: Optional[float] = None
     baseline_ape: Optional[float] = None
+    baseline_percentage_error: Optional[float] = None
     if baseline_value is not None:
         baseline_error = calculate_error(baseline_value, actual)
         if regime is None:
-            baseline_ape = calculate_ape(baseline_value, actual)
+            # Paired baseline comparison on the same MAPE-effective event
+            # set (spec §17 RB-3): baseline percentage metrics exist only
+            # where the model event is MAPE-effective.
+            baseline_ape = None if actual_zero else calculate_ape(baseline_value, actual)
+        if baseline_value != 0:
+            baseline_percentage_error = calculate_percentage_error(
+                baseline_value, actual
+            )
 
     attached = observation.actual
     state = attached.data_quality_state if attached is not None else None
@@ -234,7 +266,9 @@ def score_observation(
         baseline_value=baseline_value,
         baseline_error=baseline_error,
         baseline_ape=baseline_ape,
+        baseline_percentage_error=baseline_percentage_error,
         scored=True,
+        mape_exclusion_reason=mape_exclusion,
         data_quality_state=state,
     )
 
@@ -243,9 +277,19 @@ def score_observation(
 class SeriesEvaluation:
     """Authorized aggregates for one Company + Metric + Horizon + Version + Scenario series.
 
-    ``observation_count`` is the scored count that drives the sufficiency
-    band; ``total_observations`` and ``quarantined`` preserve everything else
-    for audit. No Reliability, no Calibration, no underperformance flag —
+    ``observation_count`` is the scored-eligible count that drives the
+    sufficiency band (spec §14 D5: valid, non-duplicate, quality-eligible
+    forecast outcomes — including outcomes withheld from ordinary MAPE).
+    MAPE and Bias each report their own effective set:
+
+    * ``mape_effective_count`` — observations feeding MAPE (scored and NOT
+      Actual-zero-excluded).
+    * ``bias_eligible_count`` — observations feeding Bias (scored with a
+      valid signed percentage term; F=0/A=0 excluded as Bias-undefined).
+    * ``bias_undefined`` — tally of the F=0/A=0 Bias-undefined status.
+
+    ``total_observations`` and ``quarantined`` preserve everything else for
+    audit. No Reliability, no Calibration, no underperformance flag —
     those belong to later prompts or lack authority (B8).
     """
 
@@ -255,12 +299,21 @@ class SeriesEvaluation:
     model_version: str
     scenario: str
     observation_count: int
-    total_observations: int
+    # Stage 6 Prompt 38 (spec §10 RB-2 (5), §14 D5/RB-1, §17 RB-3):
+    # independent Bias-eligible vs MAPE-effective counts. New fields carry
+    # defaults so legacy direct constructions keep working.
+    mape_effective_count: int = 0
+    bias_eligible_count: int = 0
+    bias_undefined: Dict[str, int] = field(default_factory=dict)
+    total_observations: int = 0
     quarantined: Dict[str, int] = field(default_factory=dict)
     mape: Optional[float] = None
     bias: Optional[float] = None
     confidence_level: str = "INSUFFICIENT_DATA"
     baseline_mape: Optional[float] = None
+    # Stage 6 Prompt 38 (spec §17 RB-3): paired baseline Bias over the same
+    # Bias-eligible event set as the model; None when no paired events.
+    baseline_bias: Optional[float] = None
     relative_improvement: Optional[float] = None
     observations: List[ScoredObservation] = field(default_factory=list)
     # Stage 6 Prompt 25 (Part B): True when any scored observation carries
@@ -284,19 +337,87 @@ def aggregate_series(
     scored: List[ScoredObservation],
     scenario: str,
 ) -> SeriesEvaluation:
-    """Aggregate one isolated series from its scored observations."""
-    valid = [item for item in scored if item.scored]
-    mape = calculate_mape([item.ape for item in valid])
-    bias = calculate_bias([item.percentage_error for item in valid])
-    count = len(valid)
+    """Aggregate one isolated series from its scored observations.
+
+    Stage 6 Prompt 38 (spec §10 RB-2, §14 D5, §17 RB-3):
+
+    * ``observation_count`` = all scored-eligible observations (drives the
+      sufficiency band per D5 — including Actual-zero MAPE-excluded ones).
+    * MAPE = mean over the MAPE-effective set only (scored and NOT
+      Actual-zero-excluded; Actual-zero absolute errors retained but
+      withheld from the mean).
+    * Bias = mean over the Bias-eligible set only (scored with a valid
+      signed term; F=0/A=0 is Bias-undefined with an explicit status).
+    * Baseline MAPE uses the same MAPE-effective event set as the model;
+      baseline Bias uses the same Bias-eligible event set as the model
+      (paired same-event comparison).
+    * NULL ``relative_improvement`` is reported as NULL with the reason
+      derivable from the surviving fields: NULL ``baseline_mape`` means
+      no paired baseline values were supplied (missing baseline metrics,
+      never fabricated); zero ``baseline_mape`` means a zero denominator
+      (no division by zero, no epsilon, no substitute denominator). No
+      invented tally is added to ``quarantined`` for either case.
+    """
+    eligible = [item for item in scored if item.scored]
+    # MAPE-effective: scored observations not withheld from ordinary MAPE.
+    mape_effective = [
+        item for item in eligible if item.mape_exclusion_reason is None
+    ]
+    # Bias-eligible: scored with a valid signed percentage term. F=0/A=0
+    # is Bias-undefined (spec §10 RB-2 (2)): both values zero means the
+    # |Forecast| denominator is zero AND there is no error magnitude to
+    # sign — excluded with an explicit status, absolute error retained.
+    bias_eligible = []
+    bias_undefined: Counter = Counter()
+    for item in eligible:
+        if item.percentage_error is None:
+            continue
+        if item.forecast_value == 0 and item.actual_value == 0:
+            bias_undefined["BIAS_UNDEFINED_ZERO_ZERO"] += 1
+            continue
+        bias_eligible.append(item)
+    mape = calculate_mape([item.ape for item in mape_effective])
+    bias = calculate_bias([item.percentage_error for item in bias_eligible])
+    count = len(eligible)
+    # Paired comparison: baseline MAPE on the same MAPE-effective events,
+    # baseline Bias on the same Bias-eligible events.
     baseline_apes = [
-        item.baseline_ape for item in valid if item.baseline_ape is not None
+        item.baseline_ape
+        for item in mape_effective
+        if item.baseline_ape is not None
     ]
     baseline_mape = calculate_mape(baseline_apes) if baseline_apes else None
+    paired_baseline_bias_terms = [
+        item.baseline_percentage_error
+        for item in bias_eligible
+        if item.baseline_percentage_error is not None
+    ]
+    baseline_bias = (
+        calculate_bias(paired_baseline_bias_terms)
+        if paired_baseline_bias_terms
+        else None
+    )
     improvement = calculate_relative_improvement(baseline_mape, mape)
     quarantined = dict(
         Counter(item.exclusion_reason for item in scored if not item.scored)
     )
+    # Scored-but-MAPE-excluded tallies stay visible for audit (they are
+    # withheld from the MAPE mean, never silently dropped).
+    # WARNING: `quarantined` therefore includes scored MAPE-excluded items
+    # (e.g. ACTUAL_ZERO) alongside unscored exclusions — it is an audit
+    # tally, not an unscored-only count.
+    mape_excluded = Counter(
+        item.mape_exclusion_reason
+        for item in eligible
+        if item.mape_exclusion_reason is not None
+    )
+    for reason, tally in mape_excluded.items():
+        quarantined[reason] = quarantined.get(reason, 0) + tally
+    # Non-computable improvement needs no invented tally: a NULL
+    # ``relative_improvement`` with NULL ``baseline_mape`` means no paired
+    # baseline (missing baseline metrics, never fabricated); with zero
+    # ``baseline_mape`` it means a zero denominator (no division by zero,
+    # no epsilon). The reason is derivable from the fields, not guessed.
     limited = any(
         item.scored and item.data_quality_state in ("ESTIMATED", "RESTATED")
         for item in scored
@@ -308,12 +429,16 @@ def aggregate_series(
         model_version=model_version,
         scenario=scenario,
         observation_count=count,
+        mape_effective_count=len(mape_effective),
+        bias_eligible_count=len(bias_eligible),
+        bias_undefined=dict(bias_undefined),
         total_observations=len(scored),
         quarantined=quarantined,
         mape=mape,
         bias=bias,
         confidence_level=observation_confidence(count),
         baseline_mape=baseline_mape,
+        baseline_bias=baseline_bias,
         relative_improvement=improvement,
         observations=list(scored),
         limited_quality=limited,
