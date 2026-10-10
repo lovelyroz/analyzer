@@ -99,7 +99,7 @@ def _series(periods=8, horizon="12M", version="V1.0", start=101, **values):
                 model_version=version,
             )
         )
-    return aggregate_observations(observations)[(7, "REVENUE", horizon, version)]
+    return aggregate_observations(observations)[(7, "REVENUE", horizon, version, "BASE")]
 
 
 # --- error sign --------------------------------------------------------------
@@ -169,8 +169,8 @@ def test_each_horizon_evaluated_independently():
     first = _observation(forecast_period_id=101, forecast_horizon="1M")
     second = _observation(forecast_period_id=102, forecast_horizon="3M")
     results = aggregate_observations([first, second])
-    assert set(results) == {(7, "REVENUE", "1M", "V1.0"), (7, "REVENUE", "3M", "V1.0")}
-    assert results[(7, "REVENUE", "1M", "V1.0")].mape == 10.0
+    assert set(results) == {(7, "REVENUE", "1M", "V1.0", "BASE"), (7, "REVENUE", "3M", "V1.0", "BASE")}
+    assert results[(7, "REVENUE", "1M", "V1.0", "BASE")].mape == 10.0
 
 
 def test_model_versions_never_combine():
@@ -182,8 +182,8 @@ def test_model_versions_never_combine():
         model_version="V2.0",
     )
     results = aggregate_observations([first, second])
-    assert results[(7, "REVENUE", "12M", "V1.0")].mape == 10.0
-    assert results[(7, "REVENUE", "12M", "V2.0")].mape == 20.0
+    assert results[(7, "REVENUE", "12M", "V1.0", "BASE")].mape == 10.0
+    assert results[(7, "REVENUE", "12M", "V2.0", "BASE")].mape == 20.0
 
 
 # --- duplicate observations --------------------------------------------------
@@ -195,7 +195,7 @@ def test_duplicate_collision_quarantines_both():
     flagged = flag_duplicates([first, second])
     assert flagged[0].duplicate_key == flagged[1].duplicate_key
     results = aggregate_observations([first, second])
-    series = results[(7, "REVENUE", "12M", "V1.0")]
+    series = results[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert series.observation_count == 0
     assert series.mape is None and series.bias is None
     assert series.quarantined == {"DUPLICATE_QUARANTINED": 2}
@@ -210,9 +210,12 @@ def test_duplicate_scenario_distinct_pair_scores_separately():
     flagged = flag_duplicates([base, bull])
     assert all(item.duplicate_key is None for item in flagged)
     results = aggregate_observations([base, bull])
-    series = results[(7, "REVENUE", "12M", "V1.0")]
-    assert series.observation_count == 2
-    assert series.quarantined == {}
+    base_series = results[(7, "REVENUE", "12M", "V1.0", "BASE")]
+    bull_series = results[(7, "REVENUE", "12M", "V1.0", "BULL")]
+    assert base_series.observation_count == 1
+    assert bull_series.observation_count == 1
+    assert base_series.quarantined == {}
+    assert bull_series.quarantined == {}
 
 
 # --- PIT leakage -------------------------------------------------------------
@@ -228,7 +231,7 @@ def test_pit_leaked_inputs_never_score():
     scored = score_observation(leaked)
     assert scored.scored is False
     results = aggregate_observations([leaked])
-    series = results[(7, "REVENUE", "12M", "V1.0")]
+    series = results[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert series.observation_count == 0
     assert series.quarantined == {"PIT_INVALID_INPUT": 1}
 
@@ -305,7 +308,7 @@ def test_baseline_comparison_matches_section_17_formula():
         baselines[observation.key.as_tuple()] = 900.0
         observations.append(observation)
     series = aggregate_observations(observations, baselines)[
-        (7, "REVENUE", "12M", "V1.0")
+        (7, "REVENUE", "12M", "V1.0", "BASE")
     ]
     assert series.mape == 10.0
     # Baseline APE = |1100-900|/|900| x 100 = 22.22%.
@@ -325,7 +328,7 @@ def test_model_worse_than_baseline_reports_negative_improvement():
         baselines[observation.key.as_tuple()] = 1150.0
         observations.append(observation)
     series = aggregate_observations(observations, baselines)[
-        (7, "REVENUE", "12M", "V1.0")
+        (7, "REVENUE", "12M", "V1.0", "BASE")
     ]
     assert series.relative_improvement < 0
 
@@ -353,7 +356,7 @@ def test_baseline_uses_same_scored_set_not_a_wider_one():
         observation.key.as_tuple(): 900.0 for observation in observations
     }
     series = aggregate_observations(observations, baselines)[
-        (7, "REVENUE", "12M", "V1.0")
+        (7, "REVENUE", "12M", "V1.0", "BASE")
     ]
     assert series.observation_count == 5
     assert series.total_observations == 7
@@ -377,7 +380,7 @@ def test_only_scored_observations_drive_the_band():
         *[ _observation(forecast_period_id=101 + i) for i in range(4)],
         _observation(forecast_value=0.0, actual_value=100.0, forecast_period_id=200),
     ]
-    series = aggregate_observations(observations)[(7, "REVENUE", "12M", "V1.0")]
+    series = aggregate_observations(observations)[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert series.observation_count == 4
     assert series.confidence_level == "INSUFFICIENT_DATA"
     assert series.quarantined == {"ZERO_BASE": 1}

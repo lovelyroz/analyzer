@@ -69,7 +69,7 @@ def _run(records, actuals):
 
 
 def _verdict(result, horizon="12M", version="V1.0"):
-    return result.verdicts[(7, "REVENUE", horizon, version)]
+    return result.verdicts[(7, "REVENUE", horizon, version, "BASE")]
 
 
 def _key(record):
@@ -337,7 +337,7 @@ def test_p25_restated_series_flags_limited_quality():
         )
         for i in range(8)
     ]
-    series = aggregate_observations(observations)[(7, "REVENUE", "12M", "V1.0")]
+    series = aggregate_observations(observations)[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert series.observation_count == 8
     assert series.limited_quality is True
     assert series.mape == 10.0

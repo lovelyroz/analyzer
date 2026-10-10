@@ -142,10 +142,9 @@ def run_evaluation_pipeline(
       its own series group and proves conservation (never double counted,
       never silently dropped).
 
-    Returns one verdict per (company, metric, horizon, version) series.
-    Series grouping stays scenario-free per spec §14; scenario isolates
-    observations (no false collision) beside the single series Reliability
-    (§37).
+    Returns one verdict per (company, metric, horizon, version, scenario)
+    series. Aggregation groups per scenario, so Bear, Base, and Bull never
+    pool observations.
     """
     observations: List[EvaluationObservation] = []
     for record in records:
@@ -170,6 +169,7 @@ def run_evaluation_pipeline(
                 observation.key.metric_code,
                 observation.key.forecast_horizon,
                 observation.key.model_version,
+                observation.key.scenario,
             )
             ttm_accounted[key] += 1
 

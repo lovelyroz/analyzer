@@ -41,10 +41,8 @@ portions, report the rest):
   observation sharing a duplicate key is quarantined wholesale
   (``DUPLICATE_QUARANTINED``); none is preferred, dropped, or merged
   silently. Scenario is part of the observation identity (Part A 7-tuple),
-  so only same-scenario keys collide; series grouping stays scenario-free
-  per spec §14 (SeriesKey = company, metric, horizon, version — spec §14
-  defines series without scenario and §37 keeps ONE Reliability beside
-  three scenario tracks).
+  so only same-scenario keys collide; series grouping is per-scenario
+  (SeriesKey = company, metric, horizon, version, scenario).
 * Zero-Actual scoring — P25-authorized: ``Actual=0 / Forecast!=0`` scores
   normally through the authorized formulas (``Error = Actual - Forecast``,
   PE/APE over ``|Forecast|``) because ``metrics.py`` already handles it
@@ -81,8 +79,10 @@ from src.evaluation.observation import (
 )
 from src.evaluation.schema import is_scoring_eligible
 
-# Series grouping per spec Section 14: Company + Metric + Horizon + Version.
-SeriesKey = Tuple[int, str, str, str]
+# Series grouping per spec Section 14 + Prompt 35: Company + Metric + Horizon
+# + Version + Scenario. Scenario is APPENDED LAST so existing positional
+# readers of positions 0-3 are unaffected.
+SeriesKey = Tuple[int, str, str, str, str]
 
 
 @dataclass
@@ -224,7 +224,7 @@ def score_observation(
 
 @dataclass
 class SeriesEvaluation:
-    """Authorized aggregates for one Company + Metric + Horizon + Version series.
+    """Authorized aggregates for one Company + Metric + Horizon + Version + Scenario series.
 
     ``observation_count`` is the scored count that drives the sufficiency
     band; ``total_observations`` and ``quarantined`` preserve everything else
@@ -236,6 +236,7 @@ class SeriesEvaluation:
     metric_code: str
     horizon: str
     model_version: str
+    scenario: str
     observation_count: int
     total_observations: int
     quarantined: Dict[str, int] = field(default_factory=dict)
@@ -255,7 +256,7 @@ class SeriesEvaluation:
 
 
 def _series_key_for(key: EvaluationKey) -> SeriesKey:
-    return (key.company_id, key.metric_code, key.forecast_horizon, key.model_version)
+    return (key.company_id, key.metric_code, key.forecast_horizon, key.model_version, key.scenario)
 
 
 def aggregate_series(
@@ -264,6 +265,7 @@ def aggregate_series(
     horizon: str,
     model_version: str,
     scored: List[ScoredObservation],
+    scenario: str,
 ) -> SeriesEvaluation:
     """Aggregate one isolated series from its scored observations."""
     valid = [item for item in scored if item.scored]
@@ -287,6 +289,7 @@ def aggregate_series(
         metric_code=metric_code,
         horizon=horizon,
         model_version=model_version,
+        scenario=scenario,
         observation_count=count,
         total_observations=len(scored),
         quarantined=quarantined,
@@ -322,8 +325,8 @@ def aggregate_observations(
         series = _series_key_for(item.key)
         groups.setdefault(series, []).append(item)
     return {
-        (company_id, metric_code, horizon, model_version): aggregate_series(
-            company_id, metric_code, horizon, model_version, items
+        (company_id, metric_code, horizon, model_version, scenario): aggregate_series(
+            company_id, metric_code, horizon, model_version, items, scenario
         )
-        for (company_id, metric_code, horizon, model_version), items in groups.items()
+        for (company_id, metric_code, horizon, model_version, scenario), items in groups.items()
     }

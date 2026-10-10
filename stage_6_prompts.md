@@ -4742,3 +4742,234 @@ Even if ready, this prompt does not authorize implementation. The next prompt mu
 Stage 6 must remain NOT FROZEN.
 
 At completion, provide a concise Persian summary of findings and the recommended next step.
+==========================================================
+# Stage 6 Prompt 35 — Implement Scenario-Isolated Evaluation Identity and Aggregation
+
+You are the primary engineering agent for `analyzer`, a financial-data application.
+
+Financial correctness, deterministic behavior, point-in-time integrity, auditability, and preservation of explicit invariants take priority over implementation speed.
+
+## 1. Objective
+
+Implement one narrowly bounded Stage 6 behavior:
+
+**Bear, Base, and Bull must remain separate throughout the existing in-memory evaluation path, from evaluation identity through aggregation and returned results.**
+
+Prompt 34 established that the current evaluation verdicts are in-memory and no evaluation-results database table was found in the bounded inspection. It also established that scenario identity is represented in `EvaluationKey`, while `SeriesEvaluation` is scenario-free by design.
+
+Verify these specific findings against the actual source before changing anything. Do not assume that the report is a substitute for inspecting the relevant code.
+
+This prompt authorizes the minimal application-code and test changes required to enforce scenario separation in the existing evaluation path. It does not authorize persistent evaluation storage or a database migration.
+
+## 2. Strict scope and repository discipline
+
+Inspect only:
+
+* The source definition of `EvaluationKey`
+* The source definition and construction of `SeriesEvaluation`
+* The directly connected aggregation and result-construction functions
+* Their direct callers that pass scenario identity
+* The focused Stage 6 tests for these behaviors
+* Any directly relevant type or serialization contract
+
+Locate these exact symbols using targeted searches. Do not scan or reload the entire repository.
+
+Do not modify Stages 1–5 or unrelated Stage 6 behavior.
+
+No GitHub, GitHub CLI/API, remote operations, push, pull, commit, branch changes, or other Git mutations.
+
+## 3. Required implementation behavior
+
+### A. Scenario-specific evaluation identity
+
+Ensure scenario identity is part of the effective identity used by the existing evaluation pipeline.
+
+The scenario dimension must distinguish Bear, Base, and Bull even when all other dimensions match:
+
+* Company
+* Metric
+* Financial period
+* Forecast horizon
+* Model version
+* Forecast cutoff, where required by the existing evaluation contract
+* Scenario
+
+Do not casually redesign the existing key or add unrelated dimensions. Preserve all existing authorized identity dimensions and add only what is necessary to enforce the scenario contract.
+
+Inspect the existing `EvaluationKey` implementation and every directly affected call site before editing.
+
+A missing scenario must not silently collapse a multi-scenario evaluation into Base. Inspect the existing `BASE` default and determine the smallest safe correction consistent with current callers. Update affected call sites and tests as needed. Preserve backward compatibility only where it is demonstrably safe and cannot silently misclassify or merge scenarios.
+
+Do not invent a new scenario taxonomy. Use the repository's existing canonical scenario representation and enum/constants.
+
+### B. Scenario-specific aggregation
+
+Ensure aggregation cannot merge observations from different scenarios.
+
+`SeriesEvaluation` and any directly connected aggregate/result structure must retain scenario identity wherever the structure represents a scenario-specific series.
+
+For otherwise identical Bear, Base, and Bull observations:
+
+* Three scenario-specific series must remain distinguishable.
+* Observation counts must be calculated independently.
+* Bias and MAPE inputs must not be pooled across scenarios.
+* Baseline comparisons must remain within the same scenario.
+* No shared series may count one forecast event's three scenarios as three observations.
+* Returned scenario-specific results must retain the correct scenario identity.
+
+Do not calculate or implement Reliability. It remains withheld/NULL.
+
+Do not implement persistence, artifact versioning, schema changes, or migrations in this prompt.
+
+### C. Preserve existing financial methodology
+
+Do not change the approved formulas or eligibility rules for:
+
+* Absolute error
+* Percentage error
+* APE/MAPE
+* Bias
+* Actual-zero cases
+* ZERO_BASE
+* Baseline comparison
+* Minimum-observation thresholds
+* ESTIMATED sensitivity analysis
+* First-known Actual selection
+* PIT validity
+
+Do not introduce epsilon, arbitrary weighting, new scoring rules, or fallback formulas.
+
+Do not alter the authorized Seasonal Naive baseline.
+
+Do not mix horizons or model versions.
+
+Do not let Reliability affect Forward P/E.
+
+## 4. Required tests — strict multi-layer validation
+
+Add or update focused tests that prove the actual behavior, not merely the existence of a scenario field.
+
+### Layer 1 — Unit and identity/formula tests
+
+Verify:
+
+1. Two otherwise identical evaluation keys with different scenarios are not equal.
+2. Each canonical scenario is preserved by key construction.
+3. Aggregation counts each scenario independently.
+4. Existing metric calculations are unchanged when all observations belong to one scenario.
+5. Equality, hashing, grouping, and dictionary/set behavior are correct wherever these mechanisms are used by the implementation.
+
+### Layer 2 — Contract and boundary tests
+
+Verify:
+
+1. Scenario identity survives the complete supported construction and return path.
+2. Scenario-specific output structures expose the correct canonical scenario.
+3. Missing or invalid scenario input cannot silently become a different scenario in the multi-scenario evaluation path.
+4. Existing valid single-scenario behavior remains compatible where compatibility is explicitly supported.
+5. Serialization or conversion does not discard scenario identity if those operations exist in the inspected path.
+
+Do not create a new public serialization format unless the existing contract requires it.
+
+### Layer 3 — Production-path/integration tests
+
+Exercise the real connected evaluation path, not just isolated constructors.
+
+Provide otherwise identical input observations for Bear, Base, and Bull. Confirm that the actual production-path aggregation produces three separate scenario-specific results, with the expected observations and metric inputs assigned to each.
+
+Include baseline comparison where the existing path supports it, proving that model and baseline observations are paired within the same scenario.
+
+### Layer 4 — Adversarial and negative tests
+
+At minimum, cover:
+
+* One company, one metric, one horizon, one model version, and one financial period with all three scenarios.
+* Different scenario insertion orders.
+* Interleaved observations from multiple scenarios.
+* Duplicate observations within one scenario.
+* Identical values across different scenarios.
+* Missing scenario input.
+* Invalid or unsupported scenario input, if the existing type/interface permits it.
+* A scenario present in the forecast but absent from the paired baseline or Actual inputs.
+* Empty and single-scenario evaluation inputs.
+* A regression case where scenario-free aggregation would incorrectly pool observations and inflate sufficiency counts.
+
+Assert both the expected result and the absence of cross-scenario leakage.
+
+Do not invent the expected behavior for an unsupported boundary that the existing contract does not define. Fail closed and document it if necessary.
+
+### Layer 5 — Regression tests
+
+Run the focused Stage 6 tests and the full repository test suite using the commands supported by the current Claude Desktop environment.
+
+Confirm:
+
+* All prior authorized Stage 6 methodology remains unchanged.
+* Stages 1–5 remain untouched.
+* Existing valid non-scenario-specific behavior remains correct where applicable.
+* No new pooling, double counting, or horizon/model-version mixing is introduced.
+* Reliability remains withheld.
+* No persistence or migration was introduced.
+
+Record exact commands and actual pass/fail/skip counts. Do not claim tests passed if they were not executed.
+
+If tests fail, investigate and correct only defects within this prompt's scope. Do not weaken assertions merely to obtain a passing result.
+
+### Layer 6 — Independent audit
+
+After implementation and tests:
+
+1. Re-read the final diff.
+2. Trace scenario identity from key construction through aggregation and returned results.
+3. Check every directly affected call site for implicit Base assignment or dropped scenario identity.
+4. Inspect tests for false positives that only assert field existence.
+5. Verify that the tests would fail if scenario identity were removed from the effective aggregation key.
+6. Verify that no unrelated methodology, schema, persistence, or stage was changed.
+
+If any required invariant remains unproven, report it as a blocker.
+
+## 5. Change control
+
+Before implementation, identify the smallest source and test files required.
+
+Do not make changes outside that bounded set.
+
+Do not create an evaluation database table or perform a migration. Prompt 34 did not establish a need or authorize one.
+
+Do not implement evaluation-artifact identity/versioning, superseded-artifact linkage, publication-timestamp persistence, or the Reliability formula in this prompt. These remain separate work items.
+
+Do not freeze Stage 6.
+
+## 6. Required report
+
+Append this exact heading to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 35: Scenario-Isolated Evaluation Identity and Aggregation`
+
+Include:
+
+* Exact files inspected and changed
+* The pre-change failure mode established by evidence
+* The scenario-identity and aggregation changes
+* How missing scenario inputs are handled
+* Tests added, including the three-scenario adversarial case
+* Exact focused and full-suite commands and results
+* Six-layer validation results with evidence
+* Any remaining defects or limitations
+* Confirmation that no schema, migration, or evaluation-persistence layer was introduced
+* Confirmation that Stages 1–5 remain untouched
+* Confirmation that Reliability remains withheld
+* Confirmation that Stage 6 remains NOT FROZEN
+* A short next-step recommendation
+
+Do not claim that scenario persistence has been implemented: this prompt addresses the existing in-memory path only.
+
+## 7. Completion gate
+
+Mark the prompt successful only if scenario identity is preserved end-to-end through the inspected in-memory evaluation path, cross-scenario pooling is prevented, and the six-layer validation is supported by actual evidence.
+
+Otherwise report `BLOCKED` and identify the exact unmet invariant.
+
+Stage 6 must remain NOT FROZEN.
+
+At completion, provide a concise Persian summary.

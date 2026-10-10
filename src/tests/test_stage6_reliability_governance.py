@@ -119,7 +119,7 @@ def _series(periods=8, horizon="12M", version="V1.0", start=101, **values):
         )
         for i in range(periods)
     ]
-    return aggregate_observations(observations)[(7, "REVENUE", horizon, version)]
+    return aggregate_observations(observations)[(7, "REVENUE", horizon, version, "BASE")]
 
 
 def _components(**overrides):
@@ -278,7 +278,7 @@ def test_pit_later_published_actual_still_governed():
         assert observation.evaluation_status == "READY"
         assert observation.actual.publication_datetime > CUTOFF
     series = aggregate_observations(observations)
-    governed = govern_aggregates(series)[(7, "REVENUE", "12M", "V1.0")]
+    governed = govern_aggregates(series)[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert governed.observation_count == 8
     assert governed.reliability.reliability is None
 
@@ -294,8 +294,8 @@ def test_horizon_and_version_isolation_survive_governance():
         for i in range(8)
     ]
     governed = govern_aggregates(aggregate_observations(observations))
-    assert set(governed) == {(7, "REVENUE", "12M", "V1.0"),
-                             (7, "REVENUE", "3M", "V2.0")}
+    assert set(governed) == {(7, "REVENUE", "12M", "V1.0", "BASE"),
+                             (7, "REVENUE", "3M", "V2.0", "BASE")}
     for verdict in governed.values():
         assert verdict.reliability.reliability is None
         assert verdict.calibration.state == "NO_CALIBRATION"
@@ -313,7 +313,7 @@ def test_null_and_quarantines_flow_through_unchanged():
             "REVENUE", _actual(),
         ),  # PIT_INVALID_INPUT quarantine
     ]
-    series = aggregate_observations(observations)[(7, "REVENUE", "12M", "V1.0")]
+    series = aggregate_observations(observations)[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert series.observation_count == 4
     governed = govern_series(series)
     assert governed.observation_count == 4
@@ -332,7 +332,7 @@ def test_regime_only_series_names_mape_unavailable():
                      forecast_period_id=101 + i)
         for i in range(5)
     ]
-    series = aggregate_observations(observations)[(7, "REVENUE", "12M", "V1.0")]
+    series = aggregate_observations(observations)[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert series.mape is None
     governed = govern_series(series)
     assert governed.reliability.reliability is None
@@ -347,7 +347,7 @@ def test_full_path_observation_to_governance():
     observations = [_observation(forecast_period_id=101 + i) for i in range(8)]
     aggregates = aggregate_observations(observations)
     governed = govern_aggregates(aggregates)
-    verdict = governed[(7, "REVENUE", "12M", "V1.0")]
+    verdict = governed[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert verdict.observation_count == 8
     assert verdict.confidence_level == "MODERATE_CONFIDENCE"
     assert verdict.performance is None  # no mappings on the production path

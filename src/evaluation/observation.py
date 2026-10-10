@@ -79,7 +79,11 @@ class EvaluationKey:
     forecast_horizon: str
     model_version: str
     forecast_cutoff_datetime: datetime
-    scenario: str = "BASE"
+    scenario: str
+
+    def __post_init__(self) -> None:
+        if not self.scenario:
+            raise ValueError("scenario is required: missing scenario must not default to BASE")
 
     def as_tuple(self) -> Tuple[Any, ...]:
         return (

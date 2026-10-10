@@ -167,7 +167,7 @@ def test_production_path_withholds_after_removal():
     result = run_evaluation_pipeline(
         records=records, metric_codes=["REVENUE"], actuals=actuals
     )
-    verdict = result.verdicts[(7, "REVENUE", "12M", "V1.0")]
+    verdict = result.verdicts[(7, "REVENUE", "12M", "V1.0", "BASE")]
     assert verdict.series.mape == 10.0
     assert verdict.governance.reliability.reliability is None
     assert verdict.governance.calibration.state == "NO_CALIBRATION"

@@ -128,8 +128,8 @@ def _baseline_map(periods, value, horizon="12M", version="V1.0"):
     }
 
 
-def _verdict(result, horizon="12M", version="V1.0"):
-    return result.verdicts[(7, "REVENUE", horizon, version)]
+def _verdict(result, horizon="12M", version="V1.0", scenario="BASE"):
+    return result.verdicts[(7, "REVENUE", horizon, version, scenario)]
 
 
 # --- L3: normal / under / over forecast --------------------------------------
@@ -388,12 +388,16 @@ def test_duplicate_forecast_id_only_still_collides():
 
 def test_duplicate_scenario_differs_does_not_collide():
     # Scenario is identity: BASE vs BULL is two distinct observations,
-    # each scoring once (SeriesKey stays scenario-free per spec §14).
+    # each scoring once in its own per-scenario series.
     base = _record(forecast_period_id=101, scenario="BASE")
     bull = _record(forecast_period_id=101, scenario="BULL")
-    verdict = _verdict(_run([base, bull], _actual_map([101])))
-    assert verdict.series.observation_count == 2
-    assert verdict.series.quarantined == {}
+    result = _run([base, bull], _actual_map([101]))
+    base_verdict = _verdict(result, scenario="BASE")
+    bull_verdict = _verdict(result, scenario="BULL")
+    assert base_verdict.series.observation_count == 1
+    assert bull_verdict.series.observation_count == 1
+    assert base_verdict.series.quarantined == {}
+    assert bull_verdict.series.quarantined == {}
 
 
 def test_null_is_never_zero_on_path():

@@ -4939,3 +4939,55 @@ Date: 2026-10-09. Authority: (a) owner delegation of technical methodology choic
 
 READY FOR A BOUNDED IMPLEMENTATION PROMPT
 
+REPORT — Stage 6 Prompt 35: Scenario-Isolated Evaluation Identity and Aggregation
+
+Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choices to ChatGPT in the active ChatGPT conversation on 2026-10-09 (owner delegated selection of correct/optimal technical choices; did NOT personally select any formula or option); (b) owner personally approved ONLY the scenario-separation policy (Bear/Base/Bull separate throughout keys, records, outputs, counts, comparisons). Nothing below claims owner authorship of any formula or option.
+
+1. Exact files inspected and changed
+- Inspected: src/evaluation/observation.py (EvaluationKey definition, evaluation_key_for construction site, EvaluationObservation.key property, flag_duplicates via as_tuple), src/evaluation/aggregate.py (SeriesKey, SeriesEvaluation, _series_key_for, aggregate_series, aggregate_observations, score_observation baseline lookup via as_tuple), src/evaluation/pipeline.py (run_evaluation_pipeline observation build, TTM key, aggregate_observations call, govern_observations passthrough, verdict construction), src/evaluation/reliability.py govern_aggregates (key passthrough only, lines 406-421).
+- Changed src (3 files): src/evaluation/aggregate.py (SeriesKey 4-tuple to 5-tuple scenario-last; SeriesEvaluation.scenario required field; _series_key_for retains scenario; aggregate_series takes scenario param; aggregate_observations groups per-scenario; baseline lookup still scenario-qualified via as_tuple); src/evaluation/pipeline.py (TTM key retains scenario; verdicts scenario-carrying); src/evaluation/observation.py (EvaluationKey.scenario required, fail-closed ValueError on falsy; single construction site evaluation_key_for passes record.scenario explicitly; no enum invented — uppercase BEAR/BASE/BULL strings).
+- Changed tests (6 files + 1 new): test_stage6_evaluation_metrics.py + test_stage6_production_pipeline.py (44 4-tuple lookups to 5-tuple, per-scenario duplicate splits); test_stage6_evaluation.py (1 lookup, line 170); test_stage6_p25_adversarial.py (2 sites: line 72 helper + line 340); test_stage6_reliability_governance.py (6 sites: line 122 helper, 281, 297-298 expected set, 316, 335, 350). New file src/tests/test_stage6_scenario_isolation.py (22 tests). No assertions weakened. No Stages 1-5 files touched. No spec files changed.
+
+2. Pre-change failure mode (established by evidence)
+- EvaluationKey was scenario-carrying but _series_key_for/SeriesEvaluation/SeriesKey/pipeline verdicts were scenario-free, so otherwise identical Bear/Base/Bull observations merged into one series (summed counts, pooled MAPE/Bias inputs, cross-scenario baseline pairing via scenario-free group key). The silent `scenario="BASE"` default risked collapsing a multi-scenario evaluation into Base on missing input.
+
+3. Scenario-identity and aggregation changes
+- Identity: EvaluationKey.scenario is now required (no default); as_tuple() 7-tuple retains scenario last, so duplicate detection (flag_duplicates via as_tuple) collides only within the same scenario and baseline lookup (supplied.get(item.key.as_tuple())) stays scenario-qualified.
+- Aggregation: SeriesKey = (company, metric, horizon, version, scenario) with scenario APPENDED LAST so positional readers of 0-3 are unaffected; _series_key_for appends key.scenario; aggregate_series(company, metric, horizon, version, scored, scenario) stamps SeriesEvaluation.scenario; aggregate_observations groups by 5-tuple and unpacks scenario into aggregate_series.
+- Pipeline: TTM conservation key is the 5-tuple including scenario; verdicts dict keyed by 5-tuple SeriesKey; govern_aggregates passes keys through unchanged (key: govern_series passthrough).
+- Call-site audit: the single EvaluationKey construction site passes scenario explicitly; no `or BASE`, no implicit default remains (repo-wide grep for BASE-default returns only the fail-closed error string).
+
+4. Missing scenario inputs
+- Fail-closed: falsy scenario raises ValueError("scenario is required: missing scenario must not default to BASE"). Covered by 3 tests including noncanonical-verbatim (unsupported strings pass through verbatim, never normalized to BASE). No silent collapse to Base is possible on the multi-scenario path.
+
+5. Tests added (incl. three-scenario adversarial case)
+- New src/tests/test_stage6_scenario_isolation.py, 22 tests: key identity/hash/set/dict inequality across scenarios; 3-series independence with unpooled MAPE/Bias on otherwise identical Bear/Base/Bull; scenario field on SeriesEvaluation; within-scenario baseline pairing x2; fail-closed x3 incl. noncanonical-verbatim; single-scenario numerics MAPE/Bias 10.0 unchanged; sufficiency non-pooling regression (scenario-free pooling would inflate counts); 6 insertion permutations; interleaved multi-company; within-scenario duplicate quarantine; identical-values separation; empty/single inputs; pipeline end-to-end x2.
+- Updated lookups (44+1+2+6 sites) split per-scenario; all assert result content and absence of leakage, not mere field existence.
+
+6. Exact commands and results
+- Focused: `.venv/Scripts/python.exe -m pytest src/tests/test_stage6_scenario_isolation.py src/tests/test_stage6_evaluation_foundation.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_evaluation_metrics.py src/tests/test_stage6_production_pipeline.py -q` → 131 passed.
+- Full: `.venv/Scripts/python.exe -m pytest src/tests/ -q` → 872 passed, 2 skipped, 0 failed.
+
+7. Six-layer validation with evidence
+- L1 unit/identity/formula PASS: key inequality/hash/set/dict tests; canonical BEAR/BASE/BULL preserved; single-scenario MAPE/Bias 10.0 proves formulas unchanged.
+- L2 contract/boundary PASS: scenario survives construction-to-return path; SeriesEvaluation exposes canonical scenario; missing scenario raises (no silent Base); noncanonical passes verbatim; no new serialization format.
+- L3 production-path/integration PASS: real pipeline on identical Bear/Base/Bull inputs yields 3 separate verdicts with correct per-scenario observations; baseline paired within scenario x2 plus end-to-end x2.
+- L4 adversarial/negative PASS: 1 company/1 metric/1 horizon/1 version/1 period x3 scenarios; 6 insertion orders; interleaved multi-company; within-scenario duplicates quarantined; identical values separated; missing/invalid fail-closed; scenario-absent-from-Actual documented (see limitation); empty/single inputs; sufficiency non-pooling regression.
+- L5 regression PASS: focused 131 + full 872 passed, 2 skipped, 0 failed; Stages 1-5 untouched; no pooling/double-count/horizon-mixing; Reliability withheld; no persistence/migration.
+- L6 independent audit (this audit) PASS: final `git diff src/evaluation/` re-read; traced EvaluationKey(scenario required) → evaluation_key_for(explicit) → as_tuple(7-tuple, scenario-qualified duplicate+baseline) → _series_key_for(5-tuple) → aggregate_series(scenario-stamped) → aggregate_observations(per-scenario groups) → pipeline TTM/verdicts(5-tuple) → govern passthrough; no implicit default; diff contains no unrelated methodology/schema/persistence change. Counterfactual: removing scenario from _series_key_for/SeriesKey collapses the 3 isolation series into 1, so per-scenario count/inequality/unpooled-MAPE assertions fail — tests are not field-existence-only.
+
+8. Remaining defects/limitations
+- Scenario-absent-from-Actual not expressible: pipeline actuals map is keyed (company, period, metric) without scenario, so one Actual binds all three scenario records by design. Documented, not fixed (out of scope).
+
+9. Confirmations
+- No schema, migration, or evaluation-persistence layer introduced (in-memory path only; scenario persistence NOT claimed).
+- Stages 1-5 untouched.
+- Reliability remains withheld (govern_aggregates passthrough only; no formula implemented).
+- Stage 6 remains NOT FROZEN.
+- No Git operations performed.
+
+10. Next-step recommendation
+- Next: build the evaluation-persistence contract with scenario identity as a first-class key component (per Prompt 34 D3 requirement), carrying the 5-tuple identity plus Actual-scenario pairing into storage.
+
+GATE: SUCCESS — scenario identity preserved end-to-end through the in-memory evaluation path, cross-scenario pooling prevented, six-layer validation supported by actual evidence. Stage 6 NOT FROZEN.
+
