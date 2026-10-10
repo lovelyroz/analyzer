@@ -4973,3 +4973,245 @@ Otherwise report `BLOCKED` and identify the exact unmet invariant.
 Stage 6 must remain NOT FROZEN.
 
 At completion, provide a concise Persian summary.
+=================================================================
+
+# Stage 6 Prompt 36 — Implement Versioned Evaluation Artifact Identity and Provenance Contract
+
+You are working in the financial-data repository `analyzer`.
+
+## 1. Mission
+
+Implement one narrowly scoped Stage 6 improvement: establish an explicit, versioned **in-memory evaluation artifact contract** that identifies an evaluation run and records the provenance needed to distinguish its primary result from reruns and sensitivity results.
+
+Stage 6 remains **NOT FROZEN**.
+
+Use the existing approved Stage 6 specification, particularly `06_Stage6_Forecast_Evaluation.md` §§10, 12, 14, 17, 37, 39, 40, 41 and 45, together with the latest Prompt 31–35 reports in `temp_report.md`. Do not perform a repository-wide review.
+
+The owner delegated technical implementation choices to ChatGPT. Apply the existing locked methodology and make conservative, auditable engineering decisions within this prompt's scope. Do not claim that the owner personally selected individual formulas or implementation details.
+
+## 2. Strict scope
+
+Inspect only the following initially:
+
+* The existing evaluation pipeline's public result boundary and result types.
+* The relevant evaluation observation, aggregate and verdict types.
+* The code that distinguishes primary evaluation results from the ESTIMATED-excluded sensitivity evaluation, if implemented.
+* Direct callers and tests that construct or consume these result objects.
+* The locked Stage 6 specification and the latest Prompt 31–35 report sections in `temp_report.md`.
+
+Use targeted symbol searches to identify the relevant files. Do not reload or analyze the entire repository.
+
+Implement the smallest coherent contract that captures, where the existing code and available source data support it:
+
+1. A unique identity for each evaluation artifact/run.
+2. An explicit artifact or contract version.
+3. The applicable Stage 6 methodology/specification version.
+4. The applicable data-quality-policy version.
+5. Artifact purpose/type, distinguishing the primary result from the ESTIMATED-excluded sensitivity result.
+6. The relevant evaluation cutoff, where defined by the existing pipeline.
+7. Actual-data provenance: source `ReportVersion` identity and publication timestamp, where available from the existing matched Actual and its authoritative provenance.
+8. A link to the prior artifact when a rerun explicitly supersedes an earlier artifact.
+9. Scenario-separated evaluation results, preserving the Prompt 35 identity: company, metric, horizon, model version and scenario must never be collapsed across scenarios.
+10. Enough explicit metadata to distinguish a new evaluation execution from an unchanged or repeated evaluation of the same inputs.
+
+Before editing, establish which of these fields can be populated truthfully from existing types. Follow authoritative existing source objects rather than copying values into unrelated fields or fabricating provenance.
+
+## 3. Hard boundaries
+
+* Do **not** create an evaluation database table, database migration, storage backend or persistence mechanism. No evaluation-results persistence table currently exists.
+* Do not claim that an in-memory contract provides durable historical immutability. It must instead make the identity and intended supersession relationship explicit so a future persistence layer can enforce that policy.
+* Do not invent ReportVersion IDs, publication timestamps, cutoff values, hashes, source snapshots, version identifiers or provenance.
+* If required source provenance is unavailable, represent it explicitly as unavailable/invalid according to the existing project conventions. Do not silently substitute the latest report or current timestamp.
+* Do not change Stages 1–5, their files, formulas, contracts or frozen behavior.
+* Do not modify the approved Stage 6 formulas, Actual selection policy, data-quality eligibility, scenario separation, sufficiency thresholds, baseline methodology, ZERO_BASE behavior, Actual-zero handling, Bias/MAPE eligibility or calibration policy.
+* Do not implement a Reliability score or invent any numeric Reliability mapping. Reliability remains withheld.
+* Do not change Forward P/E or any valuation formula.
+* Do not introduce arbitrary hashing or claim that a hash guarantees reproducibility unless the necessary canonical inputs and serialization rules already exist and are validated.
+* Do not add a generic framework, speculative abstractions or unrelated refactoring.
+* No GitHub, GitHub CLI/API, remote operations, push, pull, commit, branch changes or other Git operations.
+
+## 4. Required implementation approach
+
+### A. Inspect before designing
+
+Trace the current evaluation result from the pipeline entry point through observation matching, scoring, aggregation and the returned result.
+
+Identify the actual sources for:
+
+* Evaluation cutoff.
+* Forecast model version.
+* Scenario.
+* Matched Actual and its ReportVersion/publication provenance.
+* Primary versus sensitivity evaluation.
+* Any existing rerun/supersession information.
+
+Document which values are genuinely available and which are not.
+
+### B. Define an explicit artifact contract
+
+Use the smallest appropriate existing type or a new focused type. Keep the contract immutable where consistent with the project's existing design.
+
+The contract must distinguish:
+
+* Artifact identity from model version.
+* Artifact version from methodology/specification version.
+* Primary results from sensitivity results.
+* Scenario identity from artifact identity.
+* An explicit supersession relationship from ordinary creation of another artifact.
+
+A rerun must not silently reuse an identity in a way that makes two distinct executions indistinguishable. If an artifact supersedes another, the relationship must be explicit and validated. Do not infer supersession merely because two artifacts share a model version or evaluation cutoff.
+
+If deterministic identity cannot be established safely from existing canonical inputs, use an appropriate unique run identity instead. State its determinism limits clearly.
+
+### C. Preserve scenario isolation
+
+Use the scenario-aware key and aggregation path established by Prompt 35. Ensure that each artifact's evaluation records preserve Bear/Base/Bull separation.
+
+Do not incorrectly require the Actual itself to have a scenario. One eligible Actual may be compared against each of several scenario-specific forecasts, but their evaluation records and aggregate statistics must remain separate.
+
+### D. Handle unavailable provenance safely
+
+Where a required provenance field cannot be supplied from the authoritative matched Actual:
+
+* Do not fabricate it.
+* Do not silently use a newer Actual or latest report.
+* Do not claim the artifact has complete audit provenance.
+* Fail closed at the relevant boundary if the locked contract requires that field for a valid evaluation; otherwise expose the limitation explicitly using established project conventions.
+
+Do not broaden this prompt into redesigning Actual matching or the data foundation.
+
+### E. Keep the public contract compatible where safe
+
+Inspect all direct consumers before changing a result type. Preserve compatibility only where it does not discard provenance or silently merge distinct artifacts. If a breaking change is necessary to prevent ambiguity, update its direct callers and focused tests and explain why.
+
+Do not add unused fields merely to make the type look complete.
+
+## 5. Mandatory six-layer strict validation
+
+All six layers below are required. Do not treat a passing unit-test suite as a substitute for the other layers.
+
+### Layer 1 — Unit and identity tests
+
+Test:
+
+* Distinct execution identities remain distinct even when the evaluated inputs are identical, if unique run identity is the chosen policy.
+* Artifact version, methodology version and quality-policy version remain distinct concepts.
+* Primary and sensitivity artifacts cannot be confused.
+* Explicit supersession references are preserved and invalid references are rejected according to the chosen contract.
+* Scenario-specific result identity remains intact.
+* Immutability and equality behavior are correct for the selected type.
+* Missing provenance is represented exactly as designed.
+* Existing financial formulas remain unchanged.
+
+### Layer 2 — Contract and boundary tests
+
+Test construction and return through the public evaluation boundary.
+
+Prove that:
+
+* Required metadata cannot silently disappear between pipeline construction and returned results.
+* Missing required provenance cannot be replaced by fabricated defaults.
+* A rerun cannot silently overwrite or impersonate an earlier artifact.
+* Primary and sensitivity identities remain distinguishable.
+* Scenario identity survives the entire returned-result contract.
+* Serialization is tested only if an actual serialization boundary exists. Do not invent one solely for this prompt.
+
+### Layer 3 — Production-path integration tests
+
+Use the real evaluation pipeline with the smallest representative fixtures that exercise the actual production path.
+
+Include:
+
+* A primary evaluation artifact.
+* An ESTIMATED-excluded sensitivity artifact, if that path currently exists.
+* Multiple scenarios sharing the same matched Actual.
+* Available ReportVersion/publication provenance.
+* A rerun and an explicitly superseding rerun, if the selected contract supports both.
+
+Assert the actual returned metadata and result identity, not just object construction or field existence.
+
+### Layer 4 — Adversarial and negative tests
+
+Include:
+
+* Identical financial inputs across two distinct executions.
+* Same company/metric/horizon/model version but different scenarios.
+* Missing cutoff or Actual provenance.
+* Missing, malformed or unsupported artifact metadata.
+* Primary and sensitivity results accidentally assigned the same identity.
+* Invalid or self-referential supersession.
+* A rerun with no supersession claim.
+* An Actual shared across scenarios without pooling the evaluation statistics.
+* Empty results and partial provenance.
+* Any relevant duplicate, ordering or equality edge case.
+
+Do not invent unsupported requirements. Where a case is not applicable, explain why in the report.
+
+### Layer 5 — Regression and full-suite validation
+
+Run the focused Stage 6 tests and the full available test suite using the established local Python environment and commands appropriate to this repository.
+
+The previously used full-suite command was:
+
+`.venv/Scripts/python.exe -m pytest src/tests/ -q`
+
+Record the exact commands and actual pass/fail/skip counts.
+
+Verify that:
+
+* Prompt 35 scenario isolation remains intact.
+* Approved Stage 6 formulas and policies remain unchanged.
+* No horizon/model-version mixing, TTM double counting or scenario pooling is introduced.
+* Stages 1–5 remain untouched.
+* Reliability remains withheld.
+* No database schema, migration or persistence mechanism was added.
+
+If a test fails, investigate and fix only an in-scope defect. Do not weaken an assertion or omit a failing test to obtain a pass.
+
+### Layer 6 — Independent audit
+
+After implementation and testing, independently re-read the complete diff and trace the contract through its actual call path.
+
+Explicitly verify:
+
+* Every populated field has an authoritative source.
+* No timestamp, provenance, version or supersession relationship is fabricated.
+* Distinct artifact identity is not confused with model version or scenario.
+* Primary and sensitivity results remain identifiable.
+* Scenario isolation from Prompt 35 is preserved.
+* No false immutability or persistence guarantee is claimed.
+* No unrelated methodology, Reliability or Stage 1–5 change slipped in.
+
+Where practical, add or run a counterfactual regression test demonstrating that removing a critical identity/provenance distinction causes a relevant test to fail.
+
+## 6. Reporting requirements
+
+Append a new section to `temp_report.md`; do not overwrite earlier reports.
+
+Use this exact heading:
+
+`REPORT — Stage 6 Prompt 36: Versioned Evaluation Artifact Identity and Provenance Contract`
+
+Include:
+
+1. Files inspected and changed.
+2. Existing result path and actual authoritative sources for each populated field.
+3. The selected artifact identity/version design and its limitations.
+4. How primary, sensitivity and rerun artifacts are distinguished.
+5. Actual ReportVersion/publication provenance availability and handling of missing provenance.
+6. How scenario isolation from Prompt 35 is preserved.
+7. Tests added/changed and the adversarial cases exercised.
+8. Exact test commands and actual pass/fail/skip counts.
+9. Evidence for each of the six validation layers.
+10. Any remaining blockers or fields that cannot yet be populated truthfully.
+11. Explicit confirmation that no database table, migration or persistence mechanism was added.
+12. Explicit confirmation that Stages 1–5 are untouched and Reliability remains withheld.
+13. Final status: Stage 6 must remain **NOT FROZEN**.
+
+## 7. Completion gate
+
+Report `SUCCESS` only if the artifact contract is implemented at the actual result boundary, all populated provenance is grounded in authoritative sources, scenario isolation is preserved, and all six validation layers pass with recorded evidence.
+
+Otherwise report `BLOCKED`, identify the precise blocker, and do not claim completion.
+
+Do not proceed to Reliability scoring or Stage 6 freeze as part of this prompt.

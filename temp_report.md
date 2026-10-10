@@ -4991,3 +4991,72 @@ Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choic
 
 GATE: SUCCESS — scenario identity preserved end-to-end through the in-memory evaluation path, cross-scenario pooling prevented, six-layer validation supported by actual evidence. Stage 6 NOT FROZEN.
 
+REPORT — Stage 6 Prompt 36: Versioned Evaluation Artifact Identity and Provenance Contract
+
+Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choices to ChatGPT in the active ChatGPT conversation on 2026-10-09 (owner delegated selection of correct/optimal technical choices; did NOT personally select any formula or option); (b) owner personally approved ONLY the scenario-separation policy (Bear/Base/Bull separate throughout keys, records, outputs, counts, comparisons). Nothing below claims owner authorship of any formula or option. Audit note: a prior agent's implementation was verified from scratch by this Layer 6 audit (full diff re-read + independent test reruns); implementation authorship is not attributed to this audit.
+
+1. Files inspected and changed
+- Inspected: src/evaluation/aggregate.py (score_observation, aggregate_observations, _series_key_for), src/evaluation/pipeline.py (run_evaluation_pipeline, EvaluationPipelineResult), src/evaluation/schema.py (ActualObservation.report_version_id/publication_datetime/data_quality_state, is_valid_report_version lines 113-122, PARTICIPATING_QUALITY_STATES line 35), src/evaluation/reliability.py (govern passthrough, unchanged).
+- New src (1 file): src/evaluation/artifact.py (141 lines): ARTIFACT_CONTRACT_VERSION="ARTIFACT_V1", DATA_QUALITY_POLICY_VERSION="DATA_QUALITY_P25", ARTIFACT_PURPOSES=("PRIMARY","SENSITIVITY_ESTIMATED_EXCLUDED"), frozen SeriesProvenance + EvaluationArtifactIdentity dataclasses, build_artifact single construction boundary, provenance_for_series indexer.
+- Changed src (2 files): src/evaluation/aggregate.py (+25/-2): exclude_estimated kwarg on score_observation and aggregate_observations; ESTIMATED actuals quarantine with reason SENSITIVITY_ESTIMATED_EXCLUDED before the eligibility check. src/evaluation/pipeline.py (+99/-3): artifact field on EvaluationPipelineResult (Optional, None default for backward compatibility); exclude_estimated + supersedes kwargs; single-distinct-cutoff computation; per-series provenance build from pre-aggregation observations; build_artifact call.
+- New tests (1 file): src/tests/test_stage6_artifact_identity.py (524 lines, 38 tests). No existing test files modified. No Stages 1-5 files touched. No spec files changed (stage_6_prompts.md +242 lines is the Prompt 36 text itself).
+
+2. Existing result path and authoritative sources per field
+- Path: run_evaluation_pipeline → observations (Actual attached) → aggregate_observations(exclude_estimated) → scored aggregates → per-series provenance from observations gated by scored_keys → build_artifact → EvaluationPipelineResult.artifact.
+- run_id: uuid4 hex generated in build_artifact (no canonical hash inputs exist; determinism limit stated in the module docstring).
+- artifact_version: ARTIFACT_CONTRACT_VERSION constant. methodology_version: parameters_version argument (default PIPELINE_PARAMETERS_VERSION="STAGE6_V1", pipeline.py line 91), passed as an argument so artifact.py stays import-cycle free. quality_policy_version: DATA_QUALITY_POLICY_VERSION default, overridable.
+- purpose: derived from the exclude_estimated flag only (PRIMARY vs SENSITIVITY_ESTIMATED_EXCLUDED); fail-closed ValueError on any other string at both build_artifact and the direct constructor.
+- evaluation_cutoff: the single distinct record.data_cutoff_datetime; None when records are empty or cutoffs differ (never fabricated).
+- report_version_ids / publication_datetimes: from scored observations' attached Actuals only, gated by schema.is_valid_report_version (requires non-None id AND timestamp); multi-period series keep the sorted distinct SET; empty tuples when unavailable.
+- data_quality_states: sorted distinct states of the scored items per series. supersedes: caller-supplied prior run_id, preserved verbatim; None when not a rerun.
+
+3. Selected identity/version design and limitations
+- run_id unique per execution; identical inputs never collide; cross-run identity comparison is by field values, never run_id. No hashing (per hard boundary; stated, not solved).
+- artifact_version vs methodology_version vs quality_policy_version are three distinct strings (tested distinct). Frozen dataclasses: immutability and by-value equality tested.
+- Limitations: supersedes is caller-asserted with format-only validation (non-empty, non-self); existence is unverifiable without a persistence layer (future work). No durable immutability claimed — in-memory carrier only, disclaimed in the module docstring.
+
+4. How primary, sensitivity and rerun artifacts are distinguished
+- Primary vs sensitivity differ by purpose field; the forced-duplicate-run_id test proves they stay distinguishable even with identical run_id.
+- Sensitivity path: exclude_estimated=True quarantines ESTIMATED actuals (which otherwise score with LIMITED flag per PARTICIPATING_QUALITY_STATES) with reason SENSITIVITY_ESTIMATED_EXCLUDED; order is READY → duplicate → sensitivity-exclusion → eligibility → MISSING_VALUE → regime scoring, with both orderings tested (exclusion-after READY/duplicate; duplicate-beats-sensitivity).
+- Rerun: always a new run_id; with supersedes → explicit validated link; without → supersedes=None (tested). Self-supersede and empty-string rejected at constructor, builder, and pipeline boundary.
+
+5. Actual ReportVersion/publication provenance and missing-provenance handling
+- Surfaced per series when scored Actuals carry valid ReportVersion (id + publication test). Invalid/missing → empty tuples via the is_valid_report_version gate (missing-provenance-empty + fabricated-default-check tests assert no invented defaults). Partial provenance keeps valid entries with empty remainder. Multi-period series keep the distinct SET, never collapsed to one id. No latest-report substitution, no current-timestamp substitution anywhere in the diff.
+
+6. How scenario isolation from Prompt 35 is preserved
+- Provenance built per 5-tuple SeriesKey via _series_key_for imported from aggregate (not reimplemented); scored_keys gating is per-scenario through as_tuple. Tests: separate provenance entries per scenario, shared-Actual-across-scenarios without pooling (one Actual vs 3 scenarios → 3 separate aggregates + 3 provenance entries), scenario keys intact in provenance; the full Prompt 35 isolation file (22 tests) still passes inside the 226.
+
+7. Tests added/changed and adversarial cases exercised
+- Added 38 tests, none changed, none weakened. Adversarial coverage: identical inputs → distinct run_ids (unit + pipeline rerun); same key different scenarios; missing cutoff (mixed + empty); malformed purposes (builder + constructor); forced duplicate run_id; invalid/self/empty supersession; rerun without supersedes; shared Actual without pooling; empty results + partial provenance; duplicate/ordering/equality edges (frozen, equality-by-value, sorted provenance, duplicate-beats-sensitivity, default-path-unchanged).
+
+8. Exact test commands and results
+- New file: `.venv/Scripts/python.exe -m pytest src/tests/test_stage6_artifact_identity.py -q` → 38 passed (rerun by this audit).
+- Stage-6 files (all 9 by explicit path): same runner → 226 passed (measured twice by this audit: -k filter and explicit path list agree, 226/912 collected).
+- Full: `.venv/Scripts/python.exe -m pytest src/tests/ -q` → 910 passed, 2 skipped, 0 failed (912 collected; background run, exit 0).
+- COUNT NOTE: the task brief stated a Stage-6 filter of 230; this audit measures 226 by two methods. The brief's other counts (38 / 910+2) verified exactly. Discrepancy flagged in §10.
+
+9. Evidence for each of the six validation layers
+- L1 unit/identity PASS: distinct run_ids on identical inputs; version constants distinct; purpose vocabulary exact + fail-closed; supersedes preserved/rejected; frozen immutability; equality by value; defaults empty; formulas unchanged (aggregate default-path test + Prompt 35 numerics inside the 226).
+- L2 contract/boundary PASS: pipeline result carries artifact; cutoff single/mixed/empty; fabricated-default check; rerun distinct ids; primary/sensitivity purposes differ; scenario keys intact; no serialization boundary invented (none exists).
+- L3 production-path PASS: primary + sensitivity artifacts via the real pipeline; multi-scenario shared-Actual; ReportVersion/publication surfaced; rerun with/without supersedes — all asserting returned metadata content, not field existence.
+- L4 adversarial PASS: every §5 prompt case exercised (see §7); none skipped. Counterfactual anchors: forced-duplicate-run_id (purpose still distinguishes), duplicate-beats-sensitivity ordering, multi-period distinct-set (collapse-to-one would fail), shared-Actual no-pooling (pooling would fail counts).
+- L5 regression PASS: 38 + 226 + full 910/2 green; Prompt 35 isolation intact; formulas/policies unchanged; no horizon/version mixing, TTM double counting, or scenario pooling; Stages 1-5 untouched; Reliability withheld; no DB/migration.
+- L6 independent audit (this audit) PASS: complete diff re-read; every populated field traced to an authoritative source (§2); no fabricated timestamp/provenance/version/supersession; identity vs model-version vs scenario unconfused; primary/sensitivity identifiable; no immutability/persistence overclaim; no unrelated methodology/Reliability/Stage 1-5 change (diff is +124/-5 across 2 src files plus the new contract).
+
+10. Remaining blockers / fields not yet truthfully populable
+- COUNT DISCREPANCY (minor, non-blocking): brief says Stage-6 filter 230, audit measures 226 twice. No tests missing — 9 files, 226 collected, all pass; likely a counting-method difference. Recommend the by-path file list used here as the recount rule.
+- run_id non-deterministic by design; cross-run linkage only via explicit supersedes. supersedes references are format-validated only; existence unverifiable without a persistence layer. evaluation_cutoff is None for mixed-cutoff/empty batches — honest, but downstream consumers must handle None.
+- Methodology blockers: none. Formulas, eligibility, pairing, and NULL conventions unchanged.
+
+11. Persistence confirmation
+- No database table, migration, storage backend, or persistence mechanism was added. The artifact is an in-memory frozen dataclass attached to EvaluationPipelineResult. git status shows no migration/schema files (only aggregate.py, pipeline.py, stage_6_prompts.md modified plus the 2 new files).
+
+12. Scope confirmations
+- Stages 1-5 untouched (no Stage 1-5 files in diff or status). Reliability remains withheld (no Reliability formula/mapping; govern path unchanged). No Forward P/E or valuation change. No Stage 6 formula/policy change.
+- This audit performed no git mutations (read-only diff/status as tasked) and no code edits except this REPORT append.
+
+13. Final status
+- Stage 6 remains NOT FROZEN.
+
+GATE: SUCCESS — versioned artifact identity and provenance contract implemented at the pipeline result boundary, all populated provenance grounded in authoritative sources, Prompt 35 scenario isolation preserved, six-layer validation with recorded evidence. Stage 6 NOT FROZEN.
+

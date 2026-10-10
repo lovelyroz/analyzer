@@ -66,6 +66,12 @@ from src.evaluation.aggregate import (
     SeriesEvaluation,
     SeriesKey,
     aggregate_observations,
+    _series_key_for,
+)
+from src.evaluation.artifact import (
+    EvaluationArtifactIdentity,
+    SeriesProvenance,
+    build_artifact,
 )
 from src.evaluation.observation import (
     EvaluationObservation,
@@ -79,7 +85,7 @@ from src.evaluation.reliability import (
     govern_aggregates,
     oos_observations,
 )
-from src.evaluation.schema import ActualObservation
+from src.evaluation.schema import ActualObservation, is_valid_report_version
 from src.forecast.schema import ForecastRecord
 
 PIPELINE_PARAMETERS_VERSION = "STAGE6_V1"
@@ -112,6 +118,10 @@ class EvaluationPipelineResult:
     evaluation_timestamp: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+    # Stage 6 Prompt 36: versioned artifact identity + per-series provenance.
+    # Always populated for pipeline-built results; None default keeps direct
+    # constructions working (backward compatible).
+    artifact: Optional[EvaluationArtifactIdentity] = None
 
 
 def run_evaluation_pipeline(
@@ -121,6 +131,9 @@ def run_evaluation_pipeline(
     baselines: Optional[Mapping[tuple, Optional[float]]] = None,
     ttm_observations: Optional[List[EvaluationObservation]] = None,
     parameters_version: str = PIPELINE_PARAMETERS_VERSION,
+    *,
+    exclude_estimated: bool = False,
+    supersedes: Optional[str] = None,
 ) -> EvaluationPipelineResult:
     """Evaluate one batch end to end: records -> Actuals -> verdicts.
 
@@ -141,10 +154,17 @@ def run_evaluation_pipeline(
       already carry its own key; the path scores each exactly once inside
       its own series group and proves conservation (never double counted,
       never silently dropped).
+    * ``exclude_estimated`` — Stage 6 Prompt 36 sensitivity path: when True,
+      observations whose attached Actual is ESTIMATED quarantine as
+      ``SENSITIVITY_ESTIMATED_EXCLUDED`` (same formulas otherwise). The
+      artifact purpose records which path ran.
+    * ``supersedes`` — optional run_id of a prior artifact this run replaces;
+      preserved verbatim on the artifact (None when this is not a rerun).
 
     Returns one verdict per (company, metric, horizon, version, scenario)
     series. Aggregation groups per scenario, so Bear, Base, and Bull never
-    pool observations.
+    pool observations. The result always carries a versioned artifact
+    identity with per-series ReportVersion provenance.
     """
     observations: List[EvaluationObservation] = []
     for record in records:
@@ -173,7 +193,9 @@ def run_evaluation_pipeline(
             )
             ttm_accounted[key] += 1
 
-    aggregates = aggregate_observations(observations, baselines)
+    aggregates = aggregate_observations(
+        observations, baselines, exclude_estimated=exclude_estimated
+    )
     governed = govern_aggregates(aggregates, parameters_version)
 
     verdicts: Dict[SeriesKey, SeriesPipelineVerdict] = {}
@@ -188,6 +210,79 @@ def run_evaluation_pipeline(
     for series in aggregates.values():
         quarantined.update(series.quarantined)
 
+    # Stage 6 Prompt 36: evaluation cutoff is the single distinct
+    # data_cutoff_datetime across input records — None when records are
+    # empty or cutoffs differ (honest, never fabricated).
+    cutoffs = {record.data_cutoff_datetime for record in records}
+    evaluation_cutoff = next(iter(cutoffs)) if len(cutoffs) == 1 else None
+
+    # Stage 6 Prompt 36: per-series provenance from the pre-aggregation
+    # observations. ScoredObservation does not carry the Actual object, so
+    # ReportVersion id/publication come from observations whose attached
+    # Actual is valid; quality states come from the scored items in each
+    # aggregate. Multi-period series keep the distinct SET (sorted) — never
+    # collapsed to one fabricated id. Empty tuples = explicitly unavailable.
+    scored_keys = {
+        item.key.as_tuple()
+        for series in aggregates.values()
+        for item in series.observations
+        if item.scored
+    }
+    valid_actuals: Dict[SeriesKey, set] = {}
+    scored_states: Dict[SeriesKey, set] = {}
+    for observation in observations:
+        series_key = _series_key_for(observation.key)
+        if observation.key.as_tuple() not in scored_keys:
+            continue
+        actual = observation.actual
+        if actual is None or not is_valid_report_version(actual):
+            continue
+        valid_actuals.setdefault(series_key, set()).add(
+            (actual.report_version_id, actual.publication_datetime)
+        )
+    for key, series in aggregates.items():
+        scored_states[key] = {
+            item.data_quality_state
+            for item in series.observations
+            if item.scored and item.data_quality_state is not None
+        }
+    series_keys = set(aggregates) | set(valid_actuals)
+    provenance = tuple(
+        SeriesProvenance(
+            series=key,
+            report_version_ids=tuple(
+                sorted(
+                    {
+                        report_id
+                        for report_id, _ in valid_actuals.get(key, set())
+                        if report_id is not None
+                    }
+                )
+            ),
+            publication_datetimes=tuple(
+                sorted(
+                    {
+                        published
+                        for _, published in valid_actuals.get(key, set())
+                        if published is not None
+                    }
+                )
+            ),
+            data_quality_states=tuple(sorted(scored_states.get(key, set()))),
+        )
+        for key in sorted(series_keys)
+    )
+
+    artifact = build_artifact(
+        purpose=(
+            "SENSITIVITY_ESTIMATED_EXCLUDED" if exclude_estimated else "PRIMARY"
+        ),
+        methodology_version=parameters_version,
+        evaluation_cutoff=evaluation_cutoff,
+        series_provenance=provenance,
+        supersedes=supersedes,
+    )
+
     return EvaluationPipelineResult(
         verdicts=verdicts,
         series_count=len(verdicts),
@@ -195,6 +290,7 @@ def run_evaluation_pipeline(
             series.total_observations for series in aggregates.values()
         ),
         quarantined=dict(quarantined),
+        artifact=artifact,
     )
 
 

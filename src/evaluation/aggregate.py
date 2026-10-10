@@ -140,6 +140,8 @@ def _quarantined(
 def score_observation(
     observation: EvaluationObservation,
     baseline_value: Optional[float] = None,
+    *,
+    exclude_estimated: bool = False,
 ) -> ScoredObservation:
     """Attach authorized error metrics to one P18 observation.
 
@@ -147,16 +149,31 @@ def score_observation(
     invalid; absolute error is always retained for numeric pairs. A missing
     baseline value yields missing baseline metrics — never an invented
     fallback value.
+
+    Stage 6 Prompt 36 sensitivity path: when ``exclude_estimated`` is True,
+    observations whose attached Actual carries ``data_quality_state ==
+    "ESTIMATED"`` are quarantined with reason
+    ``SENSITIVITY_ESTIMATED_EXCLUDED``. Same formulas otherwise — no metric,
+    schema, reliability, or stage changes.
     """
     if observation.evaluation_status != "READY":
         return _quarantined(observation, observation.evaluation_status, baseline_value)
     if observation.duplicate_key is not None:
         return _quarantined(observation, "DUPLICATE_QUARANTINED", baseline_value)
+    if (
+        exclude_estimated
+        and observation.actual is not None
+        and observation.actual.data_quality_state == "ESTIMATED"
+    ):
+        return _quarantined(
+            observation, "SENSITIVITY_ESTIMATED_EXCLUDED", baseline_value
+        )
 
     # Stage 6 Prompt 25 (Part B): single source of truth — the Part A
     # ``is_scoring_eligible`` predicate (PARTICIPATING_QUALITY_STATES).
     # Order: non-READY (covers INVALID_REPORT_VERSION verbatim) → duplicate
-    # → eligibility → MISSING_VALUE on None forecast/actual (NULL != 0) →
+    # → Prompt 36 sensitivity-exclusion (ESTIMATED only, opt-in) → eligibility
+    # → MISSING_VALUE on None forecast/actual (NULL != 0) →
     # regime scoring. Zero-Actual (Actual=0 / Forecast!=0) scores normally:
     # P25-authorized since classify_regime(f != 0, 0) is None (f*a = 0 is
     # not < 0) and PE/APE over |Forecast| are valid there.
@@ -306,6 +323,8 @@ def aggregate_series(
 def aggregate_observations(
     observations: List[EvaluationObservation],
     baselines: Optional[Mapping[tuple, Optional[float]]] = None,
+    *,
+    exclude_estimated: bool = False,
 ) -> Dict[SeriesKey, SeriesEvaluation]:
     """Score P18 observations and aggregate each isolated series.
 
@@ -317,7 +336,11 @@ def aggregate_observations(
     supplied = dict(baselines or {})
     flagged = flag_duplicates(list(observations))
     scored = [
-        score_observation(item, supplied.get(item.key.as_tuple()))
+        score_observation(
+            item,
+            supplied.get(item.key.as_tuple()),
+            exclude_estimated=exclude_estimated,
+        )
         for item in flagged
     ]
     groups: Dict[SeriesKey, List[ScoredObservation]] = {}
