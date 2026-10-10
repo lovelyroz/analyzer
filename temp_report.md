@@ -5060,3 +5060,59 @@ Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choic
 
 GATE: SUCCESS — versioned artifact identity and provenance contract implemented at the pipeline result boundary, all populated provenance grounded in authoritative sources, Prompt 35 scenario isolation preserved, six-layer validation with recorded evidence. Stage 6 NOT FROZEN.
 
+REPORT — Stage 6 Prompt 37: Evaluation Artifact Production-Boundary Contract
+
+Date: 2026-10-10. Authority: (a) owner delegation of technical methodology choices to ChatGPT in the active ChatGPT conversation on 2026-10-09 (owner delegated selection of correct/optimal technical choices; did NOT personally select any formula or option); (b) owner personally approved ONLY the scenario-separation policy (Bear/Base/Bull separate throughout keys, records, outputs, counts, comparisons). Nothing below claims owner authorship of any formula or option. No git operations were performed in this task (hard rule); this report append plus one new test file are the only working-tree changes.
+
+1. Files inspected and changed
+- Inspected: D:/winprojects/analyzer/src/evaluation/artifact.py (build_artifact single construction boundary, lines 88-134), D:/winprojects/analyzer/src/evaluation/pipeline.py (EvaluationPipelineResult lines 110-124, run_evaluation_pipeline lines 127-294), the Prompt 36 report (temp_report.md lines 4994-5061) and the Prompt 35 report (temp_report.md lines 4942-4992).
+- Repo-wide symbol search (src/ excluding tests): exactly one `EvaluationPipelineResult(` construction site (pipeline.py line 286); no non-test importer/caller of run_evaluation_pipeline; `\.artifact` hits only the producer lines (pipeline.py lines 71, 124, 276, 293) plus test_stage6_artifact_identity.py. No downstream production consumer dereferences result.artifact.
+- Changed src: none (no production change required — Case A).
+- New tests (1 file): D:/winprojects/analyzer/src/tests/test_stage6_artifact_boundary.py (7 tests). No existing test files modified. No Stages 1-5 files touched. No spec changes.
+
+2. The actual production call path
+- run_evaluation_pipeline (pipeline.py line 127) → observations → aggregate_observations → govern_aggregates → cutoff computation (lines 216-217) → provenance build (lines 225-274) → build_artifact (line 276) → return EvaluationPipelineResult(..., artifact=artifact) (line 286). The build_artifact call is unconditional: no branch, early return, or exception path between it and the return can drop the artifact on a successful return. There is exactly one return statement in the function.
+
+3. Whether artifact=None was reachable in successful production results
+- No. On every successful production return the artifact is built and attached unconditionally. artifact=None is reachable ONLY through direct legacy construction (EvaluationPipelineResult() with the Optional/None default, kept by Prompt 36 for backward compatibility). No real production path constructs results directly; the default is never exercised by the pipeline.
+
+4. Implementation decision: Case A
+- No production-path bypass exists, so per §3 Case A rules: no breaking change to the Optional default (it is needed for legacy direct constructors), focused regression tests added (new boundary file), and the remaining compatibility limitation documented precisely in §11 below. No claim is made that manually constructed results are guaranteed to carry an artifact.
+
+5. Empty and mixed-cutoff behavior and its authority
+- Empty batch (no records): valid successful production evaluation; artifact present with evaluation_cutoff=None and series_provenance==() — explicitly represented emptiness, never fabricated (test_cutoff_empty_records_none in Prompt 36; test_production_empty_result_carries_explicit_empty_artifact here). Authority: pipeline.py lines 216-217 (single-distinct-cutoff, None when empty/differing) as established in the Prompt 36 report §2/§5.
+- Mixed-cutoff batch: currently accepted as a successful production evaluation with evaluation_cutoff=None (honest, never fabricated; test_cutoff_mixed_none in Prompt 36; test_production_mixed_cutoff_result_still_carries_artifact here). Per §4 rules this was checked, not redesigned: the existing contract accepts such batches and the pipeline does not reject them, so the None-cutoff acceptance is the existing supported behavior, preserved unchanged. No methodology decision was required; no Case C trigger.
+- ReportVersion IDs and publication timestamps unchanged from Prompt 36 (is_valid_report_version gate; empty tuples when unavailable; no latest-report or current-time substitution).
+
+6. Tests added or changed
+- Added D:/winprojects/analyzer/src/tests/test_stage6_artifact_boundary.py, 7 tests, none changed, none weakened: (1) primary production return carries valid artifact with field-content assertions (versions, purpose, cutoff); (2) empty production return carries explicit empty artifact; (3) sensitivity return carries SENSITIVITY_ESTIMATED_EXCLUDED artifact; (4) mixed-cutoff return still carries artifact with honest None cutoff; (5) rerun return carries artifact with supersedes link; (6) multi-scenario return carries per-scenario provenance; (7) legacy direct-construction default is None (documents the compatibility limitation). Adversarial coverage: missing artifact cannot occur through the real pipeline (single unconditional construction site — stated with the reason per §6 Layer 4); malformed artifact metadata rejected at build_artifact/direct constructor (Prompt 36 tests, still passing); empty, mixed-cutoff, primary-vs-sensitivity, shared-Actual multi-scenario, and legacy-construction paths all exercised.
+
+7. Exact commands, explicit Stage 6 test-file list, collection counts and pass/fail/skip counts
+- New file: `.venv/Scripts/python.exe -m pytest src/tests/test_stage6_artifact_boundary.py -q` → 7 passed.
+- Stage-6 explicit list (10 files): test_stage6_artifact_identity.py, test_stage6_artifact_boundary.py, test_stage6_evaluation.py, test_stage6_evaluation_foundation.py, test_stage6_evaluation_metrics.py, test_stage6_p25_adversarial.py, test_stage6_p25_selection.py, test_stage6_production_pipeline.py, test_stage6_reliability_governance.py, test_stage6_scenario_isolation.py → 233 passed, 0 failed, 0 skipped.
+- Prompt-36-era 9 files (same list minus the new boundary file), collect-only: 226 tests collected — reproduces the Prompt 36 audit's 226 exactly.
+- 230-vs-226 discrepancy resolution (actual collection evidence, not guessing): the 9-file collect-only count is 226; adding the 7 new boundary tests gives 233 (226+7=233, verified by the 10-file run). The brief's figure of 230 matches neither measured count; the measured evidence supports 226 as the correct Prompt-36-era count, consistent with the Prompt 36 report's own COUNT NOTE (brief said 230, audit measured 226 twice). The 4-test gap is therefore attributable to the brief's counting method, not to missing or added tests.
+- Full: `.venv/Scripts/python.exe -m pytest src/tests/ -q` (re-run with `-p no:warnings` to surface the tail) → 917 passed, 2 skipped, 0 failed (919 collected; 910 prior + 7 new + 2 previously-existing... precisely: Prompt 36 full was 910 passed + 2 skipped = 912 collected; now 917 passed + 2 skipped = 919 collected; delta +7 passed = the new boundary tests). All commands run with D:/winprojects/analyzer/.venv/Scripts/python.exe.
+
+8. Evidence for all six validation layers
+- L1 unit/invariant PASS: boundary tests assert artifact field content (run_id non-empty; ARTIFACT_V1 / STAGE6_V1 / DATA_QUALITY_P25; purpose PRIMARY vs SENSITIVITY_ESTIMATED_EXCLUDED; cutoff populated) plus Prompt 36's 38 identity tests still green inside the 233.
+- L2 contract/boundary PASS: public pipeline returns always carry artifacts (6 of 7 boundary tests); legacy direct constructor default None pinned as documented compatibility (1 test); invalid artifact inputs rejected at builder/constructor (Prompt 36 tests green).
+- L3 production-path integration PASS: real pipeline exercised for non-empty primary, empty, sensitivity, mixed-cutoff, rerun-with-supersedes, and multi-scenario cases; returned artifact metadata content inspected in each.
+- L4 adversarial/negative PASS: every §6 case addressed — missing artifact on production return (cannot occur: single unconditional construction site; nearest boundary tested instead = legacy-construction default test + unconditional-attach assertions); malformed metadata (Prompt 36 rejection tests green); empty (explicit-empty test); mixed cutoffs (honest-None test, behavior preserved per §4); primary vs sensitivity (purpose test); shared-Actual multi-scenario (per-scenario provenance test); legacy bypass (default-None documented, production path unaffected).
+- L5 regression PASS: 7 new + 233 Stage-6 + full 917 passed/2 skipped green; Prompt 35 isolation file still passes inside the 233; no formulas/policies changed.
+- L6 independent audit PASS: final re-read of pipeline.py return path (single return, unconditional build_artifact at line 276 → attach at line 293); artifact invariant holds at the production boundary, not via test-only masking; empty/mixed-cutoff follow Prompt 36 authority; scenario isolation and provenance intact; only change is the new test file (no src edits); reported counts match the commands actually run (7 / 233 / 226 collect-only / 917+2).
+
+9. Scenario isolation, provenance and financial methodology preserved
+- Bear/Base/Bull isolation intact (per-scenario provenance test; Prompt 35's 22 isolation tests green inside the 233). No pooling of scenario statistics. Artifact identity still distinct from scenario, model version, artifact-contract version and methodology version. Primary vs sensitivity artifacts distinguishable by purpose. Supersession explicit only. All Prompt 35/36 formulas, eligibility, MAPE/Bias behavior, ZERO_BASE rules, baseline comparisons, sufficiency thresholds unchanged (zero src modifications).
+
+10. Stages 1-5, Reliability, persistence confirmations
+- Stages 1-5 untouched (only change is the new Stage 6 test file). Reliability remains withheld (no Reliability code touched). No Forward P/E or valuation change. No database tables, migrations, or persistence added (no src changes at all).
+
+11. Remaining limitations and final status
+- Compatibility limitation (documented, not fixed per Case A rules): EvaluationPipelineResult() constructed directly still defaults to artifact=None. This affects only manual/legacy construction; no production path does this. Making the field required would be a breaking change with no production benefit, so it was deliberately not made.
+- No downstream production consumer currently reads .artifact (verified by search); consumers must still handle evaluation_cutoff=None for mixed-cutoff/empty batches (honest-None contract from Prompt 36).
+- run_id remains non-deterministic by design (uuid4); supersedes references remain format-validated only.
+- Stage 6 remains NOT FROZEN. No Reliability work begun. No git operations performed.
+
+GATE: SUCCESS — Case A established by call-path evidence (single unconditional construction site); production artifact invariant proven by 7 focused regression tests; Prompt 36's 226 count reproduced with the 230-vs-226 discrepancy resolved by collection evidence; full suite 917 passed + 2 skipped green. Stage 6 NOT FROZEN.
+

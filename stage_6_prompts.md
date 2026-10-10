@@ -5215,3 +5215,181 @@ Report `SUCCESS` only if the artifact contract is implemented at the actual resu
 Otherwise report `BLOCKED`, identify the precise blocker, and do not claim completion.
 
 Do not proceed to Reliability scoring or Stage 6 freeze as part of this prompt.
+===============================================================
+
+# Stage 6 Prompt 37 — Enforce Evaluation Artifact Presence at the Production Boundary
+
+You are working in the financial-data repository `analyzer`.
+
+## 1. Mission
+
+Perform a narrowly scoped contract-hardening task for the evaluation artifact introduced by Stage 6 Prompt 36.
+
+Determine whether a real production call to `run_evaluation_pipeline` can return an `EvaluationPipelineResult` without a valid evaluation artifact. If it can, implement the smallest safe correction so that every successful production evaluation result carries a valid artifact, including an explicitly represented empty evaluation where supported.
+
+Do not assume that the existing optional field is necessarily a defect: first distinguish actual production behavior from legacy constructors, fixtures and test-only uses.
+
+Stage 6 remains **NOT FROZEN**.
+
+## 2. Required targeted inspection
+
+Inspect only:
+
+* `src/evaluation/artifact.py`
+* `src/evaluation/pipeline.py`
+* Direct callers and constructors of `EvaluationPipelineResult`
+* Tests for the pipeline and artifact contract
+* The Prompt 35 and Prompt 36 reports in `temp_report.md`
+* Relevant existing Stage 6 specification clauses only if needed to resolve a contract question
+
+Use targeted symbol searches. Do not perform a repository-wide review.
+
+Establish:
+
+1. Whether `run_evaluation_pipeline` always builds and attaches an artifact on successful return.
+2. Whether `artifact=None` is reachable through a real production path or only through direct legacy construction.
+3. Whether callers can bypass artifact validation by constructing or modifying a result.
+4. Whether empty results are valid outputs and, if so, how their artifact metadata is represented.
+5. Whether any downstream production consumer assumes the artifact exists.
+
+## 3. Implementation decision rules
+
+### Case A — No production-path bypass exists
+
+If every successful production pipeline result already carries a valid artifact and the optional default is needed only for legacy direct constructors or test fixtures:
+
+* Do not make a breaking change merely for stylistic consistency.
+* Add focused regression tests proving the production invariant.
+* Document the remaining compatibility limitation precisely.
+* Do not claim that every possible manually constructed `EvaluationPipelineResult` is guaranteed to contain an artifact.
+
+### Case B — A production-path bypass exists
+
+If a successful production pipeline result can lack an artifact, correct the narrowest responsible boundary.
+
+Requirements:
+
+* Every successful production evaluation result must carry a valid artifact.
+* Missing or invalid required artifact metadata must not be silently accepted.
+* Preserve backward compatibility only where it does not permit a successful production result to bypass the artifact contract.
+* Update only direct callers and tests affected by the correction.
+* Do not weaken tests or introduce unrelated refactoring.
+
+### Case C — The contract cannot be enforced safely
+
+If enforcing the invariant requires an unresolved methodology decision or a wider architectural change, do not guess. Report `BLOCKED`, provide the exact call path and explain the minimum decision or change required.
+
+## 4. Cutoff and provenance semantics
+
+Check the existing `evaluation_cutoff` behavior without redesigning evaluation methodology.
+
+* Do not fabricate a cutoff for empty or mixed-cutoff batches.
+* Do not substitute the current time or latest available report.
+* Determine whether a mixed-cutoff batch can be a valid successful production evaluation under the existing contract.
+* If the existing pipeline already rejects such batches, preserve that behavior.
+* If mixed-cutoff batches are currently accepted and produce `evaluation_cutoff=None`, determine whether that is an intentional supported contract or an auditability defect. Change behavior only if the current specification and code provide sufficient authority.
+* Preserve the existing treatment of ReportVersion IDs and publication timestamps. Never fabricate missing provenance.
+
+Do not expand this task into redesigning Actual matching, PIT rules, artifact identity generation or persistence.
+
+## 5. Scenario and financial invariants
+
+Preserve all Prompt 35 and Prompt 36 behavior:
+
+* Bear, Base and Bull remain isolated through aggregation and returned results.
+* A shared Actual may be compared against multiple scenario forecasts, but their evaluation statistics must not be pooled.
+* Artifact identity remains distinct from scenario, model version, artifact-contract version and methodology version.
+* Primary and ESTIMATED-excluded sensitivity artifacts remain distinguishable.
+* Explicit supersession remains explicit; do not infer it.
+* Approved financial formulas, eligibility, MAPE/Bias behavior, ZERO_BASE rules, baseline comparisons and sufficiency thresholds remain unchanged.
+* Reliability remains withheld.
+* Forward P/E and valuation formulas remain untouched.
+* Stages 1–5 remain untouched.
+* Do not add database tables, migrations or persistence.
+
+No GitHub, GitHub CLI/API, remote operations, push, pull, commit, branch changes or other Git operations.
+
+## 6. Mandatory six-layer strict validation
+
+### Layer 1 — Unit and invariant tests
+
+Test artifact presence and validity at the correct boundary, artifact identity behavior, empty-result behavior where supported, and unchanged scenario isolation.
+
+### Layer 2 — Contract and boundary tests
+
+Exercise public pipeline returns, legacy direct constructors if still supported, invalid artifact inputs and any relevant result construction boundary.
+
+Prove that compatibility does not silently weaken the production invariant.
+
+### Layer 3 — Production-path integration tests
+
+Run the real pipeline for representative non-empty and empty cases, as applicable. Inspect the returned artifact and its required metadata. Include primary and sensitivity cases if the affected behavior applies to both.
+
+### Layer 4 — Adversarial and negative tests
+
+Include:
+
+* Missing artifact on a successful production return.
+* Invalid or malformed artifact metadata.
+* Empty results.
+* Mixed cutoffs if the existing pipeline permits them.
+* Primary versus sensitivity results.
+* Multiple scenarios sharing the same Actual.
+* Any legacy construction path that could accidentally bypass the invariant.
+
+For any case that cannot occur through the real pipeline, state why and test the nearest meaningful boundary instead.
+
+### Layer 5 — Regression and full-suite validation
+
+Run the focused Stage 6 tests and the full test suite.
+
+Use the established local environment:
+
+`.venv/Scripts/python.exe -m pytest src/tests/ -q`
+
+Record the exact command and actual pass/fail/skip counts. Do not report expected counts as measured results.
+
+For the Stage 6 count, use an explicit list of Stage 6 test files and report the exact list and collection count. Compare the result with Prompt 36's reported 226 tests; explain any discrepancy using actual collection evidence rather than guessing.
+
+### Layer 6 — Independent audit
+
+Re-read the final diff and independently trace the successful production path from `run_evaluation_pipeline` to `EvaluationPipelineResult`.
+
+Verify:
+
+* The artifact invariant is enforced at the correct boundary.
+* No test-only fix masks a production bypass.
+* Empty and mixed-cutoff behavior follows established authority.
+* Scenario isolation and provenance remain intact.
+* No unrelated files or financial methodology were changed.
+* The reported test counts match the commands actually run.
+
+## 7. Reporting
+
+Append a report to `temp_report.md`; do not overwrite prior reports.
+
+Use this exact heading:
+
+`REPORT — Stage 6 Prompt 37: Evaluation Artifact Production-Boundary Contract`
+
+Include:
+
+1. Files inspected and changed.
+2. The actual production call path.
+3. Whether `artifact=None` was reachable in successful production results.
+4. The implementation decision under Case A, B or C.
+5. Empty and mixed-cutoff behavior and its authority.
+6. Tests added or changed.
+7. Exact commands, explicit Stage 6 test-file list, collection counts and pass/fail/skip counts.
+8. Evidence for all six validation layers.
+9. Confirmation that scenario isolation, provenance and financial methodology are preserved.
+10. Confirmation that Stages 1–5 are untouched, Reliability remains withheld, and no persistence or migration was added.
+11. Remaining limitations and final status.
+
+## 8. Completion gate
+
+Report `SUCCESS` only if the production artifact invariant has been demonstrated by actual call-path evidence and all six validation layers pass, or if Case A is established with sufficient regression evidence and the remaining compatibility limitation is explicitly documented.
+
+Otherwise report `BLOCKED`.
+
+Stage 6 must remain **NOT FROZEN**. Do not implement Reliability scoring or proceed to the final Stage 6 freeze.
