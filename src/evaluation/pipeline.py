@@ -88,7 +88,11 @@ from src.evaluation.reliability import (
     govern_aggregates,
     oos_observations,
 )
-from src.evaluation.schema import ActualObservation, is_valid_report_version
+from src.evaluation.schema import (
+    ActualObservation,
+    _normalize_datetime,
+    is_valid_report_version,
+)
 from src.forecast.schema import ForecastRecord
 
 PIPELINE_PARAMETERS_VERSION = "STAGE6_V1"
@@ -169,29 +173,66 @@ def run_evaluation_pipeline(
     pool observations. The result always carries a versioned artifact
     identity with per-series ReportVersion provenance.
 
-    Stage 6 Prompt 38 (Prompt 38 section 4 default conservative rule): one
-    evaluation artifact represents one unambiguous evaluation cutoff. A
-    non-empty invocation mixing distinct non-null cutoffs fails closed
+    Stage 6 Prompt 38 (Prompt 38 section 4 default conservative rule) +
+    Stage 6 Prompt 39 (spec §2-§3): one evaluation artifact represents one
+    unambiguous evaluation cutoff. Every participating Forecast record must
+    carry a valid, normalized, non-null ``data_cutoff_datetime`` and every
+    supplied TTM observation a valid, normalized, non-null
+    ``forecast_cutoff_datetime``; all participating cutoffs must agree after
+    normalization. Any missing/invalid cutoff or distinct cutoffs fail closed
     with ``ValueError`` BEFORE any scoring or artifact construction — no
-    partial successful result is returned. Empty input keeps
-    ``evaluation_cutoff=None`` as explicitly-empty only.
+    partial successful result is returned. Empty input (no records AND no
+    TTM) keeps ``evaluation_cutoff=None`` as explicitly-empty only.
     """
-    # Fail-closed BEFORE any scoring/artifact: distinct non-null cutoffs
-    # in one non-empty invocation must never produce a single-cutoff
-    # artifact (or a None-cutoff artifact mistakable for an empty one).
-    record_cutoffs = {record.data_cutoff_datetime for record in records}
-    record_cutoffs.discard(None)
-    ttm_cutoffs = {
-        observation.key.forecast_cutoff_datetime
-        for observation in (ttm_observations or [])
-    }
-    ttm_cutoffs.discard(None)
-    distinct = record_cutoffs | ttm_cutoffs
-    if (records or ttm_observations) and len(distinct) > 1:
-        raise ValueError(
-            "mixed evaluation cutoffs in one pipeline invocation: "
-            f"{sorted(distinct)!r}; one artifact requires one cutoff"
-        )
+    # Stage 6 Prompt 39 (spec §2-§3): fail-closed cutoff validation BEFORE
+    # any scoring/aggregation/governance/provenance/artifact. Every
+    # participating Forecast record must carry a valid, normalized, non-null
+    # data_cutoff_datetime, and every supplied TTM observation a valid,
+    # normalized, non-null forecast_cutoff_datetime; all participating
+    # cutoffs must agree after normalization. Missing/invalid cutoffs fail
+    # closed (never silently discarded — D1), distinct cutoffs fail closed
+    # (D-c), and no partial successful result is returned. Empty input (no
+    # records AND no TTM) keeps evaluation_cutoff=None as explicitly empty.
+    # Normalization reuses src.evaluation.schema._normalize_datetime (the
+    # Stage 6 mirror of src.forecast.schema.normalize_datetime: naive
+    # datetimes fold onto UTC, ISO strings parse, tz-aware instants convert)
+    # so equivalent tz-aware instants compare equal. Actual publication
+    # timestamps are never consulted here — later-published valid Actuals
+    # stay eligible outcomes (Rule 10).
+    supplied_ttm = list(ttm_observations or [])
+    if not records and not supplied_ttm:
+        validated_cutoff: Optional[datetime] = None
+    else:
+        normalized_cutoffs: List[datetime] = []
+        for index, record in enumerate(records):
+            normalized = _normalize_datetime(record.data_cutoff_datetime)
+            if normalized is None:
+                raise ValueError(
+                    "missing evaluation cutoff: Forecast record "
+                    f"(index {index}) carries a null or invalid "
+                    "data_cutoff_datetime; one artifact requires one "
+                    "validated cutoff"
+                )
+            normalized_cutoffs.append(normalized)
+        for index, observation in enumerate(supplied_ttm):
+            normalized = _normalize_datetime(
+                observation.key.forecast_cutoff_datetime
+            )
+            if normalized is None:
+                raise ValueError(
+                    "missing evaluation cutoff: TTM observation "
+                    f"(index {index}) carries a null or invalid "
+                    "forecast_cutoff_datetime; one artifact requires one "
+                    "validated cutoff"
+                )
+            normalized_cutoffs.append(normalized)
+        distinct = set(normalized_cutoffs)
+        if len(distinct) > 1:
+            raise ValueError(
+                "mixed evaluation cutoffs in one pipeline invocation: "
+                f"{sorted(distinct)!r}; one artifact requires one cutoff"
+            )
+        validated_cutoff = normalized_cutoffs[0]
     observations: List[EvaluationObservation] = []
     for record in records:
         for metric_code in metric_codes:
@@ -236,14 +277,13 @@ def run_evaluation_pipeline(
     for series in aggregates.values():
         quarantined.update(series.quarantined)
 
-    # Stage 6 Prompt 36 + Prompt 38: evaluation cutoff is the single
-    # distinct non-null cutoff across records (and TTM carriers) — None
-    # only when the input is explicitly empty (honest, never fabricated).
-    # Mixed distinct non-null cutoffs never reach here: the fail-closed
-    # guard at the top of this function raises before any scoring.
-    cutoffs = {record.data_cutoff_datetime for record in records}
-    cutoffs.discard(None)
-    evaluation_cutoff = next(iter(cutoffs)) if len(cutoffs) == 1 else None
+    # Stage 6 Prompt 36 + Prompt 38 + Prompt 39: evaluation_cutoff is the
+    # single validated cutoff from the fail-closed guard above (records +
+    # TTM — D2: TTM-only invocations report their cutoff, never None).
+    # None only when the input is explicitly empty (honest, never
+    # fabricated). Missing/invalid/distinct cutoffs never reach here: the
+    # guard raises before any scoring.
+    evaluation_cutoff = validated_cutoff
 
     # Stage 6 Prompt 36: per-series provenance from the pre-aggregation
     # observations. ScoredObservation does not carry the Actual object, so

@@ -5715,3 +5715,319 @@ Do not label intentionally withheld Reliability as an implementation success, an
 If any authorized defect remains, continue working on it. If an actual authority blocker prevents safe completion, report `BLOCKED — EXPLICIT AUTHORITY REQUIRED` only after completing all other authorized work.
 
 Stage 6 must remain **NOT FROZEN**. Do not implement Reliability scoring, invent methodology, or declare a freeze as part of this task.
+=======================================================================
+
+# Stage 6 Prompt 39 — Close Cutoff Completeness and Perform the Final Independent Readiness Audit
+
+You are the primary engineering agent for the financial-data repository `analyzer`.
+
+## 1. Mission
+
+Complete the remaining Stage 6 closure work in one continuous execution:
+
+1. Inspect and correct the evaluation-cutoff contract, including missing cutoffs and TTM observations.
+2. Add strict regression and adversarial tests for every discovered boundary.
+3. Run the complete six-layer validation workflow.
+4. Fix any additional in-scope, authorized defect found during that workflow.
+5. Run the Stage 6 suite and full test suite again after the final correction.
+6. Independently re-audit the final diff and production call path.
+7. Append one consolidated report only after the work is complete.
+
+Do not stop after diagnosis or after the first successful test run. Do not defer an already identified, authorized correction to another prompt.
+
+Stage 6 remains **NOT FROZEN** unless a separate authorized final freeze approval is explicitly granted. This prompt may establish readiness for that approval, but it must not declare the stage frozen.
+
+## 2. Current evidence and the known defect
+
+Prompt 38 reported:
+
+* Stage 6: 252 passed.
+* Full suite: 936 passed, 2 skipped, 0 failed.
+* Mixed distinct non-null cutoffs are rejected before scoring.
+* Empty evaluations are allowed with `evaluation_cutoff=None`.
+
+Independent review identified a gap in the cutoff guard in `src/evaluation/pipeline.py`:
+
+* The current guard discards `None` values before counting distinct cutoffs.
+* A batch containing one non-null cutoff and another missing cutoff may therefore pass as if all inputs had one valid cutoff.
+* TTM cutoffs are considered in the guard, but the returned `evaluation_cutoff` is calculated from Forecast records only. If TTM observations carry the only valid cutoff, the artifact may incorrectly report `None`.
+
+Treat these as concrete defects to verify against the current code, not as assumptions to copy blindly. Inspect the implementation and prove the actual behavior with tests before editing.
+
+## 3. Authoritative cutoff contract
+
+A non-empty evaluation artifact must have one unambiguous cutoff shared by every Forecast record and every supplied TTM observation that participates in that evaluation.
+
+Apply these rules unless a directly applicable authoritative specification clause explicitly contradicts them:
+
+### A. Non-empty evaluation inputs
+
+* Every participating Forecast record must have a valid, normalized, non-null `data_cutoff_datetime`.
+* Every supplied TTM observation must have a valid, normalized, non-null `forecast_cutoff_datetime`.
+* All participating cutoffs must be equal after applying the project's existing datetime normalization conventions.
+* If any participating input has a missing or invalid cutoff, fail closed before scoring, aggregation, governance, artifact construction or any successful result return.
+* If distinct cutoffs are present, fail closed before any partial successful result is returned.
+* Raise a clear, stable exception consistent with existing project conventions. Its message must identify the cutoff-contract failure without leaking irrelevant data.
+* Do not silently drop the input with a missing cutoff, infer its cutoff from another record, or substitute the current time.
+
+### B. Empty evaluation
+
+An explicitly empty evaluation may have `evaluation_cutoff=None` only when there are no Forecast records and no TTM observations.
+
+Do not treat a non-empty batch containing missing cutoffs as an empty evaluation.
+
+### C. TTM-only or TTM-inclusive evaluation
+
+* When TTM observations are supplied, their cutoffs must participate in the same validation as Forecast record cutoffs.
+* If the valid non-empty evaluation consists only of TTM observations, its artifact cutoff must reflect their single valid cutoff.
+* If Forecast records and TTM observations are combined, all their cutoffs must agree.
+* Do not count TTM observations twice or create an additional series merely to solve cutoff handling.
+
+### D. Datetime normalization
+
+Use the existing authoritative normalization conventions. Equivalent timezone-aware representations of the same instant must not be falsely classified as different cutoffs if the project's normalization contract says they are equivalent.
+
+Naive or malformed datetime values must be handled according to existing project conventions. Do not silently invent a timezone or convert invalid data into a fabricated cutoff.
+
+### E. Actual publication timestamps
+
+Do not confuse the evaluation cutoff with an Actual's publication timestamp.
+
+The Actual is the evaluation outcome and may be published after the forecast cutoff. Preserve the approved first-known Actual selection and provenance rules. Do not reject a valid later-published Actual merely because it postdates the forecast cutoff.
+
+If a genuine conflict with an explicit specification clause is discovered, record the exact clause and its consequence. Do not override explicit authority by guesswork.
+
+## 4. Targeted inspection
+
+Inspect the current versions of:
+
+* `src/evaluation/pipeline.py`
+* `src/evaluation/observation.py`
+* `src/evaluation/schema.py`
+* `src/evaluation/aggregate.py`
+* `src/evaluation/artifact.py`
+* `src/evaluation/reliability.py`
+* Direct callers and relevant tests for the cutoff contract.
+* `06_Stage6_Forecast_Evaluation.md` clauses governing point-in-time correctness, forecast cutoffs, Actual publication times, artifacts and evaluation results.
+* The latest Stage 6 Prompt 35–38 reports in `temp_report.md`.
+
+Use targeted symbol searches and follow the actual production path. Do not conduct an unrelated repository-wide review.
+
+## 5. Implementation requirements
+
+### A. Enforce validation before evaluation work
+
+Place the validation at the earliest correct public pipeline boundary, before scoring, aggregation, governance, provenance construction and artifact construction.
+
+Do not merely add a check in the artifact builder if invalid observations have already been scored.
+
+Validate the complete set of participating Forecast and TTM cutoffs once, using the project's normalization rules.
+
+### B. Derive artifact cutoff from validated inputs
+
+After successful validation, derive the artifact cutoff from the validated complete input set, not from Forecast records alone.
+
+For a non-empty successful evaluation, the artifact cutoff must equal the single validated cutoff. For an explicitly empty evaluation, `None` remains valid.
+
+There must be no alternate branch that returns a non-empty successful evaluation with a missing or ambiguous cutoff.
+
+### C. Preserve compatibility only where safe
+
+Search direct callers and tests affected by stricter validation. Update only the necessary Stage 6 callers and fixtures.
+
+Do not weaken validation merely to preserve fixtures that contain invalid inputs. Correct those fixtures to express a valid case, or explicitly test the expected rejection.
+
+Do not change Stage 5 or the ForecastRecord contract unless an existing authoritative contract proves that a narrowly scoped change is necessary and permitted. Prefer enforcing the Stage 6 boundary.
+
+### D. Preserve all existing Stage 6 methodology
+
+Do not change:
+
+* Error, MAPE, APE or Bias formulas.
+* Actual-zero or ZERO_BASE behavior.
+* First-known Actual selection or exact-tie fail-closed behavior.
+* Data-quality participation and sensitivity policy.
+* Baseline methodology.
+* Sufficiency thresholds and independent counts.
+* Scenario separation.
+* Artifact identity, purpose or supersession semantics.
+* Reliability governance or calibration.
+* Forward P/E or valuation logic.
+
+Reliability remains withheld. Stages 1–5 remain frozen and untouched.
+
+Do not introduce a database table, migration, persistence backend or unrelated refactoring.
+
+No GitHub, GitHub CLI/API, remote operations, push, pull, commit, branch changes or other Git operations.
+
+## 6. Mandatory regression and adversarial test matrix
+
+Add focused tests in the appropriate Stage 6 test files. Tests must assert the actual behavior and returned artifact, not merely the presence of a validation function.
+
+At minimum, cover the following cases:
+
+1. One Forecast record with a valid cutoff succeeds and returns that cutoff.
+2. Multiple Forecast records with the same normalized cutoff succeed.
+3. Equivalent timezone-aware representations of the same instant follow the established normalization contract.
+4. Multiple distinct non-null Forecast cutoffs fail before scoring.
+5. One valid Forecast cutoff plus one missing Forecast cutoff fails closed.
+6. All non-empty Forecast records missing cutoffs fail closed.
+7. A valid Forecast cutoff plus a TTM observation with a missing cutoff fails closed.
+8. Distinct Forecast and TTM cutoffs fail closed.
+9. Matching Forecast and TTM cutoffs succeed and produce the correct artifact cutoff.
+10. TTM-only evaluation with a valid cutoff produces that cutoff in its artifact.
+11. TTM-only non-empty evaluation with a missing cutoff fails closed.
+12. Explicitly empty evaluation succeeds with `evaluation_cutoff=None` and an explicitly empty result.
+13. A rejected batch returns no partial successful result, scored aggregates or artifact.
+14. Reordered and interleaved observations produce the same validity decision and cutoff result.
+15. Scenario-separated Bear/Base/Bull observations sharing one cutoff remain separate after validation.
+16. Scenario-separated inputs with mixed cutoffs fail closed without pooling or returning partial scenario results.
+17. A later-published Actual remains eligible as an outcome when otherwise valid under the approved policy; it must not be confused with the forecast cutoff.
+18. Existing artifact provenance, primary/sensitivity purpose and explicit supersession behavior remain unchanged.
+19. TTM conservation and duplicate-handling invariants remain intact.
+
+For each case, establish whether it is reachable through the public production pipeline. If a case cannot occur, explain why and test the nearest meaningful public boundary.
+
+Add tests for any further cutoff edge case found during inspection. Do not weaken or remove existing meaningful tests.
+
+## 7. Comprehensive Stage 6 closure audit
+
+After implementing the cutoff fix, audit the connected Stage 6 contracts in the actual production path:
+
+Forecast → Actual matching → eligibility/quality → scoring → aggregation → baseline comparison → scenario-separated verdicts → artifact identity/provenance → returned result.
+
+Check the following and fix every in-scope defect that is authorized by the locked specification:
+
+* First-known Actual selection, valid ReportVersion provenance and exact-tie fail-closed behavior.
+* No fabricated publication timestamps, cutoffs, IDs, values or provenance.
+* `SUSPICIOUS` and `UNMAPPED` exclusion; ESTIMATED primary/sensitivity separation.
+* Correct independent valid, Bias-eligible and MAPE-effective counts.
+* Correct Actual-zero and ZERO_BASE status behavior.
+* Correct baseline pairing and NULL/status behavior for unavailable or zero baseline MAPE.
+* Scenario identity in all series keys, aggregation results and artifacts.
+* No cross-scenario pooling, horizon/model-version mixing, duplicate-driven sufficiency inflation or TTM double counting.
+* Artifact identity distinct from artifact version, methodology version, quality-policy version, model version and scenario.
+* Every successful production return carries its artifact.
+* No accidental Reliability score or unauthorized calibration path.
+* No Stage 1–5 changes.
+
+Do not expand the task into a speculative redesign of the financial methodology. Resolve authorized implementation defects; if an actual authority conflict remains, document the precise conflict.
+
+## 8. Six-layer validation — all required
+
+### Layer 1: Unit and mathematical invariants
+
+Test cutoff equality, missing-value rejection, datetime normalization, artifact cutoff derivation, scenario-aware identities, formulas and relevant status/count invariants.
+
+### Layer 2: Contract and boundary validation
+
+Test the public pipeline boundary, missing and malformed cutoffs, mixed cutoffs, empty inputs, TTM-only inputs, artifact construction and invalid-result rejection.
+
+### Layer 3: Production-path integration
+
+Use the real pipeline for valid, empty, Forecast-only, TTM-inclusive, TTM-only, sensitivity and multi-scenario cases. Verify the actual returned cutoff and artifact contents.
+
+### Layer 4: Adversarial and negative validation
+
+Run the full matrix in §6, including mixed cutoffs combined with missing cutoffs, TTM observations, multiple scenarios, duplicate records and reordered inputs.
+
+### Layer 5: Regression and full suite
+
+Run the explicit Stage 6 test-file list, including all current Stage 6 test files and any new test file added by this task. Record the exact filenames and collection counts.
+
+Then run the full suite using the established local command:
+
+`.venv/Scripts/python.exe -m pytest src/tests/ -q`
+
+Record the actual pass/fail/skip counts. Do not copy expected counts from earlier reports.
+
+If any test fails:
+
+1. Inspect the actual failure.
+2. Correct the underlying in-scope defect.
+3. Rerun the failing tests.
+4. Rerun the full explicit Stage 6 set.
+5. Rerun the full test suite after the final code change.
+
+Do not report completion from an intermediate green run.
+
+### Layer 6: Independent final audit
+
+After all changes and final test runs, re-read the entire final diff and trace the production path again.
+
+Verify:
+
+* Every non-empty successful evaluation has exactly one valid cutoff.
+* Forecast and TTM cutoffs are validated together.
+* The artifact cutoff derives from the complete validated input set.
+* Empty evaluation is distinguishable from invalid non-empty evaluation.
+* No rejected invocation can return partial success.
+* Actual publication timestamps remain distinct from the cutoff.
+* All other Stage 6 contracts and scenario isolation remain intact.
+* Test counts match the executed commands.
+* No unauthorized methodology, unrelated code, Stage 1–5 changes, persistence or migration was introduced.
+
+Do not treat the earlier Prompt 38 audit as a substitute for independently auditing the final implementation.
+
+## 9. Continue until the task is genuinely closed
+
+Use this completion loop:
+
+1. Inspect and prove the cutoff defect.
+2. Implement the correction.
+3. Add and run focused regression tests.
+4. Audit all six validation layers.
+5. Fix any additional authorized defect found during the closure audit.
+6. Rerun the complete Stage 6 test set and full suite.
+7. Independently review the final diff and production call path.
+8. Append the report only after the final validation is complete.
+
+Do not append interim reports. Do not defer a known authorized correction to Prompt 40.
+
+If an authority blocker remains, finish every other authorized task first. Then report the exact specification clauses, the precise conflict, why delegated engineering judgment cannot resolve it safely, and the minimum decision needed.
+
+## 10. Final report
+
+Append exactly one consolidated report to `temp_report.md`. Do not overwrite prior reports.
+
+Use this exact heading:
+
+`REPORT — Stage 6 Prompt 39: Cutoff Completeness and Final Readiness Audit`
+
+Include:
+
+1. The confirmed defect and its concrete failure mode.
+2. Files inspected and changed.
+3. The final cutoff contract and its specification authority.
+4. How Forecast and TTM cutoffs are validated and how the artifact cutoff is derived.
+5. Empty, mixed, missing-cutoff and TTM-only behavior.
+6. Actual publication-time versus forecast-cutoff handling.
+7. Tests added or changed and the complete adversarial matrix results.
+8. Exact commands, explicit Stage 6 file list, collection counts and actual pass/fail/skip counts.
+9. Concrete evidence for all six validation layers.
+10. Results of the comprehensive Stage 6 closure audit.
+11. The independent final-diff audit.
+12. Remaining limitations and any actual authority blocker.
+13. Explicit confirmation that Stages 1–5 are untouched, Reliability remains withheld, no persistence/migration was added, and Stage 6 remains NOT FROZEN.
+
+Classify every remaining item as one of:
+
+* Verified correct.
+* Fixed and tested.
+* Deliberately withheld by authority.
+* Unresolved technical defect.
+* Unresolved authority blocker.
+
+## 11. Final status gate
+
+Report `READY FOR FINAL FREEZE GATE` only if:
+
+* All authorized defects found during this task are fixed.
+* The cutoff contract is enforced at the real production boundary.
+* All six validation layers pass with evidence.
+* The full test suite passes, with any skips explained.
+* The final independent audit identifies no remaining actionable, authorized defect.
+
+Otherwise report `BLOCKED — IMPLEMENTATION OR VALIDATION FAILURE`, or `BLOCKED — EXPLICIT AUTHORITY REQUIRED` if and only if a genuine authority conflict remains after all other work is complete.
+
+Do not claim Stage 6 is frozen. Do not implement Reliability scoring. Do not issue an interim report before the final validation is complete.
