@@ -6373,3 +6373,123 @@ Choose exactly one status:
 * `BLOCKED — EXPLICIT AUTHORITY REQUIRED` only if a genuine unresolved policy ambiguity cannot be resolved from the locked specification or existing delegated decisions.
 
 Even if ready, Stage 6 remains NOT FROZEN. A separate independent final freeze gate is still required.
+=============================================================
+# Stage 6 Prompt 42 — Independent Final Freeze Gate
+
+You are the primary engineering agent for `analyzer`, a financial-data application where correctness, auditability, point-in-time integrity, deterministic behavior, and explicit financial invariants take priority over speed.
+
+## Mission
+
+Perform the **independent final freeze gate for Stage 6** following Prompt 41. Decide whether Stage 6 is demonstrably safe to freeze.
+
+This is not another implementation phase. Begin with a read-only audit. Do not assume that a previous report's READY verdict proves correctness. Verify the critical claims against the actual specification, implementation, tests, and recorded results.
+
+If and only if this audit discovers a concrete, reproducible defect within the authorized Stage 6 scope, correct it completely and rerun the required validation. Do not stop at diagnosis, a proposed fix, or a partially passing test set.
+
+## 1. Hard boundaries
+
+* Stages 1–5 are frozen. Do not modify them.
+* Do not modify Stage 7, valuation, or unrelated functionality.
+* Do not perform GitHub, GitHub CLI/API, remote, push, pull, commit, branch, or other Git operations. Read-only local status/diff inspection is permitted.
+* Do not create a database table, migration, persistence layer, or durability guarantee.
+* Do not invent methodology, mappings, thresholds, weights, defaults, or financial values.
+* Do not change approved D1–D5 decisions, financial formulas, quality policies, scenario separation, baseline rules, or point-in-time rules to make tests pass.
+* Do not weaken, delete, skip, or rewrite existing tests merely to obtain a green result.
+* Do not declare Stage 6 frozen if a material blocker remains, a required test cannot be run, or the evidence is insufficient.
+* Keep the inspection narrowly scoped. Do not reload or audit the entire repository.
+
+## 2. Required inspection scope
+
+Read `temp_report.md` sections for Stage 6 Prompts 17–41, concentrating on the latest reports and unresolved findings from P38–P41. Use the reports as claims to verify, not as unquestionable authority.
+
+Inspect only the relevant sections of `06_Stage6_Forecast_Evaluation.md`, especially the specification's identity, cutoff, matching, aggregation, quality, baseline, artifact, and invariant requirements.
+
+Inspect the implementation and directly relevant tests for:
+
+* `src/evaluation/observation.py`
+* `src/evaluation/schema.py`
+* `src/evaluation/pipeline.py`
+* The evaluation artifact, metric, baseline, and governance modules directly called by the production evaluation pipeline
+* The Stage 6 tests covering P38, P39, P40, P41, and the existing Stage 6 regression suite
+
+Do not expand into unrelated subsystems unless a concrete dependency is necessary to verify a specific invariant.
+
+## 3. Mandatory independent audit
+
+Verify the following directly from code and tests:
+
+1. **Canonical identity:** cutoff normalization used by `EvaluationKey` and the P39 cutoff guard agrees. Equivalent instants share one identity; distinct instants remain distinct. Invalid or missing cutoffs fail closed.
+2. **Duplicate handling:** every same-identity collision is quarantined wholesale. No winner-picking, silent merging, order-dependent scoring, or duplicate-driven inflation is possible.
+3. **TTM accounting:** repeated canonical TTM identities count once in `ttm_accounted`; duplicate observations do not inflate scored counts, MAPE/Bias eligibility, sufficiency, baseline pairing, or other aggregates.
+4. **Evaluation isolation:** company, metric, financial period, horizon, model version, cutoff, and scenario are respected. Bear/Base/Bull are never pooled. No missing scenario silently defaults to Base.
+5. **Forecast–Actual matching and PIT:** first-known valid Actual selection remains intact; Actual publication after the forecast cutoff is not automatically treated as input leakage; unavailable or invalid input provenance is not silently treated as clean.
+6. **Financial formulas and eligibility:** Error, Percentage Error, APE, MAPE, Bias, zero-base/sign-change exclusions, independent MAPE/Bias eligible counts, and minimum-observation classifications match the approved specification. No epsilon substitution or missing-as-zero behavior.
+7. **Baseline comparison:** paired observations and scenarios remain aligned. NULL or zero baseline MAPE produces the approved non-computable result and reason; no arbitrary fallback.
+8. **Artifact contract:** unique run identity, distinct version concepts, methodology/quality-policy versioning, cutoff, provenance, reason codes, primary-versus-sensitivity distinction, and explicit supersession metadata are preserved. Do not claim durable immutability or persisted history when the implementation is in-memory only.
+9. **Governance:** Reliability remains withheld unless authoritative numeric mappings exist; Calibration remains `NO_CALIBRATION` where required. No unauthorized scoring or valuation coupling.
+10. **Boundary and regressions:** no Stage 1–5 behavior or frozen Stage 5 forecast is recalculated or altered by Stage 6.
+
+For every item, record the exact implementation/test evidence and whether the invariant passes. A test that only checks a helper is insufficient where the production path can behave differently.
+
+## 4. If a concrete defect is found
+
+Do not stop after documenting it.
+
+* Establish a failing test that reproduces the defect.
+* Implement the smallest complete correction within the authorized Stage 6 boundary.
+* Add adversarial regression coverage for the defect and its important neighboring cases.
+* Preserve all approved methodology and frozen-stage boundaries.
+* Reinspect the actual diff to ensure that no unrelated changes or weakened tests were introduced.
+* Rerun all six validation layers below after the final source change.
+
+If no concrete defect is found, keep the implementation unchanged. Do not refactor merely for style or speculative future concerns.
+
+## 5. Mandatory six-layer validation
+
+Complete all six layers; a single successful unit-test run is not sufficient.
+
+* **L1 — Unit/formula:** verify canonical identity and normalization, financial formulas, eligibility, and aggregation invariants.
+* **L2 — Contract/boundary:** verify invalid, missing, mixed, and conflicting data; fail-closed behavior; frozen-stage and specification boundaries.
+* **L3 — Production-path/integration:** exercise the real Stage 6 pipeline, including Forecast, Actual, TTM, artifact construction, scenario isolation, and baseline integration.
+* **L4 — Adversarial/negative:** test equivalent time representations, duplicate pairs and triples, reordered inputs, conflicting duplicates, distinct periods, cross-scenario/horizon/version cases, and rejected invocations that must not return partial results.
+* **L5 — Regression/full suite:** run the complete Stage 6 regression suite and the full repository test suite using the repository's established local environment. At minimum, use the established command:
+  `.venv/Scripts/python.exe -m pytest src/tests/ -q`
+* **L6 — Independent audit:** reread the final diff and relevant source/tests after testing. Independently check for weakened tests, hidden scope changes, contradictory identity rules, count inflation, policy drift, or any mismatch between the reported results and the actual command output.
+
+Record exact commands and collected, passed, failed, and skipped counts. Identify environmental skips individually and explain why they are not test failures. Do not report a test as passed if it was not executed. If any code changes during remediation, rerun the relevant focused tests, all six layers, and the full suite after the last change.
+
+## 6. Freeze decision
+
+Issue exactly one of these verdicts:
+
+* `APPROVED FOR STAGE 6 FREEZE` — only if all required invariants are independently verified, all six layers pass, the full suite has zero failures, and no material blocker remains.
+* `NOT APPROVED — DEFECT REMAINS` — if a reproducible defect remains unresolved.
+* `NOT APPROVED — INSUFFICIENT EVIDENCE` — if a required test or audit cannot be completed, or evidence is inadequate.
+
+A skipped environmental test must be disclosed. If a skip prevents verification of a material invariant, do not approve the freeze.
+
+A freeze approval is a technical gate verdict, not permission to perform any Git or remote operation. Do not commit, push, tag, or modify branches.
+
+## 7. Reporting
+
+Append a new section to `temp_report.md`; never overwrite earlier reports.
+
+Use this exact heading:
+
+`REPORT — Stage 6 Prompt 42: Independent Final Freeze Gate`
+
+Include:
+
+1. Final verdict and concise rationale.
+2. Files inspected and the purpose of each inspection.
+3. Invariant-by-invariant audit results with specific test/source evidence.
+4. Any defect found, its root cause, correction, and regression coverage—or an explicit statement that no implementation changes were necessary.
+5. Exact six-layer commands and results.
+6. Stage 6 focused-suite and full-suite counts, with every skip identified.
+7. Final diff/scope audit, including confirmation that Stages 1–5 and Stage 7 were not modified.
+8. Explicit confirmation of whether Reliability remains withheld, Calibration status is preserved, and no persistence/migration or Git/remote operation occurred.
+9. Remaining blockers, limitations, or required owner decisions. Do not label any unresolved material issue as harmless.
+
+Do not write the report until the audit and all required validation are complete. Do not claim completion if the process stopped early.
+
+**Important:** Do not freeze Stage 6 merely because Prompts 38–41 reported READY. Freeze approval must be earned by this independent audit. If approved, state clearly that the code is approved for freeze but no Git or remote action was performed.
