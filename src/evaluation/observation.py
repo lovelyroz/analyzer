@@ -86,6 +86,17 @@ class EvaluationKey:
     def __post_init__(self) -> None:
         if not self.scenario:
             raise ValueError("scenario is required: missing scenario must not default to BASE")
+        # Stage 6 Prompt 41 Chunk A: canonical cutoff identity uses the same
+        # authoritative normalization contract as the P39 guard
+        # (src/evaluation/schema._normalize_datetime): naive folds onto UTC,
+        # ISO-8601 strings parse, tz-aware instants convert — so equivalent
+        # instants yield one canonical identity while distinct instants stay
+        # distinct. Immutable (frozen) + deterministic; other dims untouched.
+        object.__setattr__(
+            self,
+            "forecast_cutoff_datetime",
+            _normalize_datetime(self.forecast_cutoff_datetime),
+        )
 
     def as_tuple(self) -> Tuple[Any, ...]:
         return (

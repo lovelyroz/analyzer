@@ -6203,3 +6203,173 @@ Use one of these final statuses:
 
 Even if the result is `READY FOR FINAL FREEZE GATE`, **Stage 6 remains NOT FROZEN**. A separate independent final freeze gate is still required.
 =============================================================
+
+# Stage 6 Prompt 41 — Normalize Cutoff Identity and Revalidate Duplicate Invariants
+
+You are the primary engineering agent for `analyzer`, a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and explicit financial invariants are mandatory.
+
+## 1. Objective
+
+Resolve a newly identified Stage 6 identity-consistency risk before the final freeze gate.
+
+Prompt 39 normalizes cutoffs for artifact-level validation. However, `src/evaluation/observation.py` currently constructs `EvaluationKey` using the raw `record.data_cutoff_datetime`. This creates a potential mismatch between:
+
+* cutoff equality used by the Prompt 39 validation guard; and
+* cutoff equality used by canonical observation identity and duplicate detection.
+
+For example, the same instant represented once as a naive datetime interpreted under the existing UTC-normalization contract and once as an equivalent timezone-aware datetime may pass the cutoff guard as equal but fail to compare equal inside the canonical identity.
+
+**Verify this against the current implementation before changing anything. If confirmed, fix it at the canonical identity boundary, preserve the existing authority, and complete all validation in this prompt. Do not stop after diagnosis.**
+
+Stage 6 must remain NOT FROZEN.
+
+## 2. Locked constraints
+
+* Stages 1–5 remain frozen and must not be modified.
+* Stage 4 remains an adapter/evidence boundary; Stage 5 must not be recalculated.
+* Preserve the existing canonical `EvaluationKey` dimensions: company, metric, financial period, forecast horizon, model version, forecast cutoff, and scenario.
+* Preserve the approved cutoff normalization semantics from Prompt 39.
+* Preserve the authorized duplicate policy: canonical identity collisions are handled by the existing wholesale `DUPLICATE_QUARANTINED` path; never silently select a winner.
+* Duplicate observations must not inflate scored observations, general valid counts, Bias-eligible counts, MAPE-effective counts, sufficiency, or baseline pairing.
+* Distinct identity dimensions must remain distinct. Do not deduplicate merely because values match.
+* Bear/Base/Bull, horizons, and model versions must remain isolated.
+* Preserve Actual-selection and provenance rules, including eligibility of later-published Actual outcomes.
+* Reliability remains withheld/NULL. Do not invent scoring mappings.
+* No valuation or Stage 7 changes.
+* No database table, migration, persistence backend, or unsupported durability claims.
+* No Git, GitHub, remote, commit, push, pull, or branch operations.
+* Do not conduct unrestricted repository-wide exploration.
+
+## 3. Inspect the minimum necessary code
+
+Read the exact relevant authority in `06_Stage6_Forecast_Evaluation.md`, including Sections 4, 7, 14, and 42, plus the approved duplicate and cutoff decisions recorded in `temp_report.md`.
+
+Inspect only these relevant Stage 6 files and direct dependencies:
+
+* `src/evaluation/observation.py`
+* `src/evaluation/schema.py`
+* `src/evaluation/pipeline.py`
+* `src/tests/test_stage6_p39_cutoff.py`
+* `src/tests/test_stage6_p40_duplicates.py`
+* Existing Stage 6 tests directly covering key equality, duplicate detection, cutoff normalization, TTM accounting, and scenario/horizon/model-version separation.
+
+Confirm the actual behavior of `evaluation_key_for`, `EvaluationKey.as_tuple()`, the cutoff normalizer, and the duplicate aggregation path.
+
+## 4. Required implementation
+
+If the suspected inconsistency is confirmed:
+
+1. Ensure canonical observation identity uses the same authoritative cutoff normalization contract as the Prompt 39 guard. Equivalent instants must yield equivalent canonical cutoff identity, regardless of whether their original representation is naive UTC-normalized, timezone-aware, or a valid ISO-8601 representation accepted by the existing contract.
+
+2. Do not weaken the cutoff guard or change its fail-closed rules. Invalid or missing cutoffs must still fail before scoring.
+
+3. Ensure the canonical identity remains immutable and deterministic. Preserve all non-cutoff identity dimensions unchanged.
+
+4. Keep the existing duplicate policy intact. If two observations collide after canonical normalization, the existing duplicate-handling path must quarantine the collision wholesale rather than pick a winner.
+
+5. Ensure genuinely different instants remain different identities and that scenario, horizon, model version, company, metric, and financial period still distinguish observations as required.
+
+6. Inspect all direct consumers of `EvaluationKey` and its tuple representation within Stage 6. Update affected callers/tests if necessary, without changing unrelated interfaces or Stages 1–5.
+
+7. Do not add an alternate identity or a special-case workaround in only the pipeline. Fix the canonical identity contract at its proper boundary.
+
+If the concern is not reproducible, document the exact code-level reason and prove equivalence using production-path tests. Do not make unnecessary source changes merely to create a diff.
+
+## 5. Mandatory regression matrix
+
+Add or update tests proving:
+
+* Naive UTC-normalized and UTC-aware representations of the same instant produce the same canonical cutoff identity.
+* Equivalent instants represented with different timezone offsets produce the same canonical identity.
+* Valid equivalent ISO-8601 and datetime representations behave consistently with the existing normalizer.
+* Genuinely distinct instants remain distinct identities.
+* Two otherwise identical observations with equivalent cutoff representations trigger the existing duplicate quarantine behavior and cannot both contribute to aggregate counts.
+* Three equivalent cutoff representations are handled deterministically, with no winner-pick.
+* Reordering equivalent-cutoff inputs does not change the result.
+* A repeated TTM observation represented with an equivalent cutoff cannot inflate `ttm_accounted` or any scored/effective/sufficiency/baseline count.
+* Forecast/TTM overlap is detected when the only representational difference is the equivalent cutoff form.
+* Distinct financial periods remain distinct even when all other values and cutoff instants match.
+* Different scenarios, horizons, and model versions remain isolated.
+* Missing, invalid, or mixed actual cutoff instants still fail closed under Prompt 39.
+* Empty and TTM-only behavior remains correct.
+* Later-published Actuals remain eligible outcomes under the approved policy.
+* No rejected invocation returns a partial successful result or misleading artifact.
+
+Assert actual identities, quarantine reasons, result values, and counts. Merely asserting that functions return or exceptions are raised is insufficient.
+
+## 6. Mandatory six-layer validation
+
+Complete all six layers in one continuous workflow. Fix any discovered defect and repeat affected layers plus regression validation. Do not stop at the first green run.
+
+**Layer 1 — Unit and identity invariants**
+
+* Test canonical cutoff normalization and key equality directly.
+* Verify equivalent representations compare equal and distinct instants remain distinct.
+* Verify unchanged identity dimensions.
+
+**Layer 2 — Contract and boundary validation**
+
+* Test missing, invalid, equivalent, and genuinely mixed cutoffs.
+* Test conflicting canonical identities and confirm existing wholesale quarantine behavior.
+* Verify that invalid cutoffs never enter scoring.
+
+**Layer 3 — Production-path integration**
+
+* Run observations through `run_evaluation_pipeline`, duplicate detection, aggregation, baseline comparison, scenario results, and artifact construction.
+* Prove equivalent representations cannot bypass duplicate detection.
+
+**Layer 4 — Adversarial and negative testing**
+
+* Exercise reordered inputs, three-way duplicates, Forecast/TTM overlap, equivalent timezone representations, and cross-scenario/horizon/version cases.
+* Verify deterministic outcomes and no partial result on rejection.
+
+**Layer 5 — Regression and full suite**
+
+* Run the complete focused Stage 6 suite, including all Prompt 39 and Prompt 40 tests and existing direct identity/normalization tests.
+
+* Run the full suite using:
+
+  `.venv/Scripts/python.exe -m pytest src/tests/ -q`
+
+* If a test fails, investigate and fix the underlying issue; do not weaken tests or conceal failures.
+
+* Rerun affected focused tests and the full suite after fixes.
+
+* Report exact collected, passed, failed, and skipped counts, with reasons for skips.
+
+**Layer 6 — Independent diff and invariant audit**
+
+* Re-read all changed source and test hunks.
+* Independently verify that cutoff normalization and canonical identity now agree.
+* Verify no duplicate inflation, no arbitrary winner selection, and no accidental merging of distinct observations.
+* Verify Prompt 39 cutoff completeness and artifact-cutoff behavior remain intact.
+* Verify Stages 1–5 and Stage 7 remain untouched, Reliability remains withheld, and no persistence or Git/remote operations were introduced.
+
+## 7. Reporting and completion
+
+Do not stop after diagnosis. Complete authorized corrections, tests, regression runs, and the final diff audit before reporting.
+
+Append one consolidated report to `temp_report.md`; never overwrite prior reports. Use this exact heading:
+
+`REPORT — Stage 6 Prompt 41: Canonical Cutoff Identity Closure`
+
+Include:
+
+1. Whether the suspected inconsistency was confirmed and how it was demonstrated.
+2. The authoritative normalization function and canonical identity path.
+3. The root cause and exact code correction, or the evidence supporting a no-change conclusion.
+4. Every changed file and the reason for each change.
+5. The complete equivalent-versus-distinct cutoff regression matrix and results.
+6. The six validation layers, commands, and measured outcomes.
+7. Focused Stage 6 and full-suite collected/passed/failed/skipped counts.
+8. The independent diff audit and confirmation that duplicate, cutoff, scenario, horizon, and model-version invariants remain intact.
+9. Confirmation that Stages 1–5 and Stage 7 were untouched, Reliability remains withheld/NULL, no persistence/migration was added, and no Git/remote operations were performed.
+10. Every unresolved defect or authority blocker, if any.
+
+Choose exactly one status:
+
+* `READY FOR FINAL FREEZE GATE` only if the suspected issue is either fixed or conclusively disproved, all authorized invariants are verified, all six validation layers pass, and the full suite has zero failures.
+* `BLOCKED — IMPLEMENTATION OR VALIDATION FAILURE` if an authorized defect or required validation remains unresolved.
+* `BLOCKED — EXPLICIT AUTHORITY REQUIRED` only if a genuine unresolved policy ambiguity cannot be resolved from the locked specification or existing delegated decisions.
+
+Even if ready, Stage 6 remains NOT FROZEN. A separate independent final freeze gate is still required.
