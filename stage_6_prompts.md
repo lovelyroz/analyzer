@@ -6493,3 +6493,112 @@ Include:
 Do not write the report until the audit and all required validation are complete. Do not claim completion if the process stopped early.
 
 **Important:** Do not freeze Stage 6 merely because Prompts 38–41 reported READY. Freeze approval must be earned by this independent audit. If approved, state clearly that the code is approved for freeze but no Git or remote action was performed.
+=============================================================
+
+# Stage 6 — Prompt 43: Resolve Skipped-Test Evidence and Complete Final-Gate Documentation
+
+You are working in the local repository `analyzer`, a financial-data application where correctness, auditability, deterministic behavior, and preservation of explicit financial invariants take priority over speed.
+
+## Objective
+
+Perform a narrowly scoped follow-up to the Stage 6 Prompt 42 Independent Final Freeze Gate.
+
+Prompt 42 reported:
+
+* Stage 6 test set: 307 passed, 0 failed, 0 skipped.
+* Full suite: 991 passed, 0 failed, 2 skipped.
+* Skipped tests:
+
+  1. `test_codal_extraction.py:307` — “real Codal sample PDF not available in CI”.
+  2. `test_ingestion_fx.py:194` — “could not import openpyxl: No module named openpyxl”.
+
+The repository owner reports that:
+
+* Nineteen sample CODAL PDF files are present in the repository’s `pdf` folder.
+* `openpyxl` is installed in the local project virtual environment.
+
+Do not automatically accept the two skips as unavoidable environmental limitations. Determine whether the tests are using the intended files, working directory, Python interpreter, and dependencies.
+
+## Mandatory boundaries
+
+1. Do not modify application source code or test code in this prompt.
+2. Do not modify Stage 1–5, Stage 7, valuation logic, or any frozen component.
+3. Do not create database tables or migrations.
+4. Do not change Reliability or Calibration policy.
+5. Do not weaken, bypass, delete, or rewrite tests to obtain a passing result.
+6. Do not use GitHub, GitHub CLI/API, remotes, push, pull, commit, branch changes, or other remote Git operations.
+7. Read-only local Git status and diff inspection are permitted.
+8. Append a new, clearly titled addendum to `temp_report.md`. Do not overwrite or rewrite the existing Prompt 42 report.
+9. Do not claim that a test passed unless it was actually executed and its result observed.
+10. Keep this task limited to diagnosis, validation, and reporting. If a source or test change is needed to resolve a skip, report the exact cause and proposed minimal fix, but do not implement it in this prompt.
+
+## Task A — Diagnose the CODAL PDF skip
+
+1. Inspect the exact test and fixture/path-resolution logic around `test_codal_extraction.py:307`.
+2. Locate and count the nineteen PDFs in the repository’s `pdf` folder. Record their actual local paths and whether they are readable. Do not dump unnecessary PDF contents.
+3. Determine the exact path the test expects and how that path is constructed.
+4. Check whether the test’s expected sample filename, directory, working directory, or environment condition differs from the available files.
+5. Run the narrowest relevant test using the project’s intended local environment.
+6. Record the exact command, interpreter/environment used, and observed result.
+7. If the test remains skipped, establish the actual reason with evidence. The mere presence of PDFs does not prove they are valid fixtures for this specific test.
+
+## Task B — Diagnose the openpyxl skip
+
+1. Inspect the exact test and import/skip logic around `test_ingestion_fx.py:194`.
+2. Identify the Python executable used to run pytest.
+3. Using that same interpreter, verify whether `openpyxl` can be imported and report its installed version if available.
+4. Compare this with the project’s intended virtual environment. Do not rely on a package listing from a different interpreter.
+5. Run the narrowest relevant ingestion test using the intended local environment.
+6. Record the exact command and observed result.
+7. If the test still skips, establish why. Do not install packages, alter dependencies, or modify source/test code as part of this prompt.
+
+## Task C — Six-layer validation evidence
+
+Clarify the validation evidence for all six required layers:
+
+1. Unit/formula validation.
+2. Contract and boundary validation.
+3. Production-path/integration validation.
+4. Adversarial and negative validation.
+5. Regression/full-suite validation.
+6. Independent audit.
+
+For each layer, state:
+
+* The exact command actually executed, if one exists.
+* The concrete test files or test cases that provide evidence.
+* The observed pass/fail/skip counts, when available.
+* Any limitation or evidence that remains unverified.
+
+Do not invent separate layer-specific commands if those commands were not run. If one Stage 6 command covers multiple layers, explicitly say so and map the relevant tests to those layers. Clearly distinguish commands actually executed from suggested commands.
+
+## Task D — Decide whether further validation is needed
+
+Based on observed results:
+
+* If the CODAL and openpyxl tests now execute successfully, record that they were exercised and passed.
+* If either still skips, record the proven cause and whether it is genuinely unavoidable in the current local environment.
+* If a failure occurs, preserve the failure details and report the minimal next action. Do not fix it in this prompt.
+* If the targeted tests pass, run the full suite only if needed to substantiate a changed full-suite result or the final freeze evidence. Avoid unnecessary repetition of already verified expensive runs.
+* Do not declare Stage 6 frozen or perform any freeze operation. Prompt 42’s freeze recommendation remains a recommendation pending this evidence clarification.
+
+## Reporting
+
+Append a new section to `temp_report.md` titled:
+
+`REPORT — Stage 6 Prompt 43: Skipped-Test Diagnosis and Final-Gate Evidence Addendum`
+
+Include:
+
+* CODAL PDF diagnosis and evidence.
+* `openpyxl` interpreter/environment diagnosis and evidence.
+* Exact commands and observed results.
+* Six-layer evidence mapping.
+* Any unresolved blockers or required follow-up.
+* A clear conclusion stating whether Prompt 42’s technical freeze recommendation remains supported, requires additional validation, or must be withheld pending remediation.
+
+Do not retroactively alter Prompt 42’s recorded results. Distinguish the original Prompt 42 run from all Prompt 43 observations.
+
+Finally, inspect the local diff and status to verify that only the intended report file changed. Report the exact result and explicitly confirm that no application code, test code, frozen stage, remote Git state, commit, or push was changed.
+============================================================
+
