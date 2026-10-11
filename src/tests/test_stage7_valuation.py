@@ -463,3 +463,114 @@ def test_p2_required_flip_dependence_alerts_missing():
                 "HIGH_IMPACT_HIGH_UNCERTAINTY"]
     missing = [name for name in required if not any(name in item for item in vocab)]
     assert not missing, f"Missing required alerts: {missing}"
+
+
+# P3 additions: traceable one-at-a-time sensitivity + non-finite input guards.
+# Existing tests above untouched.
+def test_p3_sensitivity_recomputes_from_valuation_identity():
+    from src.valuation.parameters import SENSITIVITY_PERTURBATION
+
+    engine = ValuationEngine()
+    result = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0],
+    )
+    base = result.scenarios["base"]
+    assert base.fair_value is not None
+    expected_effect = abs(base.fair_value * SENSITIVITY_PERTURBATION)
+    assert expected_effect > 0
+    # FV = EPS x target P/E is linear in each driver, so each one-at-a-time
+    # shock moves fair value by exactly |FV x p|; the 50/50 split is a
+    # documented property of the identity, not an invented weighting.
+    assert abs(result.driver_impact["EPS"] - 50.0) < 1e-6
+    assert abs(result.driver_impact["TARGET_PE"] - 50.0) < 1e-6
+    assert abs(sum(result.driver_impact.values()) - 100.0) < 1e-6
+    again = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0],
+    )
+    assert again.driver_impact == result.driver_impact
+    assert again.review_priority == result.review_priority
+
+
+def test_p3_nan_eps_is_guarded_as_invalid():
+    import math
+
+    nan = float("nan")
+    engine = ValuationEngine()
+    result = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(nan, nan, nan), historical_pe_values=[7.0],
+    )
+    assert result.scenarios["bear"].fair_value is None
+    assert result.expected_fair_value is None
+    assert result.metadata["scenario_dispersion"] is None
+    for scenario in result.scenarios.values():
+        assert scenario.fair_value is None or math.isfinite(scenario.fair_value)
+    assert result.valuation_driver_ranking == []
+    assert result.driver_impact == {}
+
+
+def test_p3_zero_and_negative_price_guarded():
+    engine = ValuationEngine()
+    for price in (0.0, -100.0):
+        result = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", price, make_forecast(),
+            historical_pe_values=[7.0],
+        )
+        assert result.scenarios["base"].forward_pe is None
+        assert result.margin_of_safety_pct is None
+        # Upside cannot be computed without a valid price, so the
+        # pre-existing INSUFFICIENT_DATA guard applies; fair value itself
+        # (EPS x target P/E) stays valid and finite.
+        assert result.valuation_status == "INSUFFICIENT_DATA"
+        assert result.scenarios["base"].fair_value == 1260.0
+
+
+def test_p3_nonfinite_benchmark_series_filtered():
+    import math
+
+    engine = ValuationEngine()
+    polluted = [7.0, float("nan"), float("inf"), -float("inf"), None, 7.0, 8.0]
+    result = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=polluted,
+    )
+    assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
+    assert result.historical_median_pe == 7.0
+    assert result.scenarios["base"].target_pe == 7.0
+    for value in (result.expected_fair_value, result.margin_of_safety_pct):
+        assert value is None or math.isfinite(value)
+
+
+def test_p3_nonfinite_scores_fall_back_to_defaults():
+    engine = ValuationEngine()
+    nan = float("nan")
+    guarded = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=nan, historical_pe_values=[7.0],
+        probability_confidence=nan, data_quality_score=nan,
+    )
+    defaulted = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=None, historical_pe_values=[7.0],
+        probability_confidence=50.0, data_quality_score=100.0,
+    )
+    assert guarded.valuation_confidence == defaulted.valuation_confidence
+    assert guarded.driver_uncertainty == defaulted.driver_uncertainty
+
+
+def test_p3_flip_dependence_alerts_remain_explicitly_unresolved():
+    engine = ValuationEngine()
+    flip_base = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(150.0, 150.0, 250.0), historical_pe_values=[7.0],
+    )
+    assert flip_base.valuation_status == "ATTRACTIVE"
+    vocab = " ".join(flip_base.alerts + flip_base.valuation_risk_flags)
+    for name in ("ASSESSMENT_FLIP_RISK", "HIGH_MULTIPLE_DEPENDENCE",
+                 "HIGH_EPS_DEPENDENCE", "MARGIN_ASSUMPTION_RISK",
+                 "HIGH_IMPACT_HIGH_UNCERTAINTY"):
+        # Per P3 requirement 5: no invented formula may emit these alerts.
+        # They stay absent until the locked spec defines their formulas.
+        assert name not in vocab

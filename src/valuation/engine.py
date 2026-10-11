@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 from typing import Dict, List, Optional, Sequence
 
@@ -24,6 +25,30 @@ from src.valuation.parameters import (
     VALUATION_THRESHOLDS,
 )
 from src.valuation.schema import ScenarioValuation, ValuationResult
+
+
+def _finite_or_none(value: Optional[float]) -> Optional[float]:
+    """Coerce non-finite floats (NaN/inf) to None so invalid inputs never leak NaN."""
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) else None
+
+
+def _clamp_score(value: Optional[float], default: float) -> float:
+    """Clamp a 0-100 score; None or non-finite input falls back to the default."""
+    if value is None:
+        return default
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(numeric):
+        return default
+    return max(0.0, min(100.0, numeric))
 
 
 class ValuationEngine:
@@ -58,9 +83,9 @@ class ValuationEngine:
             "bull": forecast_result.scenario_forecasts.bull,
         }
 
-        historical_values = historical_pe_values or []
-        forward_values = industry_forward_pe_values or []
-        ttm_values = industry_ttm_pe_values or []
+        historical_values = [_finite_or_none(value) for value in (historical_pe_values or [])]
+        forward_values = [_finite_or_none(value) for value in (industry_forward_pe_values or [])]
+        ttm_values = [_finite_or_none(value) for value in (industry_ttm_pe_values or [])]
         valid_forward_count = self._valid_positive_count(forward_values)
 
         historical_median = median_valid(historical_values)
@@ -85,13 +110,16 @@ class ValuationEngine:
         scenarios: Dict[str, ScenarioValuation] = {}
         flags: List[str] = []
 
+        price = _finite_or_none(current_price)
+        if price is not None and price <= 0:
+            price = None
         for name, chain in scenarios_input.items():
-            eps = chain.eps
+            eps = _finite_or_none(chain.eps)
             scenario_flags = self._eps_flags(eps)
             target_pe = None if target_pe_base is None else target_pe_base * (1.0 + multiple_adjustments[name])
-            forward_pe = calculate_forward_pe(eps, current_price)
+            forward_pe = calculate_forward_pe(eps, price)
             fair_value = calculate_forward_pe_fair_value(eps, target_pe)
-            upside = calculate_margin_of_safety(fair_value, current_price)
+            upside = calculate_margin_of_safety(fair_value, price)
             scenarios[name] = ScenarioValuation(
                 scenario_name=name,
                 target_pe=None if target_pe is None else round(target_pe, 4),
@@ -387,9 +415,9 @@ class ValuationEngine:
         benchmark_available: bool,
         scenario_dispersion: Optional[float],
     ) -> float:
-        reliability = 50.0 if forecast_reliability_score is None else max(0.0, min(100.0, forecast_reliability_score))
-        probability = max(0.0, min(100.0, probability_confidence))
-        quality = max(0.0, min(100.0, data_quality_score))
+        reliability = _clamp_score(forecast_reliability_score, 50.0)
+        probability = _clamp_score(probability_confidence, 50.0)
+        quality = _clamp_score(data_quality_score, 100.0)
         benchmark = 100.0 if benchmark_available else 25.0
         dispersion_penalty = 0.0 if scenario_dispersion is None else min(40.0, scenario_dispersion * 50.0)
         return max(0.0, min(100.0, 0.40 * reliability + 0.20 * probability + 0.20 * quality + 0.20 * benchmark - dispersion_penalty))
@@ -434,13 +462,24 @@ class ValuationEngine:
         data_quality_score: float,
     ) -> tuple[List[str], Dict[str, float], Dict[str, float], Dict[str, float]]:
         base = scenarios["base"]
-        if base.fair_value is None:
+        if base.fair_value is None or base.eps_forecast is None or base.target_pe is None:
             return [], {}, {}, {}
         p = SENSITIVITY_PERTURBATION
-        drivers = {"EPS": abs(base.fair_value * p), "TARGET_PE": abs(base.fair_value * p)}
+        # One-at-a-time sensitivity on the Stage 7 V1 valuation identity FV = EPS x target P/E.
+        # EPS shock: hold the benchmark multiple fixed, recompute FV from perturbed EPS.
+        eps_up = calculate_forward_pe_fair_value(base.eps_forecast * (1.0 + p), base.target_pe)
+        eps_effect = abs(base.fair_value - eps_up) if eps_up is not None else None
+        # Target-P/E shock: hold forecast EPS fixed, recompute FV from perturbed multiple.
+        pe_up = calculate_forward_pe_fair_value(base.eps_forecast, base.target_pe * (1.0 + p))
+        pe_effect = abs(base.fair_value - pe_up) if pe_up is not None else None
+        if eps_effect is None or pe_effect is None:
+            return [], {}, {}, {}
+        drivers = {"EPS": eps_effect, "TARGET_PE": pe_effect}
         total = max(sum(drivers.values()), 1e-9)
-        reliability = 50.0 if forecast_reliability is None else max(0.0, min(100.0, forecast_reliability))
-        uncertainty_base = max(0.0, min(100.0, (100.0 - reliability) * 0.5 + (100.0 - probability_confidence) * 0.3 + (100.0 - data_quality_score) * 0.2))
+        reliability = _clamp_score(forecast_reliability, 50.0)
+        probability = _clamp_score(probability_confidence, 50.0)
+        quality = _clamp_score(data_quality_score, 100.0)
+        uncertainty_base = max(0.0, min(100.0, (100.0 - reliability) * 0.5 + (100.0 - probability) * 0.3 + (100.0 - quality) * 0.2))
         ranking = sorted(drivers, key=lambda key: (-drivers[key], key))
         impact_pct = {key: round(100.0 * value / total, 4) for key, value in drivers.items()}
         uncertainty = {key: round(uncertainty_base, 4) for key in drivers}

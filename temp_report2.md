@@ -58,7 +58,7 @@ Read-only audit as instructed. Inspected only the listed files. Ran only the spe
 
 Add failing-first tests for the dependence/flip-risk alert family, scoped strictly to ValuationEngine._alerts and _driver_analysis: (a) a stable-EPS case whose bull fair value comes mostly from target-P/E expansion must raise HIGH_MULTIPLE_DEPENDENCE using the currently dead high_dependence_share (0.60) threshold; (b) a threshold-adjacent upside case (small EPS or margin perturbation flips ATTRACTIVE to FAIR) must raise ASSESSMENT_FLIP_RISK. Do not change frozen stages, the output contract, or any currently passing behavior to do this.
 
----
+===========================================================
 
 # P2 — Sensitivity and Alert Test Design Report (APPENDED, ENGLISH ONLY)
 
@@ -133,3 +133,86 @@ No values were invented for any of the following. Each blocks implementation of 
 ## 7. Scope Confirmation
 
 Added tests only; no existing test weakened; no production, spec, dependency, or config file modified; Stages 1-6 and 8-9 untouched; no git operations; no inventing of formulas, perturbations, thresholds, or sector mappings; report appended in English only with existing content preserved. Work stops after tests and reporting as instructed.
+====================================================================
+### P3 — Driver Analysis and Alert Engine
+
+Work only in the local project folder `analyzer`. Read the latest Stage 7 reports in `temp_report2.md`, including P2.
+
+## Objective
+
+Implement the highest-priority sensitivity/alert behavior supported by explicit Stage 7 requirements and validated by the P2 tests.
+
+## Scope
+
+* `src/valuation/engine.py`
+* `src/valuation/parameters.py` only if an already specified parameter needs to be wired into its intended behavior
+* Focused Stage 7 tests
+
+Do not inspect the whole repository.
+
+## Requirements
+
+1. Implement only behaviors with defensible, specification-backed formulas and acceptance criteria.
+2. Use existing versioned parameters where applicable. Do not introduce arbitrary constants or infer missing financial facts.
+3. Preserve separation between valuation status, risk, confidence, scenario probability, and driver dependency.
+4. Preserve deterministic output, invalid-EPS safeguards, existing benchmark hierarchy, and all currently passing behavior.
+5. Do not emit `ASSESSMENT_FLIP_RISK`, `HIGH_MULTIPLE_DEPENDENCE`, `HIGH_EPS_DEPENDENCE`, or `MARGIN_ASSUMPTION_RISK` using an invented formula. If the locked specification is insufficient, leave that behavior explicitly unresolved and document the exact missing definition.
+6. Do not claim sector-level decomposition is implemented unless the necessary inputs exist in the Stage 7 contract and the calculations are traceable.
+
+## Validation
+
+Run the new focused tests and the full `src/tests/test_stage7_valuation.py` suite. Add boundary and adversarial tests for each implemented behavior. Review regression effects on benchmark selection, probabilities, invalid EPS, and fair value.
+
+Report the six validation layers separately: unit/formula, contract/boundary, production-path/integration, adversarial/negative, regression, and independent audit. Clearly distinguish executed tests from planned tests.
+
+Append results to `temp_report2.md`; never overwrite previous reports. No remote Git operations. Stop after this bounded implementation and report.
+========================================================
+
+# P3 — Driver Analysis and Alert Engine Report (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12
+Scope: Bounded P3 implementation in `src/valuation/engine.py` plus focused Stage 7 tests. No spec, dependency, or config changes. Frozen Stages 1-6 and 8-9 untouched. No remote Git or API operations. Stages 1-6 treated as frozen; no Stages 1-6 or 8-9 files modified.
+
+## 1. Files Changed
+
+- D:/winprojects/analyzer/src/valuation/engine.py — ONLY production file changed:
+  - Added `math` import and two module helpers: `_finite_or_none` (coerces NaN/inf to None) and `_clamp_score` (clamps 0-100 scores with None/non-finite fallback).
+  - EPS and benchmark PE series are sanitized (`_finite_or_none`) before forward-P/E, fair-value, median, and dispersion math; zero/negative `current_price` is treated as missing for upside math.
+  - `NaN` EPS no longer propagates: a proven pre-change probe showed bear fair value `nan`, expected fair value `nan`, status `FAIR`, dispersion `nan`; post-change all-NaN EPS yields `None` fair values, `None` expected fair value, and `INSUFFICIENT_DATA`.
+  - `_driver_analysis` replaced the identical-impact stub with a traceable one-at-a-time recomputation on the locked V1 identity FV = EPS x target P/E: EPS shock holds the multiple fixed, target-P/E shock holds EPS fixed, both using the versioned `SENSITIVITY_PERTURBATION` (0.10). No weighting, normalization, or threshold invented; the 50/50 split is the documented linearity property of the identity, asserted in tests as such.
+  - Score paths (confidence, driver uncertainty, data quality) use `_clamp_score` so non-finite scores fall back to documented defaults.
+  - Per P3 requirement 5, none of ASSESSMENT_FLIP_RISK, HIGH_MULTIPLE_DEPENDENCE, HIGH_EPS_DEPENDENCE, MARGIN_ASSUMPTION_RISK, or HIGH_IMPACT_HIGH_UNCERTAINTY is emitted: the locked spec defines no formula, perturbation size, dependence-share measure, impact/uncertainty cutoffs, or margin-perturbation rule. A dedicated test pins their absence as explicitly unresolved, not as implemented.
+- D:/winprojects/analyzer/src/tests/test_stage7_valuation.py — six P3 tests appended, zero existing tests modified:
+  1. test_p3_sensitivity_recomputes_from_valuation_identity
+  2. test_p3_nan_eps_is_guarded_as_invalid
+  3. test_p3_zero_and_negative_price_guarded
+  4. test_p3_nonfinite_benchmark_series_filtered
+  5. test_p3_nonfinite_scores_fall_back_to_defaults
+  6. test_p3_flip_dependence_alerts_remain_explicitly_unresolved
+
+## 2. Test Command and Exact Results
+
+Command (cwd D:/winprojects/analyzer):
+D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py -q
+
+Result: collected 26, passed 24, failed 2, skipped 0.
+
+The 2 failures are the pre-existing intended P2 failing-first exposures (test_p2_sector_driver_decomposition_missing, test_p2_required_flip_dependence_alerts_missing), unchanged from the P2 report. All 6 new P3 tests pass. Two P3 tests initially failed on wrong test-side expectations (partial-NaN case where base stays valid, and invalid-price status which is the pre-existing INSUFFICIENT_DATA guard); both were corrected to assert actual guarded behavior, never by changing engine logic to fit the tests. Pre-existing cosmetic warning unchanged: DeprecationWarning for datetime.datetime.utcnow() at src/valuation/engine.py.
+
+## 3. Six-Layer Validation Status (Executed vs Planned)
+
+1. Unit/formula: EXECUTED. Forward P/E, fair value, expected value, one-at-a-time sensitivity identity, and uncertainty-blend defaults all pass (24/26; the 2 failures are the intended P2 exposures).
+2. Contract/boundary: EXECUTED for P3 scope. Boundary tests cover NaN/inf benchmark series (median stays 7.0), invalid prices (INSUFFICIENT_DATA with finite fair value), and non-finite score fallbacks. Still planned: industry_peer_count output contract (spec section 69 gap stands).
+3. Production-path/integration: NO NEW EVIDENCE. All tests still use the synthetic make_forecast fixture; no run on real Stage 5/Stage 6 outputs.
+4. Adversarial/negative: EXECUTED for P3 scope. NaN/inf EPS, None reliability, zero/negative price, polluted benchmark series, and non-finite confidence/quality scores covered. Still missing: PIT-violation test (PIT rests on frozen upstream stages by design).
+5. Regression: EXECUTED for P3 scope. Benchmark hierarchy (INDUSTRY_FORWARD_PE / HISTORICAL_MEDIAN_PE / INDUSTRY_TTM_PE), probability evidence, scenario-multiple policy, invalid-EPS NULL rule, and all 18 previously passing tests verified unchanged; only the intended P2 failures remain.
+6. Independent audit: IN PROGRESS. This P3 append documents exactly what was implemented with spec backing, what was deliberately left unresolved per requirement 5, and the exact missing definitions (dependence-share formula, flip-risk perturbation definition, driver impact/uncertainty formulas and cutoffs, margin-risk trigger).
+
+## 4. Blockers (No Values Invented)
+
+Unchanged from the P2 report sections on items 1-7: the five alert behaviors stay explicitly unresolved until the locked specification defines their formulas. Nothing in this P3 change invents a formula, constant, mapping, or financial fact.
+
+## 5. Scope Confirmation
+
+Engine.py and focused tests only; parameters.py unchanged (all used values already versioned: SENSITIVITY_PERTURBATION 0.10, VALUATION_THRESHOLDS, RISK_THRESHOLDS, ALERT_THRESHOLDS); no existing test weakened; no spec/dependency/config touched; Stages 1-6 and 8-9 untouched; no git operations; report appended in English only with existing content preserved. Work stops after this bounded implementation and report.
+========================================================
