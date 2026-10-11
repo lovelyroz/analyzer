@@ -6602,3 +6602,91 @@ Do not retroactively alter Prompt 42’s recorded results. Distinguish the origi
 Finally, inspect the local diff and status to verify that only the intended report file changed. Report the exact result and explicitly confirm that no application code, test code, frozen stage, remote Git state, commit, or push was changed.
 ============================================================
 
+# Stage 6 / Repository Validation — Prompt 44: Revalidate openpyxl and Close the CODAL Fixture Decision
+
+You are working locally in `analyzer`, a financial-data application. Correctness, reproducibility, auditability, and preservation of test contracts take priority over speed.
+
+## Objective
+
+Reconcile the environment findings from Prompt 43 with the repository owner's latest information:
+
+* The owner reports that `openpyxl` has now been installed in all project virtual environments.
+* The repository's `pdf` directory contains 19 PDFs named `seo-codal-report (N).pdf`.
+* Prompt 43 found that these PDFs do not satisfy the content contract of `test_real_codal_monthly_activity_pdf`, which specifically expects a FZAR monthly production/sales report.
+
+This prompt is a fresh, narrowly scoped verification. Do not assume Prompt 43's environment results are still current.
+
+## Mandatory boundaries
+
+1. Do not modify application source code or existing tests.
+2. Do not weaken, skip, delete, or rewrite any test.
+3. Do not substitute an SEO PDF into the FZAR-specific regression test merely to make it execute.
+4. Do not install, uninstall, or upgrade dependencies in this prompt.
+5. Do not modify Stage 1–5, Stage 7, valuation, database schemas, or migrations.
+6. Do not perform GitHub, GitHub CLI/API, remote Git, commit, push, pull, or branch operations.
+7. Read-only local Git status/diff inspection is allowed.
+8. Append a new report section to `temp_report.md`; preserve all existing reports.
+9. Do not claim success without actually executing the relevant command and observing its result.
+
+## Task A — Revalidate openpyxl after the owner's update
+
+1. Identify the repository root and the intended Python virtual environment(s) using the actual local project configuration. Do not assume the previously reported interpreter is still the only relevant one.
+2. For each relevant environment, record:
+
+   * Exact Python executable.
+   * `sys.executable`.
+   * Whether `import openpyxl` succeeds.
+   * Installed `openpyxl` version when import succeeds.
+3. Run the following test with the intended project interpreter:
+
+   `src/tests/test_ingestion_fx.py::test_ingest_fx_xlsx_toman_and_rial`
+
+   Use the interpreter explicitly, e.g. `python -m pytest`, so that the test runner uses that interpreter.
+4. Record the exact command, collected count, and observed outcome.
+5. If the test passes, state that the dependency-related skip is resolved in that environment.
+6. If it still skips, compare the actual test interpreter with the environment where the owner installed the package. Do not install anything or change project files.
+7. If it fails rather than skips, preserve the actual failure details. Do not misclassify a failure as an environment skip.
+
+## Task B — Preserve the CODAL regression contract
+
+1. Reinspect `_candidate_real_codal_paths()` and `test_real_codal_monthly_activity_pdf` in `src/tests/test_codal_extraction.py`.
+2. Confirm whether the expected `fzar_403_aban.pdf` is available anywhere in the repository or through the configured `CODAL_SAMPLE_PDF` path.
+3. Do not use `seo-codal-report (1).pdf` or another SEO PDF as a replacement unless its actual contents meet the existing test's monthly-activity assertions.
+4. Keep the current FZAR-specific test and its assertions unchanged.
+5. If the expected fixture remains absent, retain the existing skip behavior and report the exact missing fixture/path requirement.
+6. Do not add a generic test based on an untracked local PDF in this prompt. Such a test would create an undeclared dependency on the developer's local filesystem and would not be reproducible in CI.
+
+## Task C — Validation evidence and scope
+
+Record:
+
+* The exact targeted commands executed and their observed outcomes.
+* Whether `openpyxl` is now available to the intended test interpreter.
+* Whether the FZAR-specific PDF fixture is available.
+* Whether either finding requires a separate, explicitly authorized follow-up.
+* The status of the six-layer Stage 6 evidence from Prompts 38–42. Do not claim that this prompt reran those six layers; this prompt does not require another Stage 6 full-suite run.
+
+## Reporting
+
+Append a section titled:
+
+`REPORT — Stage 6 Prompt 44: Environment Revalidation and CODAL Fixture Closure`
+
+Include:
+
+* Interpreter and dependency evidence.
+* Exact test command and outcome.
+* CODAL fixture availability and why the provided SEO PDFs are or are not suitable for the existing test.
+* Remaining follow-up, if any.
+* Explicit confirmation that application code and tests were not modified and no Git remote operation was performed.
+
+Finish with a concise status:
+
+* `OPENPYXL SKIP RESOLVED`, or
+* `OPENPYXL SKIP STILL UNRESOLVED`,
+  and independently:
+* `CODAL FIXTURE AVAILABLE`, or
+* `CODAL FIXTURE STILL MISSING`.
+
+Do not declare Stage 6 frozen. Do not rewrite Prompt 42 or Prompt 43 reports.
+=====================================================
