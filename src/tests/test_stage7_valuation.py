@@ -237,3 +237,229 @@ def test_alerts_include_severity_and_driver_focus():
     assert any(alert.startswith("WARNING:LOW_FORECAST_RELIABILITY") for alert in result.alerts)
     assert any(alert.startswith("INFO:TOP_DRIVER:") for alert in result.alerts)
     assert "HIGH_SCENARIO_DISPERSION" in result.valuation_risk_flags
+
+
+# P2 additions: sensitivity and alert focused tests. Existing tests above untouched.
+def test_p2_sensitivity_drivers_present_and_bounded():
+    from src.valuation.parameters import SENSITIVITY_PERTURBATION
+
+    assert SENSITIVITY_PERTURBATION == 0.10
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=85.0, historical_pe_values=[7.0],
+        probability_confidence=90.0,
+    )
+    assert result.scenarios["base"].fair_value is not None
+    assert set(result.valuation_driver_ranking) == {"EPS", "TARGET_PE"}
+    assert set(result.driver_impact) == {"EPS", "TARGET_PE"}
+    assert set(result.driver_uncertainty) == {"EPS", "TARGET_PE"}
+    assert set(result.review_priority) == {"EPS", "TARGET_PE"}
+    assert abs(sum(result.driver_impact.values()) - 100.0) < 1e-6
+    assert all(0.0 <= v <= 100.0 for v in result.driver_uncertainty.values())
+    assert all(v >= 0 for v in result.review_priority.values())
+
+
+def test_p2_sensitivity_missing_data_empty_drivers():
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(-50.0, -20.0, 10.0), historical_pe_values=[7.0],
+    )
+    assert result.scenarios["base"].fair_value is None
+    assert result.valuation_driver_ranking == []
+    assert result.driver_impact == {}
+    assert result.driver_uncertainty == {}
+    assert result.review_priority == {}
+
+
+def test_p2_sensitivity_deterministic_repeated_runs():
+    engine = ValuationEngine()
+    kwargs = dict(
+        company_id=1, period_id=101, industry_code="PETROCHEMICAL",
+        current_price=1000.0, forecast_result=make_forecast(),
+        forecast_reliability_score=70.0, historical_pe_values=[7.0],
+        probability_confidence=60.0, data_quality_score=80.0,
+    )
+    first = engine.calculate_valuation(**kwargs)
+    second = engine.calculate_valuation(**kwargs)
+    assert first.valuation_driver_ranking == second.valuation_driver_ranking
+    assert first.driver_impact == second.driver_impact
+    assert first.driver_uncertainty == second.driver_uncertainty
+    assert first.review_priority == second.review_priority
+    assert first.alerts == second.alerts
+    assert first.valuation_status == second.valuation_status
+
+
+def test_p2_alert_severity_levels_valid():
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(80.0, 180.0, 320.0),
+        forecast_reliability_score=30.0, historical_pe_values=[7.0],
+        probability_confidence=50.0,
+    )
+    assert len(result.alerts) > 0
+    allowed = {"INFO", "WATCH", "WARNING", "CRITICAL"}
+    for alert in result.alerts:
+        assert ":" in alert
+        assert alert.split(":")[0] in allowed
+    combined = " ".join(result.alerts + result.valuation_risk_flags)
+    assert "BUY" not in combined
+    assert "SELL" not in combined
+
+
+def test_p2_alert_low_reliability_threshold_boundaries():
+    from src.valuation.parameters import ALERT_THRESHOLDS
+
+    assert ALERT_THRESHOLDS["low_forecast_reliability"] == 40.0
+    engine = ValuationEngine()
+
+    def run(reliability):
+        kwargs = dict(company_id=1, period_id=101, industry_code="PETROCHEMICAL",
+                      current_price=1000.0, forecast_result=make_forecast(),
+                      historical_pe_values=[7.0])
+        if reliability is not None:
+            kwargs["forecast_reliability_score"] = reliability
+        return engine.calculate_valuation(**kwargs)
+
+    below = run(39.9)
+    assert any("LOW_FORECAST_RELIABILITY" in a for a in below.alerts)
+    assert "LOW_FORECAST_RELIABILITY" in below.valuation_risk_flags
+    at = run(40.0)
+    assert not any("LOW_FORECAST_RELIABILITY" in a for a in at.alerts)
+    assert "LOW_FORECAST_RELIABILITY" not in at.valuation_risk_flags
+    above = run(40.1)
+    assert not any("LOW_FORECAST_RELIABILITY" in a for a in above.alerts)
+    missing = run(None)
+    assert not any("LOW_FORECAST_RELIABILITY" in a for a in missing.alerts)
+    again = run(39.9)
+    assert again.alerts == below.alerts
+
+
+def test_p2_alert_high_dispersion_threshold_boundaries():
+    from src.valuation.parameters import ALERT_THRESHOLDS, RISK_THRESHOLDS
+
+    assert ALERT_THRESHOLDS["high_scenario_dispersion"] == 0.50
+    assert RISK_THRESHOLDS["high_scenario_dispersion"] == 0.50
+    engine = ValuationEngine()
+
+    def run(bear, base, bull):
+        return engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0,
+            make_forecast(bear, base, bull), historical_pe_values=[7.0],
+        )
+
+    above = run(140.0, 200.0, 260.0)
+    assert above.metadata["scenario_dispersion"] is not None
+    assert above.metadata["scenario_dispersion"] > 0.50
+    assert "HIGH_SCENARIO_DISPERSION" in above.valuation_risk_flags
+    assert any("HIGH_SCENARIO_DISPERSION" in a for a in above.alerts)
+    at = run(150.0, 200.0, 250.0)
+    assert abs(at.metadata["scenario_dispersion"] - 0.50) < 1e-9
+    assert "HIGH_SCENARIO_DISPERSION" not in at.valuation_risk_flags
+    below = run(160.0, 200.0, 240.0)
+    assert below.metadata["scenario_dispersion"] < 0.50
+    assert not any("HIGH_SCENARIO_DISPERSION" in a for a in below.alerts)
+    missing = run(-50.0, -20.0, 10.0)
+    assert missing.metadata["scenario_dispersion"] is None
+    assert not any("HIGH_SCENARIO_DISPERSION" in a for a in missing.alerts)
+    assert run(140.0, 200.0, 260.0).alerts == above.alerts
+
+
+def test_p2_alert_divergence_ratios_boundaries():
+    from src.valuation.parameters import ALERT_THRESHOLDS
+
+    assert ALERT_THRESHOLDS["benchmark_divergence_ratio"] == 1.50
+    assert ALERT_THRESHOLDS["historical_divergence_ratio"] == 1.50
+    assert ALERT_THRESHOLDS["industry_divergence_ratio"] == 1.50
+    engine = ValuationEngine()
+    above = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 900.0,
+        make_forecast(90.0, 100.0, 110.0), historical_pe_values=[6.0],
+    )
+    assert above.scenarios["base"].forward_pe == 9.0
+    assert any("VALUATION_ABOVE_TARGET_PE" in a for a in above.alerts)
+    assert any("FORWARD_PE_ABOVE_HISTORICAL" in a for a in above.alerts)
+    just_below = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 899.0,
+        make_forecast(90.0, 100.0, 110.0), historical_pe_values=[6.0],
+    )
+    assert not any("VALUATION_ABOVE_TARGET_PE" in a for a in just_below.alerts)
+    below_target = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 400.0,
+        make_forecast(90.0, 100.0, 110.0), historical_pe_values=[6.0],
+    )
+    assert any("VALUATION_BELOW_TARGET_PE" in a for a in below_target.alerts)
+    industry = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 900.0,
+        make_forecast(90.0, 100.0, 110.0), historical_pe_values=[10.0],
+        industry_forward_pe_values=[6.0] * 8,
+    )
+    assert industry.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert any("FORWARD_PE_ABOVE_INDUSTRY" in a for a in industry.alerts)
+    missing = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(-10.0, -5.0, 10.0), historical_pe_values=[6.0],
+    )
+    assert missing.scenarios["base"].forward_pe is None
+    assert not any("VALUATION_ABOVE_TARGET_PE" in a for a in missing.alerts)
+    assert not any("FORWARD_PE_ABOVE_HISTORICAL" in a for a in missing.alerts)
+
+
+def test_p2_sector_driver_decomposition_missing():
+    engine = ValuationEngine()
+    nonfin = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0],
+    )
+    bank = engine.calculate_valuation(
+        1, 101, "BANK", 1000.0, make_forecast(),
+        historical_pe_values=[7.0],
+    )
+    holding = engine.calculate_valuation(
+        1, 101, "HOLDING", 1000.0, make_forecast(),
+        forecast_reliability_score=80.0, historical_pe_values=[7.0],
+        nav_per_share=500.0,
+    )
+    observed = set(nonfin.valuation_driver_ranking) | set(bank.valuation_driver_ranking) | set(holding.valuation_driver_ranking)
+    assert {"REVENUE", "NII", "NAV"} <= observed
+
+
+def test_p2_required_flip_dependence_alerts_missing():
+    from src.valuation.parameters import SENSITIVITY_PERTURBATION, VALUATION_THRESHOLDS
+
+    assert SENSITIVITY_PERTURBATION == 0.10
+    assert VALUATION_THRESHOLDS["attractive_expected_upside"] == 15.0
+    assert VALUATION_THRESHOLDS["attractive_base_upside"] == 5.0
+    engine = ValuationEngine()
+    flip_base = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(150.0, 150.0, 250.0), historical_pe_values=[7.0],
+    )
+    assert flip_base.valuation_status == "ATTRACTIVE"
+    shocked = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(135.0, 135.0, 225.0), historical_pe_values=[7.0],
+    )
+    assert shocked.valuation_status == "FAIR"
+    stable = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(180.0, 180.0, 180.0),
+        historical_pe_values=[7.0],
+        scenario_pe_adjustments={"bear": -0.10, "base": 0.0, "bull": 0.20},
+        scenario_pe_rationales={
+            "bear": "Higher risk compresses justified multiple.",
+            "base": "Historical median is neutral.",
+            "bull": "Better quality supports premium.",
+        },
+    )
+    eps_risk = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(80.0, 180.0, 320.0),
+        forecast_reliability_score=20.0, historical_pe_values=[7.0],
+        probability_confidence=50.0, data_quality_score=20.0,
+    )
+    vocab = []
+    for result in (flip_base, shocked, stable, eps_risk):
+        vocab.extend(result.alerts)
+        vocab.extend(result.valuation_risk_flags)
+    required = ["ASSESSMENT_FLIP_RISK", "HIGH_MULTIPLE_DEPENDENCE",
+                "HIGH_EPS_DEPENDENCE", "MARGIN_ASSUMPTION_RISK",
+                "HIGH_IMPACT_HIGH_UNCERTAINTY"]
+    missing = [name for name in required if not any(name in item for item in vocab)]
+    assert not missing, f"Missing required alerts: {missing}"

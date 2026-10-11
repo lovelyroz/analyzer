@@ -41,3 +41,37 @@ Append a concise report to `temp_report2.md`; never overwrite existing content. 
 
 Stop after the audit and report. Do not begin implementation.
 ==============================================================
+### P2 — Sensitivity and Alert Test Design
+
+Work only in the local project folder `analyzer`.
+
+## Objective
+
+Extend Stage 7 validation with focused, failing-first tests for the required sensitivity and alert behavior identified in the latest Stage 7 report in `temp_report2.md`.
+
+## Inspect only
+
+* `07_Stage7_Valuation.md`
+* `src/valuation/engine.py`
+* `src/valuation/parameters.py`
+* `src/valuation/schema.py`
+* `src/tests/test_stage7_valuation.py`
+* The latest Stage 7 report in `temp_report2.md`
+
+## Tasks
+
+1. Inspect the definitions of `SENSITIVITY_PERTURBATION`, `high_dependence_share`, driver impact, driver uncertainty, and the required alerts in specification sections 41–53.
+2. Add focused tests for behaviors whose formulas and acceptance criteria are explicitly defined by the existing specification and parameters.
+3. Do not invent a formula, perturbation size, threshold, or sector-driver mapping when the specification does not define it. Record each such ambiguity as a specification blocker instead of silently choosing a value.
+4. Tests must cover positive, negative, boundary, missing-data, and deterministic/repeated-run behavior where applicable.
+5. Run the focused Stage 7 tests and report exact collected, passed, failed, and skipped counts. Expected failures are acceptable only if they expose the intended missing behavior; explain each one.
+
+## Boundaries
+
+* Do not modify production code, specification files, dependencies, or configuration.
+* Do not weaken existing tests.
+* Do not modify frozen Stages 1–6 or Stages 8–9.
+* No remote Git operations or GitHub/API access.
+
+Append the report to `temp_report2.md`. Include exact files changed, test command/results, ambiguities that block implementation, and a six-layer validation status. Stop after tests and reporting.
+=====================================================
