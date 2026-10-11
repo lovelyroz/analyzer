@@ -249,6 +249,13 @@ def run_evaluation_pipeline(
 
     ttm_accounted: Counter = Counter()
     if ttm_observations:
+        # Stage 6 Prompt 40 (spec Section 7 invariant 16, Section 42, D5):
+        # an exact-duplicate TTM supply must not inflate any aggregate.
+        # Aggregation already quarantines same-identity collisions wholesale
+        # via the canonical 7-tuple key, so this counter was the one place
+        # still counting raw supplied entries — count distinct canonical
+        # TTM identities per series instead (a repeated supply counts once).
+        seen_ttm_identities: set = set()
         for observation in ttm_observations:
             observations.append(observation)
             key = (
@@ -258,7 +265,10 @@ def run_evaluation_pipeline(
                 observation.key.model_version,
                 observation.key.scenario,
             )
-            ttm_accounted[key] += 1
+            identity = observation.key.as_tuple()
+            if identity not in seen_ttm_identities:
+                seen_ttm_identities.add(identity)
+                ttm_accounted[key] += 1
 
     aggregates = aggregate_observations(
         observations, baselines, exclude_estimated=exclude_estimated

@@ -6031,3 +6031,175 @@ Report `READY FOR FINAL FREEZE GATE` only if:
 Otherwise report `BLOCKED — IMPLEMENTATION OR VALIDATION FAILURE`, or `BLOCKED — EXPLICIT AUTHORITY REQUIRED` if and only if a genuine authority conflict remains after all other work is complete.
 
 Do not claim Stage 6 is frozen. Do not implement Reliability scoring. Do not issue an interim report before the final validation is complete.
+
+================================================================
+# Stage 6 Prompt 40 — Enforce Duplicate-Observation Invariants and Revalidate Closure
+
+You are the primary engineering agent for `analyzer`, a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and explicit financial invariants take priority over implementation speed.
+
+## 1. Objective
+
+Resolve an actionable Stage 6 specification violation discovered during independent review of Prompt 39.
+
+The Prompt 39 test file, `src/tests/test_stage6_p39_cutoff.py`, currently asserts that supplying the same TTM observation twice should count it twice. This conflicts with the locked Stage 6 specification:
+
+* Section 7, invariant 16: an independent additional TTM observation must not cause double counting.
+* Section 42, No Double Counting: TTM must not be counted multiple times as an observation.
+* The approved D5 policy: duplicate records must not be counted, and general sufficiency counts must use valid, non-duplicate observations.
+
+Do not accept the current duplicate-counting behavior merely because its test passes. Correct the implementation and its tests, then perform the complete validation workflow below.
+
+**Do not freeze Stage 6 in this prompt.**
+
+## 2. Mandatory boundaries
+
+* Stages 1–5 are frozen and must remain untouched.
+* Do not modify valuation formulas or Stage 7 behavior.
+* Do not invent a new financial methodology, observation identity, tie-breaker, or duplicate-resolution rule.
+* Do not change approved Error, MAPE, Bias, ZERO_BASE, baseline, sufficiency, scenario-isolation, Actual-selection, or cutoff rules except where a change is strictly necessary to enforce the already-authorized duplicate invariant.
+* Preserve the Prompt 39 cutoff fixes.
+* Preserve Bear/Base/Bull separation, model-version and horizon separation, and the primary versus ESTIMATED-excluded sensitivity distinction.
+* Reliability must remain withheld/NULL. Do not invent mappings or a substitute score.
+* Do not add a database table, migration, persistence backend, or durable-immutability claim.
+* Do not perform Git operations, GitHub operations, remote access, push, pull, commits, branch changes, or repository-history changes.
+* Do not perform unrestricted repository-wide exploration.
+
+## 3. Inspect only the necessary authority and implementation
+
+Read the exact relevant clauses in `06_Stage6_Forecast_Evaluation.md`, especially Sections 7, 14, 42, and the approved D5 text. Review the latest Prompt 38 and Prompt 39 reports in `temp_report.md`.
+
+Inspect only the directly relevant Stage 6 implementation and tests, including:
+
+* `src/evaluation/pipeline.py`
+* The existing canonical observation/series identity and aggregation implementation under `src/evaluation/`
+* `src/tests/test_stage6_p39_cutoff.py`
+* The existing Stage 6 tests that cover duplicate observations, TTM accounting, sufficiency counts, scenario isolation, and aggregation.
+
+Do not assume every repeated-looking observation is a duplicate. Use the existing authoritative identity contract. Do not create an alternative identity merely to make the new tests pass.
+
+## 4. Required correction
+
+Complete all of the following:
+
+1. Establish from the locked specification and current implementation what constitutes the same evaluation observation. Use the existing canonical key/identity and existing distinctions for company, metric, financial period, horizon, model version, forecast cutoff, and scenario as applicable. Do not pool scenarios or horizons.
+
+2. Ensure that repeating the same TTM observation cannot inflate:
+
+   * scored observation counts;
+   * general valid-observation counts;
+   * Bias-eligible or MAPE-effective counts;
+   * sufficiency classifications;
+   * baseline-comparison sample counts;
+   * any other aggregate derived from the repeated observation.
+
+3. Ensure that a duplicated observation is not counted once as a Forecast observation and again as an equivalent TTM observation where the locked identity contract says they represent the same evaluation outcome.
+
+4. Preserve genuinely distinct observations, including distinct periods or other identity dimensions required by the existing contract. Do not broadly deduplicate records just because their numerical values happen to match.
+
+5. If records collide under the authoritative identity but carry materially conflicting data, provenance, or values, do not silently choose an arbitrary winner. Follow an existing authoritative resolution rule if one exists; otherwise fail closed with a clear, deterministic error and document the exact unresolved distinction. Do not invent a new winner-selection policy.
+
+6. Preserve Prompt 39 cutoff behavior:
+
+   * every participating Forecast record and TTM observation must have a valid normalized cutoff;
+   * all participating cutoffs in one artifact must agree;
+   * missing, invalid, or mixed cutoffs fail before scoring and artifact construction;
+   * empty input remains explicitly empty;
+   * TTM-only input retains its validated cutoff;
+   * later-published Actuals remain eligible evaluation outcomes under the approved policy.
+
+7. Update the existing Prompt 39 test that incorrectly requires duplicate TTM observations to count twice. Replace that assertion with the behavior required by the locked specification. Do not weaken unrelated tests or remove coverage merely to obtain a green run.
+
+## 5. Mandatory regression matrix
+
+Add or revise focused tests that establish all of the following:
+
+* One valid TTM observation is counted once.
+* Repeating the exact same TTM observation does not increase any relevant count or sufficiency classification.
+* Supplying the same TTM observation in a different input order produces the same result.
+* An equivalent observation arriving through the Forecast and TTM paths is not double-counted when the canonical identity says it is the same outcome.
+* Genuinely distinct observations remain distinct.
+* Same numerical values for genuinely distinct identity keys do not cause accidental deduplication.
+* Different scenarios remain separate; deduplication in one scenario cannot remove or merge an observation from another.
+* Different horizons and model versions remain separate.
+* Conflicting payloads or provenance under the same canonical identity follow an already-authorized rule or fail closed; no arbitrary selection.
+* Duplicate observations cannot inflate general sufficiency, Bias-eligible counts, MAPE-effective counts, or baseline pairing counts.
+* Primary and ESTIMATED-excluded sensitivity evaluations remain independently correct.
+* All Prompt 39 cutoff tests continue to pass, including missing/invalid cutoff, mixed cutoff, TTM-only cutoff, empty input, and later-published Actual behavior.
+* Rejected invocations return no partial successful result or misleading artifact.
+
+For every test, assert actual results and counts, not merely that a function returns or an exception is raised.
+
+## 6. Complete six-layer validation
+
+Perform all six layers in one continuous workflow. If any layer finds a defect, correct it and repeat the affected layers plus regression validation. Do not stop after the first passing subset.
+
+**Layer 1 — Unit and mathematical invariants**
+
+* Validate canonical duplicate identity, unique-observation counts, sufficiency thresholds, and unchanged metric formulas.
+* Confirm duplicates do not alter any result that should be based on unique observations.
+
+**Layer 2 — Contract and boundary validation**
+
+* Validate duplicate Forecast/TTM overlap, repeated TTM inputs, conflicting identity collisions, missing data, and preservation of the existing identity contract.
+* Validate fail-closed behavior where a conflict has no authorized resolution.
+
+**Layer 3 — Production-path integration**
+
+* Exercise the actual `run_evaluation_pipeline` path through matching, eligibility, scoring, aggregation, baseline comparison, scenario results, and artifact construction.
+* Confirm duplicate handling occurs before duplicate records can distort aggregate results or sufficiency counts.
+
+**Layer 4 — Adversarial and negative testing**
+
+* Test repeated, reordered, interleaved, cross-scenario, cross-horizon, and cross-model-version inputs.
+* Test Forecast/TTM overlap and conflicting duplicate payloads.
+* Confirm deterministic behavior and no partial successful results after rejection.
+
+**Layer 5 — Regression and full suite**
+
+* Run the complete focused Stage 6 test set, including Prompt 39 and all existing tests covering duplicate handling, TTM accounting, metrics, baseline comparison, sufficiency, scenarios, and artifacts.
+
+* Run the full test suite using the established project command:
+
+  `.venv/Scripts/python.exe -m pytest src/tests/ -q`
+
+* After any fix, rerun the affected focused tests and the full suite. Record exact collected, passed, failed, and skipped counts. Investigate all failures; do not misrepresent environmental skips as passes.
+
+**Layer 6 — Independent diff and invariant audit**
+
+* Re-read every changed source and test hunk.
+* Independently verify that duplicate TTM observations cannot inflate counts and that legitimate distinct observations remain intact.
+* Verify that the Prompt 39 cutoff guard and artifact cutoff behavior remain correct.
+* Verify no changes to Stages 1–5, Stage 7, valuation, Reliability methodology, or persistence.
+* Verify that tests have not been weakened, skipped, or altered to conceal failures.
+* Verify no Git or remote operations were performed.
+
+## 7. Completion and reporting
+
+Do not stop at diagnosis or leave authorized fixes for a later prompt. Complete the correction, tests, regression run, and final diff audit before reporting.
+
+Append one consolidated report to `temp_report.md`; never overwrite existing reports. Use this heading:
+
+`REPORT — Stage 6 Prompt 40: Duplicate-Observation Invariant Closure`
+
+The report must include:
+
+1. The exact specification clauses governing duplicate observations.
+2. The canonical identity used and the source establishing it.
+3. Root cause of the incorrect Prompt 39 duplicate test and any implementation defect found.
+4. Every changed file and the reason for each change.
+5. The behavior for exact duplicates, Forecast/TTM overlap, conflicting collisions, and genuinely distinct observations.
+6. The focused regression matrix and exact per-test or grouped results.
+7. All six validation layers with commands and measured results.
+8. Exact focused Stage 6 and full-suite collected/passed/failed/skipped counts.
+9. Final diff audit and confirmation that Stages 1–5 and Stage 7 remain untouched.
+10. Confirmation that Reliability remains withheld/NULL, no persistence or migration was added, and no Git/remote operations were performed.
+11. Any unresolved defect or authority blocker, with the exact reason.
+
+Use one of these final statuses:
+
+* `READY FOR FINAL FREEZE GATE` only if the duplicate-observation violation and all other authorized defects found during this workflow are resolved, all six layers pass, and the full regression suite has zero failures.
+* `BLOCKED — IMPLEMENTATION OR VALIDATION FAILURE` if any actionable authorized defect or required validation remains unresolved.
+* `BLOCKED — EXPLICIT AUTHORITY REQUIRED` only if a genuine unresolved policy ambiguity cannot be resolved from the locked specification or already-delegated decisions.
+
+Even if the result is `READY FOR FINAL FREEZE GATE`, **Stage 6 remains NOT FROZEN**. A separate independent final freeze gate is still required.
+=============================================================

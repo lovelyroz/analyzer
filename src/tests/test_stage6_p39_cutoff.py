@@ -422,8 +422,13 @@ def test_p39_19_ttm_conservation_and_duplicates_intact():
     ]
     assert len(keys) == 5
     assert len(set(keys)) == 5
-    # Duplicates pass through intact: the same TTM observation supplied twice
-    # is conserved (counted twice), never silently deduped or dropped.
+    # Stage 6 Prompt 40 (spec Section 7 invariant 16, Section 42,
+    # approved D5): the same TTM observation supplied twice is ONE
+    # evaluation observation — it must not inflate scored counts,
+    # sufficiency, Bias/MAPE counts, baseline pairing, or any aggregate.
+    # Both colliding entries quarantine wholesale per the canonical
+    # 7-tuple identity (no silent winner-pick); ttm_accounted counts
+    # distinct canonical TTM identities, so the repeat counts once.
     doubled = run_evaluation_pipeline(
         records,
         ["REVENUE"],
@@ -431,5 +436,9 @@ def test_p39_19_ttm_conservation_and_duplicates_intact():
         ttm_observations=[_ttm(0, 201), _ttm(0, 201)],
     )
     doubled_verdict = doubled.verdicts[_key()]
-    assert doubled_verdict.ttm_accounted == 2
+    assert doubled_verdict.ttm_accounted == 1
     assert doubled_verdict.series.total_observations == 5
+    assert doubled_verdict.series.observation_count == 3
+    assert doubled_verdict.series.quarantined == {"DUPLICATE_QUARANTINED": 2}
+    assert doubled_verdict.series.mape_effective_count == 3
+    assert doubled_verdict.series.bias_eligible_count == 3
