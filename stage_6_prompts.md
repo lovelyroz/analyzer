@@ -6690,3 +6690,126 @@ Finish with a concise status:
 
 Do not declare Stage 6 frozen. Do not rewrite Prompt 42 or Prompt 43 reports.
 =====================================================
+# Stage 6 — Prompt 45: Post-Environment Full Validation and Freeze Evidence Refresh
+
+You are continuing the `analyzer` financial-data project.
+
+## Objective
+
+Perform a narrowly scoped, read-only validation refresh after Prompt 44 confirmed that `openpyxl` imports successfully in the intended project virtual environment and the targeted FX XLSX test passes.
+
+This prompt is validation-only. Do not implement fixes or modify application code, tests, dependencies, configuration, or methodology.
+
+Stage 6 is still NOT FROZEN unless the owner explicitly declares it frozen.
+
+## Mandatory restrictions
+
+* Do not modify any application source or test file.
+* Do not install, uninstall, or upgrade packages.
+* Do not change test assertions, skip conditions, fixtures, or dependency declarations.
+* Do not substitute any `seo-codal-report` PDF for the missing FZAR monthly-activity fixture.
+* Do not modify frozen Stage 1–5, Stage 7, valuation, database, or migration code.
+* Do not create or modify branches, commits, or remotes; do not push, pull, or use GitHub/GitHub CLI/API.
+* Read-only local Git status and diff inspection are permitted.
+* Append the result to `temp_report.md`; never overwrite previous reports.
+* Do not claim a test passed unless its current execution output confirms it.
+
+## Step 1 — Confirm the intended interpreter
+
+Use the interpreter identified in Prompt 44:
+
+`D:/winprojects/analyzer/.venv/Scripts/python.exe`
+
+Record the exact output for:
+
+1. `sys.executable`
+2. Python version
+3. `openpyxl` import and version
+4. pytest version
+
+If the interpreter is missing or `openpyxl` fails to import, stop the validation run and document the exact error. Do not install anything.
+
+## Step 2 — Re-run the Stage 6 test set
+
+Retrieve the exact 14 Stage 6 test-file paths recorded in Prompt 42 from `temp_report.md`. Do not rediscover the repository or broaden the file list.
+
+Run those exact 14 files with the intended interpreter, using the same relevant pytest options as Prompt 42 where applicable.
+
+Record the exact command, collected count, passed count, failed count, skipped count, and duration. If any test fails or is skipped, preserve its exact reason and investigate only enough to classify the result. Do not modify code.
+
+## Step 3 — Re-run the complete test suite
+
+Run:
+
+`D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest src/tests/ -q -p no:warnings -rs`
+
+Record the exact command and actual collected, passed, failed, and skipped counts. Include the full skip reasons shown by pytest.
+
+Specifically verify whether the earlier `openpyxl`-related skip is now a pass. Do not assume the expected count from Prompt 44; use only the observed output.
+
+If the full suite fails, do not attempt repairs. Report the failing test IDs and concise failure details, and classify whether the failure appears related to this environment revalidation or is unrelated. Do not label the result successful if any test failed.
+
+## Step 4 — CODAL fixture boundary
+
+Do not retry the CODAL test using an unrelated SEO PDF.
+
+Use Prompt 44’s recorded evidence that the expected `fzar_403_aban.pdf` fixture was unavailable and that the pinned test correctly skipped. Recheck fixture availability only if this can be done narrowly without repository-wide exploration.
+
+If the fixture remains absent, retain the existing skip and record it as an unresolved external fixture gap. Do not weaken the test or claim that CODAL PDF validation passed.
+
+## Step 5 — Six-layer validation evidence
+
+Use the existing Prompt 38–42 reports and the new executions to update the evidence matrix for:
+
+1. Unit/formula validation
+2. Contract/boundary validation
+3. Production-path/integration validation
+4. Adversarial/negative validation
+5. Regression/full-suite validation
+6. Independent audit
+
+For each layer, distinguish:
+
+* previously recorded evidence;
+* tests actually re-executed in Prompt 45;
+* any remaining limitation.
+
+Do not imply that the full six-layer matrix was independently re-executed if this prompt only refreshes the Stage 6 test set and full suite.
+
+## Step 6 — Scope and integrity check
+
+Run read-only `git status --short` and `git diff --stat`.
+
+Confirm whether any tracked application or test files changed during this prompt. Do not revert pre-existing user changes. If unexpected modifications appear, report them and stop.
+
+## Step 7 — Append the report
+
+Append the following heading to `temp_report.md`:
+
+`REPORT — Stage 6 Prompt 45: Post-Environment Full Validation and Freeze Evidence Refresh`
+
+Include:
+
+* interpreter and dependency evidence;
+* exact Stage 6 test command and observed counts;
+* exact full-suite command and observed counts;
+* all current skip reasons;
+* CODAL fixture status;
+* the six-layer evidence matrix, with prior versus newly executed evidence clearly distinguished;
+* `git status --short` and `git diff --stat` findings;
+* unresolved issues and recommended next action.
+
+Do not rewrite Prompt 42, 43, or 44 reports.
+
+## Required final status
+
+State each independently:
+
+* `OPENPYXL VALIDATION: PASS` or `OPENPYXL VALIDATION: UNRESOLVED`
+* `STAGE 6 TEST SET: PASS` or `STAGE 6 TEST SET: FAIL`
+* `FULL SUITE: PASS` or `FULL SUITE: FAIL`
+* `CODAL FIXTURE: AVAILABLE` or `CODAL FIXTURE: STILL MISSING`
+* `STAGE 6 STATUS: NOT FROZEN`
+
+Only report PASS when supported by the actual test output. Do not freeze Stage 6, change implementation, or claim the missing CODAL fixture has been resolved.
+================================================================
