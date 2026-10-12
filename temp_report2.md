@@ -1318,4 +1318,92 @@ Cwd and interpreter as above. Fresh run: `... -m pytest src/tests/test_stage7_va
 
 Read-only assessment plus this English-only append: read the temp_report2.md tail, spec sections 3, 7-13, 56-57, 60, 63-65, 69, 85-87, engine.py, schema.py, the full Stage 7 test file, the P13 task text in stage_7_prompts.md, decision-engine cutoff passthrough, and forecast/evaluation/Stage 1 provenance interfaces via a read-only sweep; ran only the one pytest command above; changed no code; weakened no test; invented no data, dates, provenance, formulas, or thresholds; performed no commits, pushes, pulls, or branch changes; Stages 1-6 and 8-9 untouched. All earlier reports preserved. Stage 7 is NOT declared frozen. Work stops after appending the report.
 ========================================================
+# P14 — Stage 7 Parameter-Version Registry Design (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12. DESIGN-ONLY task; zero source, test, specification, parameter, dependency, migration, or configuration changes. No commits, pushes, pulls, branch changes, remote, or GitHub/API operations. Stages 1-6 and 8-9 untouched. Stage 7 is NOT declared frozen. No weights, thresholds, fallback defaults, rounding rules, or dispersion methodology invented; all new design choices are labeled PROPOSAL and require approval. The dead `high_dependence_share` parameter is not wired.
+
+## 0. Inputs inspected (read-only)
+
+- temp_report2.md tail (P13 close, lines 1317-1322; append point verified).
+- 07_Stage7_Valuation.md sections 40 (dispersion formula must be versioned), 64 (model-version gate list), 65 (parameter record fields).
+- src/valuation/parameters.py (full file, 82 lines; 9 versioned entries post-P10).
+- src/valuation/engine.py (method-level trace: _scenario_dispersion lines 399-406; _valuation_confidence lines 432-434; _driver_analysis lines 469-498; _alerts lines 501-535; result construction lines 201-250).
+- src/valuation/schema.py (ValuationResult carries model_version and contract_version; no parameter-history fields).
+- Focused tests: version/determinism pins (P6 repeat-run, P10 golden hash 1990c6393233121df4bccea381ac6539461443ea1a77f1e6e09a1cf819b71255, P12 timestamp test).
+- Verified searches: `high_dependence_share` occurs only at parameters.py:73 (zero src references — dead, re-confirmed); `effective_from|parameter_version|valuation_model_parameters` occur nowhere in src/ (no record store exists).
+
+## 1. Four-category classification (P10 17-constant inventory, verified unchanged)
+
+(a) EXPLICITLY SPECIFIED AND VERSIONED (4): C1 SCENARIO_WEIGHTS 0.20/0.60/0.20 (Sec 22 states the prior and calls it a Model Version Parameter); C4 VALUATION_THRESHOLDS, all 7 cutoffs incl. expensive_base_upside 0.0 (Sec 35 exact table, P10 fix closed the literal gap); C5 CONFIDENCE_THRESHOLDS 90/75/60/40 (Sec 39 exact bands, Model Version Parameters); C16 MIN_INDUSTRY_PEERS 8 (Sec 10 and non-negotiable rule 6).
+
+(b) VERSIONED BUT LACKING NUMERIC SPECIFICATION SUPPORT (5): C2 PROBABILITY_EVIDENCE_BLEND 0.25 (Sec 23-24 require family votes, no blend number); C3 SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT 0.20 (Sec 17 bans fixed gaps, gives no bound); C6 RISK_THRESHOLDS numerics 40/0.50/-30/60/-15 (Sec 36 lists factors, no cutoffs); C7 ALERT_THRESHOLDS 0.50/40.0/1.50x3 (Sec 49 names categories, no triggers in Sec 41-53); C12 SENSITIVITY_PERTURBATION 0.10 (Sec 45 "reasonable change" and Sec 50 "relatively small" give no size).
+
+(c) HARDCODED FORMULAS/WEIGHTS THE SPECIFICATION SAYS MUST BE VERSIONED (3): C9 confidence blend 0.40/0.20/0.20/0.20 plus benchmark 100/25 and dispersion penalty slope 50 cap 40, engine.py lines 432-434 (Sec 38 lists factors with no weights; Sec 64 lists Confidence Formula as version-gated); C10 driver-uncertainty blend 0.5/0.3/0.2, engine.py line 493 (Sec 46 lists five bases with no selection; Sec 64 lists Driver Priority Formula); C11 dispersion formula (max-min)/base, engine.py lines 399-406 (Sec 40: formula must be versioned; it is inline code, not a named parameter).
+
+(d) DEFAULTS, ROUNDING RULES, AND NUMERICAL GUARDS WITH NO SPECIFICATION BASIS (3 + 2 legacy): C13 score fallback defaults 50/50/100 (_clamp_score call sites); C14 rounding policy (fair value round 2 and margin round 2 in models.py; forward P/E round 4, confidence round 4, impact/uncertainty/review round 4 in engine.py); C15 epsilon guards (1e-9 driver total floor; strict `>` keeps exact-0.50 dispersion silent). Separately: C8 high_dependence_share 0.60 defined-but-dead (must stay unwired until the P8-D2 dependence-share formula is decided); C17 legacy/unconsumed exports (INDUSTRY_TARGET_PE {}, SCENARIO_PE_MULTIPLIER 1.00s, calculate_nav_fair_value, signature defaults) retained for backward compatibility only.
+
+## 2. P8 options comparison (D9 record-store decision)
+
+| Dimension | A: in-code parameter registry | B: database-backed parameter table | C: V1 methodology fixed in code, version via MODEL_VERSION bump only |
+|---|---|---|---|
+| Auditability | Medium. Every value named with (model_version, parameter_name, parameter_value, effective_from, description) in parameters.py; history readable in code review and git log. No queryable audit trail. | High. Append-only table gives queryable per-version history, effective dating, and change attribution. | Low. Only MODEL_VERSION distinguishes behavior; individual value history recoverable solely from git diffs. |
+| Determinism | Strong, if lookup is a pure function of (model_version, as-of date) with no wall-clock, randomness, or dict-order dependence (sorted iteration). Same guarantee as today, extended to category (c)/(d) items. | Strong at runtime only if the engine pins one row-set per run (single SELECT at run start, no mid-run re-read). Live-table reads risk non-reproducible runs when rows change between runs. | Strong. Today's property (P6/P10/P12 pins) is unchanged. |
+| Compatibility | Backward compatible while defaults are unchanged: moving literals into named records with identical values keeps outputs bit-identical (P10 C4b precedent: zero-hash-diff change needed no MODEL_VERSION bump). No contract change; ValuationResult gains no required fields. | Same runtime compatibility, plus a new read dependency (DB availability) on the valuation path. Any required provenance-summary output fields would need a CONTRACT_VERSION bump. | Fully compatible (nothing changes) but freezes improvement: any future tuning of category (c)/(d) values still needs a mechanism. |
+| Persistence | Git history only. No runtime durability beyond the deployed code revision. | Durable, queryable history independent of deploys. | Git history only, coarser (whole-version granularity). |
+| Implementation cost | Small: Stage 7 files only (parameters.py records + engine lookup + focused tests). No shared-layer changes. | Large: migration plus table, access layer, seeding, backfill of current values with effective_from dates, and run-pinning logic. Reaches beyond Stage 7-only scope. | Zero now; cost deferred to the first tuning event, which re-opens this same decision. |
+| Frozen stages / migrations | None. No Stages 1-6 or 8-9 files touched; no migration. | Migration required; if the table lives in a shared DB layer, freeze boundaries of other stages are engaged. | None. |
+| Sec 65 standing | Satisfies the letter (values out of hard-code with the five-field records) at code-review granularity. | Satisfies the letter with the strongest trail. | Arguably violates Sec 65: blends, slopes, caps, and the dispersion formula stay hard-coded and no per-parameter records exist. |
+
+PROPOSAL verdict (requires approval): adopt Option A now for categories (c) and (d) with defaults unchanged (bit-identical outputs, no MODEL_VERSION bump, P10 precedent); defer Option B until a second consumer or a cross-deploy audit query need appears; reject Option C as a permanent answer because Sec 65 explicitly requires per-parameter records, though C describes the current state honestly.
+
+## 3. Required record fields (Sec 65) and proposed minimal schema
+
+Sec 65 requires records with exactly: `model_version`, `parameter_name`, `parameter_value`, `effective_from`, `description`. Current gap (verified): parameters.py holds values but no `effective_from`/`description` records for any entry.
+
+PROPOSAL minimal schema (requires approval; in-code form under Option A):
+
+```python
+@dataclass(frozen=True)
+class ParameterRecord:
+    model_version: str        # e.g. "STAGE7_V1"; Sec 64: old versions never overwritten
+    parameter_name: str       # e.g. "confidence_blend_reliability_weight"
+    parameter_value: float    # numeric value consumed by the engine
+    effective_from: datetime  # UTC-aware; version becomes selectable at this instant
+    description: str          # what it controls, spec basis or "engine-chosen, no spec number"
+
+PARAMETER_REGISTRY: tuple = (...)  # append-only; historical rows never edited
+```
+
+PROPOSAL scope rule (requires approval): every category (c) literal and every category (d) default/guard/rounding precision enters the registry as a named record; category (b) entries gain `effective_from`/`description` records with descriptions honestly marked "engine-chosen, no spec number" (no retroactive spec claim); category (a) entries gain records with spec-section citations; C8 stays out of the registry entirely until P8 D2 is decided (a record must never imply a wired behavior); C17 legacy exports stay out (compatibility shims, not model parameters).
+
+## 4. Immutability and effective-version selection (PROPOSAL; the spec defines no selection rule)
+
+Verified facts: Sec 64 requires old versions never be overwritten; the spec defines NO rule for selecting the effective parameter version for a valuation date or cutoff — no "latest effective_from <= X" sentence exists. The engine today reads module constants at import (single implicit version STAGE7_V1 stamped on every ValuationResult). These are stated as gaps, not assumptions.
+
+PROPOSAL immutability (requires approval): registry is a frozen tuple of frozen dataclasses; any mutation attempt raises; a startup self-check asserts append-only growth (new rows only, never edits — enforced by test, not by the type system alone); each ValuationResult records the resolved `model_version` plus the registry digest (hash over canonical record serialization) so any run is re-traceable to its exact row-set.
+
+PROPOSAL selection rule (requires approval; explicitly NOT in the spec): `effective(row) = max over rows with (model_version == requested version AND effective_from <= as_of)` where `as_of` is itself a decision — candidates are (i) data_cutoff_datetime, (ii) valuation_date, (iii) min of the two. Unknown requested version fails closed (ValueError), never silent fallback. Until the user fixes `as_of`, historical backtests cannot be parameterized deterministically and any implementation must default to the single active version only.
+
+## 5. PROPOSAL validation strategy (requires approval; no replacement values selected)
+
+- Registry self-check (fail-closed at import): every engine-consumed key present for the active MODEL_VERSION; unique (model_version, parameter_name, effective_from); effective_from values UTC-aware and monotonic per (model_version, parameter_name); value types/ranges sane (weights finite, cutoffs ordered where the spec orders them, e.g. Sec 35/39 bands).
+- Bit-identity gate: full-contract golden hash must equal 1990c6393233121df4bccea381ac6539461443ea1a77f1e6e09a1cf819b71255 after moving literals with unchanged defaults (P10 C4b method).
+
+## 6. Six validation layers (runtime layers marked not executed)
+
+1. Unit/formula: NOT EXECUTED (design-only; no registry code exists to unit-test). Proposed: per-record consumption tests (mutate-then-restore pattern per P10 test 2) for each category (c)/(d) entry; rounding-precision tests pinning round-2/round-4 behavior.
+2. Contract/boundary: STATIC VERIFICATION EXECUTED (spec Sec 40/64/65 re-read; all 17 constants re-traced to engine/parameters locations above; dead-parameter and no-record-store searches executed in Sec 0). No runtime contract executed.
+3. Production-path/integration: NOT EXECUTED. No production caller exists (P13 finding stands); registry pins the forecast-leg path identically once adopted.
+4. Adversarial/negative: NOT EXECUTED (runtime). Proposed: unknown-model_version rejection; effective_from in the future (no eligible row) rejection; NaN/inf parameter_value rejection at registry load; duplicate-record rejection.
+5. Regression: STATIC ONLY — no file changed in P14, so no regression is possible; golden-hash and Stage 9 evidence carried from P10/P11. Proposed for implementation: full 52-test rerun plus hash-identity gate (Sec 5).
+6. Independent audit: EXECUTED — this read-only design; nothing claimed implemented, wired, or runtime-validated beyond the static searches and re-trace above.
+
+## 7. Proposed future test plan (implementation-gated, nothing executed)
+
+Unit: consumption proof per new record (category c/d). Boundary: Expensive-cutoff pair style brackets for each moved cutoff; effective_from equality edge (row eligible exactly at its instant). Immutability: FrozenInstanceError on record mutation; registry-digest stability across repeated runs. Version-selection: synthetic non-production version label proves routing selects the correct row-set (asserts routing only, no financial value invented); unknown-version and future-effective_from cases fail closed. Determinism: full-contract repeat-run equality excluding calculation_timestamp (P6/P12 method) plus registry-digest equality. Regression: all 50 currently passing tests unchanged; golden hash gate; Stage 9 suite 13/13.
+
+## 8. Scope confirmation
+
+Design-only: read temp_report2.md tail, spec sections 40 and 64-65, parameters.py, engine.py, schema.py, models.py rounding sites, and focused version/determinism test references; ran no pytest commands in P14; changed no source, test, spec, dependency, migration, or configuration; weakened no test; invented no weights, thresholds, defaults, rounding rules, or dispersion methodology; left high_dependence_share unwired; performed no commits, pushes, pulls, or branch changes; Stages 1-6 and 8-9 untouched. English-only append with all prior content preserved. Stage 7 is NOT declared frozen. Work stops after appending the report.
+========================================================
 

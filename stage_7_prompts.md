@@ -440,3 +440,45 @@ Read-only: no source, test, schema, specification, parameter, dependency, or con
 
 Append `P13 — Stage 7 PIT Contract Impact Assessment` to `temp_report2.md`, preserving all prior content. Stop.
 =============================================================
+# P14 — Stage 7 Parameter-Version Registry Design
+
+Work in the local project folder `analyzer`.
+
+## Objective
+
+Design the smallest auditable mechanism for Stage 7 model-parameter versioning that addresses P8 D9 and P10 findings. This is a design-only task.
+
+Read the latest `temp_report2.md` and inspect only the relevant Stage 7 specification sections 40 and 64–65, `src/valuation/parameters.py`, `src/valuation/engine.py`, `src/valuation/schema.py`, and focused tests.
+
+## Required analysis
+
+1. Distinguish:
+
+   * Values already explicitly specified and versioned.
+   * Values currently versioned but lacking numeric specification support.
+   * Hardcoded formulas/weights that the specification says must be versioned.
+   * Defaults, rounding rules, and numerical guards with no explicit specification basis.
+2. Compare the P8 options:
+
+   * In-code parameter registry.
+   * Database-backed parameter table.
+   * V1 methodology fixed in code with model-version changes only.
+3. For each option, explain auditability, determinism, compatibility, persistence, implementation cost, and whether it requires touching frozen stages or migrations.
+4. Address the required record fields from section 65:
+   `model_version`, `parameter_name`, `parameter_value`, `effective_from`, and `description`.
+5. Explain how historical parameter versions remain immutable and how the engine selects the effective version for a valuation date or cutoff. Do not assume the required selection rule is already defined if the specification does not say so.
+6. Propose a minimal registry schema and a validation strategy, but label all new design choices as proposals requiring approval.
+7. Do not invent replacement weights, thresholds, fallback defaults, rounding rules, or dispersion methodology.
+8. Do not wire the dead `high_dependence_share` parameter until its dependence formula is decided.
+9. Do not make code changes or modify the specification.
+
+## Validation
+
+This is a design-only task. Report the six validation layers and clearly mark runtime layers as not executed. Include proposed unit, boundary, immutability, version-selection, determinism, and regression tests for a future implementation.
+
+## Constraints
+
+No source, test, spec, dependency, migration, or configuration changes. No changes to Stages 1–6 or 8–9. No remote Git operations or GitHub/API. Do not declare Stage 7 frozen.
+
+Append `P14 — Stage 7 Parameter-Version Registry Design` to `temp_report2.md`, preserving all earlier content. Stop.
+=============================================================
