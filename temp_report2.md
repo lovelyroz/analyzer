@@ -418,3 +418,257 @@ Two red tests assert absent required behavior, and the missing behaviors cannot 
 
 Read-only audit: inspected the spec, Stage 7 sources, all 49 Stage 7 tests, and the P2-P6 reports; ran only the stated pytest commands; verified frozen-stage boundaries via git history; invented no data, formulas, thresholds, or defaults. This English-only append preserves all earlier reports. Work stops after validation and reporting; Stage 7 is NOT declared frozen.
 ========================================================
+# P8 — Stage 7 Specification Decision Package (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12. P8 source: D:/winprojects/analyzer/stage_7_prompts.md, lines 195-242
+(section "# P8 — Stage 7 Specification Decision Package"). No source, test, specification,
+parameter, dependency, or configuration file was modified. No commits, pushes, pulls, branch
+changes, GitHub/API, or remote operations. Frozen Stages 1-6 and 8-9 untouched. No financial
+formula, threshold, perturbation size, sector mapping, or PIT policy was selected; candidate
+designs below are explicitly labeled PROPOSAL, not specification. P8 verification run (cwd
+D:/winprojects/analyzer, D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest
+src/tests/test_stage7_valuation.py -q -p no:warnings): collected 49, passed 47, failed 2,
+skipped 0. The 2 failures are the unchanged P2 failing-first exposures
+(test_p2_sector_driver_decomposition_missing, test_p2_required_flip_dependence_alerts_missing),
+identical to the P7 state. Full suite was not re-executed in P8; full-suite evidence is carried
+forward from P7 (2 failed, 897 passed, 1 skipped, PDF-extraction file excluded).
+
+## 1. Inputs reviewed
+
+- Failing tests: D:/winprojects/analyzer/src/tests/test_stage7_valuation.py, lines 406-465
+  (sector decomposition assertion lines 421-422; flip/dependence assertion lines 457-465).
+- P7 findings: this file, lines 377-420. BLOCKER-1 (flip/dependence alert family absent,
+  10% EPS shock provably flips ATTRACTIVE to FAIR with no alert) and BLOCKER-2 (ranking always
+  {EPS, TARGET_PE}; sections 42-44 chains unimplemented) are confirmed open by the P8 rerun.
+- Engine evidence: D:/winprojects/analyzer/src/valuation/engine.py (_driver_analysis lines
+  468-498 hardcodes two drivers; _alerts lines 500-535 emits no required family names);
+  parameters.py line 72 high_dependence_share 0.60 is defined and referenced nowhere in
+  src/valuation (independently verified by search in P8).
+- Required names are absent from all engine source: a P8 search for ASSESSMENT_FLIP_RISK,
+  HIGH_MULTIPLE_DEPENDENCE, HIGH_EPS_DEPENDENCE, MARGIN_ASSUMPTION_RISK,
+  HIGH_IMPACT_HIGH_UNCERTAINTY, VALUATION_BENCHMARK_DIVERGENCE, POINT_IN_TIME_WARNING, and
+  POOR_DATA_QUALITY matches only test files, never src/valuation.
+
+## 2. Decision table
+
+Conventions: SPEC = direct specification evidence (section quoted). MISSING = the smallest
+specification amendment needed to make the requirement testable. PROPOSAL = my candidate
+design, not a requirement; listed only so the user can see viable options and their financial
+consequences. No option is selected.
+
+### D1 — ASSESSMENT_FLIP_RISK
+
+- SPEC: section 50 requires the alert when a "relatively small and reasonable" assumption
+  change flips ATTRACTIVE to FAIR or EXPENSIVE; stress test 77 requires it for a small
+  margin/EPS change flipping ATTRACTIVE to FAIR.
+- MISSING: (a) perturbation size ("relatively small" has no number); (b) which assumptions
+  to shock (EPS, margin, multiple, all drivers?); (c) shock method (one-at-a-time vs joint);
+  (d) trigger rule (any single shock flipping status, or majority, or expected-upside-only);
+  (e) severity (INFO/WATCH/WARNING/CRITICAL unspecified).
+- PROPOSAL A (distance-to-threshold, no recomputation): alert when expected upside is within
+  X percentage points of the nearest status boundary. Consequence: cheap and deterministic,
+  but X is a new threshold and multi-assumption fragility is missed; near-boundary cases
+  could over-alert.
+- PROPOSAL B (one-at-a-time recomputation): shock base EPS and target P/E by
+  SENSITIVITY_PERTURBATION one-at-a-time and alert if any single shock changes
+  valuation_status. Consequence: directly tests fragility at ~2 extra valuations; still needs
+  the shock set/sizes and the flip rule fixed in the spec.
+- PROPOSAL C (joint worst-case shock): shock all assumptions adversely at once.
+  Consequence: most conservative; likely over-alerts and needs correlation assumptions the
+  spec does not contain.
+- REQUIRED USER DECISION: fix the (shock set, shock sizes, method, flip rule, severity)
+  tuple, or explicitly defer the alert out of V1.
+
+### D2 — HIGH_MULTIPLE_DEPENDENCE
+
+- SPEC: section 51 requires the alert when fair value depends excessively on target P/E
+  rather than EPS growth (example: near-stable EPS with the bull case built on very high P/E
+  expansion); stress test 78.
+- MISSING: (a) the dependence-share formula splitting fair value into an EPS share vs a
+  multiple share; (b) the role of the dead high_dependence_share = 0.60 (trigger value?
+  share of what?); (c) scope (bull case only, all scenarios, or base?); (d) severity.
+- PROPOSAL A (counterfactual decomposition): recompute bull fair value at the base multiple;
+  multiple_share = (bull_FV - bull_EPS x base_multiple) / bull_FV; alert above a threshold.
+  Consequence: economically intuitive; needs the threshold decision; undefined when EPS is
+  invalid (must then be NOT_APPLICABLE, not zero).
+- PROPOSAL B (elasticity ratio): compare percent FV change from a multiple shock vs an EPS
+  shock; alert if multiple elasticity dominates by factor K. Consequence: reuses existing
+  perturbation machinery; needs K and the shock sizes.
+- REQUIRED USER DECISION: define the share formula, confirm or remove the 0.60 threshold,
+  fix scope and severity, or defer out of V1.
+
+### D3 — HIGH_EPS_DEPENDENCE
+
+- SPEC: section 52 requires the alert when valuation is mainly sensitive to forecast EPS,
+  with severity allowed to rise when forecast reliability is low; stress test 79.
+- MISSING: (a) the EPS-share formula (mirror of D2); (b) the low-reliability severity
+  escalation rule (how many severity steps, at what reliability cutoff — the 40.0 engine
+  cutoff is not stated in the spec); (c) how D2 and D3 interact when both shares are high
+  (both alerts, or the larger one?).
+- PROPOSAL A: EPS_share = 1 - multiple_share from D2's formula; escalate one severity level
+  when reliability is below the low-reliability cutoff. Consequence: consistent with D2 but
+  inherits all of D2's decisions plus the escalation matrix.
+- PROPOSAL B: standalone elasticity trigger independent of D2. Consequence: D2 and D3 could
+  fire together; needs a documented precedence rule.
+- REQUIRED USER DECISION: define the share formula, the escalation rule, and D2/D3
+  precedence, or defer out of V1.
+
+### D4 — MARGIN_ASSUMPTION_RISK
+
+- SPEC: section 53 requires the alert when fair value depends strongly on operating/net
+  margin forecasts.
+- MISSING: everything functional — dependence measure, margin-perturbation size, threshold —
+  plus a structural gap: Stage 7 inputs contain EPS but no margin series, so no formula can
+  run without an input-contract change.
+- PROPOSAL A (contract expansion): Stage 5 supplies margin assumptions; shock them
+  one-at-a-time. Consequence: correct economics but the largest scope of this table
+  (upstream contract change, frozen-stage boundary engagement).
+- PROPOSAL B (EPS-shock proxy labeled margin-blind): attribute part of EPS sensitivity to
+  margins by assumption. Consequence: no contract change but economically weak and risks
+  false precision; must be labeled as a proxy, not a margin test.
+- REQUIRED USER DECISION: expand the input contract, accept a labeled proxy, or defer the
+  alert (with section 53) out of V1. Strongest deferral candidate in this package.
+
+### D5 — HIGH_IMPACT_HIGH_UNCERTAINTY
+
+- SPEC: section 49 requires the alert name; section 45 defines Driver Impact only as the
+  fair-value change from a "reasonable" driver change (no formula, sizes, or normalization);
+  section 46 lists five possible uncertainty bases with no selection or weighting; section 47
+  states Review Priority is approximately Impact x Uncertainty and explicitly defers the
+  exact formula and normalization to a model-version parameter that does not exist.
+- MISSING: (a) impact formula with per-driver shock sizes; (b) uncertainty estimation
+  formula (which bases, what weights); (c) the conjunction cutoffs (what counts as "high"
+  impact and "high" uncertainty).
+- PROPOSAL A (minimal): reuse the existing one-at-a-time 10% FV-identity shocks for impact
+  and the current reliability/probability/quality blend for uncertainty, plus fixed cutoffs.
+  Consequence: implementable immediately, but cutoffs are still new decisions and only
+  {EPS, TARGET_PE} are covered until D6 is resolved.
+- PROPOSAL B (full): per-driver framework after the sector mapping (D6) is defined.
+  Consequence: complete but blocked behind D6.
+- REQUIRED USER DECISION: fix formulas and cutoffs, or defer the alert (with sections
+  45-47) out of V1.
+
+### D6 — Sector-driver chains (non-financial, banks, holdings)
+
+- SPEC: sections 42-44 give causal chains (Revenue chain; Loans/Deposits to NII/NIM chain;
+  NAV to NAV-growth chain) and state P/NAV analysis belongs to Stage 7; the P2 test
+  requires REVENUE, NII, and NAV to appear in driver rankings.
+- MISSING: (a) industry_code-to-driver-set mapping (which codes count as bank/holding?);
+  (b) driver-to-EPS linkage formulas; (c) per-driver perturbation sizes; (d) how NAV enters
+  fair value (no P/NAV formula exists); engine currently ignores industry_code and echoes
+  nav_per_share to metadata only.
+- PROPOSAL A (identity decomposition): each chain link a multiplicative/additive identity
+  with its own shock. Consequence: needs per-link data in the inputs — large contract
+  expansion comparable to D4.
+- PROPOSAL B (sector-labeled attribution): keep the EPS-identity shocks, attribute them
+  through sector templates for ranking labels only. Consequence: small change but the
+  economics are thin; ranking labels would imply analysis that was not performed.
+- REQUIRED USER DECISION: define the mapping, linkage formulas, and NAV treatment, or
+  defer sections 42-44 (with the P/NAV claim) to V2 with ranking staying {EPS, TARGET_PE}.
+
+### D7 — Benchmark PIT provenance and valuation-date/cutoff relationship
+
+- SPEC: sections 56-57 and 8 require per-observation price date, forecast cutoff,
+  publication date, version, and availability; future-published reports are banned from
+  backtests; stress test 85.
+- CURRENT STATE (proven): benchmark series arrive as undated float lists; valuation_date
+  later than data_cutoff_datetime is accepted silently (pinned by a passing test asserting
+  ATTRACTIVE with no PIT flag); metadata pit_inputs_required=True is a claim flag, not
+  enforcement (P5/P7 evidence, uncontradicted).
+- MISSING: (a) per-value provenance fields; (b) the valuation_date-vs-cutoff rule
+  (reject, flag, or accept?); (c) the mechanism choice recorded in P5: per-value
+  provenance vs caller attestation.
+- PROPOSAL A (per-value provenance structs with validation): reject or flag
+  future-dated observations. Consequence: strongest guarantee; contract change for every
+  benchmark caller including upstream stages.
+- PROPOSAL B (caller attestation plus ordering check): flag when valuation_date exceeds
+  the cutoff by more than a tolerance. Consequence: small change; trust-based and needs
+  the tolerance decision.
+- PROPOSAL C (documented limitation): keep metadata-only behavior in V1.
+  Consequence: no work, but section 56 and stress test 85 PASS claims must be corrected.
+- REQUIRED USER DECISION: choose A, B, or C. Not implementable without this choice.
+
+### D8 — Required alert names vs currently emitted names
+
+- SPEC: section 49 requires VALUATION_BENCHMARK_DIVERGENCE, INSUFFICIENT_PEER_DATA,
+  POOR_DATA_QUALITY, NEGATIVE_EPS, SIGN_CHANGE, POINT_IN_TIME_WARNING (among others);
+  sections 54-55 use HISTORICAL_VALUATION_DIVERGENCE and INDUSTRY_VALUATION_DIVERGENCE.
+- EMITTED: WATCH:VALUATION_ABOVE/BELOW_TARGET_PE, WATCH:FORWARD_PE_ABOVE/BELOW_HISTORICAL,
+  WATCH:FORWARD_PE_ABOVE/BELOW_INDUSTRY, CRITICAL:INSUFFICIENT_BENCHMARK_DATA,
+  WARNING:LOW_FORECAST_RELIABILITY / HIGH_SCENARIO_DISPERSION, INFO:TOP_DRIVER — plus
+  NEGATIVE_EPS, SIGN_CHANGE, and INSUFFICIENT_PEER_DATA as risk flags, not alerts.
+- MISSING: (a) the name mapping (rename vs alias vs spec amendment adopting engine names);
+  (b) trigger semantics for POOR_DATA_QUALITY and POINT_IN_TIME_WARNING, which have no
+  definition anywhere; (c) whether flag-level emission satisfies the section 49 "alert
+  capability" requirement for NEGATIVE_EPS/SIGN_CHANGE/INSUFFICIENT_PEER_DATA.
+- PROPOSAL A (rename to spec names): cleanest conformance. Consequence: breaking change
+  for any consumer parsing current names.
+- PROPOSAL B (alias both, spec names canonical): backward compatible. Consequence: dual
+  vocabulary must be versioned and eventually retired.
+- PROPOSAL C (amend the spec to adopt engine names): no code change. Consequence:
+  requires editing the locked specification with governance approval.
+- REQUIRED USER DECISION: mapping choice (should be decided now — it is a naming decision,
+  not a formula); POOR_DATA_QUALITY and POINT_IN_TIME_WARNING triggers may be deferred
+  with the section 49 capability claim corrected.
+
+### D9 — Hardcoded model weights and thresholds that should be versioned
+
+- SPEC: sections 64-65 require a new model version for changes to the listed methods and
+  require all tunable thresholds outside hard-code with
+  (model_version, parameter_name, parameter_value, effective_from, description) records.
+- FOUND HARDCODED (engine.py, independently re-verified in P8): confidence blend 0.40 /
+  0.20 / 0.20 with benchmark 100/25 and dispersion penalty slope 50 capped at 40
+  (_valuation_confidence); driver-uncertainty blend 0.5 / 0.3 / 0.2 (_driver_analysis);
+  dispersion formula (max-min)/base (_scenario_dispersion — section 40 requires the formula
+  to be versioned); parameters.py holds values but no effective_from/description records.
+- MISSING: (a) the parameter-version record store (in-code registry, DB table, or file?);
+  (b) confirmation that blend weights and the dispersion formula are in scope as tunable.
+- PROPOSAL A (code registry): move all blends/slopes/caps into parameters.py with version
+  records. Consequence: code-only, no contract or migration change; needs the record-store
+  format decision.
+- PROPOSAL B (DB-backed parameter table): full audit trail. Consequence: migration work
+  that reaches beyond Stage 7-only scope.
+- PROPOSAL C (fix as V1 methodology, version via MODEL_VERSION bump only).
+  Consequence: weakest versioning; arguably violates section 65.
+- REQUIRED USER DECISION: record-store mechanism and scope confirmation. Proposal A is
+  small and need not be deferred; B may be deferred.
+
+## 3. Deferral analysis (requirements explicitly deferrable from V1)
+
+Deferrable with claim corrections: D1 (correct section 50 and stress test 77 PASS), D2
+(section 51, stress test 78), D3 (section 52, stress test 79), D4 (section 53), D5
+(sections 45-47 and the section 49 HIGH_IMPACT_HIGH_UNCERTAINTY entry), D6 (sections 42-44
+and the P/NAV claim), D7-option-C (section 56 and stress test 85 PASS), D8-partial
+(POOR_DATA_QUALITY and POINT_IN_TIME_WARNING triggers with the section 49 capability list).
+Each deferral must move the requirement to an explicit V1-excluded list and downgrade the
+corresponding PASS claim to DEFERRED/OUT-OF-SCOPE; otherwise the locked specification
+over-claims. Decide-now items: D8 name mapping and D9 record mechanism are naming and
+mechanics decisions that cost little and should not ride on a deferral. No deferral may
+weaken the two failing P2 tests artificially — deferred requirements must be removed from
+the tests' expectations by spec amendment first, never by editing tests to pass.
+
+## 4. Six validation layers (executed vs not executed in P8)
+
+1. Unit/formula: EXECUTED (P8 rerun of the Stage 7 file: 49 collected, 47 passed, 2 failed —
+   the 2 failures assert absent required behavior and fail for the right reason).
+2. Contract/boundary: EXECUTED (same rerun; peer-count, determinism, and boundary pins
+   unchanged from P7).
+3. Production-path/integration: NOT EXECUTED in P8 (carried from P7: forecast leg uses real
+   Stage 5 output; benchmark leg remains fixture-based by V1 design).
+4. Adversarial/negative: EXECUTED (same rerun; finite-input guards and rationale/bound
+   rejections unchanged from P7).
+5. Regression: NOT EXECUTED in P8 (full suite not rerun; P7 evidence carried: 897 passed,
+   1 skipped with Codal-sample reason, 2 known failures, PDF-extraction file excluded).
+6. Independent audit: EXECUTED (this read-only decision package; formulas, names, and
+   dead-parameter claims independently re-verified against source in P8). Nothing is claimed
+   implemented or validated beyond the rerun and the read-only trace.
+
+## 5. Scope confirmation
+
+Read-only decision package plus a confirming test rerun: inspected the spec, Stage 7
+sources, the two failing tests, and the P2/P7 reports; ran only the Stage 7 pytest command
+above; modified no source, test, specification, parameter, dependency, or configuration;
+invented no financial data, formulas, thresholds, defaults, or PIT policy; left the two
+failing tests failing as required. This English-only append preserves all earlier reports.
+Work stops after appending the report.
+========================================================

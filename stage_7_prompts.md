@@ -192,3 +192,51 @@ Read-only only. Do not edit source, tests, specifications, or reports except app
 Append the report, preserve all earlier reports, and stop.
 ===========================================================
 
+# P8 — Stage 7 Specification Decision Package
+
+You are working in the local project folder `analyzer`, a financial-data application.
+
+Read only the Stage 7 specification, relevant Stage 7 source/tests, and the latest reports in `temp_report2.md`. Do not reload or audit the entire repository.
+
+## Objective
+
+Convert the unresolved P7 findings into a precise, evidence-backed decision package. Do not implement speculative formulas.
+
+## Required work
+
+1. Review the two failing P2 tests and the P7 BLOCKER-1 and BLOCKER-2 findings.
+2. For each unresolved requirement, identify:
+
+   * The exact specification section.
+   * What is explicitly required.
+   * What formula, trigger, input, mapping, or acceptance criterion is missing.
+   * The smallest specification amendment needed to make implementation testable.
+3. Cover at minimum:
+
+   * `ASSESSMENT_FLIP_RISK`
+   * `HIGH_MULTIPLE_DEPENDENCE`
+   * `HIGH_EPS_DEPENDENCE`
+   * `MARGIN_ASSUMPTION_RISK`
+   * `HIGH_IMPACT_HIGH_UNCERTAINTY`
+   * Sector-driver chains for non-financial companies, banks, and holdings.
+   * Benchmark point-in-time provenance and the valuation-date/cutoff relationship.
+   * Required alert names versus currently emitted names.
+   * Hardcoded model weights or thresholds that should be versioned.
+4. For each issue, provide viable alternatives and their financial consequences. Distinguish direct specification evidence from your proposed design choices.
+5. Do not select a financial formula, threshold, perturbation size, sector mapping, or PIT policy on the user's behalf.
+6. Identify which requirements could be explicitly deferred from V1 and what specification or stress-test claims would then need correction.
+
+## Constraints
+
+* No source, test, specification, parameter, dependency, or configuration modifications.
+* Do not alter existing tests or make the two failing tests pass artificially.
+* Do not invent financial data or use external assumptions as if they were project requirements.
+* Do not modify Stages 1–6 or 8–9.
+* No GitHub/API, remote Git, commits, pushes, pulls, branch changes, or remote operations.
+
+## Report
+
+Append a section titled `P8 — Stage 7 Specification Decision Package` to `temp_report2.md`. Include a compact decision table with issue, evidence, missing definition, alternatives, consequences, and required user decision. Report the six validation layers, clearly distinguishing executed from not executed. Do not claim any behavior was implemented or validated when it was not.
+
+Stop after appending the report.
+===================================================
