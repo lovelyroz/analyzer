@@ -482,3 +482,117 @@ No source, test, spec, dependency, migration, or configuration changes. No chang
 
 Append `P14 — Stage 7 Parameter-Version Registry Design` to `temp_report2.md`, preserving all earlier content. Stop.
 =============================================================
+# P15 — Post-P12 Regression Verification
+
+You are working in the local project folder `analyzer`.
+
+## Objective
+
+Perform a fresh, read-only regression verification after P12's UTC timestamp change. Establish the current test baseline before any further Stage 7 implementation.
+
+## Scope
+
+* `src/valuation/engine.py`
+* `src/valuation/parameters.py`
+* `src/valuation/models.py`
+* `src/valuation/schema.py`
+* `src/tests/test_stage7_valuation.py`
+* `src/tests/test_stage9_decision.py`
+* The existing test suite, using the same PDF-test exclusion documented in `temp_report2.md`
+* `temp_report2.md`, for appending the report only
+
+Do not perform repository-wide exploration. Do not modify source code, tests, specifications, dependencies, or configuration. Do not modify frozen stages.
+
+## Required work
+
+1. Read the latest reports in `temp_report2.md`, especially P10-P14.
+
+2. Verify that P12's UTC-aware `calculation_timestamp` change is still present and that the two known P2 failing-first tests remain intact.
+
+3. Run these commands using the project's configured virtual-environment Python interpreter:
+
+   * `python -m pytest src/tests/test_stage7_valuation.py -q`
+   * `python -m pytest src/tests/test_stage9_decision.py -q`
+   * `python -m pytest src/tests/ -q -rs --ignore=src/tests/test_codal_pdf_extraction.py`
+
+   Run them from the project root and substitute the actual virtual-environment interpreter path if required. Do not use the system Python if it lacks project dependencies.
+
+4. Record exact collected, passed, failed, skipped, and error counts for every command. Identify each failure by test name and compare it with the documented baseline.
+
+5. Investigate whether any failure is new. Do not fix failures in this read-only task. Do not treat a skipped or excluded PDF test as passed, and do not substitute unrelated PDFs for missing fixtures.
+
+6. Recheck deterministic output and the P12 timestamp test as part of the focused suite. Report any warning counts accurately.
+
+## Six mandatory validation layers
+
+Report each layer separately:
+
+1. Unit/formula
+2. Contract/boundary
+3. Production-path/integration
+4. Adversarial/negative
+5. Regression/full suite
+6. Independent audit
+
+For each layer, label evidence as freshly executed, carried forward, static-only, unavailable, or blocked. Do not present carried-forward evidence as a fresh run.
+
+## Reporting and safeguards
+
+Append a `P15 — Post-P12 Regression Verification Report` section to `temp_report2.md`; preserve all existing content.
+
+No remote Git, GitHub/API calls, commits, pushes, pulls, branch changes, or source edits. Do not weaken tests or claim Stage 7 is ready to freeze. Stop after reporting the results.
+===================================================================
+# P16 — Stage 7 Unresolved-Decision Gate
+
+You are working in the local project folder `analyzer`.
+
+## Objective
+
+Produce a concise, evidence-backed decision package for unresolved Stage 7 specification and contract issues. This is a read-only analysis task; do not implement any proposed decision.
+
+## Scope
+
+Read only the relevant sections of:
+
+* `temp_report2.md`, especially P8-P14 and the unresolved-findings register
+* `07_Stage7_Valuation.md`, particularly sections 39-65, 69, and 85
+* `src/valuation/engine.py`
+* `src/valuation/parameters.py`
+* `src/valuation/schema.py`
+* `src/tests/test_stage7_valuation.py`
+
+Do not inspect the whole repository or modify any source, test, specification, dependency, or configuration file.
+
+## Required decision register
+
+For each item below, report: current evidence, exact missing decision, feasible options, compatibility or financial-correctness risk, recommended default if a recommendation is justified, and tests required after approval.
+
+D1. `ASSESSMENT_FLIP_RISK`: perturbation set, flip definition, and severity.
+D2. `HIGH_MULTIPLE_DEPENDENCE`: definition of multiple-dependence share and threshold usage.
+D3. `HIGH_EPS_DEPENDENCE`: EPS-dependence measure and interaction with D2.
+D4. `MARGIN_ASSUMPTION_RISK`: required inputs and trigger definition.
+D5. `HIGH_IMPACT_HIGH_UNCERTAINTY`: impact and uncertainty formulas, inputs, and thresholds.
+D6. Sector-specific drivers for non-financial companies, banks, and holdings, including the missing industry mapping and NAV/P-NAV calculation contract.
+D7. Point-in-Time correctness: provenance per benchmark observation versus caller attestation versus explicitly documented V1 limitation. Include the P13 finding that no production caller currently supplies the benchmark inputs.
+D8. Alert-name mismatches between sections 49 and 54-55 and the names emitted by the engine. Distinguish naming changes from missing trigger semantics.
+D9. Parameter registry and effective-version selection: compare P14's in-code registry proposal, a database-backed registry, and a fixed V1 approach. Explicitly identify the unresolved `as_of` rule for `effective_from` selection.
+
+## Decision integrity
+
+* Do not choose on the user's behalf.
+* Do not invent formulas, thresholds, perturbation sizes, industry mappings, date policies, or severity rules.
+* Separate decisions that can be made independently from decisions that depend on others.
+* Identify any specification statements or stress-test PASS claims that currently overstate implemented behavior.
+* Distinguish a proposal from a user-approved decision.
+* Do not remove, weaken, or rewrite the two known failing-first tests.
+
+## Six-layer validation
+
+Report all six layers: unit/formula, contract/boundary, production-path/integration, adversarial/negative, regression/full suite, and independent audit. Clearly mark any layer that was not executed because this task is design-only.
+
+## Report
+
+Append a `P16 — Stage 7 Unresolved-Decision Gate Report` section to `temp_report2.md`, preserving all existing content. Include a short final table listing each decision as `REQUIRES USER DECISION`, `DEPENDENT ON ANOTHER DECISION`, or `DOCUMENTATION CORRECTION REQUIRED`.
+
+No source or specification edits, no remote Git operations, no commits, pushes, pulls, or branch changes. Do not freeze Stage 7. Stop after appending the report.
+======================================================================
