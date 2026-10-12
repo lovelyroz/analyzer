@@ -240,3 +240,46 @@ Append a section titled `P8 — Stage 7 Specification Decision Package` to `temp
 
 Stop after appending the report.
 ===================================================
+# P9 — Alert Contract and Naming Consistency Audit
+
+Work only in the local project folder `analyzer`. Read the latest `temp_report2.md`, the locked Stage 7 specification, and only the relevant Stage 7 alert-generation, schema, parameter, and test code.
+
+## Objective
+
+Resolve what can be established from the existing contract about required alert names, emitted alert names, severity, and output representation—without inventing alert semantics.
+
+## Tasks
+
+1. Build a complete matrix of every alert required by the Stage 7 specification and every alert or flag currently emitted by the engine.
+2. For each row, record:
+
+   * Exact required name and specification section.
+   * Current emitted name, if any.
+   * Whether the mapping is an exact semantic match, a demonstrable naming mismatch, or an unresolved semantic gap.
+   * Existing trigger condition, severity, evidence, and test coverage.
+3. Pay particular attention to:
+
+   * `VALUATION_BENCHMARK_DIVERGENCE`
+   * Historical and industry valuation divergence names.
+   * `INSUFFICIENT_PEER_DATA`
+   * `POOR_DATA_QUALITY`
+   * `NEGATIVE_EPS`
+   * `SIGN_CHANGE`
+   * `POINT_IN_TIME_WARNING`
+   * The five unresolved sensitivity/dependence alerts from P7.
+4. Determine whether any naming correction can be made without changing trigger semantics, severity, public output behavior, or the meaning of existing flags.
+5. Implement a correction only if the mapping is unambiguous from the locked specification and existing behavior. If a correction requires a product or financial decision, leave the code unchanged and document the exact decision required.
+6. Add focused tests for any genuinely unambiguous correction. Never remove, weaken, or rewrite an existing test merely to obtain a pass.
+
+## Validation
+
+Run the focused Stage 7 tests and the complete `src/tests/test_stage7_valuation.py` suite using the project's intended virtual environment. Record exact commands, collected/passed/failed/skipped counts, and any failures.
+
+Report the six validation layers separately. Do not claim the overall Stage 7 blockers are resolved merely because a naming mismatch was corrected.
+
+## Boundaries
+
+No modifications to Stages 1–6 or 8–9. No dependency/config changes. No remote Git operations or GitHub/API. Do not declare Stage 7 frozen.
+
+Append `P9 — Alert Contract and Naming Consistency Audit` to `temp_report2.md`, preserving all earlier content. Stop.
+=============================================================

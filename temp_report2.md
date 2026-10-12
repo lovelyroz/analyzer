@@ -672,3 +672,148 @@ invented no financial data, formulas, thresholds, defaults, or PIT policy; left 
 failing tests failing as required. This English-only append preserves all earlier reports.
 Work stops after appending the report.
 ========================================================
+# P9 — Alert Contract and Naming Consistency Audit (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12. P9 source: D:/winprojects/analyzer/stage_7_prompts.md,
+lines 243-284. No source, test, specification, parameter, dependency, or configuration
+file was modified. No commits, pushes, pulls, branch changes, GitHub/API, or remote
+operations. Frozen Stages 1-6 and 8-9 untouched. No financial formula, threshold,
+perturbation size, severity, or trigger semantic was invented; ambiguities are recorded
+as decisions/blockers. P9 verification runs (cwd D:/winprojects/analyzer,
+D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest
+src/tests/test_stage7_valuation.py -q -p no:warnings): full file -> collected 49,
+passed 47, failed 2, skipped 0 (the 2 failures are the unchanged P2 failing-first
+exposures, identical to the P7/P8 state). Focused alert subset (-k "alert or divergence
+or peer or flag or eps or sign or reliability or dispersion") -> collected 20,
+passed 19, failed 1 (the intended flip/dependence exposure), 29 deselected.
+Full multi-stage suite was not re-executed in P9; full-suite evidence is carried
+forward from P7 (2 failed, 897 passed, 1 skipped, PDF-extraction file excluded).
+
+## 1. Method and inputs reviewed
+
+- Locked spec: D:/winprojects/analyzer/07_Stage7_Valuation.md, sections 6 (invalid-EPS
+  flags), 10 (peer rule), 18 (SCENARIO_ORDER_WARNING), 26 (POSITIVE_FORECAST_REVISION
+  evidence), 48 (severity vocabulary + Alerts-are-not-Buy/Sell), 49 (13 required alert
+  names), 50-53 (flip/multiple/EPS/margin semantics), 54-55 (historical/industry
+  divergence), 56-57 (PIT), 69 (output contract incl. valuation_alerts), 77-79/84-85
+  (stress tests), 34 (UNRELIABLE_VALUATION status).
+- Code: src/valuation/engine.py (_alerts lines 500-535; flag emission lines 153-199;
+  _eps_flags; _scenario_sign_change_flags), parameters.py ALERT_THRESHOLDS,
+  schema.py (alerts + valuation_risk_flags channels), models.py (no alert strings).
+- Tests: all alert/flag assertions in src/tests/test_stage7_valuation.py (listed per
+  row below). P2-P8 reports in this file (tail read before appending).
+- Repo-wide searches in P9: the five sensitivity/dependence names plus
+  VALUATION_BENCHMARK_DIVERGENCE, HISTORICAL/INDUSTRY_VALUATION_DIVERGENCE,
+  POINT_IN_TIME_WARNING, POOR_DATA_QUALITY, FORECAST_RISK occur in NO production file
+  (only in the test file's intended-failure assertions); POSITIVE_FORECAST_REVISION,
+  UNRELIABLE_VALUATION likewise have zero production references. No parser of Stage 7
+  alert strings was found in src/decision or src/market, but contract stability
+  (spec section 66) still makes any emitted-string change a public output change.
+
+## 2. Complete matrix
+
+Classes: EXACT = identical name and semantics (representation channel noted).
+MISMATCH = demonstrable naming mismatch against a functioning analogue.
+GAP = unresolved semantic gap (no emission and/or no defined trigger).
+Severity prefixes (INFO/WATCH/WARNING/CRITICAL, spec section 48) are an engine
+representation convention; spec section 69 requires only the `valuation_alerts` field
+with no per-alert format, so every prefixed alert is also a format couple with its
+bare-name flag where one exists.
+
+| # | Required name (spec section) | Emitted name / representation | Class | Trigger, severity, evidence, tests |
+|---|---|---|---|---|
+| 1 | HIGH_SCENARIO_DISPERSION (49; dispersion 40) | Flag HIGH_SCENARIO_DISPERSION + alert WARNING:HIGH_SCENARIO_DISPERSION | EXACT | Dispersion (max-min)/base > 0.50. Tests: P2 boundary (fires above 0.50, silent exactly at 0.50, silent None). Caveat (P2-8 stands): 0.50 is engine-chosen, not stated in spec 41-53. |
+| 2 | LOW_FORECAST_RELIABILITY (49) | Flag LOW_FORECAST_RELIABILITY + WARNING:LOW_FORECAST_RELIABILITY | EXACT | Reliability < 40.0. Tests: P2 boundary (39.9 fires; 40.0/40.1/None silent). Same caveat: 40.0 not in spec. |
+| 3 | VALUATION_BENCHMARK_DIVERGENCE (49) | WATCH:VALUATION_ABOVE_TARGET_PE / WATCH:VALUATION_BELOW_TARGET_PE | MISMATCH | Closest functional analogue: base forward P/E vs target P/E ratio >= 1.50 either direction, direction split preserved, WATCH severity. Tests: P2 divergence boundaries. Caveat: 1.50 engine-chosen. |
+| 4 | HISTORICAL_VALUATION_DIVERGENCE (54; stress 75) | WATCH:FORWARD_PE_ABOVE/BELOW_HISTORICAL | MISMATCH | Forward P/E vs historical median ratio >= 1.50 either direction. Tests: P2 divergence boundaries. |
+| 5 | INDUSTRY_VALUATION_DIVERGENCE (55) | WATCH:FORWARD_PE_ABOVE/BELOW_INDUSTRY | MISMATCH | Forward P/E vs industry forward median ratio >= 1.50 either direction. Tests: P2 industry-divergence assertions. |
+| 6 | INSUFFICIENT_PEER_DATA (49) | Flag INSUFFICIENT_PEER_DATA (risk flags only, no severity prefix, NOT in alerts list) | GAP (representation) | Emitted iff forward series non-empty and valid count < 8. Tests: P4 peer-count tests (7 peers -> flag; 8/10 peers -> absent). Open: whether flag-level emission satisfies the section 49 "alert capability" (P8 D8). |
+| 7 | NEGATIVE_EPS (49; 6; stress 73) | Flag NEGATIVE_EPS (+ NOT_APPLICABLE); status NOT_APPLICABLE; forward P/E NULL | EXACT (at flag level) | Any scenario EPS < 0. Tests: invalid-EPS tests (bear NEGATIVE_EPS, zero/negative/NaN/None variants). Same section-49 capability question as row 6. |
+| 8 | SIGN_CHANGE (49; 6; evidence family 4 in 23; stress 84) | Flags SIGN_CHANGE + LOSS_TO_PROFIT / PROFIT_TO_LOSS per scenario | EXACT (at flag level) | Mixed EPS signs across scenarios. Tests: sign-change assertions. Same capability question. |
+| 9 | ZERO_EPS / LOSS_TO_PROFIT / PROFIT_TO_LOSS / NOT_APPLICABLE (6) | Identical flag names | EXACT | EPS == 0 / sign direction / uncomputable states. Tests: invalid-EPS variants. |
+| 10 | SCENARIO_ORDER_WARNING (18) | Identical flag | EXACT | Bear/base/bull fair values unordered. Tests: P6 ordering test (inverted EPS raises flag, probabilities still sum to 1.0). |
+| 11 | INDUSTRY_BENCHMARK_INSUFFICIENT (10) | Identical flag, but trigger narrowed | MISMATCH (trigger) | Spec 10 ties it to "< 8 valid peers"; engine emits it iff target_source == INSUFFICIENT_DATA (all benchmarks missing). With 7 forward peers + valid historical median, engine emits INSUFFICIENT_PEER_DATA but NOT this flag. Tests: P6 missing-benchmark test (no series at all -> flag + CRITICAL alert). Documented, not changed (behavior change needs a decision). |
+| 12 | ASSESSMENT_FLIP_RISK (49; 50; stress 77) | None emitted | GAP | No perturbation set, sizes, method, flip rule, or severity in spec (P8 D1; P2 blockers). Pinned by failing test_p2_required_flip_dependence_alerts_missing (10% shock provably flips ATTRACTIVE to FAIR, no alert). |
+| 13 | HIGH_MULTIPLE_DEPENDENCE (49; 51; stress 78) | None emitted | GAP | No dependence-share formula; high_dependence_share = 0.60 dead in parameters.py line 72, zero src references (re-verified P8). P8 D2. |
+| 14 | HIGH_EPS_DEPENDENCE (49; 52; stress 79, which also allows FORECAST_RISK — a name used NOWHERE in code or tests) | None emitted | GAP | No EPS-share formula, no escalation rule, no D2/D3 precedence (P8 D3). |
+| 15 | MARGIN_ASSUMPTION_RISK (49; 53) | None emitted | GAP | No measure/threshold/perturbation, plus structural gap: Stage 7 inputs contain no margin series (P8 D4, strongest deferral candidate). |
+| 16 | HIGH_IMPACT_HIGH_UNCERTAINTY (49; 45-47) | None emitted | GAP | No impact formula, no uncertainty selection/weights, no conjunction cutoffs; section 47 defers exact formula to a nonexistent parameter (P8 D5). |
+| 17 | POOR_DATA_QUALITY (49) | None emitted | GAP | No trigger definition anywhere in the spec; no production or test reference. Defer-or-define per P8 D8. |
+| 18 | POINT_IN_TIME_WARNING (49; 56-57; stress 85) | None emitted | GAP | No trigger; V1 limitation pinned by passing test (valuation_date > cutoff accepted silently, P5/P6). Needs the D7 contract choice. |
+| 19 | UNRELIABLE_VALUATION (34, special states) | Never emitted (engine statuses: 5 levels + INSUFFICIENT_DATA / NOT_APPLICABLE) | GAP (minor) | No entry condition defined; engine covers the semantic neighbors. Noted for completeness, not a P7 blocker. |
+| 20 | POSITIVE_FORECAST_REVISION (26) | Not emitted (evidence-path only, if at all) | Non-alert evidence name | Listed in spec as probability evidence, not an alert; no flag contract. Noted for completeness. |
+
+Engine-emitted strings with NO spec-required counterpart: CRITICAL:INSUFFICIENT_BENCHMARK_DATA
+(nearest required name: INSUFFICIENT_PEER_DATA); INFO:TOP_DRIVER:{EPS,TARGET_PE} (no spec
+name; ranking itself is section-69 contract, severity INFO is section-48-consistent);
+the six WATCH direction-split divergence alerts (rows 3-5); bare-name flag echoes of
+rows 1-2. No test invents semantics for any of these: P2 boundary tests pin current
+cutoffs explicitly as behavior pins, not spec conformance (P2 blocker 8, preserved).
+
+## 3. Correction analysis: why the code is left unchanged
+
+Per task 4, a correction qualifies only if it changes NO trigger semantics, severity,
+public output behavior, or flag meaning. Every candidate fails at least one condition:
+
+(a) Rename rows 3-5 to the singular spec names. FAILS: changes every emitted string
+(breaking for any consumer parsing current names, against section 66 contract
+stability); collapses two directional signals (above/below have opposite economics)
+into one, losing information; severity and payload shape of the merged alert are
+undecided (single WATCH? keep direction suffix?). This is exactly P8 D8 Proposal A
+vs B vs C — a naming/governance decision, not an unambiguous mapping.
+(b) Promote row 6/7/8 flags to severity-prefixed alerts (or duplicate them into
+`alerts`). FAILS: duplicates vocabulary across both channels; per-name severity is
+undefined by the spec; the underlying question (does flag-level emission satisfy the
+section 49 "capability" requirement?) is the undecided part of P8 D8.
+(c) Emit POOR_DATA_QUALITY / POINT_IN_TIME_WARNING with chosen triggers, or narrow
+row 11 to the section-10 letter. FAILS: invents trigger semantics (rows 17-18) or
+changes flag emission behavior (row 11).
+(d) Emit any of rows 12-16. FAILS: formulas do not exist (BLOCKER-1 stands; P8 D1-D5).
+
+Therefore NO correction was implemented and NO new test was added: there is no
+behavior change to pin, emitted names are already covered by passing tests (P2
+severity/divergence/reliability/dispersion boundaries, P4 peer-count flags, P6
+ordering/missing-benchmark paths, invalid-EPS variants), and the absences are already
+pinned by the two intended P2 failures. No existing test was removed, weakened, or
+rewritten.
+
+## 4. Six validation layers (executed vs carried)
+
+1. Unit/formula: EXECUTED (P9 reruns above; 47/49 with the 2 known intended failures).
+2. Contract/boundary: EXECUTED — this matrix is the contract evidence; peer-count,
+   determinism, severity-vocabulary, and boundary pins re-executed as part of the
+   47 passes, not merely cited.
+3. Production-path/integration: NOT EXECUTED in P9 (carried from P6/P7: forecast leg
+   uses real Stage 5 output; benchmark PIT leg remains fixture-based by V1 design).
+4. Adversarial/negative: EXECUTED (same rerun; finite-input guards, rationale/bound
+   rejections unchanged).
+5. Regression: EXECUTED — identical 47/2 counts to P7/P8; no production file changed
+   in P9 so no regression is possible (git status shows only the pre-existing
+   `M stage_7_prompts.md`).
+6. Independent audit: EXECUTED — this read-only matrix plus the correction analysis;
+   nothing claimed implemented beyond the reruns and the trace. Stage 7 blockers are
+   NOT claimed resolved: BLOCKER-1 (rows 12-16), BLOCKER-2 (sector drivers, out of
+   P9 scope but re-confirmed failing), MATERIAL-1 (rows 3-5, 11), MATERIAL-2
+   (row 18) all stand.
+
+## 5. Exact decisions required (nothing invented)
+
+1. D8 name mapping (decide now, per P8): rename vs alias vs spec-amendment for rows
+   3-5; whether flag-level emission satisfies section 49 for rows 6-8 (and which
+   severities if promoted); row 11 trigger (spec-10 letter vs current fallback-gated
+   emission).
+2. Rows 17-18 triggers: define POOR_DATA_QUALITY and POINT_IN_TIME_WARNING semantics
+   or defer them with the section-49 capability claim corrected.
+3. Rows 12-16 formulas: P8 D1-D5 unchanged (dependence-share, flip-risk tuple,
+   escalation/precedence, margin contract-or-proxy, impact/uncertainty cutoffs).
+
+## 6. Scope confirmation
+
+Read-only audit plus two confirming test reruns: inspected the spec, Stage 7
+alert/flag/parameter/schema code, all alert-related test assertions, and the P2-P8
+reports; ran only the Stage 7 pytest commands above; modified no source, test,
+specification, parameter, dependency, or configuration; invented no financial data,
+formulas, thresholds, severities, or trigger semantics; left the two failing tests
+failing as required. This English-only append preserves all earlier reports. Stage 7
+is NOT declared frozen. Work stops after appending the report.
+========================================================
