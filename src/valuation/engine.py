@@ -209,6 +209,7 @@ class ValuationEngine:
             historical_median_pe=historical_median,
             industry_forward_pe_median=industry_forward_median,
             industry_ttm_pe_median=industry_ttm_median,
+            industry_peer_count=valid_forward_count,
             forecast_reliability_score=reliability,
             probability_confidence=probability_confidence,
             valuation_confidence_label=confidence_label,

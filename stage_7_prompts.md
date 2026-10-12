@@ -75,3 +75,33 @@ Extend Stage 7 validation with focused, failing-first tests for the required sen
 
 Append the report to `temp_report2.md`. Include exact files changed, test command/results, ambiguities that block implementation, and a six-layer validation status. Stop after tests and reporting.
 =====================================================
+### P4 — Output Contract and Peer Evidence
+
+Work only in the local project folder `analyzer`. Read the latest Stage 7 reports in `temp_report2.md`.
+
+## Objective
+
+Close the Stage 7 output-contract gap concerning actual industry peer count and verify benchmark provenance.
+
+## Inspect only
+
+* `07_Stage7_Valuation.md`, especially sections 1–20 and 63–69
+* `src/valuation/engine.py`
+* `src/valuation/schema.py`
+* `src/valuation/parameters.py`
+* `src/tests/test_stage7_valuation.py`
+
+## Tasks
+
+1. Trace how valid industry-forward-PE peers are filtered, counted, and used in benchmark selection.
+2. Verify the distinction between actual valid peer count and the configured minimum of eight.
+3. If the existing output contract explicitly requires the actual peer count, implement the smallest backward-compatible Stage 7-only change and add tests. Preserve existing constructor/API compatibility where feasible.
+4. Test peer counts below, at, and above the minimum; invalid values; empty data; benchmark fallback; and consistency between the selected benchmark and reported count.
+5. Do not mix Forward P/E and TTM P/E populations, change the benchmark hierarchy, or invent missing peer data.
+
+## Validation
+
+Run focused tests and the complete Stage 7 valuation test file. Check serialization/contract compatibility where supported by existing code. Record all six validation layers and identify any layer that cannot be verified with available infrastructure.
+
+Append the report to `temp_report2.md`. Do not modify Stages 1–6, Stages 8–9, or unrelated contracts. No remote Git operations. Stop after the bounded change and report.
+==========================================================

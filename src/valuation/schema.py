@@ -35,6 +35,7 @@ class ValuationResult:
     historical_median_pe: Optional[float] = None
     industry_forward_pe_median: Optional[float] = None
     industry_ttm_pe_median: Optional[float] = None
+    industry_peer_count: int = 0
     forecast_reliability_score: Optional[float] = None
     probability_confidence: float = 0.0
     valuation_confidence_label: str = "INSUFFICIENT_DATA"

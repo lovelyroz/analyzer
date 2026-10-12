@@ -574,3 +574,87 @@ def test_p3_flip_dependence_alerts_remain_explicitly_unresolved():
         # Per P3 requirement 5: no invented formula may emit these alerts.
         # They stay absent until the locked spec defines their formulas.
         assert name not in vocab
+
+
+# P4 additions: actual industry peer count in the output contract.
+# Existing tests above untouched.
+def test_p4_peer_count_below_minimum_falls_back():
+    engine = ValuationEngine()
+    result = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0],
+        industry_forward_pe_values=[6.0] * 7,
+    )
+    assert result.industry_peer_count == 7
+    assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
+    assert result.target_pe_source != "INDUSTRY_FORWARD_PE"
+    assert "INSUFFICIENT_PEER_DATA" in result.valuation_risk_flags
+
+
+def test_p4_peer_count_at_minimum_selects_industry_forward():
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        industry_forward_pe_values=[6.0] * 8,
+    )
+    assert result.industry_peer_count == 8
+    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert result.scenarios["base"].target_pe == 6.0
+    assert result.industry_forward_pe_median == 6.0
+
+
+def test_p4_peer_count_above_minimum_and_median_provenance():
+    values = [5.0, 6.0, 6.0, 7.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        industry_forward_pe_values=values,
+    )
+    from statistics import median
+
+    assert result.industry_peer_count == 10
+    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert result.industry_forward_pe_median == median(values)
+    assert result.scenarios["base"].target_pe == median(values)
+
+
+def test_p4_peer_count_filters_invalid_values():
+    import math
+
+    engine = ValuationEngine()
+    polluted = [6.0] * 8 + [float("nan"), float("inf"), -float("inf"), None, 0.0, -3.0]
+    result = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        industry_forward_pe_values=polluted,
+    )
+    # Only the 8 finite positive values count; NaN/inf/None/zero/negative
+    # are filtered before counting, median, and benchmark selection alike.
+    assert result.industry_peer_count == 8
+    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert result.industry_forward_pe_median == 6.0
+    assert math.isfinite(result.scenarios["base"].target_pe)
+
+
+def test_p4_peer_count_empty_data_reports_zero_and_falls_back():
+    engine = ValuationEngine()
+    for peers in (None, [], [None, float("nan"), 0.0, -1.0]):
+        result = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+            historical_pe_values=[7.0],
+            industry_forward_pe_values=peers,
+        )
+        assert result.industry_peer_count == 0
+        assert result.industry_forward_pe_median is None
+        assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
+
+
+def test_p4_benchmark_fallback_ignores_forward_count_for_ttm():
+    # TTM fallback must not consume forward P/E values: populations stay
+    # separate per spec section 12; the reported count is forward-only.
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        industry_forward_pe_values=[6.0] * 7,
+        industry_ttm_pe_values=[5.0, 6.0, 7.0],
+    )
+    assert result.industry_peer_count == 7
+    assert result.target_pe_source == "INDUSTRY_TTM_PE"
+    assert result.scenarios["base"].target_pe == 6.0
+    assert result.industry_ttm_pe_median == 6.0

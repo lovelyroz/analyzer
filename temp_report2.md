@@ -216,3 +216,58 @@ Unchanged from the P2 report sections on items 1-7: the five alert behaviors sta
 
 Engine.py and focused tests only; parameters.py unchanged (all used values already versioned: SENSITIVITY_PERTURBATION 0.10, VALUATION_THRESHOLDS, RISK_THRESHOLDS, ALERT_THRESHOLDS); no existing test weakened; no spec/dependency/config touched; Stages 1-6 and 8-9 untouched; no git operations; report appended in English only with existing content preserved. Work stops after this bounded implementation and report.
 ========================================================
+
+# P4 — Output Contract and Peer Evidence Report (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12
+Scope: Bounded P4 output-contract change in Stage 7 only. Read the latest Stage 7 reports in temp_report2.md (baseline, P2, P3). Inspected 07_Stage7_Valuation.md sections 1-20 and 63-69, src/valuation/engine.py, schema.py, parameters.py, src/tests/test_stage7_valuation.py. No Stages 1-6 or 8-9 modifications. No remote Git operations. No invented formulas, data, or thresholds.
+
+## 1. Peer Filtering/Count Trace (Task 1)
+
+- Engine sanitizes the forward series before any use (engine.py): `forward_values = [_finite_or_none(v) for v in (industry_forward_pe_values or [])`. NaN, inf, -inf, None, and non-numeric inputs become None.
+- `valid_forward_count = self._valid_positive_count(forward_values)` counts only finite values strictly greater than zero. Zero and negative P/E values are excluded from the count, the median (`median_valid` applies the same finite-positive filter), and benchmark selection alike.
+- `_select_target_pe` implements the spec sections 11-13 hierarchy: INDUSTRY_FORWARD_PE is selected if and only if the forward median is not None AND `forward_peer_count >= MIN_INDUSTRY_PEERS` (8, from parameters.py). Otherwise HISTORICAL_MEDIAN_PE, then INDUSTRY_TTM_PE, else INSUFFICIENT_DATA. The TTM path uses only the separate `industry_ttm_pe_values` series; forward and TTM populations are never pooled.
+- Benchmark provenance chain verified end to end: raw forward series -> sanitized series -> (count, median) -> hierarchy decision recorded in `target_pe_source` -> per-scenario `target_pe` -> fair values. Provenance fields emitted: `industry_forward_pe_median`, `industry_ttm_pe_median`, `historical_median_pe`, `target_pe_source`, plus `metadata["benchmark_peer_minimum"] = 8`.
+
+## 2. Actual Count vs Configured Minimum (Task 2)
+
+- Gap confirmed: before this change the actual valid peer count existed only as the local variable `valid_forward_count` and was never emitted. The only count-related output was `metadata["benchmark_peer_minimum"] = 8` (the configured threshold). A consumer could not distinguish 0, 7, 8, or 50 peers behind an identical industry median.
+- Spec section 69 explicitly lists `industry_peer_count` in the minimum Stage 7 output contract, so the Task 3 condition is met: the contract explicitly requires the actual peer count.
+
+## 3. Bounded Change (Task 3)
+
+- D:/winprojects/analyzer/src/valuation/schema.py — added one defaulted field to ValuationResult: `industry_peer_count: int = 0`. Default 0 preserves constructor compatibility for existing direct constructions (Stage 9 test helper) and means "no forward peers supplied or none valid".
+- D:/winprojects/analyzer/src/valuation/engine.py — one added kwarg in the ValuationResult construction: `industry_peer_count=valid_forward_count`. No hierarchy change, no population mixing, no invented peer data, no Stages 1-6/8-9 edits.
+- D:/winprojects/analyzer/src/tests/test_stage7_valuation.py — six P4 tests appended, zero existing tests modified:
+  1. test_p4_peer_count_below_minimum_falls_back (7 peers -> count 7, HISTORICAL_MEDIAN_PE, INSUFFICIENT_PEER_DATA flag)
+  2. test_p4_peer_count_at_minimum_selects_industry_forward (8 peers -> count 8, INDUSTRY_FORWARD_PE, median provenance)
+  3. test_p4_peer_count_above_minimum_and_median_provenance (10 peers -> count 10, median equals statistics.median of inputs)
+  4. test_p4_peer_count_filters_invalid_values (8 valid + NaN/inf/-inf/None/0.0/negative -> count 8, INDUSTRY_FORWARD_PE, median 6.0)
+  5. test_p4_peer_count_empty_data_reports_zero_and_falls_back (None / [] / all-invalid -> count 0, median None, HISTORICAL_MEDIAN_PE)
+  6. test_p4_benchmark_fallback_ignores_forward_count_for_ttm (7 forward + 3 TTM -> count 7 forward-only, INDUSTRY_TTM_PE, TTM median 6.0; populations stay separate per spec section 12)
+
+## 4. Validation (Tasks 4-5)
+
+- Focused + full Stage 7 file, cwd D:/winprojects/analyzer:
+  `D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py -q`
+  Result: collected 32, passed 30, failed 2, skipped 0. The 2 failures are the pre-existing intended P2 failing-first exposures (test_p2_sector_driver_decomposition_missing, test_p2_required_flip_dependence_alerts_missing), unchanged. All 6 new P4 tests pass; all 24 previously passing tests still pass.
+- Serialization/contract compatibility: `dataclasses.asdict(result)` roundtrip verified with the new field present; ValuationResult field count is now 31 including `industry_peer_count`. Stage 9 regression (it constructs ValuationResult directly): `python.exe -m pytest src/tests/test_stage9_decision.py -q` -> 13 passed, confirming backward-compatible constructor behavior.
+- Pre-existing cosmetic warning unchanged: DeprecationWarning for datetime.datetime.utcnow() in engine.py.
+
+## 5. Six Validation Layers
+
+1. Unit/formula: EXECUTED. Count/median/hierarchy math passes (30/32; the 2 failures are the intended P2 exposures). Median provenance asserted against statistics.median.
+2. Contract/boundary: EXECUTED for P4 scope. Below/at/above minimum, invalid-value filtering, empty-data zero-count, TTM-fallback separation, and source/count consistency covered. The section-69 industry_peer_count gap is now closed.
+3. Production-path/integration: NOT VERIFIABLE with available infrastructure. All tests use the synthetic make_forecast fixture; no run on real Stage 5/Stage 6 outputs.
+4. Adversarial/negative: EXECUTED for P4 scope. NaN/inf/None/zero/negative peers, empty series, and fallback paths covered. Still missing (out of P4 scope): PIT-violation test.
+5. Regression: EXECUTED for P4 scope. All 24 previously passing Stage 7 tests unchanged; Stage 9 suite 13/13 unchanged; benchmark hierarchy, probabilities, invalid-EPS NULL rule, and fair-value behavior untouched.
+6. Independent audit: IN PROGRESS. This P4 append documents the trace, the contract basis (section 69), the exact diff, and test evidence; no unexecuted test claimed as passed.
+
+## 6. Blockers
+
+None for P4 scope. Nothing invented: the count is a deterministic count of caller-supplied valid values; the minimum 8 and all thresholds are pre-existing versioned parameters. Deliberately out of scope per P4 task 5 and P3 requirement 5: dependence-share/flip-risk/margin-risk alerts remain unresolved (no spec formulas).
+
+## 7. Scope Confirmation
+
+Stage 7 schema + engine wiring + focused tests only; parameters.py, specs, dependencies, config untouched; no existing test weakened; Stages 1-6 and 8-9 untouched (Stage 9 only read for compatibility and regression-tested); no git operations; English-only append with all prior content preserved. Work stops after this bounded change and report.
+========================================================
