@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -1154,3 +1154,32 @@ def test_p10_expensive_threshold_consumed_from_parameters():
         forecast_reliability_score=85.0, historical_pe_values=[7.0],
     )
     assert restored.valuation_status == "EXPENSIVE"
+
+
+def test_p12_calculation_timestamp_utc_aware_and_deterministic():
+    import dataclasses
+
+    engine = ValuationEngine()
+    result = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=85.0, historical_pe_values=[6.5, 7.0, 8.0],
+        probability_confidence=90.0,
+    )
+    # Timezone-aware UTC construction (no naive datetime.utcnow()).
+    assert result.calculation_timestamp.tzinfo is not None
+    assert result.calculation_timestamp.utcoffset() == timezone.utc.utcoffset(None)
+    # Deterministic behavior unchanged apart from the wall-clock timestamp.
+    second = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=85.0, historical_pe_values=[6.5, 7.0, 8.0],
+        probability_confidence=90.0,
+    )
+    first_dict = dataclasses.asdict(result)
+    second_dict = dataclasses.asdict(second)
+    first_dict.pop("calculation_timestamp")
+    second_dict.pop("calculation_timestamp")
+    assert first_dict == second_dict
+    # Golden outputs pinned by prior runs are unaffected.
+    assert result.scenarios["base"].fair_value == 1260.0
+    assert result.expected_fair_value == 1260.0
+    assert result.valuation_status == "ATTRACTIVE"

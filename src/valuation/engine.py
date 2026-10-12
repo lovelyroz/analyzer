@@ -1,5 +1,5 @@
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Sequence
 
 from src.forecast.schema import CompanyForecastResult, normalize_datetime
@@ -209,7 +209,7 @@ class ValuationEngine:
             valuation_risk_level=risk,
             scenarios=scenarios,
             model_version=MODEL_VERSION,
-            calculation_timestamp=datetime.utcnow(),
+            calculation_timestamp=datetime.now(timezone.utc),
             valuation_date=valuation_date,
             market_price_date=market_price_date,
             data_cutoff_datetime=data_cutoff_datetime or forecast_result.data_cutoff_datetime,

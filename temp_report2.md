@@ -1164,3 +1164,158 @@ preserved. Stage 7 is NOT declared frozen and remains unfrozen unless a
 future independent audit explicitly approves it and the user separately
 authorizes the freeze decision. Work stops after appending the report.
 ========================================================
+# P12 — UTC Deprecation Cleanup Report (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12. Scope: `src/valuation/engine.py` plus one focused
+test in `src/tests/test_stage7_valuation.py`; inspected the datetime
+construction at engine.py:212, the `normalize_datetime` path in
+`src/forecast/schema.py:231-243`, and this file. No spec, dependency,
+migration, or config change; no Stages 1-6 or 8-9 change; no commits,
+pushes, pulls, or branch changes. Stage 7 is NOT declared frozen.
+
+## 1. utcnow() uses found and how replaced
+
+Exactly one relevant `datetime.utcnow()` use existed in the scoped Stage 7
+code: `src/valuation/engine.py:212`,
+`calculation_timestamp=datetime.utcnow()` (naive datetime, triggers
+`DeprecationWarning: datetime.datetime.utcnow() is deprecated ... Use
+timezone-aware objects`). Replaced with
+`calculation_timestamp=datetime.now(timezone.utc)` and the import widened
+from `from datetime import datetime` to
+`from datetime import datetime, timezone`. The pre-existing
+`normalize_datetime` contract is untouched: naive inputs are still folded
+onto UTC (`value.replace(tzinfo=timezone.utc)`), aware inputs are still
+converted via `.astimezone(timezone.utc)`. No valuation date, cutoff
+semantic, PIT behavior, formula, alert trigger, or model parameter changed.
+This does NOT close the PIT blocker (P11 UF-4 stands); it is datetime
+construction and code hygiene only.
+
+## 2. Focused test added: yes, and why
+
+Added `test_p12_calculation_timestamp_utc_aware_and_deterministic`
+(test file line 1159): asserts `calculation_timestamp.tzinfo is not None`
+with a UTC offset, runs the identical valuation twice, drops only
+`calculation_timestamp` from both `dataclasses.asdict` outputs, and asserts
+the dicts are equal; pins golden outputs (base fair value 1260.0, expected
+fair value 1260.0, status ATTRACTIVE). Needed because no prior test pinned
+timestamp awareness or whole-output determinism excluding the wall clock.
+No existing test was modified or weakened.
+
+## 3. Pre/post output comparison
+
+Representative golden case (PETROCHEMICAL, price 1000.0, reliability 85.0,
+peers [6.5, 7.0, 8.0], confidence 90.0):
+pre-change timestamp naive `datetime(2026,10,12,14,2,18)` with
+`tzinfo=None`; post-change timestamp
+`datetime(2026,10,12,14,3,2, tzinfo=timezone.utc)`. All other fields
+identical: base fair value 1260.0, expected fair value 1260.0, status
+ATTRACTIVE, alerts ["INFO:TOP_DRIVER:EPS"], driver impact/uncertainty
+unchanged. Zero behavioral differences apart from the wall-clock field.
+
+## 4. Six validation layers (separately)
+
+Cwd for all commands: D:/winprojects/analyzer. Interpreter:
+D:/winprojects/analyzer/.venv/Scripts/python.exe (venv; system python
+lacks sqlalchemy).
+
+1. Unit/formula: EXECUTED. Stage 7 file post-change:
+`... -m pytest src/tests/test_stage7_valuation.py -q` -> collected 52,
+50 passed, 2 failed (the same two long-standing P2 failing-first
+exposures: test_p2_sector_driver_decomposition_missing,
+test_p2_required_flip_dependence_alerts_missing), 0 warnings.
+Pre-change baseline (stashed fix): 51 collected, 49 passed, same 2
+failed, 98 DeprecationWarnings from engine.py:212. Delta is exactly +1
+(the new P12 test, passing); no prior pass broke.
+2. Contract/boundary: EXECUTED as part of layer 1 (peer-count,
+determinism, NaN/inf guards, cutoff normalization re-executed among the
+50 passes); the new P12 test adds the timestamp-awareness contract pin.
+3. Production-path/integration: NOT freshly executed in P12 (same carried
+P6 evidence as P11: genuine Stage 5-to-Stage 7 integration achieved in
+P6, not re-run here).
+4. Adversarial/negative: EXECUTED (finite-input guards, rationale/bound
+rejections, invalid-EPS/price variants re-executed as part of the 50
+passes; no new adversarial test added in P12).
+5. Regression: EXECUTED. Stage 9 consumer post-change:
+`... -m pytest src/tests/test_stage9_decision.py -q` -> 13 passed,
+52 warnings (all pre-existing Stage 9/decision utcnow() sites, out of
+P12 scope and untouched). Pre-change Stage 9: identical 13 passed /
+52 warnings. Full multi-stage suite: NOT freshly executed in P12
+(P11 evidence carried: 2 failed, 899 passed, 1 skipped, 0 errors).
+No Stage 9 file modified.
+6. Independent audit: EXECUTED — this append plus the pre/post
+snapshots. Nothing claimed implemented beyond the one-line construction
+fix and its test; nothing claimed validated beyond the stated reruns.
+
+## 5. Warning counts
+
+Stage 7 file: pre-change 98 DeprecationWarnings (all engine.py:212);
+post-change 0 warnings. Stage 9 file: 52 warnings both pre- and post-
+change (out-of-scope `datetime.utcnow()` sites in decision engine,
+decision schema, and Stage 9 test fixtures; intentionally untouched per
+P12 boundaries). No other warnings observed.
+
+## 6. Scope confirmation
+
+engine.py (2 lines: import + construction) and the test file (1 import
+line + 29-line appended test) only; pre-existing uncommitted
+stage_7_prompts.md P12 task-text addition left as found; no spec,
+dependency, migration, or unrelated code touched; no financial data,
+formulas, thresholds, or semantics invented; English-only append with all
+prior content preserved. The PIT blocker and all P11 unresolved findings
+(UF-1 through UF-7) are untouched by this change. Stage 7 is NOT
+declared frozen. Work stops after appending the report.
+========================================================
+# P13 — Stage 7 PIT Contract Impact Assessment (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12. Read-only impact assessment; zero source, test, schema, spec, parameter, dependency, or config changes. Cwd D:/winprojects/analyzer; interpreter D:/winprojects/analyzer/.venv/Scripts/python.exe. No commits, pushes, pulls, branch changes, remote, or GitHub. Stage 7 is NOT declared frozen. No data, dates, provenance, or formulas invented.
+
+## 1. Caller trace: every supplier of the six PIT-relevant inputs (verified facts)
+
+1.1 Boundary signature. `ValuationEngine.calculate_valuation` (src/valuation/engine.py:57-79) accepts: `valuation_date`, `market_price_date`, `data_cutoff_datetime` (all Optional[datetime]; normalized via `normalize_datetime`, echoed to `ValuationResult`, never compared against each other); `historical_pe_values`, `industry_forward_pe_values`, `industry_ttm_pe_values` (all Optional[Sequence[Optional[float]]]; finite-filtered by `_finite_or_none`, reduced to medians plus a forward-only peer count; no dates, publication stamps, or versions accepted or stored).
+
+1.2 Production callers: NONE. Grep for `calculate_valuation|historical_pe_values|industry_forward_pe_values|industry_ttm_pe_values` across src/ matches only src/valuation/engine.py (the definition) and src/tests/test_stage7_valuation.py (33 hits). No non-test code supplies any of the six inputs. The only downstream consumer is `src/decision/engine.py:250`, which passes `valuation_result.data_cutoff_datetime` through (`cutoff = data_cutoff_datetime or valuation_result.data_cutoff_datetime`) without validating any Stage 7 PIT input.
+
+1.3 Test-caller shapes. Bare undated float lists (e.g. `[6.5, 7.0, 8.0]`, `[6.0]*8`); naive or aware datetimes normalized to UTC. Pinned behavior proves the gap: `test_p5_undated_benchmark_series_carry_no_provenance` and `test_p6_cutoff_pit_limitation_pinned` show a valuation_date of 2026-06-01 with a cutoff of 2026-01-01 accepted with no rejection and no PIT flag.
+
+1.4 Spec boundary demands. 07_Stage7_Valuation.md: section 3 requires every output to carry valuation timestamp, model version, and data_cutoff_datetime; section 7 requires price use to record valuation_date and market_price_date; section 69 (output contract) lists valuation_date, market_price_date, and data_cutoff_datetime; section 56 requires the PIT tuple (Price Date, Forecast Cutoff, Report Publication Date, Report Version); section 57 requires current analysis to use the Latest Valid Version and backtests to use the version actually available on that date; section 63 requires lineage Fair Value to Target P/E to Benchmark and Forecast EPS to Forecast Version to ReportVersion to Publication Date; section 85 (stress test) claims a report published after the valuation date is excluded from historical valuation, marked PASS. That PASS is a claim only: no enforcement mechanism exists anywhere in the Stage 7 code path.
+
+1.5 Upstream provenance capability exists but is unwired. Verified present: `ReportVersion` with report_version_id, version_number, publication_datetime (src/models/report.py:35-42); `select_report_version` filtering on publication_datetime <= cutoff (src/core/point_in_time.py:20-25); `ForecastInputRef` carrying report_version_id, available_at, source (src/forecast/schema.py:156-166); `detect_pit_leakage(cutoff, refs)` flagging available_at after cutoff (src/evaluation/observation.py:255-273). None of it reaches Stage 7: a provenance-term grep over src/valuation returns zero matches, and `ValuationResult` carries only medians, the peer count, the passthrough cutoff, and metadata `"pit_inputs_required": True`.
+
+1.6 Can sources supply publication timestamps and report versions? The Stage 1 and forecast layers can (fields verified above), but no wired path to Stage 7 exists and no production caller exists to carry them. Capability is present upstream; the interface is absent at the boundary.
+
+## 2. Can Stage 7 validate PIT correctness with current inputs alone? No.
+
+Verified facts: benchmark series arrive as undated floats with no observation dates, publication stamps, or versions; valuation_date and market_price_date are echoed, never cross-checked against the cutoff (pinned by tests); the engine output records medians, peer count, and a passthrough cutoff only; no production caller exists to attest or supply anything further. Assumptions (not relied upon): that any future caller will supply PIT-clean data; that Stage 1 publication datetimes cover every benchmark input a future caller might use; that eight valid peers implies eight PIT-clean peers. None of these is verifiable from inside Stage 7 today.
+
+## 3. Option A: per-observation provenance records validated against the cutoff
+
+Design: add optional parallel provenance inputs (one record per benchmark observation: observation date, publication/available-at timestamp, report version id) or a provenance envelope; the engine drops or flags observations with available_at after the cutoff and enforces a valuation-date/cutoff policy with explicit reject-or-flag semantics. Affected callers: none in production; only the test file uses the boundary today, so this is a greenfield addition — the future production caller must supply provenance assembled from existing Stage 1/forecast interfaces. Compatibility: additive optional parameters are backward compatible; making them required needs a CONTRACT_VERSION bump and new ValuationResult provenance-summary fields. Migration: none for existing callers (none exist); spec sections 56-57, 69, and 85 must define the record shape and reject/flag semantics first. Tests: late-publication observation rejected/flagged; missing available_at reported as missing-provenance (not leakage, mirroring `detect_pit_leakage`); valuation_date after cutoff rejected/flagged per policy; determinism and golden outputs unchanged. Smallest viable boundary: optional provenance params plus cutoff comparison plus one flag/alert plus tests; Stage 7 files only. Frozen Stages 1-6 need NO changes provided provenance is assembled from existing interfaces (ReportVersion, select_report_version, ForecastInputRef); if new Stage 1 query APIs prove necessary, that crosses the freeze and must be declared then.
+
+## 4. Option B: caller attestation of PIT validity plus valuation-date/cutoff policy
+
+Design: add an attestation input (boolean or enum plus basis string) and enforce date policy inside the engine (valuation_date and market_price_date on or before the cutoff, with a documented tolerance or rejection rule); unattested calls are flagged (e.g. PIT_UNATTESTED) or rejected per policy. Affected callers: same as Option A — none yet; the future caller must attest. Compatibility: a new optional input is backward compatible; enforcement strictness is the risk point (reject breaks, flag warns). Migration: spec amendment defining attestation semantics and the date policy; no schema break while optional. Tests: unattested call flagged; valuation_date after cutoff rejected/flagged per policy; attested path outputs byte-identical apart from the attestation record. Smallest viable boundary: one attestation parameter plus date comparisons plus one flag; no provenance plumbing, Stage 7 files only, no frozen-stage changes. Residual weakness: attestation is a claim, not verification — date checks alone cannot catch backfilled or restated values, so lookahead inside the series stays undetectable.
+
+## 5. Option C (from P8): retain the V1 limitation, correct the spec and stress-test claims
+
+Design: no code change. Amend sections 56-57 to state PIT safety is a caller/upstream responsibility in V1; change the section 85 PASS to NOT-APPLICABLE or documented-limitation; keep metadata `"pit_inputs_required": True` as the marker and the two pinning tests as documented-limitation pins. Guarantees that stay unavailable: per-observation publication checks; report-version correctness; valuation-date-vs-cutoff enforcement; lookahead/backfill detection in backtests — the section 85 guarantee is void and backtest PIT safety rests entirely on upstream/caller discipline. Affected callers: none. Compatibility risk: zero. Migration: zero. Tests: existing pins retained unchanged. Smallest viable boundary: spec-text edits only (out of P13 read-only scope; recorded as future work, not performed here).
+
+## 6. Recommendation (not a selection; nothing implemented)
+
+Option A is recommended for eventual adoption: there are no production callers so there is no migration cost (greenfield timing is the cheapest moment to add the boundary); the upstream provenance fields already exist, so the work is plumbing plus validation rather than new data capture; and it is the only option that actually closes UF-4 — Option B attests without verifying and Option C leaves every PIT guarantee unavailable. Prerequisite under any option: correct the false section 85 PASS claim and the sections 56-57 scope wording first, since the current text overstates what the code enforces. The user must still select (or reject) an option and authorize any spec or contract change separately.
+
+## 7. Six validation layers (design-only/unavailable marked explicitly)
+
+Cwd and interpreter as above. Fresh run: `... -m pytest src/tests/test_stage7_valuation.py -q` gives 52 collected, 50 passed, 2 failed (the same two long-standing P2 failing-first exposures as P11/P12), 0 warnings.
+
+1. Unit/formula: EXECUTED (the 50 passes; no PIT enforcement exists to unit-test).
+2. Contract/boundary: EXECUTED as static verification (signature read, provenance grep with zero matches, no-production-caller grep); no runtime PIT contract executed — DESIGN-ONLY beyond the static facts.
+3. Production-path/integration: UNAVAILABLE — no production caller exists, so no benchmark-PIT integration can be executed; P6 Stage 5-forecast evidence carried, benchmark path never integrated.
+4. Adversarial/negative: EXECUTED for existing guards (finite-input, rationale/bound rejections within the 50 passes); PIT-specific adversarial cases are DESIGN-ONLY proposals, not executed.
+5. Regression: EXECUTED (golden values intact in the fresh run; no code touched).
+6. Independent audit: EXECUTED — this read-only append; nothing claimed implemented or enforced beyond what was executed above.
+
+## 8. Scope confirmation
+
+Read-only assessment plus this English-only append: read the temp_report2.md tail, spec sections 3, 7-13, 56-57, 60, 63-65, 69, 85-87, engine.py, schema.py, the full Stage 7 test file, the P13 task text in stage_7_prompts.md, decision-engine cutoff passthrough, and forecast/evaluation/Stage 1 provenance interfaces via a read-only sweep; ran only the one pytest command above; changed no code; weakened no test; invented no data, dates, provenance, formulas, or thresholds; performed no commits, pushes, pulls, or branch changes; Stages 1-6 and 8-9 untouched. All earlier reports preserved. Stage 7 is NOT declared frozen. Work stops after appending the report.
+========================================================
+

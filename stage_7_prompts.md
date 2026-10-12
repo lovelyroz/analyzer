@@ -361,3 +361,82 @@ Establish a reliable current baseline after P2–P10 and identify whether any cl
 
 Append `P11 — Stage 7 Consolidated Regression and Evidence Audit` to `temp_report2.md`, preserving all earlier reports. Stop.
 ========================================================
+# P12 — Remove the UTC Deprecation Warning Safely
+
+Work in the local project folder `analyzer`.
+
+## Objective
+
+Fix the documented `datetime.datetime.utcnow()` deprecation warning in Stage 7 without changing valuation behavior.
+
+## Scope
+
+* `src/valuation/engine.py`
+* `src/tests/test_stage7_valuation.py`, only if a focused regression test is needed.
+
+Inspect only the relevant datetime construction and normalization paths, their existing tests, and the latest `temp_report2.md`.
+
+## Requirements
+
+1. Locate every relevant `datetime.utcnow()` use in the scoped Stage 7 code.
+2. Replace deprecated naive-UTC construction with timezone-aware UTC construction, preserving the existing output contract and normalization rules.
+3. Do not change valuation dates, cutoff semantics, PIT behavior, calculation formulas, alert triggers, or model parameters.
+4. Do not claim that this closes the PIT blocker. It only addresses datetime construction and code hygiene.
+5. Add a focused test if needed to establish that generated timestamps remain UTC-aware and deterministic behavior remains unchanged apart from the wall-clock timestamp.
+6. Do not modify existing tests to weaken assertions.
+
+## Validation
+
+Run the complete Stage 7 test file and Stage 9 consumer tests using the project virtual environment.
+
+Record exact commands, environment, counts, failures, and warnings. Compare representative pre-change and post-change outputs, excluding only the wall-clock calculation timestamp where appropriate.
+
+Report all six validation layers separately. Clearly identify any layer not freshly executed.
+
+## Boundaries
+
+Do not modify Stages 1–6 or 8–9, the Stage 7 specification, dependencies, migrations, or unrelated code. No remote Git operations, GitHub/API, commits, pushes, pulls, or branch changes. Do not declare Stage 7 frozen.
+
+Append `P12 — UTC Deprecation Cleanup Report` to `temp_report2.md`, preserving all prior content. Stop.
+================================================================
+# P13 — Stage 7 Point-in-Time Contract Impact Assessment
+
+Work in the local project folder `analyzer`.
+
+## Objective
+
+Prepare an evidence-based impact assessment for closing the Stage 7 point-in-time (PIT) blocker. Do not implement a new contract until its design is approved.
+
+Read the latest `temp_report2.md`, the relevant sections of `07_Stage7_Valuation.md`, Stage 7 source/schema/tests, and only the upstream forecast interfaces and existing callers needed to trace benchmark inputs.
+
+## Tasks
+
+1. Trace every caller that supplies:
+
+   * `historical_pe_values`
+   * `industry_forward_pe_values`
+   * `industry_ttm_pe_values`
+   * `valuation_date`
+   * `market_price_date`
+   * `data_cutoff_datetime`
+2. For each caller, document the actual value shape, date/provenance information available, and whether the source can supply publication/availability timestamps and report versions.
+3. Compare the two principal contract options:
+
+   * **Option A:** Per-observation provenance records validated against the cutoff.
+   * **Option B:** Explicit caller attestation of PIT validity, together with a defined valuation-date/cutoff policy.
+4. Include Option C from P8: retain the V1 limitation and correct the specification and stress-test claims. Explain precisely which PIT guarantees would remain unavailable.
+5. For each option, identify affected callers, schema/API compatibility risks, migration needs, test cases, and the smallest viable implementation boundary.
+6. Determine whether Stage 7 can validate PIT correctness using current inputs alone. Separate verified facts from assumptions.
+7. Recommend an option, but do not select or implement it on the user's behalf.
+8. Do not modify frozen Stage 1–6 files. If an option would require changing a frozen interface, state that explicitly rather than making the change.
+
+## Validation
+
+This is an impact-assessment task. Do not claim runtime PIT enforcement or integration tests were executed unless they actually were. Report the six validation layers, marking design-only or unavailable layers explicitly.
+
+## Constraints
+
+Read-only: no source, test, schema, specification, parameter, dependency, or configuration modifications. No invented dates or provenance. No remote Git operations or GitHub/API. Do not declare Stage 7 frozen.
+
+Append `P13 — Stage 7 PIT Contract Impact Assessment` to `temp_report2.md`, preserving all prior content. Stop.
+=============================================================
