@@ -817,3 +817,350 @@ formulas, thresholds, severities, or trigger semantics; left the two failing tes
 failing as required. This English-only append preserves all earlier reports. Stage 7
 is NOT declared frozen. Work stops after appending the report.
 ========================================================
+# P10 — Model Parameterization and Determinism Audit (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12. P10 source: the P10 task prompt (no stage_7_prompts.md
+section; prompt provenance is the task text itself). Work limited to the Stage 7
+specification (07_Stage7_Valuation.md), src/valuation/engine.py, models.py,
+parameters.py, schema.py, and src/tests/test_stage7_valuation.py plus the
+Stage 9 consumer test file for regression. No Stages 1-6 or 8-9 file modified.
+No dependencies, migrations, commits, pushes, pulls, or branch changes. No
+financial data, formulas, thresholds, or semantics invented; ambiguities recorded
+as blockers. Stage 7 is NOT declared frozen.
+
+## 1. Constants table (Task 1-2)
+
+Legend. Versioned = present in parameters.py with its current value consumed by
+the engine. Explicit = stated numerically or structurally in the spec.
+Indirect = supported by spec structure but without a number. Unspecified = no
+spec basis. Risk notes cover both changing and leaving hardcoded.
+
+| # | Constant / formula (engine location) | Current value | Spec section / requirement | Versioned | Spec basis | Risk if changed / if left hardcoded |
+|---|---|---|---|---|---|---|
+| C1 | SCENARIO_WEIGHTS prior 20/60/20 (engine _resolve_probabilities) | 0.20/0.60/0.20 | Sec 22 states the exact prior and calls it a Model Version Parameter | Yes | Explicit | Change: shifts every expected fair value and status; needs MODEL_VERSION bump. Hardcoded risk: none, it is versioned. |
+| C2 | PROBABILITY_EVIDENCE_BLEND (engine _resolve_probabilities) | 0.25 | Sec 23-24 require four family-level votes with no double counting; no numeric blend stated | Yes | Indirect | Change: shifts all evidence-blended probabilities. The 0.25 equal-family vote is an implementation choice pinned by tests, not a spec number; changing it alters behavior without spec direction. |
+| C3 | SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT (engine _resolve_scenario_multiple_adjustments) | 0.20 | Sec 17 bans fixed 0.8/1.2 gaps and requires explainable, versioned, backtestable, rationale-backed multiples | Yes | Indirect | Change: widens/narrows allowed multiple adjustments; rationale gate unchanged. Value itself is engine-chosen, not spec-stated. |
+| C4 | VALUATION_THRESHOLDS 7 cutoffs (engine _valuation_status) | 30/15/15/5/-10/-25/-10 | Sec 35 gives this exact example table and requires storage as Valuation Model Parameters | Yes (after P10 fix; C4b was the gap) | Explicit | Change: moves status boundaries for every valuation; needs MODEL_VERSION bump. |
+| C4b | Expensive base-upside cutoff literal `< 0.0` (engine _valuation_status line 417, pre-fix) | 0.0 hardcoded | Sec 35 "Base Upside < 0%" — the zero IS the specified value | No (pre-fix) / Yes (post-fix, key expensive_base_upside = 0.0) | Explicit | THE P10 CORRECTION. Pre-fix the engine consumed 6 of 7 specified cutoffs from parameters and one literal. Post-fix all 7 are versioned; outputs identical (Sec 4). |
+| C5 | CONFIDENCE_THRESHOLDS 90/75/60/40 (engine _confidence_label) | 90/75/60/40 | Sec 39 gives these exact label bands and calls them Model Version Parameters | Yes | Explicit | Change: relabels confidence for identical scores. |
+| C6 | RISK_THRESHOLDS 40/0.50/-30/60/-15 (engine _valuation_risk) | as listed | Sec 36 lists risk factors but states NO numeric cutoffs | Yes | Unspecified | Change: moves EXTREME/HIGH/MEDIUM boundaries without spec direction. Values are engine-chosen and pinned by tests only; recorded as decision required, not corrected. |
+| C7 | ALERT_THRESHOLDS dispersion 0.50, reliability 40.0, 3 divergence ratios 1.50 (engine _alerts) | as listed | Sec 49 names the alert categories; no numeric trigger stated in Sec 41-53 | Yes | Unspecified | Same as C6: versioned but spec-unstated; boundary tests pin behavior, not conformance (P2 blocker 8 preserved). |
+| C8 | high_dependence_share 0.60 (parameters.py line 72) | 0.60, zero src references | Sec 51-52 require dependence alerts but define no share formula | Defined but dead | Unspecified | Cannot wire without inventing the share formula (P8 D2/D3). Left untouched; BLOCKER-1 stands. |
+| C9 | Confidence blend 0.40/0.20/0.20/0.20 + benchmark 100/25 + dispersion penalty slope 50 cap 40 (engine _valuation_confidence lines 432-434) | as listed | Sec 38 lists confidence factors but gives NO weights; Sec 64 lists Confidence Formula as version-gated but gives no formula | No | Unspecified | P7 MINOR-1 re-confirmed. Change: shifts every confidence score. No spec basis for any replacement set, so NO reparameterization performed; recorded as decision required (P8 D9 stands). Needs the record-store mechanism decision. |
+| C10 | Driver-uncertainty blend 0.5/0.3/0.2 (engine _driver_analysis line 493) | 0.5/0.3/0.2 | Sec 46 lists five possible uncertainty bases with no selection or weights | No | Unspecified | Same as C9: no basis for replacement weights; untouched. |
+| C11 | Dispersion formula (max-min)/base (engine _scenario_dispersion) | formula | Sec 40 explicitly requires the dispersion formula to be versioned | No (formula in code, not a named parameter) | Indirect (method unspecified, versioning required) | Change: alters dispersion, risk, alerts, confidence penalty. Untouched: renaming the formula into a parameter without the Sec 65 record store (effective_from/description) would be cosmetic versioning. |
+| C12 | SENSITIVITY_PERTURBATION (engine _driver_analysis) | 0.10 | Sec 45 "reasonable change" with no size; Sec 50 "relatively small" with no size | Yes | Indirect | The 0.10 is engine-chosen; used only for the FV-identity one-at-a-time shocks (P3). Must NOT be reused as the flip-risk perturbation without a spec decision (P8 D1). |
+| C13 | Score defaults: reliability 50, probability 50, quality 100; data_quality None/NaN -> 100 (engine _clamp_score call sites) | 50/50/100 | No spec section defines fallback defaults | No | Unspecified | Change: shifts confidence/uncertainty on missing data. Untouched; recorded as decision required. |
+| C14 | Rounding policy: fair value round 2, P/E round 4, confidence round 4, impact/uncertainty/review round 4 (models.py, engine.py) | as listed | No spec section defines rounding | No | Unspecified | Change: breaks golden values and determinism pins at the 4th decimal. Untouched. |
+| C15 | Epsilon guards: total floor 1e-9 (driver), dispersion exact-0.50 silence via `>` (engine) | as listed | No spec basis | No | Unspecified | Numerical-stability micro-constants; changing them is behavior-neutral except at degenerate inputs. Untouched. |
+| C16 | MIN_INDUSTRY_PEERS 8 (engine _select_target_pe, flags) | 8 | Sec 10 and non-negotiable rule 6 state exactly 8 | Yes | Explicit | Change: contradicts the locked spec. None. |
+| C17 | Legacy/unused: INDUSTRY_TARGET_PE {} , SCENARIO_PE_MULTIPLIER 1.00s, calculate_nav_fair_value, probability_confidence default 50.0, data_quality_score default 100.0 | as listed | Sec 17 (no fixed gaps), Sec 44 (P/NAV belongs to Stage 7 but no formula), Sec 28 (probability confidence exists, no default) | Exported but unconsumed (multiplier/nav) / signature defaults | Indirect or Unspecified | Removing exports breaks backward compatibility (src/valuation/__init__.py); wiring NAV needs the missing P/NAV formula (P8 D6). Untouched. |
+
+Summary counts: 17 rows traced. Versioned after the P10 fix: C1, C2, C3, C4
+(incl. C4b), C5, C6, C7, C12, C16 (9 of 17). Hardcoded or otherwise
+unversioned: C9, C10, C11, C13, C14, C15 (6 of 17). Defined-but-dead or
+legacy: C8, C17 (2 of 17). Exactly ONE hardcoded value had an explicit spec
+basis and was corrected (C4b). The remaining six hardcoded items have no spec
+numbers and were deliberately left unchanged.
+
+## 2. P7 MINOR-1 investigation (Task 3)
+
+P7 MINOR-1 states the confidence/risk/dispersion blend weights and related
+constants are hardcoded rather than versioned parameters, noting Sec 64-65
+cover thresholds (versioned) but not the blend weights. Re-verified in P10:
+engine.py lines 432-434 contain literals 0.40/0.20/0.20/0.20, 100.0/25.0,
+50.0/40.0; line 493 contains 0.5/0.3/0.2; lines 399-406 contain the dispersion
+formula inline; none appears in parameters.py. The spec lists Confidence
+Formula, Risk Formula, and Driver Priority Formula as version-gated (Sec 64)
+and requires tunable thresholds outside hard-code (Sec 65), but it never gives
+replacement weights, the uncertainty-base selection, or the Sec 65 record
+format (model_version, parameter_name, parameter_value, effective_from,
+description) — parameters.py holds values but no effective_from/description
+records (P8 D9). Moving literals into parameters.py without the record store
+would rename the problem, not fix traceability; inventing "spec-backed"
+weights is impossible since none exist. Therefore NO reparameterization of C9,
+C10, or C11 was performed. Required decisions (unchanged from P8 D9): (a) the
+parameter-version record store mechanism (code registry vs DB table vs file);
+(b) confirmation that blend weights and the dispersion formula are in scope as
+tunable. Proposal A (code registry) remains small and need not be deferred, but
+it is a user decision, not an audit action.
+
+## 3. Determinism and traceability (Task 4)
+
+Parameter changes preserve deterministic output if and only if (i) the engine
+reads the parameter once per run with no randomness, time, or iteration-order
+dependence, and (ii) model_version changes whenever a value changes (Sec 64:
+old versions never overwritten). The P10 correction satisfies both: the new
+key is read from the same VALUATION_THRESHOLDS dict on the same code path, and
+MODEL_VERSION is still STAGE7_V1 because default outputs are bit-identical
+(Sec 4). Traceability gap stands: parameters.py has no effective_from /
+description records (Sec 65 record example), so a future value change is
+traceable only through git history plus MODEL_VERSION, not through a parameter
+audit trail. That gap is the P8 D9 record-store decision, not something P10
+closes. Full-contract repeat-run determinism (excluding wall-clock
+calculation_timestamp) re-executed as part of the 49 passes.
+
+## 4. Strictly specification-backed correction (Task 5)
+
+Implemented, preserving existing outputs:
+
+- D:/winprojects/analyzer/src/valuation/parameters.py — added one key to
+  VALUATION_THRESHOLDS: "expensive_base_upside": 0.0. Spec basis: Sec 35
+  Expensive rule "Expected Upside <= -10% AND Base Upside < 0%" — the 0% cutoff
+  is explicit in the specification, and Sec 35 requires these thresholds to be
+  stored as Valuation Model Parameters. Pre-fix the engine consumed six of the
+  seven Sec-35 cutoffs from parameters and compared the seventh against the
+  literal `0.0`; that literal was the only spec-explicit hardcoded constant in
+  the table.
+- D:/winprojects/analyzer/src/valuation/engine.py — one comparison changed in
+  _valuation_status: `base_upside < 0.0` becomes
+  `base_upside < t["expensive_base_upside"]`. The comparison semantics are
+  identical for the default value (strict less-than against 0.0).
+- D:/winprojects/analyzer/src/tests/test_stage7_valuation.py — two P10 tests
+  appended, zero existing tests modified:
+  1. test_p10_expensive_base_upside_parameterized_outputs_unchanged: asserts
+     the key exists at 0.0, asserts the golden valuation (fair values
+     1050.0/1260.0/1470.0, expected 1260.0, margin 26.0, ATTRACTIVE,
+     VALUATION_CONTRACT_V1/STAGE7_V1), asserts the full-contract
+     representation hash equals the pre-change golden hash
+     1990c6393233121df4bccea381ac6539461443ea1a77f1e6e09a1cf819b71255, and
+     asserts the boundary pair bracketing the cutoff (base upside -2.0 with
+     expected -10.4 -> EXPENSIVE; base upside +1.5 with expected -10.4 ->
+     FAIR).
+  2. test_p10_expensive_threshold_consumed_from_parameters: mutates the key
+     to -50.0, proves the EXPENSIVE case flips to FAIR (parameter actually
+     consumed, not a dead export), restores the key in finally, and proves
+     the restored engine returns EXPENSIVE again.
+
+Pre/post output comparison (representative cases run before and after the
+change; identical inputs, full-contract dataclass dict minus wall-clock
+calculation_timestamp, sha256 over canonical JSON):
+- Golden case (EPS 150/180/210, price 1000, historical 6.5/7.0/8.0):
+  pre 1990c6393233121df4bccea381ac6539461443ea1a77f1e6e09a1cf819b71255 /
+  ATTRACTIVE 75.3333 LOW; post identical hash / identical triple. EXACT
+  DIFFERENCES: NONE — zero fields differ.
+- Expensive-boundary case (EPS 70/140/150): pre base -2.0 / expected -10.4 /
+  EXPENSIVE; post identical. EXACT DIFFERENCES: NONE.
+- Fair-boundary case (EPS 55/145/150): pre base +1.5 / expected -10.4 / FAIR;
+  post identical. EXACT DIFFERENCES: NONE.
+No other output changed: the correction touches only the Expensive branch
+predicate, and the default key value reproduces the literal exactly.
+
+## 5. Values without specification basis (Task 6, no replacement selected)
+
+Recorded as required decisions, not implemented: RISK_THRESHOLDS numerics (C6),
+alert-trigger numerics 0.50/40.0/1.50 (C7), confidence blend weights/benchmark
+levels/penalty slope and cap (C9), driver-uncertainty blend (C10), dispersion
+formula versioning (C11), score fallback defaults 50/50/100 (C13), rounding
+policy (C14), epsilon guards (C15), high_dependence_share wiring (C8, needs the
+dependence-share formula), legacy multiplier/NAV exports (C17). Per Task 7, no
+attempt was made to infer the flip-risk, dependence, margin-risk,
+sector-mapping, or PIT-contract resolutions; P8 D1-D7 and P7 BLOCKER-1/2 plus
+MATERIAL-1/2 stand unchanged.
+
+## 6. Validation — six layers with exact commands and results
+
+Cwd for all commands: D:/winprojects/analyzer. Interpreter:
+D:/winprojects/analyzer/.venv/Scripts/python.exe.
+
+1. Unit/formula: EXECUTED. `... -m pytest src/tests/test_stage7_valuation.py
+   -q -p no:warnings` -> collected 51, passed 49, failed 2, skipped 0. The 2
+   failures are the unchanged pre-existing intended P2 failing-first exposures
+   (test_p2_sector_driver_decomposition_missing,
+   test_p2_required_flip_dependence_alerts_missing). All 11 baseline, 7 P2, 6
+   P3, 6 P4, 10 P5, 7 P6, and 2 P10 tests pass.
+2. Contract/boundary: EXECUTED for P10 scope. The Expensive cutoff boundary
+   pair (-2.0 -> EXPENSIVE / +1.5 -> FAIR at expected -10.4) plus the
+   parameter-consumption mutation test; peer-count, determinism, severity, and
+   divergence pins re-executed as part of the 49 passes.
+3. Production-path/integration: PARTIAL (carried, not re-proved in P10). No
+   P10 test uses real Stage 5 output; forecast-leg evidence carried from P6
+   (real ForecastEngine output consumed); benchmark leg remains fixture-based
+   by V1 design. No production-path run executed in P10 beyond the synthetic
+   golden/boundary cases above.
+4. Adversarial/negative: EXECUTED (carried re-execution). Finite-input guards,
+   rationale/bound rejections, and invalid-EPS/price variants re-executed as
+   part of the 49 passes; no new adversarial test added in P10 (the mutation
+   test is a consumption proof, not an attack case).
+5. Regression: EXECUTED. Stage 7: all 47 previously passing tests still pass
+   (49 now includes the 2 new P10). Stage 9 consumer:
+   `... -m pytest src/tests/test_stage9_decision.py -q -p no:warnings` ->
+   13 passed. Combined file run: 51 + 13 = 64 tests, 62 passed, 2 intended
+   P2 failures. Pre/post golden-hash comparison: zero differences (Sec 4).
+   Full multi-stage suite: ABSENT in P10 (not re-executed; P7 evidence
+   carried: 2 failed, 897 passed, 1 skipped, PDF-extraction file excluded).
+6. Independent audit: EXECUTED — this append plus the pre/post hash evidence.
+   Nothing claimed implemented beyond the C4b correction and its two tests;
+   nothing claimed validated beyond the stated reruns.
+
+## 7. Scope confirmation
+
+Stage 7 parameters.py (one key) + engine.py (one predicate) + focused tests
+(two appended) only; no spec, dependency, migration, or config change; no
+existing test weakened; Stages 1-6 and 8-9 untouched (Stage 9 read-only
+regression run); no git operations of any kind; English-only append with all
+prior content preserved. The unresolved flip-risk, dependence, margin-risk,
+sector-mapping, and PIT-contract blockers were not touched by inference. Stage
+7 is NOT declared frozen. Work stops after appending the report.
+========================================================
+# P11 — Stage 7 Consolidated Regression and Evidence Audit (APPENDED, ENGLISH ONLY)
+
+Date (UTC): 2026-10-12. P11 source: the P11 task prompt (no stage_7_prompts.md
+section; prompt provenance is the task text itself). Read-only verification
+except for this appended report: no source, test, specification, parameter,
+dependency, or configuration file was modified in P11. No commits, pushes,
+pulls, branch changes, GitHub/API, or remote operations. Frozen Stages 1-6
+and 8-9 untouched. No financial data, formulas, thresholds, or semantics
+invented; ambiguities recorded as blockers. Stage 7 is NOT declared frozen.
+
+## 1. Test-count reconciliation P2-P10 (Task 1)
+
+| Report | Collected | Passed | Failed | Delta vs prior (exact) |
+|---|---|---|---|---|
+| Baseline | 11 | 11 | 0 | — |
+| P2 | 20 | 18 | 2 | +9 tests: 7 pass, 2 intended failing-first exposures |
+| P3 | 26 | 24 | 2 | +6 P3 tests, all pass |
+| P4 | 32 | 30 | 2 | +6 P4 tests, all pass |
+| P5 | 42 | 40 | 2 | +10 P5 tests, all pass |
+| P6 | 49 | 47 | 2 | +7 P6 tests, all pass |
+| P7 | 49 | 47 | 2 | Rerun, identical; full suite 2F/897P/1S/0E |
+| P8 | 49 | 47 | 2 | Rerun, identical; full suite carried from P7 |
+| P9 | 49 | 47 | 2 | Rerun, identical; focused alert subset 20 collected / 19 passed / 1 failed / 29 deselected |
+| P10 | 51 | 49 | 2 | +2 P10 tests, all pass; Stage 9 13/13; combined 64 tests, 62 passed, 2 intended failures |
+| P11 fresh (Sec 3) | 51 | 49 | 2 | Identical to P10; Stage 9 13/13; full suite 2F/899P/1S/0E |
+
+Arithmetic chain is fully consistent (11+9+6+6+10+7+0+0+0+2 = 51). The two
+failures are the same two P2 tests in every report from P2 through the P11
+fresh run; no report treats them as passing. Full-suite reconciliation: P7 897
+passed to P11 899 passed is exactly +2 (the two new P10 tests); failures
+identical. P6 reported 3 failed / 893 passed / 1 skipped / 4 errors with the
+third failure and 4 errors unattributed; that anomaly has now failed to recur
+in two consecutive full-suite runs (P7, P11) and is classified
+transient/environmental in Sec 4 — not a regression.
+
+## 2. P2 failing-first tests: present and unchanged (Task 2)
+
+- test_p2_sector_driver_decomposition_missing is present at
+  src/tests/test_stage7_valuation.py line 406; content matches the P2 report
+  (PETROCHEMICAL/BANK/HOLDING union ranking must contain REVENUE, NII, NAV).
+- test_p2_required_flip_dependence_alerts_missing is present at line 425;
+  content matches the P2 report (SENSITIVITY_PERTURBATION 0.10 guard, flip
+  ATTRACTIVE-to-FAIR pair, five required alert names asserted jointly).
+- Diff of the test file against the P2 commit f18cc1f for these two tests:
+  hunk @@ -463,3 +463,694 @@ — purely additive insertions after line 463
+  (P3-P10 appends); zero modified lines in either P2 test body. Both still
+  fail in the P11 fresh run for the documented reasons (Sec 3), so they still
+  pin the absences. No restore or rewrite performed; none warranted.
+
+## 3. Fresh validation runs (Tasks 3-5)
+
+Cwd for all commands: D:/winprojects/analyzer. Interpreter:
+D:/winprojects/analyzer/.venv/Scripts/python.exe (venv interpreter per
+project rule; system python lacks sqlalchemy).
+
+Run A — Stage 7 file.
+Command: D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest
+src/tests/test_stage7_valuation.py -q -p no:warnings
+Result: collected 51, passed 49, failed 2, skipped 0, errors 0, duration
+1.03s.
+Exact failures:
+- FAILED test_p2_sector_driver_decomposition_missing — documented assertion
+  (required {REVENUE, NII, NAV} not subset of observed {EPS, TARGET_PE}).
+- FAILED test_p2_required_flip_dependence_alerts_missing — AssertionError:
+  Missing required alerts: ['ASSESSMENT_FLIP_RISK',
+  'HIGH_MULTIPLE_DEPENDENCE', 'HIGH_EPS_DEPENDENCE', 'MARGIN_ASSUMPTION_RISK',
+  'HIGH_IMPACT_HIGH_UNCERTAINTY'].
+
+Run B — Stage 9 consumer.
+Command: D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest
+src/tests/test_stage9_decision.py -q -p no:warnings
+Result: 13 passed, 0 failed, 0 skipped, duration 0.64s.
+
+Run C — full suite.
+Command: D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest
+src/tests/ -q -p no:warnings -rs --ignore=src/tests/test_codal_pdf_extraction.py
+Result: 2 failed, 899 passed, 1 skipped, 0 errors, duration 143.51s
+(0:02:23). Exclusion: src/tests/test_codal_pdf_extraction.py ignored because
+it requires real Codal sample PDFs unavailable in this environment (same
+exclusion as P6/P7; no substitute PDF used). The 1 skip is
+src/tests/test_codal_extraction.py:307 (real Codal sample PDF not available
+in CI). The 2 failures are the Run A P2 exposures; no other file failed.
+
+## 4. Failure classification (Task 6, evidence-backed)
+
+- Current Stage 7 blockers: the 2 Run A failures = P7 BLOCKER-1
+  (flip/dependence alert family; a 10% EPS shock provably flips ATTRACTIVE to
+  FAIR with no alert, P2/P6 evidence) and BLOCKER-2 (sector decomposition;
+  ranking always {EPS, TARGET_PE}). Root cause per the P8 decision package is
+  missing specification formulas (dependence-share, flip-risk tuple,
+  impact/uncertainty cutoffs, margin trigger, sector mapping), not
+  implementation error. Unchanged since P2.
+- Regressions caused by recent changes: NONE FOUND. The working-tree P10
+  production diff is one parameter key ("expensive_base_upside": 0.0) plus one
+  predicate consuming it, with P10 pre/post golden-hash evidence of zero
+  output differences; all 47 pre-P10 passes still pass, the 2 new P10 tests
+  pass, Stage 9 is 13/13, and the full-suite delta (+2) is exactly the new
+  P10 tests. No repair action taken — none warranted under the read-only
+  constraint.
+- Unrelated pre-existing failures: NONE OBSERVED. Zero failures outside the
+  two known Stage 7 exposures; zero errors.
+- Environment/fixture limitations: (a) PDF-extraction file excluded plus 1
+  Codal-sample skip — fixture unavailable, same as P6/P7; (b) P6's transient
+  third failure plus 4 errors, non-recurrent in P7 and P11, classified
+  transient/environmental with two consecutive clean runs as evidence — not
+  attributed to any Stage 7 change.
+
+## 5. Six-layer reassessment (Task 7, fresh vs carried)
+
+1. Unit/formula: FRESH EVIDENCE (Run A 49/51; the 2 failures assert absent
+   required behavior and fail for the right reason).
+2. Contract/boundary: FRESH EVIDENCE (peer-count, determinism,
+   severity-vocabulary, NaN/inf guards, Expensive-cutoff boundary re-executed
+   as part of the 49 passes).
+3. Production-path/integration: CARRIED from P6, re-stated precisely.
+   GENUINE Stage 5-to-Stage 7 integration was achieved in P6 (real
+   ForecastEngine output consumed through the production constructor; cutoff
+   inherited; not re-executed in P11). This is explicitly distinct from
+   benchmark-series PIT verification, which remains fixture-based and
+   metadata-only by V1 design (undated float series; valuation_date-vs-cutoff
+   unchecked; P5/P6 pinned limitation stands).
+4. Adversarial/negative: FRESH EVIDENCE (finite-input guards, rationale/bound
+   rejections, invalid-EPS/price variants re-executed in Run A).
+5. Regression: FRESH EVIDENCE (Runs A+B+C; golden values, hierarchy,
+   probabilities, NULL rules unchanged).
+6. Independent audit: FRESH EVIDENCE (this read-only append; every count
+   above was executed in P11 except where explicitly marked carried).
+
+## 6. Unresolved-findings register (Task 8)
+
+| ID | Severity | Finding + evidence | Affected requirement | Prerequisite decision | Next bounded action |
+|---|---|---|---|---|---|
+| UF-1 | Blocker | Flip/dependence alert family absent (Run A failure names all five; P8 D1-D5) | Spec 49-53; stress 77-79 | User fixes formulas/severities or defers out of V1 | Spec amendment first; then implement and green the test |
+| UF-2 | Blocker | Sector decomposition absent (Run A; ranking {EPS,TARGET_PE}; P8 D6) | Spec 42-44; P/NAV claim | Mapping/linkage/NAV decisions or deferral | Same as UF-1 |
+| UF-3 | Material | Alert-name mismatches (P9 matrix rows 3-5, 11; behavior pinned, not conformance) | Spec 49, 54-55 vs emitted names | D8 rename/alias/amend choice (decide now) | Apply chosen mapping; pin with tests |
+| UF-4 | Material | PIT cross-validation absent (P5/P6 pinned test; metadata-only flag) | Spec 56-57; stress 85 | D7 provenance-vs-attestation plus date-rule choice | Implement chosen option or correct PASS claims (D7-C) |
+| UF-5 | Minor | Unversioned blends/formulas/defaults/rounding (P10 C9-C15; C4b closed in P10) | Spec 64-65 | D9 record-store mechanism plus scope | Move to chosen registry; no weight invention |
+| UF-6 | Minor (subsumed by UF-1) | high_dependence_share 0.60 defined-but-dead (P10 C8; zero src references) | Spec 51-52 | D2 share-formula decision | Wire or remove with the formula decision |
+| UF-7 | Environment | PDF-extraction exclusion plus Codal skip (Run C) | Test coverage only | Fixture availability | Re-run file when real Codal samples exist; no substitution |
+| UF-8 | Cosmetic | datetime.utcnow() DeprecationWarning persists | Code hygiene | None | Replace with timezone-aware call in a bounded change |
+
+Working-tree note: git status shows uncommitted P10 changes (engine.py one
+predicate, parameters.py one key, test file plus 2 tests, stage_7_prompts.md,
+temp_report2.md); P11 modified nothing — verification was read-only (pytest
+plus git status/diff) apart from this append. schema.py is unmodified since
+P4, consistent with no contract change after P4.
+
+## 7. Scope confirmation
+
+Read-only verification plus this English-only append: inspected the full
+P2-P10 history in temp_report2.md, the Stage 7 files changed by P2-P10
+(engine.py, parameters.py, schema.py, test file), and the Stage 9 consumer
+file for regression; ran only the three pytest commands and read-only git
+commands above; changed no code (no new regression proven, so no repair
+warranted); weakened no test; invented no data, formulas, thresholds, or
+semantics; performed no commits, pushes, pulls, or branch changes; Stages 1-6
+and 8-9 untouched (Stage 9 read-only regression run). All earlier reports
+preserved. Stage 7 is NOT declared frozen and remains unfrozen unless a
+future independent audit explicitly approves it and the user separately
+authorizes the freeze decision. Work stops after appending the report.
+========================================================

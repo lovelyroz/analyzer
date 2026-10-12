@@ -44,6 +44,7 @@ VALUATION_THRESHOLDS: Dict[str, float] = {
     "attractive_expected_upside": 15.0,
     "attractive_base_upside": 5.0,
     "expensive_expected_upside": -10.0,
+    "expensive_base_upside": 0.0,
     "very_expensive_expected_upside": -25.0,
     "very_expensive_base_upside": -10.0,
 }

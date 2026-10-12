@@ -1085,3 +1085,72 @@ def test_p6_regression_prior_behavior_preserved():
     )
     assert ttm.target_pe_source == "INDUSTRY_TTM_PE"
     assert ttm.industry_peer_count == 7
+
+
+def test_p10_expensive_base_upside_parameterized_outputs_unchanged():
+    import dataclasses
+    import hashlib
+    import json
+
+    from src.valuation.parameters import VALUATION_THRESHOLDS
+
+    # Spec section 35 requires the Expensive base-upside cutoff to be a stored
+    # versioned parameter; the engine must consume that key (value 0.0 preserves
+    # the pre-change '< 0.0' comparison exactly).
+    assert VALUATION_THRESHOLDS["expensive_base_upside"] == 0.0
+    engine = ValuationEngine()
+    golden = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=85.0, historical_pe_values=[6.5, 7.0, 8.0],
+        probability_confidence=90.0,
+    )
+    assert golden.scenarios["bear"].fair_value == 1050.0
+    assert golden.scenarios["base"].fair_value == 1260.0
+    assert golden.scenarios["bull"].fair_value == 1470.0
+    assert golden.expected_fair_value == 1260.0
+    assert golden.margin_of_safety_pct == 26.0
+    assert golden.valuation_status == "ATTRACTIVE"
+    assert golden.contract_version == "VALUATION_CONTRACT_V1"
+    assert golden.model_version == "STAGE7_V1"
+    representation = dataclasses.asdict(golden)
+    representation.pop("calculation_timestamp")
+    digest = hashlib.sha256(
+        json.dumps(representation, sort_keys=True, default=str).encode()
+    ).hexdigest()
+    assert digest == "1990c6393233121df4bccea381ac6539461443ea1a77f1e6e09a1cf819b71255"
+    # Boundary pair bracketing the parameterized cutoff: expected upside
+    # <= -10 with base upside on each side of 0.0.
+    expensive = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(70.0, 140.0, 150.0),
+        forecast_reliability_score=85.0, historical_pe_values=[7.0],
+    )
+    assert expensive.valuation_status == "EXPENSIVE"
+    fair = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(55.0, 145.0, 150.0),
+        forecast_reliability_score=85.0, historical_pe_values=[7.0],
+    )
+    assert fair.valuation_status == "FAIR"
+
+
+def test_p10_expensive_threshold_consumed_from_parameters():
+    from src.valuation import parameters as valuation_parameters
+
+    engine = ValuationEngine()
+    original = valuation_parameters.VALUATION_THRESHOLDS["expensive_base_upside"]
+    try:
+        valuation_parameters.VALUATION_THRESHOLDS["expensive_base_upside"] = -50.0
+        relaxed = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(70.0, 140.0, 150.0),
+            forecast_reliability_score=85.0, historical_pe_values=[7.0],
+        )
+        # With the cutoff relaxed to -50.0, the same -2.0 base upside no longer
+        # satisfies the Expensive branch and falls through to FAIR.
+        assert relaxed.scenarios["base"].upside_downside_pct == -2.0
+        assert relaxed.valuation_status == "FAIR"
+    finally:
+        valuation_parameters.VALUATION_THRESHOLDS["expensive_base_upside"] = original
+    restored = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(70.0, 140.0, 150.0),
+        forecast_reliability_score=85.0, historical_pe_values=[7.0],
+    )
+    assert restored.valuation_status == "EXPENSIVE"

@@ -414,7 +414,7 @@ class ValuationEngine:
             return "ATTRACTIVE"
         if expected_upside <= t["very_expensive_expected_upside"] and base_upside <= t["very_expensive_base_upside"]:
             return "VERY_EXPENSIVE"
-        if expected_upside <= t["expensive_expected_upside"] and base_upside < 0.0:
+        if expected_upside <= t["expensive_expected_upside"] and base_upside < t["expensive_base_upside"]:
             return "EXPENSIVE"
         return "FAIR"
 

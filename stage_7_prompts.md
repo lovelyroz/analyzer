@@ -283,3 +283,81 @@ No modifications to Stages 1–6 or 8–9. No dependency/config changes. No remo
 
 Append `P9 — Alert Contract and Naming Consistency Audit` to `temp_report2.md`, preserving all earlier content. Stop.
 =============================================================
+# P10 — Model Parameterization and Determinism Audit
+
+Work only in local folder `analyzer`. Read the latest Stage 7 reports and inspect only the Stage 7 specification, `src/valuation/engine.py`, `models.py`, `parameters.py`, `schema.py`, and `src/tests/test_stage7_valuation.py`.
+
+## Objective
+
+Identify and, where explicitly justified by the existing specification, correct Stage 7 model constants that are hardcoded instead of versioned parameters. Preserve financial behavior unless the specification clearly requires a change.
+
+## Tasks
+
+1. Trace every model weight, threshold, score blend, cap, perturbation, normalization rule, and fallback default used by Stage 7.
+2. Create a table containing:
+
+   * Constant or formula.
+   * Current value and source location.
+   * Specification section and requirement.
+   * Whether the value is versioned in `parameters.py`.
+   * Whether the value is explicitly specified, indirectly supported, or unspecified.
+   * Risk if changed or left hardcoded.
+3. Investigate P7's finding that confidence/risk/dispersion blend weights and related constants are hardcoded.
+4. Check whether parameter changes can preserve deterministic output and model-version traceability.
+5. Implement only a strictly specification-backed parameterization correction that preserves existing outputs. Add tests proving that the default outputs are unchanged and that the intended parameter is actually consumed.
+6. If a value or formula lacks a specification basis, do not select a replacement value. Record the required decision instead.
+7. Do not attempt to solve the unresolved flip-risk, dependence, margin-risk, sector-mapping, or PIT contract blockers by inference.
+
+## Validation
+
+Run the focused Stage 7 test file and the relevant Stage 9 consumer test file. For any production change, compare representative pre-change and post-change outputs and report exact differences. If no safe change is justified, make no code changes and report why.
+
+Report all six validation layers, marking each as executed, partial, absent, or blocked. Include exact test commands and results.
+
+## Constraints
+
+No changes to Stages 1–6 or 8–9. Do not change dependencies, migrations, or unrelated valuation code. No remote Git operations, GitHub/API, commits, pushes, pulls, or branch changes. Do not declare Stage 7 frozen.
+
+Append `P10 — Model Parameterization and Determinism Audit` to `temp_report2.md`. Preserve earlier reports and stop.
+=============================================================
+# P11 — Stage 7 Consolidated Regression and Evidence Audit
+
+Work in the local project folder `analyzer`. This is a bounded verification task, not a repository-wide review.
+
+Read the latest `temp_report2.md` and inspect only the Stage 7 files changed or referenced by P2–P10, plus the specific test files needed to verify regression claims.
+
+## Objective
+
+Establish a reliable current baseline after P2–P10 and identify whether any claimed fix, regression result, or validation layer lacks direct evidence.
+
+## Tasks
+
+1. Reconcile all reported Stage 7 test counts from P2 through P10. Identify the exact current tests and expected outcomes; do not treat the two P2 failing-first tests as passing.
+2. Verify whether the latest test code still contains:
+
+   * `test_p2_sector_driver_decomposition_missing`
+   * `test_p2_required_flip_dependence_alerts_missing`
+     If either is absent or changed, investigate the exact diff and explain why. Do not restore or rewrite tests without evidence and a specific justification.
+3. Run the full Stage 7 test file and the Stage 9 consumer tests using the intended virtual environment.
+4. Run the full available test suite with the project's established command. If the PDF-extraction tests require a specific unavailable fixture, report the exact exclusion and reason. Do not substitute unrelated PDFs for a fixture with different expected content.
+5. For every command, record the exact command, environment, collected count, passed, failed, skipped, errors, and duration when available.
+6. For any failure, capture the exact test name and failure summary. Separate:
+
+   * Current Stage 7 blockers.
+   * Regressions caused by recent changes.
+   * Unrelated pre-existing failures.
+   * Environment or fixture limitations.
+     Do not attribute failures to a category without evidence.
+7. Reassess all six validation layers using fresh evidence where possible. Explicitly distinguish genuine Stage 5-to-Stage 7 integration from benchmark-series PIT verification.
+8. Produce a final unresolved-findings register with severity, evidence, affected requirement, prerequisite decision, and the next bounded action.
+
+## Constraints
+
+* Prefer read-only verification; change code only to repair a newly proven regression caused by P2–P10, and only if the fix is narrow and specification-backed.
+* Never weaken tests, invent formulas, suppress unexplained failures, or claim unexecuted tests passed.
+* Do not modify Stages 1–6 or 8–9.
+* No remote Git operations, GitHub/API, commits, pushes, pulls, or branch changes.
+* Stage 7 must remain unfrozen unless a future independent audit explicitly approves it and the user separately authorizes the freeze decision.
+
+Append `P11 — Stage 7 Consolidated Regression and Evidence Audit` to `temp_report2.md`, preserving all earlier reports. Stop.
+========================================================
