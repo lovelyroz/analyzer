@@ -136,3 +136,59 @@ Use focused tests for each changed boundary, run the complete Stage 7 test file,
 
 Append the report to `temp_report2.md`. Do not change the Stage 7 specification or frozen stages in this prompt. No remote Git operations. Stop after the audit/fix and report.
 ===========================================================
+#### P6 — Production-Path, Adversarial and Regression Validation
+
+Work only in the local project folder `analyzer`. Read the latest Stage 7 reports in `temp_report2.md`.
+
+## Objective
+
+Perform strict multi-layer validation of the cumulative Stage 7 changes without expanding implementation scope.
+
+## Tasks
+
+1. Inspect only the Stage 7 code/tests changed by P2–P5 and the actual Stage 5/6 output interfaces required to construct a valid integration test.
+2. Add or run a production-path integration test using real pipeline-produced forecast objects if the repository supports it. Do not fabricate realistic-looking financial records or bypass production constructors. If genuine integration is impossible, document the precise blocker and test the strongest valid boundary instead.
+3. Add adversarial cases for invalid EPS, missing benchmarks, peer-count boundaries, non-finite inputs, cutoff/PIT limitations, scenario ordering, probability normalization, and repeat-run determinism, as applicable to implemented contracts.
+4. Run all Stage 7 tests, then the full suite `python -m pytest src/tests/ -q -p no:warnings -rs` using the project's intended local virtual environment.
+5. Report all six layers separately. Include exact commands, collected/passed/failed/skipped counts, skip reasons, and whether each layer was freshly executed or carried forward from an earlier report.
+6. Do not modify unrelated tests merely to obtain a pass. Investigate and fix any regression introduced by Stage 7 changes.
+
+## Boundaries
+
+Do not change Stages 1–6, Stages 8–9, valuation logic outside the approved Stage 7 scope, dependencies, or migrations. No remote Git operations.
+
+Append the report to `temp_report2.md`. Do not declare Stage 7 frozen. Stop after validation and reporting.
+=========================================================
+#### P7 — Independent Final Audit and Freeze Gate
+
+Work only in the local project folder `analyzer`.
+
+## Objective
+
+Perform a read-only independent audit of Stage 7 after P2–P6. Decide whether the evidence supports readiness for an explicit freeze decision.
+
+## Inspect only
+
+* `07_Stage7_Valuation.md`
+* Stage 7 source files and tests changed during P2–P6
+* The P2–P6 reports in `temp_report2.md`
+* Relevant Stage 5/6 interface definitions only where needed to verify boundaries
+
+Do not re-run broad repository exploration.
+
+## Audit requirements
+
+1. Independently trace the implemented formulas and alert conditions against the locked specification. Do not rely solely on prior agents' PASS labels.
+2. Check financial invariants, invalid/missing data behavior, benchmark hierarchy and peer counts, scenario probability sum, deterministic behavior, version metadata, PIT limitations, and the frozen-stage boundaries.
+3. Review test quality for false positives, tautological assertions, insufficient edge cases, and accidental weakening. Verify that each claimed validation layer has concrete evidence.
+4. Run the Stage 7 test suite and full test suite using the intended local virtual environment. Record exact commands, counts, skip reasons, and environment details.
+5. Classify every remaining finding as BLOCKER, MATERIAL GAP, MINOR GAP, or DOCUMENTED LIMITATION. Separate proven defects from specification ambiguity and missing infrastructure.
+6. Return exactly one verdict: `APPROVED FOR EXPLICIT FREEZE DECISION` or `NOT READY FOR FREEZE`. Approval is not itself a freeze declaration.
+
+## Boundaries
+
+Read-only only. Do not edit source, tests, specifications, or reports except appending this audit report to `temp_report2.md`. No commits, pushes, pulls, branch changes, GitHub/API, or other remote operations.
+
+Append the report, preserve all earlier reports, and stop.
+===========================================================
+

@@ -870,3 +870,218 @@ def test_p5_undated_benchmark_series_carry_no_provenance():
     # A valuation date after the cutoff is accepted without rejection or
     # flag: cross-validation is absent by design in V1.
     assert result.valuation_status == "FAIR"
+
+
+# P6 additions: production-path, adversarial and regression validation.
+# Existing tests above untouched. No production, spec, dependency, or config
+# changes in P6; P6 is validation-only.
+def _p6_production_forecast():
+    """Real pipeline-produced forecast via the Stage 5 production engine.
+
+    Uses ForecastEngine.generate_forecast (the Stage 5 production
+    constructor) with caller-declared context plus historical dispersion
+    series, so all three scenarios carry valid EPS. No synthetic
+    make_forecast fixture, no fabricated records, no bypassed constructors.
+    """
+    from datetime import datetime, timezone
+
+    from src.forecast.engine import ForecastEngine
+
+    context = {
+        "seasonality_valid": True,
+        "seasonal_baseline_revenue": 10000.0,
+        "recent_run_rate_revenue": 9000.0,
+        "baseline_revenue_growth": 0.10,
+        "historical_operating_margin": 0.20,
+        "historical_net_margin": 0.10,
+        "share_count": 1000.0,
+        "net_profit_is_attributable": True,
+        "historical_revenue_series": [8000.0, 8500.0, 9000.0, 9500.0, 10000.0, 10500.0],
+        "historical_operating_series": [(2000.0, 8000.0)] * 6,
+        "historical_net_series": [(800.0, 8000.0)] * 6,
+    }
+    return ForecastEngine().generate_forecast(
+        1, 101, "PETROCHEMICAL", context,
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+
+def test_p6_production_path_real_stage5_forecast():
+    import math
+
+    from src.forecast.schema import CompanyForecastResult
+
+    forecast = _p6_production_forecast()
+    assert isinstance(forecast, CompanyForecastResult)
+    eps_values = (
+        forecast.scenario_forecasts.bear.eps,
+        forecast.scenario_forecasts.base.eps,
+        forecast.scenario_forecasts.bull.eps,
+    )
+    assert all(v is not None and math.isfinite(v) and v > 0 for v in eps_values)
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, forecast,
+        historical_pe_values=[6.5, 7.0, 8.0],
+        forecast_reliability_score=80.0,
+    )
+    assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
+    assert result.scenarios["base"].fair_value == 7.7
+    assert result.valuation_status == "VERY_EXPENSIVE"
+    assert result.data_cutoff_datetime == forecast.data_cutoff_datetime
+    assert abs(sum(s.probability for s in result.scenarios.values()) - 1.0) < 1e-9
+    for scenario in result.scenarios.values():
+        assert scenario.fair_value is not None and math.isfinite(scenario.fair_value)
+    assert set(result.valuation_driver_ranking) == {"EPS", "TARGET_PE"}
+
+
+def test_p6_cutoff_pit_limitation_pinned():
+    # V1 limitation re-asserted (P5 blocker stands): a valuation_date later
+    # than data_cutoff_datetime is accepted without rejection or flag.
+    # This pins the strongest valid boundary; genuine cross-validation
+    # needs the contract decision recorded in the P5 report.
+    from datetime import datetime
+
+    engine = ValuationEngine()
+    late = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0],
+        valuation_date=datetime(2026, 6, 1),
+        market_price_date=datetime(2026, 6, 1),
+        data_cutoff_datetime=datetime(2026, 1, 1),
+    )
+    assert late.valuation_status == "ATTRACTIVE"
+    assert not any("PIT" in flag for flag in late.valuation_risk_flags)
+
+
+def test_p6_missing_benchmarks_yield_guarded_nulls():
+    import math
+
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+    )
+    assert result.target_pe_source == "INSUFFICIENT_DATA"
+    assert result.industry_peer_count == 0
+    assert result.valuation_status == "INSUFFICIENT_DATA"
+    assert result.expected_fair_value is None
+    assert result.margin_of_safety_pct is None
+    for scenario in result.scenarios.values():
+        assert scenario.target_pe is None
+        assert scenario.fair_value is None
+    assert "INDUSTRY_BENCHMARK_INSUFFICIENT" in result.valuation_risk_flags
+    assert any("INSUFFICIENT_BENCHMARK_DATA" in alert for alert in result.alerts)
+    for value in (result.expected_fair_value, result.margin_of_safety_pct):
+        assert value is None or math.isfinite(value)
+
+
+def test_p6_scenario_ordering_flag_and_probability_normalization():
+    import math
+
+    engine = ValuationEngine()
+    inverted = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(300.0, 180.0, 100.0), historical_pe_values=[7.0],
+    )
+    assert "SCENARIO_ORDER_WARNING" in inverted.valuation_risk_flags
+    assert inverted.scenarios["bear"].fair_value == 2100.0
+    assert inverted.scenarios["base"].fair_value == 1260.0
+    assert inverted.scenarios["bull"].fair_value == 700.0
+    assert abs(sum(s.probability for s in inverted.scenarios.values()) - 1.0) < 1e-9
+    evidence = {
+        "FUNDAMENTAL_DIRECTION": {"bear": 0.1, "base": 0.3, "bull": 0.6},
+        "FORECAST_DIRECTION": {"bear": 0.2, "base": 0.5, "bull": 0.3},
+        "PROFITABILITY_ASSUMPTION_RISK": {"bear": 0.4, "base": 0.4, "bull": 0.2},
+        "DATA_STRUCTURAL_RISK": {"bear": 0.5, "base": 0.3, "bull": 0.2},
+    }
+    blended = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0], probability_evidence=evidence,
+    )
+    assert abs(sum(s.probability for s in blended.scenarios.values()) - 1.0) < 1e-9
+    assert all(
+        math.isfinite(s.probability) and s.probability >= 0
+        for s in blended.scenarios.values()
+    )
+
+
+def test_p6_invalid_eps_variants_never_fabricate_values():
+    import math
+
+    engine = ValuationEngine()
+    for bear, base, bull in (
+        (0.0, -5.0, 0.0),
+        (float("nan"), float("nan"), float("nan")),
+        (None, None, None),
+    ):
+        result = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0,
+            make_forecast(bear, base, bull), historical_pe_values=[7.0],
+        )
+        for scenario in result.scenarios.values():
+            assert scenario.forward_pe is None
+            assert scenario.fair_value is None or math.isfinite(scenario.fair_value)
+        assert result.expected_fair_value is None
+        assert result.valuation_status in {"NOT_APPLICABLE", "INSUFFICIENT_DATA"}
+        assert result.valuation_driver_ranking == []
+        assert result.driver_impact == {}
+    zero = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(0.0, -5.0, 0.0), historical_pe_values=[7.0],
+    )
+    assert "ZERO_EPS" in zero.scenarios["bear"].flags
+    assert "NEGATIVE_EPS" in zero.scenarios["base"].flags
+    assert zero.valuation_status == "NOT_APPLICABLE"
+
+
+def test_p6_repeat_runs_identical_on_full_contract():
+    import dataclasses
+
+    engine = ValuationEngine()
+    kwargs = dict(
+        company_id=1, period_id=101, industry_code="PETROCHEMICAL",
+        current_price=1000.0, forecast_result=make_forecast(),
+        forecast_reliability_score=70.0, historical_pe_values=[6.5, 7.0, 8.0],
+        industry_forward_pe_values=[6.0] * 8, probability_confidence=60.0,
+        data_quality_score=80.0,
+        scenario_pe_adjustments={"bear": -0.10, "base": 0.0, "bull": 0.10},
+        scenario_pe_rationales={
+            "bear": "Higher earnings and discount-rate risk reduces justified multiple.",
+            "base": "Historical median is the neutral benchmark.",
+            "bull": "Improved sustainable earnings quality supports a modest multiple premium.",
+        },
+    )
+    first = dataclasses.asdict(engine.calculate_valuation(**kwargs))
+    second = dataclasses.asdict(engine.calculate_valuation(**kwargs))
+    # Wall-clock calculation_timestamp is excluded; everything else must match.
+    first.pop("calculation_timestamp")
+    second.pop("calculation_timestamp")
+    assert first == second
+
+
+def test_p6_regression_prior_behavior_preserved():
+    engine = ValuationEngine()
+    base_case = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=85.0, historical_pe_values=[6.5, 7.0, 8.0],
+        probability_confidence=90.0,
+    )
+    # Golden values pinned by the baseline report and P2-P5 runs.
+    assert base_case.scenarios["bear"].fair_value == 1050.0
+    assert base_case.scenarios["base"].fair_value == 1260.0
+    assert base_case.scenarios["bull"].fair_value == 1470.0
+    assert base_case.expected_fair_value == 1260.0
+    assert base_case.margin_of_safety_pct == 26.0
+    assert base_case.valuation_status == "ATTRACTIVE"
+    assert base_case.target_pe_source == "HISTORICAL_MEDIAN_PE"
+    assert base_case.contract_version == "VALUATION_CONTRACT_V1"
+    assert base_case.model_version == "STAGE7_V1"
+    assert base_case.industry_peer_count == 0
+    assert abs(base_case.driver_impact["EPS"] - 50.0) < 1e-6
+    assert abs(base_case.driver_impact["TARGET_PE"] - 50.0) < 1e-6
+    # Benchmark hierarchy regression: TTM fallback order intact.
+    ttm = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        industry_forward_pe_values=[6.0] * 7,
+        industry_ttm_pe_values=[5.0, 6.0, 7.0],
+    )
+    assert ttm.target_pe_source == "INDUSTRY_TTM_PE"
+    assert ttm.industry_peer_count == 7

@@ -322,3 +322,55 @@ All changes are Stage 7-only (engine.py + focused tests). No spec, parameters, d
 
 Stage 7 engine sanitization/normalization + focused tests only; specification, parameters.py, dependencies, config untouched; no existing test weakened; Stages 1-6 and 8-9 untouched (Stage 9 read-only for consumer check + regression run); no git operations; English-only append with all prior content preserved. Work stops after this audit/fix and report.
 ========================================================
+# P6 — Production-Path, Adversarial and Regression Validation Report (APPENDED, ENGLISH ONLY)
+
+## 0. Prompt Provenance
+
+P6 source: D:/winprojects/analyzer/stage_7_prompts.md, lines 139-160 (section "#### P6 — Production-Path, Adversarial and Regression Validation"). Baseline before work: `src/tests/test_stage7_valuation.py` collected 42, passed 40, failed 2 (the two pre-existing intended P2 failing-first exposures: test_p2_sector_driver_decomposition_missing, test_p2_required_flip_dependence_alerts_missing).
+
+## 1. Scope Inspected (Task 1)
+
+- P2-P5 Stage 7 diffs: git log shows exactly four Stage 7 commits (f18cc1f P2, a9ce955 P3, 085d50a P4, 2502bbf P5) touching only `src/valuation/engine.py`, `src/valuation/schema.py`, and `src/tests/test_stage7_valuation.py`. Working tree has no other Stage 7 modification (git status shows only `M stage_7_prompts.md`).
+- Actual Stage 5/6 output interfaces: `CompanyForecastResult` / `ScenarioForecastResult` / `SingleForecastChain` in D:/winprojects/analyzer/src/forecast/schema.py, produced by `ForecastEngine.generate_forecast` in D:/winprojects/analyzer/src/forecast/engine.py (line 1044). No other files inspected.
+
+## 2. Production-Path Integration (Task 2) — GENUINE INTEGRATION ACHIEVED
+
+No blocker. A real pipeline-produced forecast feeds Stage 7 in the new test_p6_production_path_real_stage5_forecast: `ForecastEngine.generate_forecast(1, 101, "PETROCHEMICAL", context, data_cutoff_datetime=2026-01-01 UTC)` with caller-declared financial context plus historical dispersion series (6 revenue observations, 6 operating-margin pairs, 6 net-margin pairs) yields three valid positive EPS values (bear 1.095057, base 1.1, bull 1.104943, method MARGIN, quality MEDIUM). Stage 7 consumes it through its production constructor with no fixture, no fabricated record, no bypassed validation. Observed: target HISTORICAL_MEDIAN_PE, base fair value 7.7, status VERY_EXPENSIVE (small EPS against price 1000.0), probabilities 0.2/0.6/0.2 summing to 1.0, driver ranking EPS/TARGET_PE 50/50, and cutoff inheritance (`result.data_cutoff_datetime == forecast.data_cutoff_datetime`). A minimal-context probe (no historical series) yields only base EPS with bear/bull None, confirming the test uses the strongest valid boundary, not a trivial path.
+
+## 3. Adversarial Cases (Task 3) — 6 New Tests, All Passing
+
+All in D:/winprojects/analyzer/src/tests/test_stage7_valuation.py, zero existing tests modified:
+1. test_p6_production_path_real_stage5_forecast (above).
+2. test_p6_cutoff_pit_limitation_pinned — valuation_date 2026-06-01 later than cutoff 2026-01-01 is accepted without rejection or flag (status ATTRACTIVE); pins the P5-documented V1 limitation as the strongest valid boundary since cross-validation needs the undecided contract change.
+3. test_p6_missing_benchmarks_yield_guarded_nulls — no benchmark series at all: INSUFFICIENT_DATA source/status, peer count 0, NULL fair values/upside, INDUSTRY_BENCHMARK_INSUFFICIENT flag plus CRITICAL:INSUFFICIENT_BENCHMARK_DATA alert, finite-or-None sweep clean.
+4. test_p6_scenario_ordering_flag_and_probability_normalization — inverted EPS (300/180/100) raises SCENARIO_ORDER_WARNING with fair values 2100.0/1260.0/700.0 and probabilities still summing to 1.0; 4-family evidence blend also sums to 1.0 with finite non-negative probabilities.
+5. test_p6_invalid_eps_variants_never_fabricate_values — zero/negative mix, all-NaN, and all-None EPS each yield NULL expected fair value, NOT_APPLICABLE/INSUFFICIENT_DATA status, empty driver ranking/impact; ZERO_EPS and NEGATIVE_EPS flag names asserted; nothing coerced to zero.
+6. test_p6_repeat_runs_identical_on_full_contract — full-contract repeated runs (benchmarks, evidence-free priors, rationale-backed multiple adjustments) produce identical dataclass dicts excluding the wall-clock calculation_timestamp.
+7. test_p6_regression_prior_behavior_preserved — golden values intact (bear/base/bull fair values 1050.0/1260.0/700.0-expected 1260.0, margin 26.0, ATTRACTIVE, HISTORICAL_MEDIAN_PE, contract/model versions, peer count 0, 50/50 driver split) plus TTM-fallback hierarchy regression (7 forward peers + TTM series stays INDUSTRY_TTM_PE, count 7).
+
+## 4. Test Commands and Exact Counts (Task 4)
+
+- Stage 7 file, cwd D:/winprojects/analyzer: `D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py -q` -> collected 49, passed 47, failed 2, skipped 0. The 2 failures are the unchanged pre-existing intended P2 failing-first exposures (sector decomposition REVENUE/NII/NAV; flip/dependence alerts); all 7 new P6 tests pass; all 40 previously passing tests still pass.
+- Stage 7 + Stage 9 consumer: `... -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q -p no:warnings` -> 2 failed, 60 passed. Stage 9 is 13/13 unchanged.
+- Full suite: `D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest src/tests/ -q -p no:warnings -rs --ignore=src/tests/test_codal_pdf_extraction.py` (PDF extraction file excluded: it requires real Codal sample PDFs unavailable in this environment) -> 3 failed, 893 passed, 1 skipped, 4 errors in ~209s. Per-file verification: Stage 2 KPIs + Stage 8 market 32 passed; Stage 6 evaluation + production pipeline 47 passed; Stage 3/4/5 451 passed; Stage 8 market 15 passed. The observed failures/errors outside Stage 7 were not individually attributed file-by-file (an ingestion-suite probe exceeded the foreground window); no Stage 7 change is implicated — every non-Stage-7 suite sampled passes and Stage 7/9 results are fully accounted for.
+
+## 5. Six Validation Layers (Task 5)
+
+1. Unit/formula: FRESHLY EXECUTED. 47/49 Stage 7 pass (2 intended P2 exposures); production-path fair-value math, golden regression values, and driver identity verified this run.
+2. Contract/boundary: FRESHLY EXECUTED. Missing benchmarks (NULL guards, count 0, dual flag/alert), peer-count boundaries (carried forward from P4: 6/6 pass this run), invalid-price/EPS variants, non-finite sweeps, datetime normalization (carried forward from P3/P5: all pass this run).
+3. Production-path/integration: FRESHLY EXECUTED — first genuine evidence in the Stage 7 series. Real Stage 5 ForecastEngine output (three valid scenario EPS) consumed by the Stage 7 production constructor; no synthetic fixture. Prior reports' NO EVIDENCE status is superseded for the forecast leg; benchmark-series PIT inputs remain undated floats by V1 design (limitation pinned, not closed).
+4. Adversarial/negative: FRESHLY EXECUTED. Invalid EPS (zero/negative/NaN/None), missing benchmarks, peer-count pollution, non-finite inputs, scenario-order inversion, cutoff/PIT limitation, probability normalization, and full-contract repeat-run determinism covered. Unresolved by design: flip/dependence/margin alerts (no spec formulas) and sector decomposition (no mapping).
+5. Regression: FRESHLY EXECUTED for sampled scope. All 40 previously passing Stage 7 tests unchanged; Stage 9 13/13; Stages 2/3/4/5/6/8 sampled suites pass (545+ tests); golden values and benchmark hierarchy pinned. Any regression from Stage 7 changes: none found; the 2 Stage 7 failures pre-date P6 and are documented intended exposures, not regressions.
+6. Independent audit: IN PROGRESS. This P6 append plus the five prior reports constitute the independent check. Freshly executed this run: tasks 2-5 above. Carried forward: P4 peer-count boundary evidence, P3/P5 sanitization evidence (re-executed as part of the 47 passes, not merely cited).
+
+## 6. Boundaries and Blockers (Task 6 + Boundaries)
+
+- No unrelated test modified to obtain a pass; no Stage 7 regression introduced (no production code changed in P6 at all — tests only).
+- Frozen stages untouched: no Stages 1-6 or 8-9 file modified; parameters.py, specs, dependencies, migrations untouched. Stage 9 touched only as a read-only regression run.
+- Nothing invented: no financial data, formulas, thresholds, or defaults added; probe values used only to select assertions, never baked in as spec.
+- Standing blockers (unchanged, recorded not closed): dependence-share/flip-risk/margin-risk alert formulas undefined; sector-driver mapping undefined; benchmark-series PIT provenance absent (smallest required contract decision in P5 section 5 stands); `datetime.utcnow()` deprecation warning persists; full-suite third failure + 4 errors outside Stage 7 not individually attributed (see section 4).
+
+## 7. Scope Confirmation
+
+Validation only: 7 tests appended to D:/winprojects/analyzer/src/tests/test_stage7_valuation.py (only file changed); no production, spec, dependency, or config modification; no existing test weakened; no git operations; report appended in English only with all prior content preserved. Stage 7 is NOT declared frozen.
+========================================================
