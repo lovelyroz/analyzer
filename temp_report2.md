@@ -374,3 +374,47 @@ All in D:/winprojects/analyzer/src/tests/test_stage7_valuation.py, zero existing
 
 Validation only: 7 tests appended to D:/winprojects/analyzer/src/tests/test_stage7_valuation.py (only file changed); no production, spec, dependency, or config modification; no existing test weakened; no git operations; report appended in English only with all prior content preserved. Stage 7 is NOT declared frozen.
 ========================================================
+# P7 — Independent Final Audit and Freeze Gate Report (APPENDED, ENGLISH ONLY)
+
+## 0. Prompt Provenance
+
+P7 source: D:/winprojects/analyzer/stage_7_prompts.md, lines 162-193 (section "#### P7 — Independent Final Audit and Freeze Gate"). Read-only execution; no source, test, spec, dependency, or config file was modified. Working tree was clean before work and remains clean apart from this appended report. No commits, pushes, pulls, branch changes, GitHub/API, or remote operations. Frozen-stage boundary verified via git history: P2-P6 commits touch only src/valuation/engine.py, src/valuation/schema.py, src/tests/test_stage7_valuation.py, stage_7_prompts.md, and temp_report2.md.
+
+## 1. Independent Formula Trace (Requirement 1)
+
+Traced engine.py against 07_Stage7_Valuation.md without relying on prior PASS labels. Conformant: Forward P/E = price / EPS per scenario (sections 4-5); invalid EPS yields NULL with NEGATIVE_EPS/ZERO_EPS/SIGN_CHANGE/NOT_APPLICABLE flags and no fabricated fair value (section 6); benchmark hierarchy INDUSTRY_FORWARD_PE -> HISTORICAL_MEDIAN_PE -> INDUSTRY_TTM_PE with 8-peer gate, median priority, no Forward/TTM pooling (sections 10-13); neutral 1.0 scenario multiples with bounded (+/-0.20) rationale-backed adjustments instead of a fixed 0.8/1.2 rule (section 17); direct probability adjustments rejected, family-level evidence blended at 0.25 onto the 20/60/20 prior (sections 22-24); reliability never multiplies P/E or fair value (section 16); status/risk/confidence computed independently (sections 34-39). Confirmed dead parameter: ALERT_THRESHOLDS high_dependence_share (0.60) is defined in parameters.py line 72 and referenced nowhere in src/valuation. Confirmed metadata-only inputs: industry_code and nav_per_share are echoed to metadata and never enter any calculation; models.py calculate_nav_fair_value is legacy and unwired.
+
+## 2. Invariants and Boundaries (Requirement 2)
+
+Verified by passing tests this run: probability sums to 1.0 incl. 4-family blends and inverted-EPS ordering (flag SCENARIO_ORDER_WARNING raised, never reordered); golden values bear/base/bull 1050.0/1260.0/700.0-expected 1260.0 margin 26.0 ATTRACTIVE match the baseline assertions; peer count emitted and consistent with selected source (7->fallback, 8->INDUSTRY_FORWARD_PE); NaN/inf/None/zero/negative inputs sanitized at every numeric entry point with finite-or-None sweeps; datetime echoes normalized to UTC-aware with cutoff inheritance; full-contract repeat runs identical excluding wall-clock calculation_timestamp; model/contract versions STAGE7_V1 / VALUATION_CONTRACT_V1 pinned. PIT limitation re-confirmed: benchmark series arrive as undated floats and valuation_date later than data_cutoff_datetime is accepted without flag (pinned test asserts ATTRACTIVE with no PIT flag) — metadata claim only, not enforcement.
+
+## 3. Test Quality Review (Requirement 3)
+
+Reviewed all 49 tests by section. No false positives: the 2 failures fail for the right reason (asserted alert names absent from combined alert/flag vocabulary; asserted sector drivers not subset of {EPS, TARGET_PE}). No tautological assertions found: boundary tests assert both sides (reliability fires at 39.9, silent at 40.0 and None; dispersion fires above 0.50, silent exactly at 0.50 verified to 1e-9); median provenance checked against statistics.median; determinism via repeated runs and full-dataclass comparison. No weakening: diff of the test file against the baseline commit is purely additive (848 insertions, zero deleted assertions). Honest caveat preserved from P2: boundary tests pin engine-chosen cutoffs (40.0/0.50/1.50) not stated in spec sections 41-53, so they pin behavior, not spec conformance.
+
+## 4. Test Commands, Counts, Environment (Requirement 4)
+
+Cwd D:/winprojects/analyzer, interpreter D:/winprojects/analyzer/.venv/Scripts/python.exe (Python 3.12.9, pytest 9.1.1):
+- Stage 7 file: -m pytest src/tests/test_stage7_valuation.py -q -p no:warnings -> collected 49, passed 47, failed 2, skipped 0. Both failures are the pre-existing intended P2 failing-first exposures, unchanged since P2.
+- Stage 7 + Stage 9 consumer: -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q -p no:warnings -> 2 failed, 60 passed (Stage 9 13/13).
+- Full suite: -m pytest src/tests/ -q -p no:warnings -rs --ignore=src/tests/test_codal_pdf_extraction.py -> 2 failed, 897 passed, 1 skipped, 0 errors in 143.51s. Skip reason: test_codal_extraction.py:307, real Codal sample PDF not available in CI. PDF-extraction file excluded: requires real Codal sample PDFs unavailable in this environment. Note: the unattributed third failure + 4 errors reported in the P6 full-suite run did not recur; with identical code the only failures are the two known Stage 7 exposures. Pre-existing cosmetic warning (datetime.utcnow DeprecationWarning, engine.py:212) persists.
+
+## 5. Classified Findings (Requirement 5)
+
+- BLOCKER-1: Required flip/dependence alert family absent. ASSESSMENT_FLIP_RISK, HIGH_MULTIPLE_DEPENDENCE, HIGH_EPS_DEPENDENCE, MARGIN_ASSUMPTION_RISK, HIGH_IMPACT_HIGH_UNCERTAINTY cannot be produced by any input (proven by failing test_p2_required_flip_dependence_alerts_missing; 10% EPS shock demonstrably flips ATTRACTIVE to FAIR with no alert). Spec sections 49-53 and stress tests 77-79 require them but define no dependence-share formula, flip-risk perturbation, impact/uncertainty cutoffs, or margin trigger (P2 blockers 1-7 stand). Proven absence; root cause is specification ambiguity, but freeze conformance fails regardless.
+- BLOCKER-2: Sector driver decomposition absent. Ranking is always {EPS, TARGET_PE}; REVENUE/NII/NAV chains (sections 42-44) unimplemented (proven by failing test_p2_sector_driver_decomposition_missing). No industry-to-driver mapping or linkage formula exists in the spec.
+- MATERIAL-1: Alert vocabulary mismatch. Engine emits VALUATION_ABOVE/BELOW_TARGET_PE vs required VALUATION_BENCHMARK_DIVERGENCE (section 49), and FORWARD_PE_ABOVE/BELOW_HISTORICAL/INDUSTRY vs required HISTORICAL/INDUSTRY_VALUATION_DIVERGENCE (sections 54-55). No mapping defined.
+- MATERIAL-2: PIT cross-validation absent. Undated benchmark floats plus unchecked valuation_date-vs-cutoff need the contract decision recorded in P5 section 5 (per-value provenance or caller attestation; reject/flag/accept rule). Not closable without upstream contract change.
+- MINOR-1: Confidence/risk/dispersion blend constants (0.40/0.20 weights, dispersion slope and cap) are hardcoded in engine.py rather than versioned parameters (sections 64-65 cover thresholds, which are versioned; the blend weights are not). Cosmetic utcnow() deprecation warning persists.
+- DOCUMENTED LIMITATION: Production-path evidence covers the forecast leg (real Stage 5 ForecastEngine output consumed, cutoff inherited); the benchmark PIT leg remains fixture-based by V1 design.
+
+## 6. Verdict (Requirement 6)
+
+NOT READY FOR FREEZE
+
+Two red tests assert absent required behavior, and the missing behaviors cannot be implemented without spec formulas that do not exist. Freezing now would certify conformance the evidence contradicts. Path to readiness: either the locked specification defines the dependence-share, flip-risk, impact/uncertainty, margin-risk, and sector-mapping formulas (then implement + green the two tests), or an explicit scope decision defers those requirements out of V1 with the stress-test claims corrected. This verdict is an audit finding, not a freeze declaration.
+
+## 7. Scope Confirmation
+
+Read-only audit: inspected the spec, Stage 7 sources, all 49 Stage 7 tests, and the P2-P6 reports; ran only the stated pytest commands; verified frozen-stage boundaries via git history; invented no data, formulas, thresholds, or defaults. This English-only append preserves all earlier reports. Work stops after validation and reporting; Stage 7 is NOT declared frozen.
+========================================================
