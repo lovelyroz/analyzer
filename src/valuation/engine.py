@@ -2,7 +2,7 @@ import math
 from datetime import datetime
 from typing import Dict, List, Optional, Sequence
 
-from src.forecast.schema import CompanyForecastResult
+from src.forecast.schema import CompanyForecastResult, normalize_datetime
 from src.valuation.models import (
     calculate_forward_pe,
     calculate_forward_pe_fair_value,
@@ -98,6 +98,14 @@ class ValuationEngine:
             valid_forward_count,
         )
 
+        probability_confidence = _finite_or_none(probability_confidence)
+        if probability_confidence is None:
+            probability_confidence = 50.0
+        valuation_date = normalize_datetime(valuation_date)
+        market_price_date = normalize_datetime(market_price_date)
+        if data_cutoff_datetime is None:
+            data_cutoff_datetime = forecast_result.data_cutoff_datetime
+        data_cutoff_datetime = normalize_datetime(data_cutoff_datetime)
         probabilities, probability_meta = self._resolve_probabilities(
             probability_adjustments=probability_adjustments,
             probability_evidence=probability_evidence,
@@ -138,7 +146,7 @@ class ValuationEngine:
             flags.extend(scenario_flags)
 
         expected_fv = self._expected_fair_value(scenarios)
-        expected_upside = calculate_margin_of_safety(expected_fv, current_price)
+        expected_upside = calculate_margin_of_safety(expected_fv, price)
         base_upside = scenarios["base"].upside_downside_pct
         scenario_dispersion = self._scenario_dispersion(scenarios)
 
@@ -150,7 +158,7 @@ class ValuationEngine:
         if self._scenario_order_warning(scenarios):
             flags.append("SCENARIO_ORDER_WARNING")
 
-        reliability = forecast_reliability_score
+        reliability = _finite_or_none(forecast_reliability_score)
         if reliability is not None and reliability < ALERT_THRESHOLDS["low_forecast_reliability"]:
             flags.append("LOW_FORECAST_RELIABILITY")
         if forward_values and valid_forward_count < MIN_INDUSTRY_PEERS:
@@ -219,7 +227,7 @@ class ValuationEngine:
             driver_impact=driver_impact,
             driver_uncertainty=driver_uncertainty,
             review_priority=review_priority,
-            valuation_data_quality=max(0.0, min(100.0, data_quality_score)),
+            valuation_data_quality=_clamp_score(data_quality_score, 100.0),
             contract_version=CONTRACT_VERSION,
             metadata={
                 "industry_code": industry_code,
@@ -278,7 +286,7 @@ class ValuationEngine:
                 if set(evidence) != set(values):
                     raise ValueError(f"Evidence family {family} must provide bear/base/bull scores")
                 scores = {name: float(evidence[name]) for name in values}
-                if any(score < 0 or score > 1 for score in scores.values()):
+                if any(not math.isfinite(score) or score < 0 or score > 1 for score in scores.values()):
                     raise ValueError(f"Evidence family {family} scores must be in [0, 1]")
                 total = sum(scores.values())
                 if total <= 0:
@@ -332,6 +340,8 @@ class ValuationEngine:
         rationales = scenario_pe_rationales or {}
         for name, adjustment in scenario_pe_adjustments.items():
             value = float(adjustment)
+            if not math.isfinite(value):
+                raise ValueError(f"Scenario multiple adjustment for {name} must be finite")
             if abs(value) > SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT:
                 raise ValueError(f"Scenario multiple adjustment for {name} exceeds V1 bound")
             if name != "base" and not str(rationales.get(name, "")).strip():

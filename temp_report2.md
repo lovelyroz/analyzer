@@ -271,3 +271,54 @@ None for P4 scope. Nothing invented: the count is a deterministic count of calle
 
 Stage 7 schema + engine wiring + focused tests only; parameters.py, specs, dependencies, config untouched; no existing test weakened; Stages 1-6 and 8-9 untouched (Stage 9 only read for compatibility and regression-tested); no git operations; English-only append with all prior content preserved. Work stops after this bounded change and report.
 ========================================================
+# P5 — Point-in-Time and Adversarial Input Audit Report (APPENDED, ENGLISH ONLY)
+
+## 0. Prompt Provenance
+
+P5 source: D:/winprojects/analyzer/stage_7_prompts.md, lines 108-137 (section "#### P5 — Point-in-Time and Adversarial Input Audit"). Baseline before work: `src/tests/test_stage7_valuation.py` collected 32, passed 30, failed 2 (the two pre-existing intended P2 failing-first exposures: test_p2_sector_driver_decomposition_missing, test_p2_required_flip_dependence_alerts_missing).
+
+## 1. PIT Input Trace (Task 1)
+
+- Stage 7 V1 benchmark inputs (`historical_pe_values`, `industry_forward_pe_values`, `industry_ttm_pe_values`) arrive as plain undated floats. No observation dates, publication timestamps, report versions, or per-value cutoff metadata cross the Stage 7 boundary, so the engine cannot verify PIT validity of the series themselves. It records medians plus the forward-only peer count (`industry_peer_count`) and a passthrough cutoff; `metadata["pit_inputs_required"] = True` is a metadata claim, not enforcement.
+- Forecast EPS inputs inherit Stage 5/6 PIT machinery (`CompanyForecastResult.data_cutoff_datetime`, `ForecastInputRef.available_at`, `normalize_datetime` folding naive datetimes to UTC, `ForecastVersionStore.read_at_cutoff`), but Stage 7 dereferences only `scenario_forecasts.*.eps` plus `data_cutoff_datetime` — the per-input `available_at` refs are not passed and never checked.
+- `valuation_date` / `market_price_date` are echoed, never cross-checked against the cutoff: a valuation dated 2026-06-01 with cutoff 2026-01-01 is accepted without rejection or flag (asserted in test_p5_undated_benchmark_series_carry_no_provenance as the reported V1 limitation). No historical records, dates, or provenance were invented; the smallest required contract decision is recorded in section 5 as a blocker.
+
+## 2. Demonstrable Gaps Closed (Tasks 2-3, 5)
+
+All changes are Stage 7-only (engine.py + focused tests). No spec, parameters, dependency, config, Stage 1-6/8-9, or existing-test modification.
+- D:/winprojects/analyzer/src/valuation/engine.py:
+  1. `expected_upside` computed from sanitized `price` (was raw `current_price`): NaN/inf/None price now yields NULL upside with INSUFFICIENT_DATA status instead of NaN margin leaking into `metadata["expected_upside"]` (Stage 9 reads this field).
+  2. `forecast_reliability_score` sanitized via `_finite_or_none`: NaN/inf echo no longer leaks into the output; non-finite reliability falls back to the P3 default path and cannot trigger a false LOW_FORECAST_RELIABILITY alert.
+  3. `probability_confidence` non-finite/None now defaults to 50.0 before echo and downstream use (previously echoed NaN verbatim into the contract).
+  4. Datetime echoes normalized to UTC-aware via Stage 5/6 `normalize_datetime`: valuation_date, market_price_date, and data_cutoff_datetime (the last inheriting `forecast_result.data_cutoff_datetime` when not supplied) are mutually comparable; mixed naive/aware inputs no longer risk TypeError downstream.
+  5. `data_quality_score` None/NaN/out-of-range now flows through `_clamp_score` (None/NaN -> 100.0, clamped to 0-100) instead of raising TypeError on None or echoing NaN.
+  6. Non-finite scenario multiple adjustments rejected with "must be finite" ValueError (previously `float(nan)` passed the bound check and silently poisoned target P/E).
+  7. NaN probability-evidence scores rejected: `not math.isfinite(score)` added to the [0,1] guard (previously NaN passed every comparison and produced NaN probabilities summing to NaN).
+- D:/winprojects/analyzer/src/tests/test_stage7_valuation.py: 10 P5 tests appended, zero existing tests modified. 8 of 10 failed failing-first against the pre-fix engine (reliability echo, pc echo, quality crash, finite-adjustment, evidence-NaN, 2 datetime normalization, expected-upside NaN); missing-EPS and undated-provenance tests passed pre-fix and document enforced vs metadata-only behavior. A finite-or-None sweep helper asserts no NaN leaks across all numeric outputs.
+
+## 3. Validation (Task 4 + Validation section)
+
+- Focused P5 subset, cwd D:/winprojects/analyzer: `D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py -q -k "p5"` -> 10 passed, 32 deselected.
+- Full Stage 7 file: same command without -k -> collected 42, passed 40, failed 2, skipped 0. The 2 failures are the unchanged pre-existing intended P2 exposures; all 10 new P5 tests pass and all 30 previously passing tests still pass.
+- Directly relevant existing contract tests (Stage 9 consumer, read-only, unmodified): `D:/winprojects/analyzer/.venv/Scripts/python.exe -m pytest src/tests/test_stage9_decision.py -q` -> 13 passed. Stage 9 reads only sanitized `metadata["expected_upside"]`/`margin_of_safety_pct`, never the raw price echo, so leaving the echo field untouched is safe.
+- Deterministic behavior preserved: datetime normalization and repeated-run equality asserted; valid calculations unchanged (base fair value 1260.0, ATTRACTIVE status, driver 50/50 split intact).
+
+## 4. Six Validation Layers
+
+1. Unit/formula: EXECUTED. 40/42 pass; the 2 failures are the intended P2 exposures, not P5 regressions. Median/hierarchy/probability/EPS-NULL math untouched.
+2. Contract/boundary: EXECUTED for P5 scope. NaN/inf/None price, missing/None EPS, NaN reliability/pc/quality, NaN evidence, non-finite adjustments, naive/aware/missing datetimes, and undated-series provenance covered.
+3. Production-path/integration: NOT VERIFIABLE with available infrastructure. All tests use the synthetic make_forecast fixture; no run on real Stage 5/6 outputs.
+4. Adversarial/negative: EXECUTED for P5 scope. Every numeric entry point now rejects or sanitizes NaN/inf; datetime mixing normalized. Still absent by V1 design: valuation-date-vs-cutoff cross-check (blocker below).
+5. Regression: EXECUTED. All 30 previously passing Stage 7 tests unchanged; Stage 9 suite 13/13; hierarchy, probabilities, invalid-EPS NULL rule, fair-value behavior untouched.
+6. Independent audit: IN PROGRESS. This P5 append documents the trace, the exact diff, test evidence, verified-vs-claimed PIT separation, and the blocker; no unexecuted test claimed as passed.
+
+## 5. Blockers (Nothing Invented)
+
+- PIT cross-validation absent by V1 design and NOT closed here per P5 task 4 (no upstream redesign): Stage 7 cannot establish whether undated benchmark floats or a valuation_date later than data_cutoff_datetime are PIT-valid. Smallest required contract decision: add per-value observation/publication metadata to the three benchmark series (or an explicit caller attestation that they are PIT-valid at the cutoff), plus a decision on whether valuation_date > data_cutoff_datetime must reject, flag, or remain accepted. Recorded, not implemented.
+- Out of P5 scope, unchanged: dependence-share/flip-risk/margin-risk alerts still lack spec formulas (P2/P3 blockers stand); `datetime.utcnow()` deprecation warning persists; sector driver decomposition (REVENUE/NII/NAV) still absent.
+- Missing-data handling verified, not defaulted: missing EPS yields NOT_APPLICABLE/NULL (never zero); missing price yields NULL upside with fair value preserved; nothing silently converted to zero.
+
+## 6. Scope Confirmation
+
+Stage 7 engine sanitization/normalization + focused tests only; specification, parameters.py, dependencies, config untouched; no existing test weakened; Stages 1-6 and 8-9 untouched (Stage 9 read-only for consumer check + regression run); no git operations; English-only append with all prior content preserved. Work stops after this audit/fix and report.
+========================================================

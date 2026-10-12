@@ -658,3 +658,215 @@ def test_p4_benchmark_fallback_ignores_forward_count_for_ttm():
     assert result.target_pe_source == "INDUSTRY_TTM_PE"
     assert result.scenarios["base"].target_pe == 6.0
     assert result.industry_ttm_pe_median == 6.0
+
+
+# P5 additions: PIT and adversarial input audit. Existing tests above untouched.
+def _assert_all_p5_outputs_finite_or_none(result):
+    import math
+
+    values = [
+        result.expected_fair_value,
+        result.margin_of_safety_pct,
+        result.valuation_confidence,
+        result.valuation_data_quality,
+        result.forecast_reliability_score,
+        result.probability_confidence,
+        result.historical_median_pe,
+        result.industry_forward_pe_median,
+        result.industry_ttm_pe_median,
+    ]
+    for scenario in result.scenarios.values():
+        values.extend((
+            scenario.target_pe,
+            scenario.eps_forecast,
+            scenario.forward_pe,
+            scenario.fair_value,
+            scenario.upside_downside_pct,
+            scenario.probability,
+        ))
+    values.extend(result.driver_impact.values())
+    values.extend(result.driver_uncertainty.values())
+    values.extend(result.review_priority.values())
+    for value in values:
+        assert value is None or math.isfinite(value), f"non-finite output leaked: {value!r}"
+
+
+def test_p5_nonfinite_price_yields_null_outputs():
+    engine = ValuationEngine()
+    for price in (float("nan"), float("inf"), -float("inf"), None):
+        result = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", price, make_forecast(),
+            historical_pe_values=[7.0],
+        )
+        for scenario in result.scenarios.values():
+            assert scenario.forward_pe is None
+            assert scenario.upside_downside_pct is None
+        assert result.margin_of_safety_pct is None
+        assert result.valuation_status == "INSUFFICIENT_DATA"
+        # Fair value (EPS x target P/E) needs no price and stays valid.
+        assert result.scenarios["base"].fair_value == 1260.0
+        _assert_all_p5_outputs_finite_or_none(result)
+
+
+def test_p5_missing_eps_is_not_applicable_not_zero():
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(None, None, None), historical_pe_values=[7.0],
+    )
+    for scenario in result.scenarios.values():
+        assert scenario.forward_pe is None
+        assert scenario.fair_value is None
+        assert "NOT_APPLICABLE" in scenario.flags
+    assert result.expected_fair_value is None
+    assert result.valuation_status in {"NOT_APPLICABLE", "INSUFFICIENT_DATA"}
+    assert result.valuation_driver_ranking == []
+    _assert_all_p5_outputs_finite_or_none(result)
+
+
+def test_p5_nonfinite_reliability_echo_sanitized():
+    engine = ValuationEngine()
+    for bad in (float("nan"), float("inf"), -float("inf")):
+        result = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+            forecast_reliability_score=bad, historical_pe_values=[7.0],
+        )
+        assert result.forecast_reliability_score is None
+        assert "LOW_FORECAST_RELIABILITY" not in result.valuation_risk_flags
+        assert not any("LOW_FORECAST_RELIABILITY" in alert for alert in result.alerts)
+        _assert_all_p5_outputs_finite_or_none(result)
+    defaulted = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=None, historical_pe_values=[7.0],
+    )
+    guarded = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        forecast_reliability_score=float("nan"), historical_pe_values=[7.0],
+    )
+    assert guarded.valuation_confidence == defaulted.valuation_confidence
+    assert guarded.driver_uncertainty == defaulted.driver_uncertainty
+
+
+def test_p5_nonfinite_probability_confidence_echo_finite():
+    engine = ValuationEngine()
+    for bad in (float("nan"), float("inf"), -float("inf"), None):
+        result = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+            historical_pe_values=[7.0], probability_confidence=bad,
+        )
+        assert result.probability_confidence == 50.0
+        _assert_all_p5_outputs_finite_or_none(result)
+    defaulted = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0], probability_confidence=50.0,
+    )
+    guarded = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0], probability_confidence=float("nan"),
+    )
+    assert guarded.driver_uncertainty == defaulted.driver_uncertainty
+    assert guarded.valuation_confidence == defaulted.valuation_confidence
+
+
+def test_p5_missing_data_quality_does_not_crash():
+    engine = ValuationEngine()
+    for quality, expected in ((None, 100.0), (float("nan"), 100.0), (150.0, 100.0), (-20.0, 0.0)):
+        result = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+            historical_pe_values=[7.0], data_quality_score=quality,
+        )
+        assert result.valuation_data_quality == expected
+        _assert_all_p5_outputs_finite_or_none(result)
+    missing = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0], data_quality_score=None,
+    )
+    full = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0], data_quality_score=100.0,
+    )
+    assert missing.valuation_confidence == full.valuation_confidence
+
+
+def test_p5_nonfinite_multiple_adjustment_rejected():
+    import pytest as _pytest
+
+    engine = ValuationEngine()
+    for bad in (float("nan"), float("inf"), -float("inf")):
+        with _pytest.raises(ValueError, match="finite|bound"):
+            engine.calculate_valuation(
+                1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+                historical_pe_values=[7.0],
+                scenario_pe_adjustments={"bull": bad},
+                scenario_pe_rationales={"bull": "Probe of non-finite input handling."},
+            )
+
+
+def test_p5_nan_probability_evidence_rejected():
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="must be in"):
+        ValuationEngine().calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+            historical_pe_values=[7.0],
+            probability_evidence={"FUNDAMENTAL_DIRECTION": {"bear": float("nan"), "base": 0.5, "bull": 0.5}},
+        )
+
+
+def test_p5_datetime_echoes_normalized_to_utc():
+    from datetime import datetime, timedelta, timezone
+
+    engine = ValuationEngine()
+    naive = datetime(2026, 3, 15, 12, 0, 0)
+    aware = datetime(2026, 3, 15, 12, 0, 0, tzinfo=timezone(timedelta(hours=3, minutes=30)))
+    kwargs = dict(
+        company_id=1, period_id=101, industry_code="PETROCHEMICAL",
+        current_price=1000.0, forecast_result=make_forecast(),
+        historical_pe_values=[7.0], valuation_date=naive,
+        market_price_date=aware, data_cutoff_datetime=naive,
+    )
+    result = engine.calculate_valuation(**kwargs)
+    assert result.valuation_date == datetime(2026, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
+    assert result.market_price_date == aware.astimezone(timezone.utc)
+    assert result.data_cutoff_datetime == datetime(2026, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
+    # Mixed naive/aware inputs are mutually comparable after normalization.
+    assert (result.valuation_date <= result.market_price_date) or (result.valuation_date > result.market_price_date)
+    again = engine.calculate_valuation(**kwargs)
+    assert again.valuation_date == result.valuation_date
+    assert again.market_price_date == result.market_price_date
+    assert again.data_cutoff_datetime == result.data_cutoff_datetime
+
+
+def test_p5_default_cutoff_inherits_forecast_cutoff_normalized():
+    from datetime import datetime, timezone
+
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0],
+    )
+    assert result.data_cutoff_datetime == datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+def test_p5_undated_benchmark_series_carry_no_provenance():
+    from datetime import datetime
+
+    # Stage 7 V1 benchmark inputs are plain floats: no observation dates,
+    # publication timestamps, report versions, or per-value cutoff metadata
+    # cross the boundary. The engine records medians and the forward-only
+    # peer count plus a passthrough cutoff; it cannot verify PIT validity
+    # of the series itself. valuation_date/market_price_date are echoed,
+    # never cross-checked against the cutoff (reported contract limitation).
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[6.5, 7.0, 8.0],
+        industry_forward_pe_values=[6.0] * 8,
+        valuation_date=datetime(2026, 6, 1),
+        market_price_date=datetime(2026, 6, 1),
+        data_cutoff_datetime=datetime(2026, 1, 1),
+    )
+    assert result.historical_median_pe == 7.0
+    assert result.industry_forward_pe_median == 6.0
+    assert result.industry_peer_count == 8
+    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
+    # A valuation date after the cutoff is accepted without rejection or
+    # flag: cross-validation is absent by design in V1.
+    assert result.valuation_status == "FAIR"

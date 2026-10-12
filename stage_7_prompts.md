@@ -105,3 +105,34 @@ Run focused tests and the complete Stage 7 valuation test file. Check serializat
 
 Append the report to `temp_report2.md`. Do not modify Stages 1–6, Stages 8–9, or unrelated contracts. No remote Git operations. Stop after the bounded change and report.
 ==========================================================
+#### P5 — Point-in-Time and Adversarial Input Audit
+
+Work only in the local project folder `analyzer`. Read the latest Stage 7 reports in `temp_report2.md`.
+
+## Objective
+
+Audit and close only demonstrable Stage 7 input-validation gaps involving PIT metadata and invalid numerical inputs.
+
+## Inspect only
+
+* `07_Stage7_Valuation.md`, especially sections 56–63
+* `src/valuation/engine.py`
+* `src/valuation/models.py`
+* `src/valuation/schema.py`
+* `src/tests/test_stage7_valuation.py`
+* Stage 5/6 interfaces only if needed to verify the actual input contract; do not modify them.
+
+## Tasks
+
+1. Trace whether historical benchmark inputs carry dates, publication timestamps, report versions, and cutoff metadata, or arrive as undated numbers.
+2. Test zero/negative prices, NaN/infinity, missing values, invalid reliability/data-quality values, and naive/aware datetime handling wherever these inputs are accepted.
+3. Reject or explicitly flag invalid inputs when required by the existing contract. Do not silently convert missing values to zero or claim that undated historical values are PIT-safe.
+4. Do not invent historical records, report versions, dates, or provenance. If the current interface cannot establish PIT validity, report the limitation and the smallest required contract decision; do not redesign upstream stages.
+5. Preserve existing valid calculations and deterministic behavior.
+
+## Validation
+
+Use focused tests for each changed boundary, run the complete Stage 7 test file, and run any directly relevant existing contract tests without modifying them. Report exact commands and counts. Clearly separate verified PIT enforcement from metadata-only claims.
+
+Append the report to `temp_report2.md`. Do not change the Stage 7 specification or frozen stages in this prompt. No remote Git operations. Stop after the audit/fix and report.
+===========================================================
