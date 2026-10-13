@@ -596,3 +596,98 @@ Append a `P16 — Stage 7 Unresolved-Decision Gate Report` section to `temp_repo
 
 No source or specification edits, no remote Git operations, no commits, pushes, pulls, or branch changes. Do not freeze Stage 7. Stop after appending the report.
 ======================================================================
+# P17 — Stage 7 Specification Correction Draft (READ-ONLY)
+
+You are working in the local project folder `analyzer`.
+
+## Objective
+
+Prepare an evidence-backed draft of the minimum documentation corrections needed to prevent the Stage 7 V1 specification from claiming behavior that the current implementation does not enforce.
+
+## Scope
+
+Inspect only:
+
+* `temp_report2.md`, especially P11-P16
+* Relevant passages in `07_Stage7_Valuation.md`: sections 42-57, 64-65, 69, and stress tests 77-79 and 85
+* `src/valuation/engine.py`
+* `src/valuation/schema.py`
+* `src/tests/test_stage7_valuation.py`
+
+Do not perform repository-wide exploration.
+
+## Required analysis
+
+1. Identify each specification statement or stress-test PASS claim that overstates implemented behavior.
+2. For each item, provide:
+
+   * Exact section or test identifier
+   * Evidence from the current implementation and tests
+   * Proposed replacement wording
+   * Whether the change would defer a V1 requirement, narrow a guarantee, or merely correct a factual claim
+   * Any financial-correctness or compatibility consequence
+3. Cover at least:
+
+   * Flip-risk and dependence alerts
+   * Sector-driver decomposition and P/NAV
+   * Point-in-Time provenance and stress test 85
+   * Alert-name and trigger mismatches
+   * Parameter-version registry requirements
+4. Do not silently mark a required feature as implemented or remove a requirement merely because it is difficult.
+5. Separate corrections that are factually mandatory from optional V1-to-V2 deferrals that require explicit user approval.
+6. Do not modify the specification, tests, source, or configuration. Do not choose unresolved D1-D9 decisions on the user's behalf.
+
+## Six-layer validation
+
+Report all six layers: unit/formula, contract/boundary, production-path/integration, adversarial/negative, regression/full suite, and independent audit. Mark runtime testing as not applicable where appropriate for this documentation-only task; distinguish static verification from executed tests.
+
+## Reporting
+
+Append `P17 — Stage 7 Specification Correction Draft Report` to `temp_report2.md`. Include a proposed patch-style draft for review, but do not apply it.
+
+No remote Git operations, commits, pushes, pulls, branch changes, or test weakening. Stage 7 remains unfrozen. Stop after reporting.
+============================================================
+# P18 — Stage 7 Decision-Independent Work Inventory (READ-ONLY)
+
+You are working in the local project folder `analyzer`.
+
+## Objective
+
+Identify whether any meaningful Stage 7 implementation or validation work can proceed safely without resolving the outstanding decisions D1-D9.
+
+## Scope
+
+Use `temp_report2.md` P11-P17 and inspect only the Stage 7 specification passages, valuation implementation, schema, parameters, and focused tests necessary to verify each candidate.
+
+Do not perform a repository-wide review.
+
+## Required work
+
+1. Build a candidate list of outstanding Stage 7 tasks.
+2. For every candidate, classify it as exactly one of:
+
+   * `SAFE TO IMPLEMENT NOW`: the required behavior, formula, and acceptance criteria are explicitly defined; no unresolved D1-D9 decision is needed.
+   * `SAFE TO TEST ONLY`: behavior is specified, but implementation would require an additional investigation or contract confirmation.
+   * `BLOCKED ON USER DECISION`: a formula, threshold, mapping, severity, contract change, date policy, or version-selection rule remains unresolved.
+   * `DOCUMENTATION ONLY`: the change concerns correcting a false claim or accurately documenting a known limitation.
+3. For each candidate, state:
+
+   * Exact specification section
+   * Relevant implementation location
+   * Required scope and files
+   * Dependencies on other decisions
+   * Tests required, including boundary and adversarial cases
+   * Whether a public output or contract version change may be required
+4. Re-verify the two known P2 failing-first tests. Do not remove, weaken, skip, or rewrite them.
+5. Do not implement anything in this prompt. In particular, do not infer missing financial formulas, thresholds, industry mappings, or PIT policy.
+6. If no substantive implementation is safe without user decisions, state that explicitly rather than manufacturing work.
+
+## Six-layer validation
+
+Report unit/formula, contract/boundary, production-path/integration, adversarial/negative, regression/full suite, and independent audit separately. Clearly distinguish executed tests from static review, carried-forward evidence, and blocked work.
+
+## Reporting
+
+Append `P18 — Stage 7 Decision-Independent Work Inventory Report` to `temp_report2.md`, preserving all previous content.
+
+No source, test, or specification changes. No remote Git operations, commits, pushes, pulls, or branch changes. Do not freeze Stage 7. Stop after reporting.
