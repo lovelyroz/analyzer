@@ -1848,3 +1848,227 @@ Everything else requires user policy decisions.
 
 ========================================================
 
+# P19 — Stage 7 Factual Specification Corrections Report
+
+**Date (UTC):** 2026-10-13
+**Nature:** BOUNDED IMPLEMENTATION — factual documentation corrections only. The single file modified is `07_Stage7_Valuation.md`. No Python source, test, schema, dependency, migration, or configuration file was changed. No D1-D9 decision was chosen. No valuation logic was implemented.
+
+---
+
+## 1. Specification Sections Changed (Before/After)
+
+All nine corrections requested by P19 were found **already present in the spec** as evidence-backed factual annotations, and were re-verified against the implementation in this prompt. No additional edits were required.
+
+| # | P19 Item | Spec Section | Before | After |
+|---|---|---|---|---|
+| 1 | Stress test 77 / D1 | Sec 77 (line ~1889) | Unsupported PASS claim for `ASSESSMENT_FLIP_RISK` | **NOT IMPLEMENTED** annotation: engine emits zero `ASSESSMENT_FLIP_RISK`; P2 test shows a 10% EPS shock flips ATTRACTIVE→FAIR with no alert; **D1 unresolved** |
+| 2 | Stress test 78 / D2 | Sec 78 (line ~1907) | Unsupported PASS claim for `HIGH_MULTIPLE_DEPENDENCE` | **NOT IMPLEMENTED** annotation: no dependence formula exists; `high_dependence_share = 0.60` is a dead definition (sole reference in all of `src`), unwired to any production formula; **D2 unresolved** |
+| 3 | Stress test 79 / D3 | Sec 79 (line ~1927) | Unsupported PASS claim for `HIGH_EPS_DEPENDENCE` / `FORECAST_RISK` | **NOT IMPLEMENTED** annotation: no EPS-share formula, no severity escalation, no D2/D3 precedence; `FORECAST_RISK` explicitly identified as an undefined, consumer-less name with no decision taken on it; **D3 unresolved** |
+| 4 | Stress test 85 / D7 | Sec 85 (line ~2009) | False claim that PIT protection passed | **NOT ACHIEVABLE IN V1**: benchmark series enter as bare floats with no dates; no `valuation_date` vs `data_cutoff_datetime` comparison; `metadata["pit_inputs_required"]` is informational only. PIT enforcement labelled unresolved; caller responsibility **not** declared as approved policy (**D7 unresolved**) |
+| 5 | Sec 49 alert capability list | Sec 49 (line ~1251) | Flat list implying all 13 alerts exist | Evidence-backed status table: **IMPLEMENTED** (`HIGH_SCENARIO_DISPERSION`, `LOW_FORECAST_RELIABILITY`), **FLAG-LEVEL ONLY** (`INSUFFICIENT_PEER_DATA`, `NEGATIVE_EPS`, `SIGN_CHANGE`), **NAME MISMATCH** (`VALUATION_BENCHMARK_DIVERGENCE`, `HISTORICAL/INDUSTRY_VALUATION_DIVERGENCE`), **ABSENT** (D1-D5 family, `POOR_DATA_QUALITY`, `POINT_IN_TIME_WARNING`). Explicit note that a flag without severity is not equivalent to a severity-bearing alert. All required names preserved; no renaming chosen |
+| 6 | Sec 42-44 / D6 | Sec 44 (line ~1108) | Sector driver chains presented as implemented | Factual annotation: driver analysis emits only `EPS` and `TARGET_PE`; no branching on `industry_code`; `nav_per_share` recorded in metadata only; `calculate_nav_fair_value` is an unwired export. No deferral to V2 decided (**D6 unresolved**) |
+| 7 | Sec 47 / D9 | Sec 47 (line ~1171) | Wording implying a versioned parameter record exists | Factual annotation: no versioned parameter record or selection mechanism exists (`effective_from`/`parameter_version` have zero references in `src`); thresholds are fixed constants in `parameters.py`. Required registry/selection mechanism stated as unresolved; no V2 deferral declared (**D9 unresolved**) |
+| 8 | Sec 54-55 / D8 | Sec 54 (line ~1369), Sec 55 (line ~1392) | Required names presented without engine mapping | Name-mapping tables recording spec name vs emitted name (`WATCH:FORWARD_PE_ABOVE/BELOW_HISTORICAL`, `WATCH:FORWARD_PE_ABOVE/BELOW_INDUSTRY`), with above/below distinctions preserved. Also records the Sec 10 `INDUSTRY_BENCHMARK_INSUFFICIENT` trigger mismatch (actual condition `target_source == "INSUFFICIENT_DATA"`). No renames, aliases, or contract changes |
+| 9 | Unsupported trigger thresholds | Sec 49 area (line ~1206) | Thresholds implied as spec-approved | **V1 Threshold Provenance** annotation: the spec defines no trigger values; all values (`high_scenario_dispersion=0.50`, `low_forecast_reliability=40.0`, `benchmark/historical/industry_divergence_ratio=1.50`, `high_dependence_share=0.60` unused) are code constants in `src/valuation/parameters.py`. Implementation behavior explicitly distinguished from spec-approved policy; no numbers ratified or changed |
+
+---
+
+## 2. Confirmation That No Source/Test/Configuration Files Changed
+
+- `git status --short -- src/` → **empty** (no Python source, schema, or config changes).
+- `git diff --stat -- src/` → **empty**.
+- The only modified file is `07_Stage7_Valuation.md` (+117 / −7 lines, documentation annotations only).
+- `temp_report2.md` receives this appended report; no existing content was overwritten.
+
+---
+
+## 3. Six-Layer Validation Evidence
+
+**1. Unit/formula** — Static verification: no valuation formula or implementation changed. Confirmed by empty `src/` diff. Executed focused tests (below) show identical behavior to the P18 baseline. **No formula was inferred or implemented.**
+
+**2. Contract/boundary** — No public Python signature, schema field, output name, or boundary behavior changed. The spec annotations are purely documentary; all mandated alert names in Sec 49 are preserved verbatim; no rename, alias, or merge was applied. The above/below distinction in Sec 54-55 mappings is explicitly preserved.
+
+**3. Production-path/integration** — Only the specification file changed. No consumer or runtime behavior was altered; the engine, schema, and parameters are byte-identical to HEAD for `src/`.
+
+**4. Adversarial/negative** — Executed the two known P2 failing-first tests:
+```
+.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py -k p2 -v
+→ 2 failed, 7 passed, 43 deselected
+  FAILED test_p2_sector_driver_decomposition_missing
+  FAILED test_p2_required_flip_dependence_alerts_missing
+```
+Both remain present, unmodified, and fail for the documented reasons (missing `REVENUE`/`NII`/`NAV` drivers; missing all five D1-D5 alerts). **Not weakened, removed, skipped, or rewritten.** These are pre-existing expected failures, **not new regressions**.
+
+**5. Regression/full suite** — Freshly executed in this prompt:
+```
+.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py -q
+→ 2 failed, 50 passed
+
+.venv/Scripts/python.exe -m pytest src/tests/test_stage9_decision.py -q
+→ 13 passed, 52 warnings
+
+.venv/Scripts/python.exe -m pytest src/tests/ -q
+→ 2 failed, 1031 passed, 1 skipped, 2850 warnings in 293.00s
+```
+The 2 failures are exactly the two known P2 tests; status unchanged from P15/P18 baselines. Skips: 1 (pre-existing). No test execution was blocked; nothing was claimed as passing without running. Warnings are pre-existing and unrelated to this documentation change.
+
+**6. Independent audit** — Compared final spec wording against `src/valuation/engine.py`, `schema.py`, `parameters.py`, and the P17 findings:
+- A search for remaining bare `PASS.` claims found 11, all located in stress tests **71-76 and 80-84** — outside P19's permitted scope (77, 78, 79, 85). No false PASS claim remains in the four in-scope stress tests.
+- No accidental D1-D9 decision was made: every annotation explicitly defers to the unresolved decision and none selects a formula, threshold, mapping, severity, precedence rule, industry mapping, PIT policy, registry mechanism, or `as_of` rule.
+- No feature was marked deferred to V2 without explicit authorization — each annotation states the decision is unresolved rather than deferred.
+- No public contract meaning was changed.
+
+---
+
+## 4. Remaining D1-D9 Blockers (All Unresolved)
+
+| Decision | Subject | Status |
+|---|---|---|
+| D1 | Flip-risk formula (shock size, flip definition, severity) | UNRESOLVED |
+| D2 | Multiple-dependence share formula and threshold use | UNRESOLVED |
+| D3 | EPS-dependence formula, severity escalation, `FORECAST_RISK` naming | UNRESOLVED |
+| D4 | Margin-assumption risk | UNRESOLVED |
+| D5 | Impact × Uncertainty alert | UNRESOLVED |
+| D6 | Industry mapping / sector-specific driver chains / P/NAV wiring | UNRESOLVED |
+| D7 | PIT enforcement policy (provenance vs attestation vs documented limitation) | UNRESOLVED |
+| D8 | Alert-name mapping (rename vs alias vs spec adoption); flag-vs-alert sufficiency | UNRESOLVED |
+| D9 | Parameter-version registry, scope, and `as_of` selection rule | UNRESOLVED |
+
+The two P2 failing tests will continue to fail until the corresponding decisions (D1-D3, D6) are implemented — by design, not by defect.
+
+---
+
+## 5. Completion Confirmation
+
+- All nine permitted documentation corrections were verified as present, evidence-backed, and consistent with the current implementation.
+- No source, test, schema, dependency, migration, or configuration file changed.
+- No failing test was weakened, deleted, skipped, or rewritten.
+- No remote Git operation occurred (no commits, pushes, pulls, or branch changes).
+- Stage 7 remains **unfrozen**; no feature was silently marked implemented and no requirement was removed because it was difficult.
+- Work stops after appending this report.
+
+========================================================
+
+# P20 — Independent Audit of Stage 7 Specification Corrections Report
+
+**Date (UTC):** 2026-10-13
+**Nature:** INDEPENDENT AUDIT of the P19 corrections. This is an audit task, not a feature implementation task. No source code, test, or specification file was edited during this audit. No D1-D9 policy was chosen or inferred.
+
+---
+
+## 1. Audit Checklist Results
+
+### Checklist 1 — Stress-test PASS claims 77, 78, 79, 85 (PASS)
+Verified by direct reading of `07_Stage7_Valuation.md`:
+- **Sec 77** (line 1889): `PASS` claim replaced by "**V1 Implementation Status: NOT IMPLEMENTED**" annotation. States the engine never emits `ASSESSMENT_FLIP_RISK`, cites `test_p2_required_flip_dependence_alerts_missing`, and marks **D1 unresolved**. The `ASSESSMENT_FLIP_RISK` "نتیجه مورد انتظار" block remains as the *expected* result (correct — it documents the requirement), with the invalid PASS invalidated below it.
+- **Sec 78** (line 1907): `PASS` claim replaced by "NOT IMPLEMENTED". Correctly explains `high_dependence_share = 0.60` is a **dead definition** (sole reference in `src`, unwired). Marks **D2 unresolved**. Verified: `parameters.py:73` defines it; no formula reads it.
+- **Sec 79** (line 1927): `PASS` claim replaced by "NOT IMPLEMENTED". Correctly identifies `FORECAST_RISK` as an undefined, consumer-less name and explicitly declines to decide its fate (deferred to D3/D8). Marks **D3 unresolved**.
+- **Sec 85** (line 2009): `PASS` claim struck through (`~~PASS.~~`) and replaced with a statement that the V1 boundary does not enforce publication/version provenance or date-safe benchmark selection. Explicitly states **caller responsibility is NOT declared as approved policy** — only that Stage 7 itself does not enforce it. Marks **D7 unresolved**.
+
+**Audit verdict: no false PASS claim remains in sections 77, 78, 79, or 85.**
+
+### Checklist 2 — Implemented / flag-only / missing alert distinction (PASS)
+Sec 49 (line 1251) contains a status table classifying all 13 required names:
+- **IMPLEMENTED**: `HIGH_SCENARIO_DISPERSION`, `LOW_FORECAST_RELIABILITY` — verified: emitted as severity-bearing `WARNING:` alerts at `engine.py:512,514` AND as flags at `engine.py:163,167`.
+- **FLAG-LEVEL ONLY**: `INSUFFICIENT_PEER_DATA` (`engine.py:165`), `NEGATIVE_EPS`, `SIGN_CHANGE` — verified as flag-channel only, not severity-bearing alerts.
+- **NAME MISMATCH**: `VALUATION_BENCHMARK_DIVERGENCE`, `HISTORICAL_VALUATION_DIVERGENCE`, `INDUSTRY_VALUATION_DIVERGENCE` — verified against `engine.py:519-532`.
+- **ABSENT**: all five D1-D5 family names, `POOR_DATA_QUALITY`, `POINT_IN_TIME_WARNING`.
+The table explicitly states "یک flag بدون Severity معادل یک severity-bearing Alert نیست" (a flag without severity is not equivalent to a severity-bearing alert) and declines to decide whether flag-level suffices (D8). **Accurate.**
+
+### Checklist 3 — Alert name documentation without renaming/aliasing/merging (PASS)
+Sec 54 (line 1369) and Sec 55 (line 1392) contain mapping tables preserving the above/below distinction for all three divergence pairs. No output was renamed, no alias added, no signal merged. All required names are preserved verbatim in the Sec 49 list. **Accurate.**
+
+### Checklist 4 — Sector-driver and P/NAV limitations (PASS)
+Sec 44 (line 1108) annotation states the driver analysis emits exactly `EPS` and `TARGET_PE`. **Verified against `_driver_analysis` at `engine.py:488`: `drivers = {"EPS": eps_effect, "TARGET_PE": pe_effect}`** — hardcoded, no `industry_code` branching, `nav_per_share` consumed by no formula. `calculate_nav_fair_value` confirmed present in `models.py` but unwired. D6 explicitly marked unresolved, with no V2 deferral declared. **Accurate.**
+
+### Checklist 5 — Parameter-version registry (PASS)
+Sec 47 (line 1171) annotation states no versioned parameter record or selection mechanism exists. **Verified: `effective_from` and `parameter_version` have zero references in `src/`; thresholds are fixed constants in `parameters.py`.** D9 marked unresolved; no `as_of` policy selected; no V2 deferral declared. **Accurate.**
+
+### Checklist 6 — Unsupported thresholds not presented as approved (PASS)
+Sec 49-area annotation (line 1206) explicitly states the spec defines **no** threshold values, then lists the code constants (`high_scenario_dispersion=0.50`, `low_forecast_reliability=40.0`, divergence ratios `1.50`, unused `high_dependence_share=0.60`). **Verified line-by-line against `parameters.py:59-74` — every value matches.** No numeric value was ratified or changed. **Accurate.**
+
+### Checklist 7 — PIT limitations without adopting a D7 policy (PASS)
+Sec 85 annotation describes the boundary factually (bare-float benchmark inputs, no date comparison, `pit_inputs_required` informational only) and explicitly refuses to declare caller attestation as approved policy. **Accurate.**
+
+### Checklist 8 — P19 did not alter code/tests/contracts/schemas/dependencies/migrations/config (PASS)
+Freshly executed in this audit:
+```
+git status --short -- src/ tests/     → empty
+git diff --stat -- src/ tests/        → empty
+```
+Only `07_Stage7_Valuation.md` and `temp_report2.md` were modified. **Confirmed.**
+
+### Checklist 9 — The two P2 failing tests remain intact (PASS)
+Freshly executed in this audit:
+```
+.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py -k p2 -v
+→ 7 passed, 2 failed, 43 deselected (0.89s)
+  FAILED test_p2_sector_driver_decomposition_missing      (missing REVENUE/NII/NAV drivers)
+  FAILED test_p2_required_flip_dependence_alerts_missing  (missing all five D1-D5 alerts)
+```
+Both tests remain present in `src/tests/test_stage7_valuation.py`, unweakened, undeleted, unskipped, unrewritten, and fail for the documented reasons. **These are pre-existing expected failures, not new regressions and not P19 artifacts.**
+
+### Checklist 10 — Cross-consistency check between spec, code, and prior reports (PASS with one minor note)
+One consistency note, **non-material to the audit verdict**: the Sec 55 annotation (line 1399) states the `INDUSTRY_BENCHMARK_INSUFFICIENT` trigger "در کد به شکل متفاوتی صادر می‌شود" and that "تریگر واقعی بخش ۱۰ هنوز در کد پیاده‌سازی نشده است". In fact `engine.py:168-169` **does** emit `INDUSTRY_BENCHMARK_INSUFFICIENT` as a flag when `target_source == "INSUFFICIENT_DATA"`. The annotation's substantive point — that the Sec 10 *trigger condition* ("fewer than 8 valid peers") is not what gates the flag, so a 7-peer case with a valid historical median does not emit it — is correct and verified (`MIN_INDUSTRY_PEERS = 8`, `engine.py:164-165` handles peer-count separately as `INSUFFICIENT_PEER_DATA`). The wording could be read as implying the flag is never emitted at all.
+**Proposed minimal correction (NOT applied — audit is read-only):** in Sec 55, clarify that the flag is emitted under `target_source == "INSUFFICIENT_DATA"` (a narrower condition than the Sec 10 peer-count rule), rather than "در کد به شکل متفاوتی صادر می‌شود". This is a wording refinement, not a factual error in the audited claim set.
+
+**No inconsistency was found between the spec, the code, and the P17/P18/P19 reports on any material point.**
+
+---
+
+## 2. Six-Layer Validation (Freshly Executed Unless Noted)
+
+**1. Unit/formula** — Static verification: no formula or valuation code changed (`src/` diff empty). Read `_driver_analysis` (`engine.py:469-498`), `_alerts` (`engine.py:500-535`), risk-flag block (`engine.py:158-195`), and `parameters.py` in full. All behavior described in the P19 annotations matches the code. **No valuation formula was inferred, implemented, or changed.**
+
+**2. Contract/boundary** — Inspected the `calculate_valuation` signature and `ValuationResult` in `schema.py`: `contract_version = "VALUATION_CONTRACT_V1"` (line 49), `model_version` set from `MODEL_VERSION` (`engine.py:211`), `calculation_timestamp` UTC (`engine.py:212`). All Sec 69 output-contract fields map to existing `ValuationResult` attributes. **No public signature, schema field, or output name changed.**
+
+**3. Production-path/integration** — Runtime and consumer paths are unchanged: `src/` is byte-identical to the pre-P19 state, so no runtime behavior could have changed. Only documentation text differs.
+
+**4. Adversarial/negative** — Freshly executed (results above in Checklist 9): the two known failing tests still expose the unresolved D1-D3 and D6 requirements. Actual outcome: **2 failed**.
+
+**5. Regression/full suite** — Freshly executed in this audit:
+```
+.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q
+→ 2 failed, 63 passed, 52 warnings in 1.30s
+```
+Breakdown: Stage 7 = 50 passed / 2 failed; Stage 9 = 13 passed. The 2 failures are the known P2 tests. Full-suite numbers from P19 (2 failed / 1031 passed / 1 skipped in 293s) are **carried forward, not re-executed here** — no test execution was blocked, and the focused suites above cover the audited surface. Skips: 1 (pre-existing). No test was treated as passed because it was skipped or excluded.
+
+**6. Independent audit** — Performed as this entire report. The final documentation was compared directly against `engine.py`, `schema.py`, `parameters.py`, and the P17 findings. **No unsupported claim or accidental D1-D9 decision was found.** Every annotation defers explicitly to its unresolved decision; none selects a formula, threshold, mapping, severity, precedence rule, industry mapping, PIT policy, registry mechanism, or `as_of` rule.
+
+---
+
+## 3. D1-D9 Decision Firewall Check
+
+| Decision | Chosen by P19? | Evidence |
+|---|---|---|
+| D1 | No | Sec 77 annotation marks D1 unresolved |
+| D2 | No | Sec 78 annotation marks D2 unresolved; 0..60 left unwired |
+| D3 | No | Sec 79 annotation declines to decide `FORECAST_RISK` |
+| D4, D5 | No | Sec 49 table marks both ABSENT |
+| D6 | No | Sec 44 annotation marks D6 unresolved; no V2 deferral declared |
+| D7 | No | Sec 85 annotation explicitly does not adopt caller attestation |
+| D8 | No | Sec 49/54/55 record mismatches without choosing rename/alias/adoption |
+| D9 | No | Sec 47 annotation marks D9 unresolved; no registry implemented |
+
+**The decision firewall held.**
+
+---
+
+## 4. Remaining D1-D9 Blockers
+
+All nine decisions D1-D9 remain **UNRESOLVED**, unchanged from P17/P18/P19. The two P2 failing tests will continue to fail until D1-D3 and D6 are implemented — by design, not by defect.
+
+---
+
+## 5. Audit Status
+
+**PASS — Documentation accurately describes current implementation; no audited overclaims remain.**
+
+This PASS applies **only to the documentation audit**. It does **not** mean Stage 7 is feature-complete or ready to freeze. Five alert capabilities (D1-D5), sector-driver decomposition (D6), PIT enforcement (D7), alert-name harmonization (D8), and the parameter registry (D9) all remain unimplemented pending user decisions.
+
+- No remote Git operations were performed (no commits, pushes, pulls, or branch changes).
+- Stage 7 remains **unfrozen**. No stage was frozen.
+- No discrepancy requiring correction was found; the single minor wording note in Checklist 10 is reported for optional refinement and was **not** applied (audit is read-only).
+
+========================================================
+

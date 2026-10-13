@@ -691,3 +691,150 @@ Report unit/formula, contract/boundary, production-path/integration, adversarial
 Append `P18 — Stage 7 Decision-Independent Work Inventory Report` to `temp_report2.md`, preserving all previous content.
 
 No source, test, or specification changes. No remote Git operations, commits, pushes, pulls, or branch changes. Do not freeze Stage 7. Stop after reporting.
+======================================================================
+
+# P19 — Stage 7 Factual Specification Corrections (Bounded Implementation)
+
+You are working locally in the `analyzer` folder on a financial-data application.
+
+## Objective
+
+Apply only the factual documentation corrections established by P17. Do not implement valuation logic and do not resolve any open D1-D9 decision.
+
+## Context and mandatory safeguards
+
+* Financial correctness, auditability, point-in-time correctness, deterministic behavior, and explicit financial invariants take priority over speed.
+* Treat `temp_report2.md` as the evidence source for P17 and P18. Inspect the relevant report sections and the exact current text before editing.
+* The specification is `07_Stage7_Valuation.md`; the relevant implementation files include `src/valuation/engine.py`, `src/valuation/schema.py`, and `src/valuation/parameters.py`.
+* Do not modify Python source, tests, schemas, dependencies, migrations, configuration, or files belonging to frozen stages.
+* Do not weaken, delete, skip, or rewrite failing tests to make the result appear successful.
+* Do not access GitHub, remote APIs, remotes, branches, commits, pushes, or pulls.
+* Append the final report to `temp_report2.md`; never overwrite existing content.
+* Stage 7 remains unfrozen.
+
+## Permitted work
+
+Make narrowly scoped, evidence-backed corrections in `07_Stage7_Valuation.md` only:
+
+1. **Stress test 77 / D1:** Replace the unsupported PASS claim with a factual statement that the required flip-risk alert is not implemented in the current implementation and D1 remains unresolved.
+2. **Stress test 78 / D2:** Replace the unsupported PASS claim with a factual statement that the multiple-dependence formula is not implemented and D2 remains unresolved. Explain that the existing `high_dependence_share = 0.60` definition is not wired into a production formula.
+3. **Stress test 79 / D3:** Replace the unsupported PASS claim with a factual statement that the required EPS-dependence behavior is not implemented and D3 remains unresolved. Identify `FORECAST_RISK` as an undefined/unimplemented alternative name unless the current specification contains evidence to the contrary.
+4. **Stress test 85 / D7:** Remove the false claim that PIT protection has passed. State that the current Stage 7 boundary does not enforce report-publication/version provenance or date-safe benchmark selection. Explicitly label PIT enforcement as unresolved; do not declare caller responsibility to be the approved policy.
+5. **Section 49 alert capability list:** Add an evidence-backed implementation-status annotation distinguishing implemented alerts, flag-only outputs, and absent/unimplemented capabilities. Do not silently treat a flag as equivalent to a severity-bearing alert. Preserve all existing required names and record naming mismatches rather than choosing a renaming strategy.
+6. **Sections 42-44 / D6:** State factually that the current driver analysis emits only `EPS` and `TARGET_PE`, and that `industry_code` and `nav_per_share` do not currently drive sector-specific calculations. Do not decide whether these requirements are deferred to V2.
+7. **Section 47 / D9:** Correct any wording that implies a versioned parameter record or selection mechanism already exists, where code inspection confirms that it does not. State that the required registry/selection mechanism is unresolved.
+8. **Sections 54-55 / D8:** Add a concise mapping of required specification names versus the names actually emitted by the current engine. Preserve distinctions between above/below conditions. Do not rename outputs, add aliases, or change consumer-facing contracts.
+9. **Unsupported trigger thresholds:** Where the specification implies that threshold values have been formally specified but evidence shows they exist only in implementation/tests, explicitly distinguish implementation behavior from specification-approved policy. Do not ratify or change numeric values.
+
+## Decision firewall
+
+D1-D9 remain unresolved. Do not:
+
+* choose any formulas, shock sizes, perturbation sets, thresholds, severity rules, or precedence rules;
+* select or implement an industry mapping or sector-driver formula;
+* decide the PIT enforcement policy;
+* decide between alert renaming, aliases, or specification adoption of current names;
+* implement a parameter registry or select an `as_of` policy;
+* mark any feature as deferred to V2 unless that deferral has already been explicitly authorized;
+* change the meaning of a public contract.
+
+If a proposed wording would implicitly make one of these decisions, leave that wording unchanged and document the blocker in the report.
+
+## Validation requirements — six layers
+
+Report all six layers separately, with exact commands and outcomes:
+
+1. **Unit/formula:** Confirm no valuation formula or implementation changed; run focused tests if feasible.
+2. **Contract/boundary:** Verify that no public Python signature, schema, output name, or boundary behavior changed.
+3. **Production-path/integration:** Verify that only the specification file changed and no consumer or runtime behavior was altered.
+4. **Adversarial/negative:** Confirm that the two known P2 failing tests remain present and were not weakened; identify their actual outcomes if executed.
+5. **Regression/full suite:** Run the focused Stage 7 and Stage 9 tests, then the applicable full suite using the established project commands. Report exclusions and skips explicitly. If execution is blocked or too expensive, report that as blocked rather than claiming success.
+6. **Independent audit:** Compare the final specification wording against the relevant engine implementation and the P17 findings. Check for accidental D1-D9 decisions and false PASS claims.
+
+Distinguish freshly executed results from carried-forward results, static checks, and blocked work. Do not present the existing two P2 failures as new regressions if their status is unchanged.
+
+## Report and completion
+
+Append `P19 — Stage 7 Factual Specification Corrections Report` to `temp_report2.md`. Include:
+
+* exact specification sections changed;
+* a concise before/after description of each correction;
+* confirmation that no source/test/configuration files changed;
+* six-layer validation evidence;
+* remaining D1-D9 blockers;
+* confirmation that no remote Git operation occurred and Stage 7 remains unfrozen.
+
+Inspect the final diff before reporting. Do not stop with a proposal: complete the permitted documentation corrections and validation, or clearly report any specific blocker preventing completion.
+===========================================================
+# P20 — Independent Audit of Stage 7 Specification Corrections
+
+You are working locally in the `analyzer` folder on a financial-data application.
+
+## Objective
+
+Independently audit the completed P19 changes. Determine whether the specification now accurately describes the current Stage 7 implementation without implying that unresolved financial behavior is implemented or approved.
+
+This is an audit task, not a feature implementation task.
+
+## Required scope
+
+Inspect only:
+
+* `temp_report2.md`, including the P17, P18, and P19 reports;
+* `07_Stage7_Valuation.md`, limited to the sections modified by P19 and the related sections 10, 42-57, 64-65, 69, 77-79, and 85;
+* `src/valuation/engine.py`;
+* `src/valuation/schema.py`;
+* `src/valuation/parameters.py`;
+* the two known failing test bodies in `src/tests/test_stage7_valuation.py`;
+* relevant Stage 7 and Stage 9 test results, using the established commands.
+
+Do not perform a repository-wide review.
+
+## Audit checklist
+
+1. Verify that stress-test PASS claims 77, 78, 79, and 85 no longer falsely imply that missing behavior is implemented.
+2. Verify that the specification accurately distinguishes implemented alerts, flag-only outputs, and missing alert behavior.
+3. Verify that required alert names and current emitted names are documented accurately without silently renaming, aliasing, or merging signals.
+4. Verify that sector-driver and P/NAV limitations are described factually, without treating D6 as decided.
+5. Verify that missing parameter-version registry behavior is described accurately, without selecting D9 or an `as_of` policy.
+6. Verify that unsupported thresholds are not presented as formally approved merely because code or tests contain numeric values.
+7. Verify that PIT limitations are stated accurately without silently adopting caller attestation or another D7 policy.
+8. Confirm that P19 did not alter source code, tests, public contracts, schemas, dependencies, migrations, or configuration.
+9. Confirm that the two known P2 failing tests remain intact and were not weakened, deleted, skipped, or rewritten to pass.
+10. Check for inconsistencies introduced by P19 between the specification, code, and prior reports.
+
+## Required validation — six layers
+
+Report all six independently:
+
+1. Unit/formula: static verification that no formulas or valuation code changed; report any focused tests freshly executed.
+2. Contract/boundary: inspect the relevant signatures, schema, and public output names.
+3. Production-path/integration: confirm whether runtime and consumer paths remain unchanged.
+4. Adversarial/negative: verify the two known failing tests still expose the unresolved requirements; execute them if possible and report actual results.
+5. Regression/full suite: run the established Stage 7, Stage 9, and applicable full-suite commands. Report exact counts, exclusions, skips, warnings, and failures. Clearly separate fresh results from earlier P15/P19 results.
+6. Independent audit: compare the final documentation directly against the implementation and P17 findings. Identify any unsupported claim or accidental decision.
+
+Do not fabricate test results. Do not call carried-forward results freshly executed. Do not treat a skipped or excluded test as passed.
+
+## Remediation boundary
+
+* Do not edit source code, tests, or the specification during the audit.
+* Do not fix findings silently. If a discrepancy remains, list the exact section/file and proposed minimal correction.
+* If P19 introduced an error, report it precisely and stop; wait for a follow-up correction prompt.
+* Do not choose or infer any D1-D9 policy.
+* Do not perform remote Git operations, commits, pushes, pulls, or branch changes.
+
+## Report
+
+Append `P20 — Independent Audit of Stage 7 Specification Corrections Report` to `temp_report2.md`, preserving all existing content.
+
+Conclude with exactly one evidence-based status:
+
+* `PASS — Documentation accurately describes current implementation; no audited overclaims remain.`
+* `FAIL — Documentation still contains one or more material inaccuracies.`
+* `BLOCKED — Audit could not be completed; list the precise blockers.`
+
+A PASS applies only to the documentation audit. It does not mean Stage 7 is feature-complete or ready to freeze.
+
+Confirm that Stage 7 remains unfrozen. Do not freeze any stage and do not perform remote Git operations.
+====================================================================

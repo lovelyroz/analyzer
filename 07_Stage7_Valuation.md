@@ -1105,6 +1105,19 @@ Fair Value
 
 P/NAV تحلیل Valuation است و متعلق به Stage 7 است، نه Forecast Stage.
 
+> **V1 Implementation Status (factual annotation — بخش‌های ۴۲ تا ۴۴):**
+>
+> **این زنجیره‌های Driver در V1 پیاده‌سازی نشده‌اند.** تحلیل Driver فعلی (`_driver_analysis` در `src/valuation/engine.py`) دقیقاً دو Driver را تولید می‌کند:
+>
+> ```text
+> EPS
+> TARGET_PE
+> ```
+>
+> و هیچ شاخه‌گیری بر اساس `industry_code` وجود ندارد (این فیلد فقط در metadata بازنویسی می‌شود). `nav_per_share` نیز فقط در metadata به‌صورت `nav_per_share_received` ثبت می‌شود و در هیچ فرمولی مصرف نمی‌شود. تابع `calculate_nav_fair_value` در `src/valuation/models.py` صرفاً یک export متصل‌نشده است.
+>
+> در نتیجه `valuation_driver_ranking` برای یک شرکت غیرمالی، یک Bank و یک Holding یکسان است. **تصمیم D6 (نگاشت industry و فرمول‌های sector-specific) هنوز حل‌نشده است.**
+
 ---
 
 # 45. Driver Impact
@@ -1155,6 +1168,12 @@ Impact × Uncertainty
 
 فرمول دقیق و Normalization باید Model Version Parameter باشد.
 
+> **V1 Implementation Status (factual annotation):**
+>
+> **چنین پارامتری در V1 وجود ندارد.** هیچ رکورد پارامتر versioned و هیچ مکانیزم selection در کد وجود ندارد (`effective_from` و `parameter_version` صفر ارجاع در کل `src`)؛ Thresholdها مقادیر ثابت در `src/valuation/parameters.py` هستند. در عمل، فرمول Review Priority همان پیاده‌سازی ثابت موتور است.
+>
+> **تصمیم D9 (registry پارامتر و مکانیزم effective-version selection) هنوز حل‌نشده است** — این سند deferral به V2 را اعلام نمی‌کند، تنها ثبت می‌کند که مکانیزم مورد نیاز وجود ندارد.
+
 هدف:
 
 Driverهایی که هم:
@@ -1184,6 +1203,29 @@ Alerts فقط Risk/Review Alert هستند.
 
 آنها Buy/Sell Signal نیستند.
 
+> **V1 Threshold Provenance (factual annotation):**
+>
+> این سند **هیچ مقدار آستانه‌ای برای تریگرهای Alert یا Risk تعریف نکرده است**. مقادیری که موتور فعلی استفاده می‌کند ثابت‌های کد در `src/valuation/parameters.py` هستند:
+>
+> ```text
+> ALERT_THRESHOLDS:
+>   high_scenario_dispersion   = 0.50
+>   low_forecast_reliability   = 40.0
+>   benchmark_divergence_ratio = 1.50
+>   historical_divergence_ratio = 1.50
+>   industry_divergence_ratio  = 1.50
+>   high_dependence_share      = 0.60   (استفاده‌نشده — D2)
+>
+> RISK_THRESHOLDS:
+>   extreme_confidence         = 40.0
+>   high_scenario_dispersion   = 0.50
+>   high_bear_downside         = -30.0
+>   medium_confidence          = 60.0
+>   medium_bear_downside       = -15.0
+> ```
+>
+> این **رفتار پیاده‌سازی** است، نه سیاست تأییدشده توسط مشخصات. بخش‌های ۴۱ تا ۵۳ هیچ مقدار تریگری را تعیین نمی‌کنند. آیا این اعداد در مشخصات تأیید (ratify) شوند یا به‌عنوان «مقادیر انتخاب‌شده توسط موتور بدون پشتوانه مشخصاتی» حاشیه‌نویسی شوند، خود یک تصمیم باز است (D9) — این سند هیچ عددی را تأیید یا تغییر نمی‌دهد. آزمون‌های boundary، رفتار فعلی را pin می‌کنند، نه انطباق با مشخصات را.
+
 ---
 
 # 49. Required Alert Categories
@@ -1205,6 +1247,32 @@ NEGATIVE_EPS
 SIGN_CHANGE
 POINT_IN_TIME_WARNING
 ```
+
+> **V1 Implementation-Status Annotation (factual — بدون تغییر نام، بدون ادغام، بدون تصمیم)**
+>
+> این فهرست الزامات نام‌گذاری را حفظ می‌کند. جدول زیر فقط وضعیت فعلی موتور را ثبت می‌کند و هیچ تصمیمی نمی‌گیرد.
+>
+> | نام الزامی (این سند) | وضعیت در V1 | توضیح مستند |
+> |---|---|---|
+> | `HIGH_SCENARIO_DISPERSION` | **IMPLEMENTED** | به‌صورت severity-bearing از `_alerts` صادر می‌شود (`WARNING:HIGH_SCENARIO_DISPERSION`) و هم در flag channel. |
+> | `LOW_FORECAST_RELIABILITY` | **IMPLEMENTED** | به‌صورت severity-bearing از `_alerts` صادر می‌شود (`WARNING:LOW_FORECAST_RELIABILITY`) و هم در flag channel. |
+> | `INSUFFICIENT_PEER_DATA` | **FLAG-LEVEL ONLY** | فقط در `valuation_risk_flags` صادر می‌شود (`engine.py:165`)، نه به‌عنوان severity-bearing alert. آیا این برای «قابلیت Alert» کافی است، بخشی از تصمیم D8 است. |
+> | `NEGATIVE_EPS` | **FLAG-LEVEL ONLY** | فقط از `_eps_flags` در flag channel. |
+> | `SIGN_CHANGE` | **FLAG-LEVEL ONLY** | فقط از `_scenario_sign_change_flags` در flag channel. |
+> | `VALUATION_BENCHMARK_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:VALUATION_ABOVE_TARGET_PE` / `WATCH:VALUATION_BELOW_TARGET_PE` است. عدم تطابق در بخش ۵۴ ثبت شده. |
+> | `HISTORICAL_VALUATION_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:FORWARD_PE_ABOVE_HISTORICAL` / `WATCH:FORWARD_PE_BELOW_HISTORICAL` است (بخش ۵۴). |
+> | `INDUSTRY_VALUATION_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:FORWARD_PE_ABOVE_INDUSTRY` / `WATCH:FORWARD_PE_BELOW_INDUSTRY` است (بخش ۵۵). |
+> | `ASSESSMENT_FLIP_RISK` | **ABSENT** | صفر ارجاع در `src/valuation` — **D1 حل‌نشده**. |
+> | `HIGH_MULTIPLE_DEPENDENCE` | **ABSENT** | صفر ارجاع در `src/valuation` — **D2 حل‌نشده**. |
+> | `HIGH_EPS_DEPENDENCE` | **ABSENT** | صفر ارجاع در `src/valuation` — **D3 حل‌نشده**. |
+> | `MARGIN_ASSUMPTION_RISK` | **ABSENT** | صفر ارجاع در `src/valuation` — **D4 حل‌نشده**. |
+> | `HIGH_IMPACT_HIGH_UNCERTAINTY` | **ABSENT** | صفر ارجاع در `src/valuation` — **D5 حل‌نشده**. |
+> | `POOR_DATA_QUALITY` | **ABSENT** | در مشخصات هیچ تعریف تریگری وجود ندارد و صفر ارجاع در کد. |
+> | `POINT_IN_TIME_WARNING` | **ABSENT** | صفر ارجاع در کد؛ تریگر آن به تصمیم D7 گره خورده است. |
+>
+> **تفاوت مهم:** یک flag بدون Severity معادل یک severity-bearing Alert نیست. فهرست بالا این دو را به‌طور جداگانه نشان می‌دهد و هیچ تصمیمی درباره اینکه آیا flag-level کافی است یا خیر، نمی‌گیرد (D8).
+>
+> **تصمیم باز (D8):** انتخاب بین rename، alias، یا پذیرش نام‌های فعلی در مشخصات، و همچنین اینکه آیا emission در سطح flag برای قابلیت بخش ۴۹ کافی است، هنوز انجام نشده و در این سند اتخاذ نشده است.
 
 ---
 
@@ -1298,6 +1366,15 @@ HISTORICAL_VALUATION_DIVERGENCE
 
 این Alert به خودی خود Cheap/Expensive Signal قطعی نیست.
 
+> **V1 Name Mapping (factual — بدون rename، بدون alias، بدون تغییر contract)**
+>
+> | نام الزامی این سند | نامی که موتور فعلی صادر می‌کند | کانال | تمایز بالا/پایین حفظ شده؟ |
+> |---|---|---|---|
+> | `HISTORICAL_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_ABOVE_HISTORICAL` | severity-bearing alert | بله — بالا مجزا از پایین |
+> | `HISTORICAL_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_BELOW_HISTORICAL` | severity-bearing alert | بله — پایین مجزا از بالا |
+>
+> **تصمیم باز (D8):** آیا spec نام‌های فعلی را می‌پذیرد، یا rename یا alias معرفی می‌شود، هنوز اتخاذ نشده است. این سند فقط عدم تطابق را ثبت می‌کند و خروجی‌های مصرف‌کننده را تغییر نمی‌دهد.
+
 ---
 
 # 55. Industry Divergence Alert
@@ -1311,6 +1388,17 @@ INDUSTRY_VALUATION_DIVERGENCE
 ایجاد می‌شود.
 
 علت Divergence باید قابل بررسی باشد.
+
+> **V1 Name Mapping (factual — بدون rename، بدون alias، بدون تغییر contract)**
+>
+> | نام الزامی این سند | نامی که موتور فعلی صادر می‌کند | کانال | تمایز بالا/پایین حفظ شده؟ |
+> |---|---|---|---|
+> | `INDUSTRY_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_ABOVE_INDUSTRY` | severity-bearing alert | بله — بالا مجزا از پایین |
+> | `INDUSTRY_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_BELOW_INDUSTRY` | severity-bearing alert | بله — پایین مجزا از بالا |
+>
+> علاوه بر این، تریگر `INDUSTRY_BENCHMARK_INSUFFICIENT` (بخش ۱۰، «کمتر از ۸ Peer معتبر») در کد به شکل متفاوتی صادر می‌شود: شرط واقعی `target_source == "INSUFFICIENT_DATA"` است. در نتیجه، با ۷ Peer ولی یک Historical Median معتبر، این flag صادر **نمی‌شود** و فقط `INSUFFICIENT_PEER_DATA` در flag channel ظاهر می‌شود. تریگر واقعی بخش ۱۰ هنوز در کد پیاده‌سازی نشده است.
+>
+> **تصمیم باز (D8):** انتخاب rename / alias / پذیرش spec، هنوز اتخاذ نشده است.
 
 ---
 
@@ -1792,13 +1880,17 @@ PASS.
 ATTRACTIVE → FAIR
 ```
 
-نتیجه:
+نتیجه مورد انتظار:
 
 ```text
 ASSESSMENT_FLIP_RISK
 ```
 
-PASS.
+> **V1 Implementation Status (factual annotation):** **NOT IMPLEMENTED.**
+>
+> موتور فعلی Stage 7 هرگز `ASSESSMENT_FLIP_RISK` تولید نمی‌کند (صفر ارجاع در کل `src/valuation`). آزمون `test_p2_required_flip_dependence_alerts_missing` نشان می‌دهد که یک شوک ۱۰٪ در EPS، وضعیت را از `ATTRACTIVE` به `FAIR` تغییر می‌دهد بدون اینکه هیچ Alertای صادر شود.
+>
+> **تصمیم D1 (اندازه شوک، تعریف Flip، فرمول، Severity) هنوز حل‌نشده است.** ادعای PASS بالا نامعتبر است و تا زمان پیاده‌سازی یا تعویق صریح به V2، باید به‌عنوان الزام حل‌نشده در نظر گرفته شود.
 
 ---
 
@@ -1806,13 +1898,17 @@ PASS.
 
 EPS Forecast پایدار است ولی Fair Value عمدتاً به افزایش Target P/E وابسته است.
 
-نتیجه:
+نتیجه مورد انتظار:
 
 ```text
 HIGH_MULTIPLE_DEPENDENCE
 ```
 
-PASS.
+> **V1 Implementation Status (factual annotation):** **NOT IMPLEMENTED.**
+>
+> هیچ فرمول وابستگی به Multiple در مشخصات یا کد وجود ندارد. تعریف `high_dependence_share = 0.60` در `src/valuation/parameters.py` یک تعریف مرده است: تنها ارجاع در کل `src` همین خط است و به هیچ فرمول تولیدی متصل نیست (هیچ کدی این مقدار را نمی‌خواند).
+>
+> **تصمیم D2 (تعریف سهم وابستگی، نحوه استفاده از آستانه، Severity) هنوز حل‌نشده است.** ادعای PASS بالا نامعتبر است.
 
 ---
 
@@ -1820,7 +1916,7 @@ PASS.
 
 Target Multiple پایدار است ولی EPS Forecast بسیار نامطمئن است.
 
-نتیجه:
+نتیجه مورد انتظار:
 
 ```text
 HIGH_EPS_DEPENDENCE
@@ -1828,7 +1924,13 @@ HIGH_EPS_DEPENDENCE
 FORECAST_RISK
 ```
 
-PASS.
+> **V1 Implementation Status (factual annotation):** **NOT IMPLEMENTED.**
+>
+> `HIGH_EPS_DEPENDENCE` هیچ‌گاه صادر نمی‌شود (صفر ارجاع در `src/valuation`)؛ هیچ فرمول سهم EPS، قانون تشدید Severity بر اساس Reliability، و قانون تقدم D2/D3 وجود ندارد.
+>
+> نام `FORECAST_RISK` در هیچ فایل تولیدی یا آزمونی تعریف نشده است (صفر ارجاع در کل `src`) و هیچ مصرف‌کننده‌ای ندارد. این سند نام `FORECAST_RISK` را تعریف نکرده و هیچ تصمیمی درباره حذف، نگه‌داشتن یا جایگزینی آن نمی‌گیرد — تعیین اینکه آیا این نام به‌عنوان جایگزین `HIGH_EPS_DEPENDENCE` مورد قبول است، بخشی از تصمیم D3/D8 است.
+>
+> **تصمیم D3 هنوز حل‌نشده است.** ادعای PASS بالا نامعتبر است.
 
 ---
 
@@ -1904,9 +2006,17 @@ PASS.
 
 # 85. Stress Test — Point-in-Time
 
+> **V1 Implementation Status (factual annotation):** **NOT ACHIEVABLE IN V1 — این ادعای PASS برداشته شد.**
+>
+> مرز ورودی Stage 7 این آزمون را اجرا نمی‌کند. در `calculate_valuation` سری‌های بنچمارک (`historical_pe_values`، `industry_forward_pe_values`، `industry_ttm_pe_values`) به‌صورت floatهای ساده و بدون تاریخ وارد می‌شوند؛ هیچ مقایسه‌ای بین `valuation_date` و `data_cutoff_datetime` انجام نمی‌شود (این دو فقط نرمالایز و در خروجی بازنویسی می‌شوند)؛ و `metadata["pit_inputs_required"]` صرفاً یک نشانگر اطلاعاتی است، نه یک اعمال قانون.
+>
+> بنابراین Stage 7 در V1 **اصل publication/version provenance و انتخاب date-safe بنچمارک را اجرا نمی‌کند**. این یک محدودیت ثبت‌شده است، نه یک تأیید correctness.
+>
+> **تصمیم D7 (provenance هر مشاهده در برابر تأیید caller در برابر محدودیت ثبت‌شده) هنوز حل‌نشده است** — این سند مسئولیت caller را به‌عنوان سیاست تأییدشده معرفی نمی‌کند؛ تنها ثبت می‌کند که خود Stage 7 آن را اجرا نمی‌کند.
+
 گزارشی که بعد از Valuation Date منتشر شده نباید وارد Historical Valuation شود.
 
-PASS.
+~~PASS.~~ → **وضعیت: در V1 صدق نمی‌کند — مرز Stage 7 این قانون را اجرا نمی‌کند (D7 حل‌نشده).**
 
 ---
 
