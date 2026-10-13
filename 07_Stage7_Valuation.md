@@ -1396,7 +1396,11 @@ INDUSTRY_VALUATION_DIVERGENCE
 > | `INDUSTRY_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_ABOVE_INDUSTRY` | severity-bearing alert | بله — بالا مجزا از پایین |
 > | `INDUSTRY_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_BELOW_INDUSTRY` | severity-bearing alert | بله — پایین مجزا از بالا |
 >
-> علاوه بر این، تریگر `INDUSTRY_BENCHMARK_INSUFFICIENT` (بخش ۱۰، «کمتر از ۸ Peer معتبر») در کد به شکل متفاوتی صادر می‌شود: شرط واقعی `target_source == "INSUFFICIENT_DATA"` است. در نتیجه، با ۷ Peer ولی یک Historical Median معتبر، این flag صادر **نمی‌شود** و فقط `INSUFFICIENT_PEER_DATA` در flag channel ظاهر می‌شود. تریگر واقعی بخش ۱۰ هنوز در کد پیاده‌سازی نشده است.
+> علاوه بر این، تریگر `INDUSTRY_BENCHMARK_INSUFFICIENT` (بخش ۱۰، «کمتر از ۸ Peer معتبر») در کد تحت **شرط متفاوتی** صادر می‌شود. موتور این flag را **صادر می‌کند**، اما تنها زمانی که `target_source == "INSUFFICIENT_DATA"` باشد — یعنی هیچ Industry Forward P/E با حداقل ۸ Peer معتبر، هیچ Historical Median معتبر و هیچ Industry TTM P/E معتبر در دسترس نباشد (`_select_target_pe` در `src/valuation/engine.py`).
+>
+> این شرط emission با شرط Peer Count بخش ۱۰ **معادل نیست**: با ۷ Peer معتبر ولی یک Historical Median معتبر، `target_source` برابر `HISTORICAL_MEDIAN_PE` می‌شود، در نتیجه `INDUSTRY_BENCHMARK_INSUFFICIENT` صادر **نمی‌شود** — حتی اگر یک benchmark جایگزین و قابل‌استفاده انتخاب شده باشد. بنابراین یک مورد «کمتر از ۸ Peer معتبر» می‌تواند یک benchmark قابل‌استفاده داشته باشد و باز هم این flag را دریافت نکند. تریگر کامل بخش ۱۰ (مبتنی بر Peer Count) در کد پیاده‌سازی نشده است.
+>
+> `INSUFFICIENT_PEER_DATA` یک سیگنال **مجزا** است و نباید با `INDUSTRY_BENCHMARK_INSUFFICIENT` یکی گرفته شود: اولی زمانی صادر می‌شود که `forward_values` موجود باشد و تعداد peerهای Forward معتبر کمتر از `MIN_INDUSTRY_PEERS = 8` باشد (`engine.py:164-165`) و صرفاً کمبود تعداد Peer را گزارش می‌کند، دومی صرفاً نبود هر گونه benchmark قابل‌استفاده را گزارش می‌کند. این دو flag هم می‌توانند هم‌زمان صادر شوند و هم می‌توانند مستقل از یکدیگر صادر شوند.
 >
 > **تصمیم باز (D8):** انتخاب rename / alias / پذیرش spec، هنوز اتخاذ نشده است.
 

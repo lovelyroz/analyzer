@@ -838,3 +838,235 @@ A PASS applies only to the documentation audit. It does not mean Stage 7 is feat
 
 Confirm that Stage 7 remains unfrozen. Do not freeze any stage and do not perform remote Git operations.
 ====================================================================
+# P21 — Stage 7 Section 55 Factual Wording Refinement
+
+You are working locally in the `analyzer` folder on a financial-data application.
+
+## Objective
+
+Apply the one minor wording refinement identified by P20's independent audit in `07_Stage7_Valuation.md`, section 55, concerning `INDUSTRY_BENCHMARK_INSUFFICIENT`.
+
+## Evidence to verify first
+
+Read the P20 report in `temp_report2.md` and inspect:
+
+* Section 55 of `07_Stage7_Valuation.md`;
+* the relevant flag-generation logic in `src/valuation/engine.py`;
+* the peer-count logic and `MIN_INDUSTRY_PEERS` definition.
+
+Verify the current implementation before editing.
+
+The wording must accurately distinguish these facts:
+
+1. The engine can emit `INDUSTRY_BENCHMARK_INSUFFICIENT` when `target_source == "INSUFFICIENT_DATA"`.
+2. The specification's peer-count condition (fewer than 8 valid peers) is not equivalent to that emission condition.
+3. A case with fewer than 8 valid peers may have a usable historical benchmark and therefore may not emit `INDUSTRY_BENCHMARK_INSUFFICIENT`.
+4. The existing `INSUFFICIENT_PEER_DATA` flag is a separate signal and must not be conflated with `INDUSTRY_BENCHMARK_INSUFFICIENT`.
+
+## Strict scope
+
+* Modify only the ambiguous wording in section 55 of `07_Stage7_Valuation.md`.
+* Do not modify Python source, tests, schemas, dependencies, migrations, configuration, or any other specification section.
+* Do not change alert names, emission conditions, severity, thresholds, or output contracts.
+* Do not choose D8 or imply that the current implementation satisfies the specification's peer-count trigger.
+* Do not access remote Git/GitHub/APIs or perform commits, pushes, pulls, or branch changes.
+* Preserve all existing content in `temp_report2.md` and append the report only.
+
+## Six-layer validation
+
+Report all six layers separately:
+
+1. **Unit/formula:** Verify that no financial logic changed; report any tests actually executed.
+2. **Contract/boundary:** Confirm that public signatures, schema, alert names, and output contracts remain unchanged.
+3. **Production-path/integration:** Confirm that no runtime file changed.
+4. **Adversarial/negative:** Verify that the wording accurately describes the case where peer count is below 8 but a historical benchmark remains usable.
+5. **Regression/full suite:** Run the focused Stage 7 and Stage 9 tests. Run the established full suite if feasible; report exact counts, skips, exclusions, and failures. Do not call existing P2 failures new regressions.
+6. **Independent audit:** Compare the final sentence against the actual flag and peer-count logic. Confirm that D8 remains unresolved.
+
+Clearly distinguish freshly executed tests from carried-forward results and static checks.
+
+## Report and completion
+
+Append `P21 — Stage 7 Section 55 Wording Refinement Report` to `temp_report2.md`.
+
+Include the exact wording changed, the code evidence, all six validation layers, and confirmation that Stage 7 remains unfrozen. Inspect the final diff. If the existing wording is already accurate or the evidence does not support the proposed correction, do not force an edit; document the finding instead.
+==============================================================
+# P22 — Stage 7 D1-D9 Evidence-Based Decision Brief
+
+You are working locally in the `analyzer` folder on a financial-data application.
+
+## Objective
+
+Prepare a concise but technically rigorous decision brief for the project owner covering unresolved Stage 7 decisions D1-D9.
+
+This is a READ-ONLY analysis task. The report must help the owner make explicit policy choices before implementation. You must not make those choices on the owner's behalf.
+
+## Context and constraints
+
+* Financial correctness, auditability, point-in-time correctness, determinism, and explicit financial invariants take priority over speed.
+* Review `temp_report2.md` reports P11-P21, especially the unresolved decision inventory, and inspect only the relevant sections of `07_Stage7_Valuation.md` and the specific implementation/tests needed to substantiate each decision.
+* Relevant code includes `src/valuation/engine.py`, `models.py`, `parameters.py`, and `schema.py`.
+* Relevant tests include `src/tests/test_stage7_valuation.py` and, where a consumer contract is implicated, `src/tests/test_stage9_decision.py`.
+* Do not perform a repository-wide review.
+* Do not modify source code, tests, schemas, specifications, dependencies, migrations, or configuration.
+* Append the decision brief to `temp_report2.md` without overwriting prior reports.
+* Do not access remote Git/GitHub/APIs or perform commits, pushes, pulls, or branch changes.
+* Stage 7 remains unfrozen.
+
+## Required output: nine separate decisions
+
+Create one decision section for each item below. Do not merge decisions simply because they are related.
+
+### D1 — Assessment flip risk
+
+Document the unresolved choices concerning:
+
+* what qualifies as a status/assessment flip;
+* the perturbation method and which inputs are perturbed;
+* how perturbation sizes should be established and versioned;
+* how severity is determined;
+* how the alert interacts with existing valuation outputs.
+
+Do not invent shock percentages or formulas. If the existing specification/code does not establish a value, explicitly say so.
+
+### D2 — Multiple dependence
+
+Document:
+
+* what "multiple dependence" must measure;
+* the formula needed to calculate the dependence share;
+* how `high_dependence_share = 0.60` would be used only after the metric is defined;
+* missing-data and denominator behavior;
+* the interaction with D3 and D1.
+
+Do not wire the existing constant into code.
+
+### D3 — EPS forecast dependence
+
+Document:
+
+* what constitutes EPS dependence;
+* the candidate metric and required input data, if grounded in the existing contract;
+* the relationship to D2 and any escalation/precedence rule;
+* whether `FORECAST_RISK` should be a separate name, alias, or excluded requirement.
+
+Present naming choices neutrally. Do not select one.
+
+### D4 — Margin assumption risk
+
+Document the current contract limitation: Stage 7 does not expose a defined margin series for the proposed risk calculation.
+
+Compare only evidence-supported options:
+
+* explicit contract expansion with provenance and validation;
+* a proxy metric, only if the owner can define and approve one;
+* documented non-implementation pending a later decision.
+
+Do not create a proxy formula or imply that a proxy already exists.
+
+### D5 — High impact plus high uncertainty
+
+Document the missing definitions for impact, uncertainty, their combination, trigger thresholds, and input selection.
+
+Explain the dependency on D6 if a complete sector-driver framework is required. Separate any work that is independently definable from work that genuinely depends on D6.
+
+Do not reuse engine-chosen perturbation sizes or uncertainty weights as though they were approved financial policy.
+
+### D6 — Sector-specific driver chains and P/NAV
+
+Document the required chains separately:
+
+* Non-financial: Revenue → Operating Margin → Operating Profit → Net Profit → EPS → Fair Value.
+* Bank: Loans/Deposits → NII/NIM → Net Profit → EPS → Fair Value.
+* Holding: NAV → NAV Growth → Net Profit → EPS → Fair Value, with P/NAV assigned to Stage 7.
+
+Identify which source fields, formulas, sector mappings, and contract expansions are missing. Explicitly account for the rule that Stage 7 must use Stage 5 EPS forecasts rather than rebuild EPS using a new share count.
+
+Do not invent industry-code mappings or valuation formulas. State any dependencies that cannot be resolved from current evidence.
+
+### D7 — Point-in-Time enforcement
+
+Compare these policy options without choosing one:
+
+* per-observation provenance structures and explicit enforcement;
+* caller/upstream attestation with a precisely specified ordering/validation rule;
+* a documented V1 limitation.
+
+For each option, identify contract changes, enforcement strength, auditability, migration/consumer impact, and residual lookahead risk. Do not claim that metadata alone enforces PIT correctness.
+
+Explicitly account for valuation date, data cutoff, report publication date/version, benchmark observation dates, and historical EPS availability. Do not invent a date-ordering policy.
+
+### D8 — Alert names and trigger semantics
+
+Document the observed name mismatches, including:
+
+* `VALUATION_BENCHMARK_DIVERGENCE` versus the current `WATCH:VALUATION_ABOVE/BELOW_TARGET_PE` family;
+* `HISTORICAL_VALUATION_DIVERGENCE` versus the current historical above/below family;
+* `INDUSTRY_VALUATION_DIVERGENCE` versus the current industry above/below family;
+* the difference between `INSUFFICIENT_PEER_DATA` and `INDUSTRY_BENCHMARK_INSUFFICIENT`;
+* the difference between flag-level signals and severity-bearing alerts;
+* missing trigger definitions for `POOR_DATA_QUALITY` and `POINT_IN_TIME_WARNING`.
+
+Compare renaming, aliases, and adopting current output names in the specification. Evaluate public-contract stability and consumer compatibility. Do not implement or select a strategy.
+
+### D9 — Parameter registry and version selection
+
+Compare:
+
+* a structured in-code registry;
+* a persistent database-backed registry;
+* another versioning approach only if it is already supported by evidence in the project.
+
+Assess auditability, reproducibility, effective-date selection, testability, cross-stage coupling, migration burden, and historical backtest safety.
+
+Explicitly analyze why the selection timestamp (`as_of`) is unresolved: valuation date, data cutoff, or another policy cannot be chosen without owner approval and a clear temporal contract.
+
+Do not build a registry or decide a timestamp policy.
+
+## Decision quality requirements
+
+For every D1-D9 section, include:
+
+1. Current verified behavior and precise evidence (file/function/spec section or test).
+2. The unanswered policy question.
+3. Evidence-supported options, clearly separated from recommendations.
+4. Financial correctness risks and possible failure modes.
+5. Public contract, downstream consumer, and regression implications.
+6. Required inputs and definitions before implementation.
+7. Required tests once the owner approves a policy.
+8. Explicit dependencies on other decisions.
+9. What cannot safely be implemented before approval.
+
+Do not invent missing formulas, data fields, thresholds, severities, mappings, dates, or defaults. If a decision has no evidence-supported answer, say so directly.
+
+## Prioritization
+
+Provide a dependency-aware ordering for discussing the decisions. Explain the rationale and mark any ordering as a proposed discussion sequence, not an approved implementation plan. Do not claim that one decision is already resolved.
+
+Identify any factual/documentation-only task that remains safe regardless of policy decisions, but do not implement it in this prompt.
+
+## Six-layer validation
+
+Report all six layers, distinguishing static review from test execution:
+
+1. **Unit/formula:** inspect relevant formulas and identify undefined ones; do not create new formulas.
+2. **Contract/boundary:** inspect relevant input/output schemas and identify the precise contract changes each option would require.
+3. **Production-path/integration:** trace only relevant call paths and Stage 9 consumer dependencies where needed.
+4. **Adversarial/negative:** enumerate missing-data, stale/future data, sign-change, threshold-boundary, and consumer-compatibility cases that must be tested once a policy is approved. Do not claim these were executed unless they were.
+5. **Regression/full suite:** this is read-only, so tests need not be run unless required to verify a specific claim. If tests are run, report exact commands and counts; otherwise label historical test counts as carried forward.
+6. **Independent audit:** cross-check all nine decision sections against P11-P21, the specification, and the relevant code. Ensure no decision is implicitly selected by wording.
+
+## Report format
+
+Append `P22 — Stage 7 D1-D9 Evidence-Based Decision Brief Report` to `temp_report2.md`.
+
+End with:
+
+* a one-page executive summary of the nine decisions;
+* a compact decision table with options, dependencies, and contract impact;
+* a proposed discussion sequence;
+* the exact unresolved items that still require owner approval;
+* explicit confirmation that no implementation or policy choice was made.
+
+Stage 7 must remain unfrozen. Stop after appending the report.
+==================================================================

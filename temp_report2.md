@@ -2072,3 +2072,435 @@ This PASS applies **only to the documentation audit**. It does **not** mean Stag
 
 ========================================================
 
+# P21 — Stage 7 Section 55 Wording Refinement Report
+
+**Date (UTC):** 2026-10-13
+**Nature:** BOUNDED DOCUMENTATION EDIT — one wording refinement in section 55 of `07_Stage7_Valuation.md` only. No Python source, test, schema, dependency, migration, or configuration file was changed. No alert names, emission conditions, severity, thresholds, or output contracts were changed. D8 was not chosen.
+
+---
+
+## 1. Evidence Verified Before Editing
+
+**`_select_target_pe` — `src/valuation/engine.py:256-269`:**
+```python
+if industry_forward is not None and forward_peer_count >= MIN_INDUSTRY_PEERS:
+    return industry_forward, "INDUSTRY_FORWARD_PE"
+if historical is not None:
+    return historical, "HISTORICAL_MEDIAN_PE"
+if industry_ttm is not None:
+    return industry_ttm, "INDUSTRY_TTM_PE"
+return None, "INSUFFICIENT_DATA"
+```
+
+**Flag generation — `src/valuation/engine.py:164-169`:**
+```python
+if forward_values and valid_forward_count < MIN_INDUSTRY_PEERS:
+    flags.append("INSUFFICIENT_PEER_DATA")
+...
+if target_source == "INSUFFICIENT_DATA":
+    flags.append("INDUSTRY_BENCHMARK_INSUFFICIENT")
+```
+
+**`MIN_INDUSTRY_PEERS = 8`** — `src/valuation/parameters.py:79`.
+
+The evidence supports all four required facts: the engine **can** emit `INDUSTRY_BENCHMARK_INSUFFICIENT` (under `target_source == "INSUFFICIENT_DATA"`); the section 10 peer-count condition is **not** equivalent to that emission condition; a sub-8-peer case with a usable historical median does **not** emit it (`target_source` becomes `HISTORICAL_MEDIAN_PE`); and `INSUFFICIENT_PEER_DATA` is a **separate** signal (gated on peer count alone).
+
+---
+
+## 2. Exact Wording Changed (Before / After)
+
+**BEFORE** (single paragraph, section 55):
+> علاوه بر این، تریگر `INDUSTRY_BENCHMARK_INSUFFICIENT` (بخش ۱۰، «کمتر از ۸ Peer معتبر») در کد به شکل متفاوتی صادر می‌شود: شرط واقعی `target_source == "INSUFFICIENT_DATA"` است. در نتیجه، با ۷ Peer ولی یک Historical Median معتبر، این flag صادر **نمی‌شود** و فقط `INSUFFICIENT_PEER_DATA` در flag channel ظاهر می‌شود. تریگر واقعی بخش ۱۰ هنوز در کد پیاده‌سازی نشده است.
+
+**AFTER** (three paragraphs):
+> علاوه بر این، تریگر `INDUSTRY_BENCHMARK_INSUFFICIENT` (بخش ۱۰، «کمتر از ۸ Peer معتبر») در کد تحت **شرط متفاوتی** صادر می‌شود. موتور این flag را **صادر می‌کند**، اما تنها زمانی که `target_source == "INSUFFICIENT_DATA"` باشد — یعنی هیچ Industry Forward P/E با حداقل ۸ Peer معتبر، هیچ Historical Median معتبر و هیچ Industry TTM P/E معتبر در دسترس نباشد (`_select_target_pe` در `src/valuation/engine.py`).
+>
+> این شرط emission با شرط Peer Count بخش ۱۰ **معادل نیست**: با ۷ Peer معتبر ولی یک Historical Median معتبر، `target_source` برابر `HISTORICAL_MEDIAN_PE` می‌شود، در نتیجه `INDUSTRY_BENCHMARK_INSUFFICIENT` صادر **نمی‌شود** — حتی اگر یک benchmark جایگزین و قابل‌استفاده انتخاب شده باشد. بنابراین یک مورد «کمتر از ۸ Peer معتبر» می‌تواند یک benchmark قابل‌استفاده داشته باشد و باز هم این flag را دریافت نکند. تریگر کامل بخش ۱۰ (مبتنی بر Peer Count) در کد پیاده‌سازی نشده است.
+>
+> `INSUFFICIENT_PEER_DATA` یک سیگنال **مجزا** است و نباید با `INDUSTRY_BENCHMARK_INSUFFICIENT` یکی گرفته شود: اولی زمانی صادر می‌شود که `forward_values` موجود باشد و تعداد peerهای Forward معتبر کمتر از `MIN_INDUSTRY_PEERS = 8` باشد (`engine.py:164-165`) و صرفاً کمبود تعداد Peer را گزارش می‌کند، دومی صرفاً نبود هر گونه benchmark قابل‌استفاده را گزارش می‌کند. این دو flag هم می‌توانند هم‌زمان صادر شوند و هم می‌توانند مستقل از یکدیگر صادر شوند.
+
+**What the refinement corrects:** the old wording could be read as implying the flag is never emitted at all ("در کد به شکل متفاوتی صادر می‌شود" followed only by a non-emission example). The new wording states positively that the flag **is** emitted, names its exact emission condition, states the non-equivalence with the peer-count rule, and separates `INSUFFICIENT_PEER_DATA` explicitly.
+
+The retained D8 line ("**تصمیم باز (D8):** انتخاب rename / alias / پذیرش spec، هنوز اتخاذ نشده است.") and the entire name-mapping table above it are unchanged.
+
+---
+
+## 3. Six-Layer Validation
+
+**1. Unit/formula** — Static verification: no financial logic changed. `src/` diff is empty. No formula, threshold, or computation was touched. **No tests were executed for this layer** — the change is documentation-only and cannot affect formula behavior.
+
+**2. Contract/boundary** — Public signatures, schema, alert names, and output contracts are unchanged: `git status --short -- src/ tests/` → **empty**. The refinement names existing flags and existing conditions only; it introduces no new name, no alias, no merge, and no severity claim. `VALUATION_CONTRACT_V1` is untouched.
+
+**3. Production-path/integration** — No runtime file changed. Only `07_Stage7_Valuation.md` was edited (documentation only), so no runtime or consumer path could change.
+
+**4. Adversarial/negative** — The wording now accurately describes the adversarial case: fewer than 8 valid peers **with** a usable historical median. Traced through `_select_target_pe`: `industry_forward is not None and forward_peer_count >= MIN_INDUSTRY_PEERS` fails at 7 peers → falls to `if historical is not None` → returns `HISTORICAL_MEDIAN_PE` → `target_source != "INSUFFICIENT_DATA"` → `INDUSTRY_BENCHMARK_INSUFFICIENT` is **not** emitted, while `INSUFFICIENT_PEER_DATA` **is** emitted (7 < 8 with forward values present). The new wording states exactly this, and does not imply the current implementation satisfies the section 10 trigger.
+
+**5. Regression/full suite** — Freshly executed:
+```
+.venv/Scripts/python.exe -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q
+→ 2 failed, 63 passed, 52 warnings in 1.24s
+```
+Breakdown: Stage 7 = 50 passed / 2 failed; Stage 9 = 13 passed. The 2 failures are the known P2 tests (`test_p2_sector_driver_decomposition_missing`, `test_p2_required_flip_dependence_alerts_missing`) — **pre-existing expected failures, not new regressions**. Skips: 0 in this focused run; the full-suite skip count of 1 is carried forward from P19/P20. No test was treated as passed because it was skipped or excluded. Full-suite re-execution was not repeated here; the focused Stage 7 + Stage 9 suites cover the affected surface and the change cannot affect runtime behavior.
+
+**6. Independent audit** — The final sentences were compared directly against `_select_target_pe` (`engine.py:256-269`), the flag block (`engine.py:164-169`), and `MIN_INDUSTRY_PEERS = 8` (`parameters.py:79`). Every assertion in the new wording is traceable to code. **D8 remains unresolved** — the refinement records the mismatch without choosing rename, alias, or spec adoption, and does not imply the current implementation satisfies the section 10 peer-count trigger.
+
+---
+
+## 4. Scope Compliance
+
+- Only the ambiguous wording in section 55 was modified; the name-mapping table and D8 line are unchanged.
+- No other specification section was touched; no source, test, schema, dependency, migration, or configuration file was changed.
+- No alert name, emission condition, severity, threshold, or output contract was changed.
+- D8 was not chosen; no D1-D9 policy was inferred.
+- No remote Git operations (no commits, pushes, pulls, or branch changes).
+
+---
+
+## 5. Remaining Blockers
+
+D1-D9 all remain **UNRESOLVED**, unchanged. D8 specifically remains open: rename vs alias vs spec adoption of the current names, plus whether flag-level emission satisfies the section 49 alert capability. The two P2 failing tests will continue to fail until D1-D3 and D6 are implemented — by design, not by defect.
+
+---
+
+## 6. Completion Confirmation
+
+- The single wording refinement identified by P20 was applied and verified against the implementation.
+- The evidence supported the correction (the pre-existing wording was genuinely ambiguous, per P20 Checklist 10), so the edit was not forced.
+- **Stage 7 remains unfrozen.** No stage was frozen. Work stops after appending this report.
+
+========================================================
+
+# P22 — Stage 7 D1-D9 Evidence-Based Decision Brief Report
+
+**Date (UTC):** 2026-10-13
+**Nature:** READ-ONLY decision brief for the project owner. No source, test, schema, spec, dependency, migration, or configuration file was modified. No D1-D9 policy choice was made. No formulas, thresholds, severities, mappings, dates, or defaults were invented.
+**Evidence base:** `temp_report2.md` (P11-P21); `07_Stage7_Valuation.md` (sections 10, 42-57, 64-65, 69, 77-79, 85); `src/valuation/engine.py`, `models.py`, `parameters.py`, `schema.py`; `src/tests/test_stage7_valuation.py`; `src/tests/test_stage9_decision.py` (consumer contract). Produced by static review after two subagent attempts failed on upstream API connection errors; the subagent's last incomplete action was an industry-code taxonomy check for D6, so D6 uses only evidence already verified in P17-P21.
+
+---
+
+## Executive Summary (one page)
+
+Stage 7's core valuation path is implemented and tested: the scenario fair-value identity `FV = EPS × target P/E` (`calculate_forward_pe_fair_value`), the benchmark hierarchy (`_select_target_pe`), confidence/risk grading, driver impact/uncertainty/review-priority for `{EPS, TARGET_PE}`, and severity-bearing divergence alerts. **50 of 52 Stage 7 tests pass; Stage 9's 13 consumer tests pass.** What remains is the *sensitivity/risk-alert layer* (D1-D5) and *provenance/versioning infrastructure* (D7, D9), plus *sector-driver chains* (D6) and *alert-name harmonization* (D8).
+
+The central finding: **none of D1-D5 has a formula in the spec or the code.** For D1 and D5 the engine already computes *ingredients* (a 0.10 one-at-a-time perturbation, an uncertainty blend) but they are engine-chosen implementation constants, **not** owner-approved financial policy, and reusing them as policy would silently launder an unapproved choice into the spec. For D2 and D3 there is not even a candidate metric. For D4 there is a hard contract gap: **Stage 7 exposes no margin series at all.** D6 requires source fields, sector mappings, and contract expansions that do not exist anywhere in the project, and is additionally constrained by the rule that Stage 7 must consume Stage 5 EPS forecasts rather than rebuild EPS. D7 cannot be enforced at the current boundary because benchmark series enter as bare floats with no dates. D8 is a naming/semantics question where every option has real consumer-compatibility cost (Stage 9 parses these outputs today). D9 has three viable mechanisms but the `as_of` selection rule is unresolvable without an owner-approved temporal contract.
+
+**Two decisions are prerequisites for the rest: D6 (unlocks D5's full scope and the two failing P2 tests) and D8 (fixes the vocabulary every other alert decision emits into).** D7 and D9 are infrastructure that can proceed in parallel once funded. No substantive implementation is safe before owner approval — this was already the P18 conclusion and P22's independent re-verification confirms it.
+
+---
+
+## D1 — Assessment Flip Risk
+
+**1. Current verified behavior (evidence).** The engine emits **no** `ASSESSMENT_FLIP_RISK` output — zero references in all of `src/valuation` (verified P17). `_alerts` (`engine.py:500-535`) produces only: `WARNING:HIGH_SCENARIO_DISPERSION`, `WARNING:LOW_FORECAST_RELIABILITY`, `CRITICAL:INSUFFICIENT_BENCHMARK_DATA`, `WATCH:VALUATION_ABOVE/BELOW_TARGET_PE`, `WATCH:FORWARD_PE_ABOVE/BELOW_HISTORICAL`, `WATCH:FORWARD_PE_ABOVE/BELOW_INDUSTRY`, `INFO:TOP_DRIVER:{first}`. Status transitions *are* computed (`_valuation_status`, `engine.py:156`), and the failing test `test_p2_required_flip_dependence_alerts_missing` demonstrates that a 10% EPS shock moves status `ATTRACTIVE → FAIR` **with no alert raised**. `SENSITIVITY_PERTURBATION = 0.10` (`parameters.py:77`) exists but is used only inside `_driver_analysis` for driver *impact*, never for flip detection.
+
+**2. Unanswered policy question.** What counts as a flip, on which inputs, at what perturbation magnitude, with what severity — and is that severity derived from status distance, magnitude of fair-value change, or something else?
+
+**3. Evidence-supported options (not recommendations).**
+- **(a) Reuse the existing 0.10 one-at-a-time perturbation** as the flip probe. Grounded in real code, zero new constants. But 0.10 is an engine-chosen driver-impact constant; adopting it for flips is a *policy* act, not a discovery.
+- **(b) Define a dedicated flip perturbation set** (which inputs: EPS, target P/E, scenario probabilities, reliability?) with owner-specified magnitudes. Most faithful to spec sections 50/77; requires the owner to state values.
+- **(c) Define flip by status-transition class only** (e.g. `ATTRACTIVE → FAIR/EXPENSIVE`), with no magnitude modeling. Simplest, but cannot express "relatively small and reasonable change" (spec section 50's own words) without a magnitude.
+- The spec establishes **no** flip magnitude, formula, or severity. That must be stated plainly: there is no value to discover here, only one to decide.
+
+**4. Financial correctness risks / failure modes.** A too-large probe makes genuinely fragile ratings look stable (false negatives on the highest-risk `ATTRACTIVE` band — the exact population the alert targets). A too-small probe floods the output with noise (false positives) and can be gamed by threshold placement. Perturbing *correlated* inputs independently (EPS and target P/E together) double-counts. Severity detached from economic magnitude invites threshold-fitting to backtest noise.
+
+**5. Contract / consumer / regression implications.** Adds a **new public alert name** to `ValuationResult.alerts` — a contract change under section 66 stability, affecting Stage 9 consumers that parse alerts today. Regression risk is low for existing passing tests (new name is additive) but the two P2 tests will only pass once D1 *and* D2/D3 land together.
+
+**6. Required inputs and definitions before implementation.** A flip definition (which status transitions qualify); the perturbation set (which inputs, joint or one-at-a-time); the perturbation magnitude and its versioning (see D9 — magnitudes must be Model Version Parameters per spec section 47); the severity mapping; and the interaction rule with existing divergence alerts (co-occurrence ordering).
+
+**7. Required tests once approved.** Boundary tests at exactly the flip threshold (status changes vs. does not); adversarial cases — missing/NaN inputs, negative EPS, sign-change scenarios, zero target P/E, all-`None` scenarios (early-return path at `engine.py:476`); determinism (repeated runs); and a negative case asserting no flip alert when status is stable.
+
+**8. Dependencies on other decisions.** Depends on **D2/D3** for precedence when multiple risk conditions co-occur; on **D8** for the emitted name; on **D9** for how the perturbation magnitude is versioned.
+
+**9. What cannot safely be implemented before approval.** Any flip formula or magnitude. Specifically: do **not** reuse `SENSITIVITY_PERTURBATION = 0.10` as though it were the approved flip shock.
+
+---
+
+## D2 — Multiple Dependence
+
+**1. Current verified behavior (evidence).** No multiple-dependence formula exists in spec or code. `high_dependence_share = 0.60` (`parameters.py:73`) is a **dead definition**: the only reference in all of `src` is its own declaration; no code reads it (verified P17, re-confirmed P19). `HIGH_MULTIPLE_DEPENDENCE` has zero references in `src/valuation`.
+
+**2. Unanswered policy question.** What is "multiple dependence" measuring — the share of fair value attributable to the target-multiple component versus the EPS component, or sensitivity of fair value to multiple movement? Both are defensible readings of spec section 51 and they are **not the same metric**.
+
+**3. Evidence-supported options (not recommendations).**
+- **(a) Attribution share**: decompose `FV = EPS × target P/E` into the two multiplicative factors' contributions — directly computable from the existing identity (`_driver_analysis` already computes impact percentages for `{EPS, TARGET_PE}`, `engine.py:495`). The 0.60 threshold could then be applied to the `TARGET_PE` share.
+- **(b) Sensitivity share**: fair-value elasticity to a multiple shock versus an EPS shock at equal perturbation — also derivable from existing one-at-a-time machinery.
+- **(c) Documented non-implementation** until the metric is defined.
+- Under (a) or (b), `high_dependence_share = 0.60` becomes *usable* — but only after the metric is defined; the threshold cannot be wired before then.
+
+**4. Financial correctness risks / failure modes.** A multiplicative decomposition's shares are scale-invariant but not invariant to which factor is perturbed or to perturbation ordering. Denominator behavior is the live risk: with `total = max(sum(drivers.values()), 1e-9)` (`engine.py:489`) a degenerate near-zero denominator inflates shares arbitrarily. Missing data (one factor `None`) must return *no* metric rather than a misleading 100% share. High multiple dependence on a *cheap* company (below-target multiple) carries a different economic reading than on an expensive one — a single threshold conflates them.
+
+**5. Contract / consumer / regression implications.** New public alert name (same section-66 considerations as D1). Because (a)/(b) reuse `_driver_analysis` outputs, a wrong choice risks retroactively re-interpreting the *already-shipped* driver-impact contract.
+
+**6. Required inputs and definitions before implementation.** The metric definition (attribution vs. sensitivity); the denominator/missing-data rule; whether the 0.60 threshold applies and on which side; severity; interaction with D3 (EPS dependence) — both are "dependence" alerts and need a precedence rule.
+
+**7. Required tests once approved.** Boundary cases at share = exactly 0.60 and 0.599/0.601; degenerate denominator; one factor `None`; both factors `None`; determinism; negative-case asserting no alert when the EPS share dominates.
+
+**8. Dependencies.** **D3** (precedence between two dependence alerts), **D8** (name), **D9** (threshold versioning).
+
+**9. What cannot safely be implemented before approval.** Wiring `high_dependence_share = 0.60` into any production path. The constant is currently inert; connecting it before the metric is defined would freeze an unapproved formula.
+
+
+---
+
+## D3 — EPS Forecast Dependence
+
+**1. Current verified behavior (evidence).** No EPS-dependence formula exists. `HIGH_EPS_DEPENDENCE` has zero references in `src/valuation` (verified P17). No severity-escalation rule based on `forecast_reliability`, and no D2/D3 precedence rule. The name `FORECAST_RISK` appears in spec section 79 as an *alternative* to `HIGH_EPS_DEPENDENCE` but is defined nowhere and consumed nowhere (zero references in all of `src`). The forecast-reliability input *is* part of the contract: `forecast_reliability_score` is a `calculate_valuation` parameter, and `LOW_FORECAST_RELIABILITY` is already emitted (flag at `engine.py:163`, severity-bearing alert at `engine.py:514`).
+
+**2. Unanswered policy question.** What constitutes "EPS dependence" — is it the share of fair value attributable to the EPS component (the mirror of D2), the *unreliability-weighted* EPS share, or the combination of high EPS share with low forecast reliability? And should the alert escalate or suppress when `LOW_FORECAST_RELIABILITY` already fires?
+
+**3. Evidence-supported options (not recommendations).** The candidate metric grounded in the existing contract is the EPS attribution share from `_driver_analysis` (`engine.py:495`: `impact_pct` per driver) combined with the existing `forecast_reliability_score` input — no new data field is strictly required for a share-based definition. Naming choices, presented neutrally: **(a)** keep `HIGH_EPS_DEPENDENCE` as the single required name and treat `FORECAST_RISK` as an excluded alias (spec section 79 currently offers both); **(b)** make `FORECAST_RISK` a separate alert with a distinct trigger (e.g. reliability-driven) while `HIGH_EPS_DEPENDENCE` remains share-driven; **(c)** keep only `FORECAST_RISK` and retire `HIGH_EPS_DEPENDENCE`. None is selected. Note that section 79 lists the two names as alternatives without distinguishing their triggers — that ambiguity itself must be resolved.
+
+**4. Financial correctness risks / failure modes.** Conflating *share* with *reliability* produces a single alert that cannot distinguish "fair value rests on EPS, and that EPS is trustworthy" from "fair value rests on EPS, and that EPS is a guess." A reliability-weighted metric needs an aggregation rule (multiplicative? threshold-conditional?) that no evidence currently supplies. Escalation stacking with `LOW_FORECAST_RELIABILITY` risks double-signaling the same underlying input.
+
+**5. Contract / consumer / regression implications.** One or two new public alert names (section 66). Stage 9 consumers currently see neither name; whichever option is chosen, the vocabulary grows. Spec section 79's accept-result text must be rewritten to match the chosen option — a documentation consequence, not a code one.
+
+**6. Required inputs and definitions before implementation.** The metric definition (share-only vs. reliability-weighted); the escalation/precedence rule with `LOW_FORECAST_RELIABILITY` and with D2; the naming decision; severity; and the missing-data rule (reliability `None` or clamped, cf. `_clamp_score` at `engine.py:490`).
+
+**7. Required tests once approved.** Share at exactly the chosen threshold; reliability `None` and at boundaries (e.g. around `low_forecast_reliability = 40.0`); both dependence alerts co-occurring (precedence rule); determinism; negative case with EPS share low.
+
+**8. Dependencies.** **D2** (precedence between two dependence alerts — spec section 51/52 ordering), **D8** (naming), **D9** (threshold/reliability-cutoff versioning).
+
+**9. What cannot safely be implemented before approval.** Any EPS-share threshold, any reliability-escalation rule, and any decision on `FORECAST_RISK`.
+
+---
+
+## D4 — Margin Assumption Risk
+
+**1. Current verified behavior (evidence).** `MARGIN_ASSUMPTION_RISK` has zero references in `src/valuation` (verified P17). **Stage 7 exposes no margin series anywhere in its contract**: the `calculate_valuation` signature (`engine.py:57-79`) takes price, EPS forecasts, benchmark P/E series, reliability, confidence, and quality scores — no margin, revenue, or cost input. `ValuationResult` (`schema.py:19-50`) exposes no margin field. This is a hard contract limitation, not a wiring gap.
+
+**2. Unanswered policy question.** Should the margin assumption risk be supported at all in V1, and if so, where does the margin data come from?
+
+**3. Evidence-supported options (not recommendations).**
+- **(a) Explicit contract expansion**: add an observed margin-series input with provenance and validation (per-observation dating per D7). Highest correctness; requires upstream stages to supply a validated margin series, which is outside Stage 7's current boundary.
+- **(b) A proxy metric** — only if the **owner** defines and approves one. No proxy exists in the code or spec, and none is proposed here; inventing one would fabricate financial policy.
+- **(c) Documented non-implementation** pending a later decision. The alert remains absent and the spec records the gap (already done in P19's section 49 table: `MARGIN_ASSUMPTION_RISK` → **ABSENT**, D4 unresolved).
+
+**4. Financial correctness risks / failure modes.** A proxy built from P/E or scenario data would import the assumptions it is meant to test — circular and audit-hostile. An undated margin series reintroduces lookahead risk (ties to D7).
+
+**5. Contract / consumer / regression implications.** Option (a) changes the public `calculate_valuation` signature — a boundary change with consumer impact; options (b)/(c) do not. Under (c), `MARGIN_ASSUMPTION_RISK` stays absent from `alerts`/`valuation_risk_flags`.
+
+**6. Required inputs and definitions before implementation.** Under (a): a defined margin series with provenance, a validation rule, and the risk formula. Under (b): an owner-approved proxy definition. Under (c): nothing further.
+
+**7. Required tests once approved.** Under (a)/(b): missing-margin and stale-margin cases; margin sign changes; boundary at the risk threshold; determinism. Under (c): a negative test asserting the alert stays absent.
+
+**8. Dependencies.** **D7** (margin provenance/dating), **D9** (formula versioning), **D8** (name).
+
+**9. What cannot safely be implemented before approval.** Any margin formula, and any proxy. There is no evidence-supported proxy answer — this is stated directly rather than manufactured.
+
+---
+
+## D5 — High Impact Plus High Uncertainty
+
+**1. Current verified behavior (evidence).** `HIGH_IMPACT_HIGH_UNCERTAINTY` has zero references in `src/valuation` (verified P17). However, the engine **already computes both ingredients** for the two-driver V1 chain: `driver_impact` (impact percentages, `engine.py:495`), `driver_uncertainty` (a blend, `engine.py:493`: `(100 - reliability)*0.5 + (100 - probability)*0.3 + (100 - quality)*0.2`), and `review_priority = impact × uncertainty / 100` (`engine.py:497`). These cover `{EPS, TARGET_PE}` **only**. The 0.10 perturbation and the 0.5/0.3/0.2 uncertainty weights are engine-chosen implementation constants — **not** approved financial policy.
+
+**2. Unanswered policy question.** What defines "high impact" and "high uncertainty", how are they combined (product? joint-threshold?), and what triggers the alert?
+
+**3. Evidence-supported options (not recommendations).**
+- **(a) Apply the combination to the existing `{EPS, TARGET_PE}` driver set** — implementable now from existing outputs, with thresholds owner-specified. Scope limited to the V1 two-driver world.
+- **(b) Defer until D6 lands** a complete sector-driver framework, then define impact/uncertainty per sector chain. Fuller, but blocked on D6.
+- Note the split: **(a) is independently definable; (b) genuinely depends on D6.** The owner chooses scope, not just thresholds.
+
+**4. Financial correctness risks / failure modes.** Reusing the 0.5/0.3/0.2 weights as policy would convert an implementation convenience into an audited financial invariant — exactly the laundering P22 exists to prevent. A product `impact × uncertainty` is dominated by whichever factor is normalized differently; a joint threshold requires two thresholds and an AND/OR rule. With only two drivers, "high impact" is nearly tautological (shares sum to 100%), so the trigger may carry little information until D6 widens the driver set.
+
+**5. Contract / consumer / regression implications.** New public alert name (section 66). Under (a), `review_priority`'s existing semantics would be retroactively attached to an alert — consumers reading `review_priority` today would gain a new derived signal.
+
+**6. Required inputs and definitions before implementation.** Definitions of impact and uncertainty in alert terms (not just as existing outputs); the combination rule; both trigger thresholds; scope choice (two-driver vs. sector chains); severity.
+
+**7. Required tests once approved.** Impact/uncertainty each at exactly their thresholds and just inside/outside; both high (alert fires); one high (no alert); determinism; degenerate empty-driver path (`engine.py:477` early return).
+
+**8. Dependencies.** **D6** (if sector-driver scope is chosen), **D8** (name), **D9** (threshold/weight versioning).
+
+**9. What cannot safely be implemented before approval.** Any combination rule or thresholds; in particular, do not present the engine's 0.10 perturbation or 0.5/0.3/0.2 weights as approved policy.
+
+---
+
+## D6 — Sector-Specific Driver Chains and P/NAV
+
+**1. Current verified behavior (evidence).** `_driver_analysis` (`engine.py:469-498`) hardcodes exactly two drivers: `drivers = {"EPS": eps_effect, "TARGET_PE": pe_effect}` (`engine.py:488`). There is **no branching on `industry_code`** — it is only echoed into metadata. `nav_per_share` is recorded in metadata as `nav_per_share_received` (`engine.py:247`) and consumed by **no** formula. `calculate_nav_fair_value` exists in `src/valuation/models.py` but is an **unwired export** (verified P17/P19/P20). Consequently `valuation_driver_ranking` is identical for a non-financial company, a bank, and a holding — proven by the failing test `test_p2_sector_driver_decomposition_missing`, which asserts `{"REVENUE", "NII", "NAV"} ⊆ observed` and finds only `{"EPS", "TARGET_PE"}`.
+
+**2. Unanswered policy question.** How are the three required chains implemented, on what source fields, with which sector mapping — and does Stage 7 compute P/NAV fair value itself or consume it?
+
+**3. Evidence-supported options (not recommendations).** This decision is not a choice between formulas but a build/buy/defer question: **(a)** implement the three chains as sector-branching driver analysis (requires new source fields and mappings); **(b)** defer to V2 with the current two-driver behavior documented (already recorded in P19's section 44 annotation). Under either option the three chains from spec sections 42-44 must be documented **separately**, per the prompt: *Non-financial*: Revenue → Operating Margin → Operating Profit → Net Profit → EPS → Fair Value; *Bank*: Loans/Deposits → NII/NIM → Net Profit → EPS → Fair Value; *Holding*: NAV → NAV Growth → Net Profit → EPS → Fair Value, with P/NAV assigned to Stage 7.
+
+**4. Financial correctness risks / failure modes.** Every chain field except EPS and target P/E is **absent** from the current contract: no revenue, operating margin, loans/deposits, NII/NIM, or NAV-growth input exists in `calculate_valuation` or `ValuationResult`. Rebuilding EPS inside Stage 7 from a new share count would **violate the explicit rule** that Stage 7 must consume Stage 5 EPS forecasts (spec section 58) — a lookahead and consistency hazard. Any invented industry-code mapping would be fabricated taxonomy. The `NAV` chain is the most tractable (a `nav_per_share` parameter already reaches the engine) yet is still unused.
+
+**5. Contract / consumer / regression implications.** Option (a) changes `valuation_driver_ranking`'s content — a **public contract output** (spec section 69) that Stage 9 and dashboards consume; ranking values would become sector-dependent. `calculate_nav_fair_value` activation would change fair-value outputs for holdings. This is the largest single contract change among D1-D9.
+
+**6. Required inputs and definitions before implementation.** Source fields for each chain (revenue, operating margin, loans/deposits, NII/NIM, NAV growth); an **owner-approved** industry-code → sector mapping (does not exist in the project — the subagent's taxonomy check for this did not complete); per-chain sensitivity formulas; the Stage 5 EPS-consumption validation rule; and a decision on P/NAV (compute vs. consume).
+
+**7. Required tests once approved.** One chain per sector with correct ranking; mixed/unknown industry code; missing chain inputs (partial fields); NAV = 0 or negative; determinism; and the two P2 tests would need re-baselining **only after** a decision — not before.
+
+**8. Dependencies.** **D7** (chain input provenance), **D9** (formula versioning), **D8** (if new driver names enter alerts). D6 in turn **unblocks** D5's sector scope.
+
+**9. What cannot safely be implemented before approval.** Any industry mapping, any chain formula, and any wiring of `nav_per_share` or `calculate_nav_fair_value`.
+
+
+---
+
+## D7 — Point-in-Time Enforcement
+
+**1. Current verified behavior (evidence).** The Stage 7 boundary does **not** enforce PIT correctness. Benchmark series (`historical_pe_values`, `industry_forward_pe_values`, `industry_ttm_pe_values`) enter `calculate_valuation` (`engine.py:70-72`) as **bare floats with no dates**. `valuation_date` and `data_cutoff_datetime` are only normalized and echoed (`engine.py:104-108`); **no comparison** between them occurs. `metadata["pit_inputs_required"] = True` (`engine.py:248`) is an informational marker, not an enforcement. The failing test `test_p6_cutoff_pit_limitation_pinned` pins the silent acceptance of a post-cutoff date. No production caller supplies the six PIT-related inputs (finding P13, still standing). The spec requires per-date observance of Price Date, Forecast Cutoff, Report Publication Date, Report Version, and Historical EPS Availability (sections 56-57).
+
+**2. Unanswered policy question.** Which enforcement policy applies, and on which temporal fields — provenance on every observation, caller attestation, or a documented limitation?
+
+**3. Evidence-supported options (not recommendations).** For each: contract changes, enforcement strength, auditability, migration/consumer impact, residual lookahead risk.
+- **(a) Per-observation provenance with explicit enforcement**: every benchmark series carries an observation date; the engine rejects or downgrades any observation dated after the valuation date / cutoff. *Contract:* the `calculate_valuation` signature must accept dated series (breaking change, or additive optional fields). *Strength:* highest — violations caught at the boundary. *Auditability:* strong — each input is self-evidencing. *Migration:* heaviest — every caller must supply dates. *Residual risk:* low, provided report publication date/version are also dated (they are not currently inputs at all).
+- **(b) Caller/upstream attestation with a precisely specified ordering/validation rule**: callers assert cutoff compliance; Stage 7 validates the assertion's form (not its truth). *Contract:* smaller (an attestation field). *Strength:* moderate — does not detect upstream error. *Auditability:* depends on the attestation record's durability. *Migration:* light. *Residual risk:* moderate-to-high — a false attestation is undetectable downstream.
+- **(c) A documented V1 limitation**: Stage 7 records that PIT safety is the caller's/upstream's responsibility and the spec marks section 85 NOT-APPLICABLE in V1 (largely the state P19 left the spec in). *Contract:* none. *Strength:* none. *Auditability:* weak. *Migration:* none. *Residual risk:* highest — lookahead contamination of backtests is uncaught.
+- **Metadata alone does not enforce PIT correctness.** `pit_inputs_required` asserts a requirement without testing it; it must not be represented as enforcement under any option.
+
+**4. Financial correctness risks / failure modes.** The dominant failure mode is lookahead: a revised or late-published report used in a historical backtest inflates apparent performance. This is the most consequential creditability issue in the entire D1-D9 set (P17's C-04). A date-ordering rule that compares the wrong pair (e.g. cutoff vs. valuation date when the binding constraint is publication date) gives false assurance.
+
+**5. Contract / consumer / regression implications.** Option (a) changes the public signature — the largest boundary change alongside D6. Option (b) adds a field. Option (c) leaves code untouched. Under (a)/(b), existing callers (including any Stage 9 path) must be migrated; under (c), backtests remain caller-responsible.
+
+**6. Required inputs and definitions before implementation.** The temporal contract: which fields are dated (valuation date, data cutoff, report publication date/version, benchmark observation dates, historical EPS availability), the ordering rule among them, and the violation response (reject, downgrade, or flag — the last being a `POINT_IN_TIME_WARNING`, whose trigger is itself undefined and gated here).
+
+**7. Required tests once approved.** Post-cutoff observations rejected/downgraded as specified; date-equal boundary cases; missing dates; future-dated valuation; determinism; and a negative case proving pre-cutoff data passes untouched.
+
+**8. Dependencies.** **D6** (sector chain inputs also need provenance), **D9** (version selection is meaningless without a temporal contract), **D8** (`POINT_IN_TIME_WARNING` trigger).
+
+**9. What cannot safely be implemented before approval.** Any date-ordering policy, any rejection rule, and any claim that current metadata provides PIT safety.
+
+---
+
+## D8 — Alert Names and Trigger Semantics
+
+**1. Current verified behavior (evidence).** The spec mandates 13 alert names (section 49); the engine emits a different vocabulary (verified P17/P19/P20):
+- `VALUATION_BENCHMARK_DIVERGENCE` (spec) vs. `WATCH:VALUATION_ABOVE_TARGET_PE` / `WATCH:VALUATION_BELOW_TARGET_PE` (engine, `engine.py:519-522`).
+- `HISTORICAL_VALUATION_DIVERGENCE` vs. `WATCH:FORWARD_PE_ABOVE/BELOW_HISTORICAL` (`engine.py:523-527`).
+- `INDUSTRY_VALUATION_DIVERGENCE` vs. `WATCH:FORWARD_PE_ABOVE/BELOW_INDUSTRY` (`engine.py:528-532`).
+- `INSUFFICIENT_PEER_DATA` ≠ `INDUSTRY_BENCHMARK_INSUFFICIENT`: the former fires when forward values exist and valid forward peers `< MIN_INDUSTRY_PEERS = 8` (`engine.py:164-165`); the latter fires only when `target_source == "INSUFFICIENT_DATA"` (`engine.py:168-169`, i.e. no usable benchmark at all). A 7-peer case with a valid historical median emits the first but **not** the second (P21's section 55 refinement records this precisely).
+- **Flag-level vs severity-bearing**: `INSUFFICIENT_PEER_DATA`, `NEGATIVE_EPS`, `SIGN_CHANGE` are emitted only in `valuation_risk_flags`, not as severity-bearing `alerts`; a flag without severity is not equivalent to a severity-bearing alert.
+- **Missing trigger definitions**: `POOR_DATA_QUALITY` has no trigger in the spec and zero code references; `POINT_IN_TIME_WARNING` has zero code references and its trigger is gated on D7.
+
+**2. Unanswered policy question.** Rename engine outputs, alias them, or adopt current names in the spec — and does flag-level emission satisfy the section 49 "alert capability"?
+
+**3. Evidence-supported options (not recommendations).**
+- **(a) Rename** engine outputs to the spec names. *Contract stability:* poor — breaks any consumer parsing current names (Stage 9 consumes these outputs today). Also collapses the above/below pairs (two signals with opposing economics become one), losing direction information.
+- **(b) Alias** both names so each emission carries spec and current names. *Stability:* good — backwards compatible. *Cost:* duplicated vocabulary across two channels, with no defined severity for the alias form.
+- **(c) Adopt current names in the spec** (amend sections 49/54-55 to the emitted vocabulary). *Stability:* best for consumers; requires accepting the loss of the mandated names and rewriting sections 49/54-55/77-79's expected-result blocks.
+- The flag-vs-alert sufficiency question is orthogonal to all three and must be decided separately.
+
+**4. Financial correctness risks / failure modes.** Merging above/below destroys directional signal — a divergence *above* target and *below* target carry opposite implications. Promoting flags to severity-bearing alerts without a defined severity produces unrankable output. A rename performed without a coordinated consumer migration causes silent alert-dropage downstream.
+
+**5. Contract / consumer / regression implications.** This is the decision with the broadest consumer surface: `alerts` and `valuation_risk_flags` are public outputs (spec section 69) read by Stage 9 (`test_stage9_decision.py` passes today — 13/13 — so any rename must be validated there). Section 66 contract stability makes a rename a versioned contract change, not a silent one.
+
+**6. Required inputs and definitions before implementation.** The chosen strategy; the full mapping table (already drafted in P19's sections 49/54-55 annotations, which record mismatches without choosing); severity definitions for any promoted flag; and a `POOR_DATA_QUALITY` trigger definition.
+
+**7. Required tests once approved.** Every alert name asserted present/absent as chosen; above/below both exercisable and distinguishable; Stage 9 consumer tests re-run; a compatibility test if aliasing; negative cases for each trigger.
+
+**8. Dependencies.** Unblocks clean expression of **D1, D2, D3, D4, D5** (all emit new names) and **D7** (`POINT_IN_TIME_WARNING`).
+
+**9. What cannot safely be implemented before approval.** Any rename, alias, flag promotion, or spec amendment of the mandated names.
+
+---
+
+## D9 — Parameter Registry and Version Selection
+
+**1. Current verified behavior (evidence).** All thresholds are **fixed constants** in `src/valuation/parameters.py`: `VALUATION_THRESHOLDS` (8 status thresholds), `CONFIDENCE_THRESHOLDS`, `RISK_THRESHOLDS`, `ALERT_THRESHOLDS` (incl. `high_dependence_share = 0.60`, unused), `SENSITIVITY_PERTURBATION = 0.10`, `MIN_INDUSTRY_PEERS = 8`, plus `MODEL_VERSION = "STAGE7_V1"` and `CONTRACT_VERSION = "VALUATION_CONTRACT_V1"`. `effective_from` and `parameter_version` have **zero references** in all of `src` (verified P17/P19). Spec section 65 mandates a five-field record store (`valuation_model_parameters`: model_version, parameter_name, parameter_value, effective_from, description) that **does not exist**. P14 proposed an in-code registry ("Option A") as a proposal — **not approved**.
+
+**2. Unanswered policy question.** Which registry mechanism, and how is the effective version selected at query time (`as_of`)?
+
+**3. Evidence-supported options (not recommendations).**
+- **(a) Structured in-code registry**: a versioned constant structure with effective dates in `parameters.py`. *Auditability:* good (version-controlled, reviewable). *Reproducibility:* good for current runs. *Effective-date selection:* requires an `as_of` rule — unresolved. *Testability:* straightforward. *Cross-stage coupling:* low. *Migration:* minimal. *Backtest safety:* weak — historical runs re-execute against *current* constants unless the caller pins a version, so historical valuations are not reproducible as-of.
+- **(b) Persistent database-backed registry**: the section 65 five-field table. *Auditability:* strongest. *Reproducibility:* strongest (true as-of selection). *Effective-date selection:* native to the schema. *Testability:* requires DB fixtures. *Cross-stage coupling:* high (a shared schema object). *Migration:* heaviest (new table, dependencies, migration). *Backtest safety:* strongest.
+- **(c) Another versioning approach only if project-supported**: no alternative mechanism has project evidence; the only candidate artifacts are the existing fixed constants (which is the status quo, not a registry). This option therefore has **no evidence-supported instantiation** and is reported as empty rather than invented.
+
+**4. Financial correctness risks / failure modes.** Without as-of selection, any threshold change silently re-writes history — a backtest's results become a moving target, destroying the auditability the versioning requirement exists to protect. A registry without a selection rule is documentation, not versioning.
+
+**5. Contract / consumer / regression implications.** (a) keeps the public surface stable. (b) adds a schema object and dependency, and changes how every consumer resolves parameters. Under both, `MODEL_VERSION` semantics deepen from a static label to a version key.
+
+**6. Required inputs and definitions before implementation.** The mechanism choice; the `as_of` rule — **explicitly unresolved**: valuation date, data cutoff, or another policy cannot be chosen without owner approval and a clear temporal contract (this ties directly to D7, whose temporal contract is also unresolved — the two are mutually dependent). Also: the parameter inventory to version (spec sections 47/64 list formulas, thresholds, priors, and sensitivity parameters).
+
+**7. Required tests once approved.** As-of selection across a known version boundary; parameter changes effective on the correct date and not before; determinism given a pinned version; DB-roundtrip tests under (b).
+
+**8. Dependencies.** **D7** (the temporal contract defines what `as_of` means), and in turn D9 supplies versioning for **D1-D6**'s formulas and thresholds.
+
+**9. What cannot safely be implemented before approval.** Any registry, and any `as_of` policy.
+
+
+---
+
+## Prioritization — Proposed Discussion Sequence
+
+This is a **proposed discussion sequence for the owner**, not an approved implementation plan. No decision is resolved by this ordering, and none should be inferred as already settled.
+
+1. **D8 (alert names and trigger semantics) — first.** It fixes the vocabulary that D1, D2, D3, D4, D5, and D7 all emit into. Deciding it last means every alert decision is expressed in a name that may be renamed. It also has the widest consumer surface, so its cost should be confronted before, not after, alert features are built on top.
+2. **D6 (sector chains and P/NAV) — second.** It unblocks the largest body of work: D5's sector scope, the `REVENUE`/`NII`/`NAV` chains the two failing P2 tests assert, and the activation of the already-present `calculate_nav_fair_value`. It is also the largest contract change, so its scope decision frames everything downstream.
+3. **D1 → D2 → D3 — together, in that order.** These are the three dependence/risk alerts with a shared precedence question. D1 defines the perturbation vocabulary D2/D3 can reuse; D2 and D3 need their precedence rule decided jointly; D3's naming question (`FORECAST_RISK`) depends on D8.
+4. **D4 — parallel, low dependency.** Its most evidence-supported option right now is documented non-implementation (no margin series exists in the contract), so it can be resolved cheaply while the others proceed.
+5. **D7 and D9 — paired, last.** They are mutually dependent: D9's `as_of` rule needs D7's temporal contract, and D7's enforcement needs D9's versioning to be auditable. Both are infrastructure with the heaviest migration cost; deciding them after the feature set is stable avoids re-specifying a temporal contract twice.
+
+**Rationale:** decisions that change vocabulary (D8) and contract shape (D6, D7) precede decisions that fill in formulas (D1-D5), because formulas are expressed *in* the vocabulary and *on* the contract.
+
+**Documentation-only work that remains safe regardless of policy decisions** (identified, **not** implemented here): the remaining stress-test PASS claims in sections 71-76 and 80-84 sit outside the P19/P21 scope and were never audited for overclaims — checking them is purely factual work requiring no policy choice. Also, recording that `POOR_DATA_QUALITY` has no trigger definition (already noted) and maintaining the P19 annotation set as decisions land. None of this is implemented in this prompt.
+
+---
+
+## Six-Layer Validation
+
+**1. Unit/formula.** Static review only. Inspected the formulas relevant to each decision: `calculate_forward_pe_fair_value` (the shipped `FV = EPS × target P/E` identity), `_driver_analysis` (`engine.py:469-498`, including the `drivers = {"EPS", "TARGET_PE"}` hardcode, the `max(sum, 1e-9)` denominator guard, and the `review_priority` product), `_alerts` (`engine.py:500-535`), `_select_target_pe` (`engine.py:256-269`), and the flag block (`engine.py:164-169`). **No new formulas were created.** Undefined formulas identified: D1 (flip), D2 (dependence share), D3 (EPS share / escalation), D5 (impact×uncertainty combination + thresholds), D6 (per-chain sensitivity), D7 (date ordering). No tests were executed for this layer — the task is read-only and no claim required execution.
+
+**2. Contract/boundary.** Static inspection of `ValuationResult` (`schema.py:19-50`) and the `calculate_valuation` signature (`engine.py:57-79`). Precise contract changes each option would require: D1/D2/D3/D4/D5 add alert **names** to `alerts`/`valuation_risk_flags` (additive but versioned under section 66); D4(a) and D7(a) **change the input signature** (the only boundary-breaking options); D6(a) changes the **content** of the public `valuation_driver_ranking` output and activates `calculate_nav_fair_value`; D8(a) changes emitted names (breaking), D8(b) additive, D8(c) spec-only; D9(a) surface-stable, D9(b) adds a schema object. No contract change was made — all are described as options.
+
+**3. Production-path/integration.** Traced the relevant call path: `calculate_valuation` → `_select_target_pe` → flag block → `_driver_analysis` → `_alerts` → `ValuationResult` construction (`engine.py:201-250`), with `MODEL_VERSION`/`CONTRACT_VERSION`/`calculation_timestamp` set at `engine.py:211-212, 231`. Stage 9 consumer dependency confirmed by the passing `src/tests/test_stage9_decision.py` (13 passed, carried forward from P20/P21) — establishing that Stage 9 reads Stage 7's public outputs today, which is why D8 and D6 carry real consumer-compatibility risk. No runtime path was modified.
+
+**4. Adversarial/negative.** Enumerated cases that **must be tested once a policy is approved** — these are requirements for future test suites, **not** results claimed as executed:
+- *Missing data:* `None` inputs, empty driver set (`engine.py:477` early return), degenerate denominator (`max(sum, 1e-9)` at `engine.py:489`), reliability `None` vs. clamped (`_clamp_score` at `engine.py:490`).
+- *Stale/future data:* post-cutoff benchmark observations (PIT), future-dated valuation — only meaningful once D7 lands.
+- *Sign changes:* negative EPS, `NEGATIVE_EPS`/`SIGN_CHANGE` flag interaction with `NOT_APPLICABLE` status (`engine.py:197-199`), NAV ≤ 0 under D6.
+- *Threshold boundaries:* exactly at 0.60 (D2), at the reliability cutoff 40.0, at the divergence ratios 1.50, and at whatever D1/D5 thresholds the owner sets — including just-inside/just-outside pairs.
+- *Consumer compatibility:* Stage 9 parsing under each D8 option; alert-vocabulary regressions under renames.
+None of these were executed in P22.
+
+**5. Regression/full suite.** No tests were executed in this prompt — none of the decision-brief claims required execution, and the brief is documentation-only. Counts are **carried forward, freshly labeled as such**: Stage 7 = 50 passed / 2 failed (the known P2 tests, pre-existing and expected); Stage 9 = 13 passed; last full-suite run (P19) = 1031 passed / 2 failed / 1 skipped in 293s. The two failures are **not** new regressions. No test was treated as passing because it was skipped or excluded.
+
+**6. Independent audit.** All nine decision sections were cross-checked against P11-P21, the specification, and the code. Consistency findings: every "current behavior" claim re-verified against the same engine/parameters/schema locations cited in P17/P19/P20/P21; the D8 mismatch list matches the P19 section 49/54-55 annotations and the P21 section 55 refinement; the D2 dead-constant claim matches P17/P19 (single reference, `parameters.py:73`); the D6 unwired-export claim matches P17/P19/P20. **No decision is implicitly selected by wording** — each section presents options as options, separates them from any recommendation, and states what cannot be implemented before approval. One caveat recorded honestly: the D6 industry-code taxonomy check that the failed subagent was attempting did not complete, so D6 asserts only that **no** owner-approved mapping exists in the project (verified) and does not characterize candidate taxonomies.
+
+---
+
+## Compact Decision Table
+
+| Decision | Evidence-Supported Options | Dependencies | Contract Impact |
+|---|---|---|---|
+| **D1** Flip risk | (a) reuse 0.10 OAT perturbation; (b) dedicated owner-specified flip set; (c) status-transition-class only | D2/D3 (precedence), D8 (name), D9 (magnitude versioning) | New alert name (additive, versioned) |
+| **D2** Multiple dependence | (a) attribution share from existing decomposition; (b) sensitivity share; (c) documented non-implementation | D3 (precedence), D8, D9 | New alert name; risk of re-interpreting shipped driver-impact contract |
+| **D3** EPS dependence | Metric: EPS share (optionally reliability-weighted). Naming: (a) `HIGH_EPS_DEPENDENCE` only; (b) both names, distinct triggers; (c) `FORECAST_RISK` only | D2 (precedence), D8 (naming), D9 | One or two new alert names; spec section 79 rewrite |
+| **D4** Margin assumption | (a) contract expansion with provenance; (b) owner-approved proxy (none exists); (c) documented non-implementation | D7 (provenance), D9, D8 | (a) changes input signature; (b)/(c) none |
+| **D5** Impact × uncertainty | (a) apply to existing `{EPS, TARGET_PE}` set; (b) defer until D6 sector chains | D6 (for scope b), D8, D9 | New alert name; attaches to existing `review_priority` |
+| **D6** Sector chains + P/NAV | (a) implement three sector chains; (b) defer to V2 (current two-driver documented) | D7 (input provenance), D9, D8; **unblocks** D5 | Largest: changes `valuation_driver_ranking` content; activates `calculate_nav_fair_value` |
+| **D7** PIT enforcement | (a) per-observation provenance; (b) caller attestation; (c) documented V1 limitation | D9 (`as_of`), D6, D8 (`POINT_IN_TIME_WARNING`) | (a) changes input signature; (b) adds field; (c) none |
+| **D8** Alert names/triggers | (a) rename to spec names; (b) alias both; (c) adopt engine names in spec; plus flag-vs-alert sufficiency (orthogonal) | Unblocks D1-D5, D7 | Broadest consumer surface; Stage 9 parses these outputs today |
+| **D9** Parameter registry | (a) in-code registry; (b) DB-backed five-field table (spec section 65); (c) no evidence-supported alternative exists | D7 (temporal contract for `as_of`); supplies D1-D6 | (a) surface-stable; (b) new schema object + dependency |
+
+---
+
+## Exact Unresolved Items Still Requiring Owner Approval
+
+- **D1:** flip definition; perturbation set and magnitude (no spec/code value exists — must be *decided*, not discovered); severity mapping; interaction with divergence alerts.
+- **D2:** the metric definition itself (attribution vs. sensitivity share); denominator/missing-data rule; whether 0.60 applies and on which side; precedence vs. D3.
+- **D3:** the metric (share-only vs. reliability-weighted); the escalation/precedence rule with `LOW_FORECAST_RELIABILITY`; the `FORECAST_RISK` naming decision.
+- **D4:** whether to support margin risk at all in V1; if so, the margin-series source and provenance, or an owner-defined proxy. No proxy exists and none is proposed.
+- **D5:** definitions of "high impact" and "high uncertainty"; combination rule; both thresholds; scope (two-driver now vs. sector chains after D6).
+- **D6:** the industry-code → sector mapping (does not exist in the project); per-chain source fields and formulas; the Stage 5 EPS-consumption validation rule; the P/NAV compute-vs-consume decision.
+- **D7:** the enforcement policy; the full temporal contract (which fields are dated, the ordering rule, the violation response); the `POINT_IN_TIME_WARNING` trigger definition.
+- **D8:** the naming strategy (rename / alias / spec adoption); whether flag-level emission satisfies section 49's alert capability; the `POOR_DATA_QUALITY` trigger definition.
+- **D9:** the registry mechanism; the `as_of` selection rule (valuation date vs. data cutoff vs. another policy); the parameter inventory to version.
+
+Additionally, an unaddressed documentation-only item sits outside the policy decisions: stress-test PASS claims in sections **71-76 and 80-84** were never audited (outside P19/P21 scope) and may contain overclaims analogous to those corrected in 77-79/85.
+
+---
+
+## Confirmation
+
+- **No implementation or policy choice was made.** No D1-D9 decision was selected, explicitly or implicitly; every option is presented as an option and separated from any recommendation.
+- No formulas, thresholds, severities, industry mappings, dates, or defaults were invented. Where no evidence-supported answer exists (D1 magnitudes, D4 proxy, D9 alternative mechanism), that is stated directly.
+- No source, test, schema, spec, dependency, migration, or configuration file was modified — this brief is appended to `temp_report2.md` only, and no prior content was overwritten.
+- No tests were executed; all test counts are carried forward and labeled as such. No carried-forward result is presented as freshly executed, and no skipped/excluded test is treated as passing.
+- No remote Git operations were performed (no commits, pushes, pulls, or branch changes).
+- **Stage 7 remains unfrozen.** No stage was frozen. Work stops after appending this report.
+
+
+
+
+
+
