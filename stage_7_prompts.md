@@ -1989,3 +1989,125 @@ Append a dated P34 section to the END of `temp_report2.md`. Include exact code d
 
 Do not commit, push, pull, access GitHub, or modify remotes or branches. Do not freeze Stage 7.
 ======================================================
+# Continue Stage 7 Engineering — Direct GitHub Editing Required
+
+You are taking over the Stage 7 remediation of the private GitHub repository `lovelyroz/analyzer`.
+
+This is a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants are mandatory.
+
+## 1. Verify capabilities before starting
+
+Before proposing a solution, verify which capabilities are actually available in this chat:
+
+1. Read files from the connected GitHub repository.
+2. Create an isolated working branch.
+3. Edit and create repository files directly.
+4. Execute Python and pytest against the actual repository code.
+5. Run or inspect CI checks, if available.
+
+Do not claim that you can edit, execute, or test anything unless the corresponding capability is actually available.
+
+**Direct implementation is required.** Do not merely generate prompts for OpenCode, Claude Code, or another agent. If direct repository editing is available, use it. If execution is unavailable, state that limitation explicitly and do not claim tests passed.
+
+## 2. Protect the repository
+
+* Repository: `lovelyroz/analyzer`.
+* Work on a dedicated Stage 7 remediation branch, never directly on the default branch.
+* Inspect the current branch and file versions before editing.
+* Do not overwrite unrelated work or discard existing changes.
+* Do not merge the branch or modify the default branch.
+* Do not claim a commit, file update, or test execution succeeded without confirming the result.
+* Preserve all existing reports by appending to `temp_report2.md`; never overwrite its history.
+
+## 3. Project state
+
+Stage 7 is not frozen and must not be declared complete without an independent final audit and the user's authorization.
+
+Stages 1–6 and 8–9 are historically frozen. Do not modify them without first establishing a concrete dependency and obtaining explicit authorization for the minimum necessary cross-stage change.
+
+Known issues from the latest available reports:
+
+* `P31`: root-cause investigation did not implement production-path integration.
+* `P32`: added limited forecast-input date validation, but the actual production valuation path and benchmark provenance remain unresolved.
+* `P33`: introduced a parameter registry/snapshot and tests, but the engine still uses module-level constants for material calculations. The selected version may not control the actual calculation.
+* `P34`: did not implement code changes; two known tests still failed.
+* No verified P35 independent audit is available.
+
+Historical reported test counts were 911 passed, 2 failed, 1 skipped in the broad suite, and 74 passed, 2 failed in the Stage 7 + Stage 9 suites. These counts must be re-verified; do not treat them as current results.
+
+Known failing tests:
+
+* `test_p2_sector_driver_decomposition_missing`
+* `test_p2_required_flip_dependence_alerts_missing`
+
+Never delete, skip, weaken, or relax these tests simply to achieve a passing result.
+
+Relevant files include:
+
+* `07_Stage7_Valuation.md`
+* `src/valuation/engine.py`
+* `src/valuation/models.py`
+* `src/valuation/parameters.py`
+* `src/valuation/schema.py`
+* `src/tests/test_stage7_valuation.py`
+* `src/tests/test_stage9_decision.py`
+* `temp_report2.md`
+
+Inspect the current repository state rather than trusting this summary over the actual code.
+
+## 4. Engineering objectives
+
+Prioritize the following:
+
+1. Establish the real production call path for Stage 7 valuation and connect the engine where justified by the existing architecture and contracts.
+2. Fix the two known test failures at their root cause.
+3. Make parameter versioning control the parameters actually consumed by calculations. Ensure audit snapshots match the parameters actually used.
+4. Enforce PIT controls against authoritative source dates and provenance, including benchmark observations where supported.
+5. Complete sector-specific valuation logic only when source inputs, formulas, and contracts are verifiable.
+6. Implement meaningful risk metrics and alerts only when their definitions and triggers are valid.
+7. Add regression and adversarial tests for all changes.
+
+Stage 7 must consume Stage 5 EPS forecasts and must not rebuild EPS using a new share-count calculation.
+
+## 5. Financial safety rules
+
+Never invent formulas, thresholds, shock magnitudes, dates, peer mappings, source provenance, historical parameter effective dates, rounding rules, or acceptance criteria.
+
+Missing data is not zero. Do not hide uncertainty or silently substitute current values into historical calculations. Do not present an unreachable alert or a degenerate metric as a validated financial risk measure.
+
+Where a policy is genuinely undefined, implement every independent, contract-supported correction first. Then identify the exact decision required, the available alternatives, and the consequences. Do not use one unresolved policy as a reason to abandon unrelated fixable work.
+
+## 6. Validation requirements
+
+Every implementation task must address all six layers:
+
+1. Unit/formula correctness.
+2. Contract and boundary validation.
+3. Production-path/integration tests.
+4. Adversarial and negative tests.
+5. Regression and relevant full-suite tests.
+6. Independent audit of the changed logic.
+
+Report exact commands, test counts, failures, skips, and environment limitations. Clearly distinguish freshly executed tests from static inspection and historical results.
+
+## 7. Working method
+
+First inspect `temp_report2.md` and the current source files. Then identify the single highest-priority implementation defect and fix it completely, including tests.
+
+Do not start with another report-only review. Do not attempt a broad rewrite. Do not stop after diagnosis when a valid, evidence-supported correction is available.
+
+After each bounded implementation, append a dated report to the end of `temp_report2.md`, including the code changes, test evidence, remaining blockers, and next priority.
+
+Do not freeze Stage 7. Do not claim completion until an independent audit confirms the requirements and the user authorizes the freeze.
+
+## 8. First response required
+
+In your first response, state:
+
+* whether direct GitHub reading and writing are available;
+* whether an isolated branch can be created;
+* whether code execution and pytest are available;
+* the exact first action you will take.
+
+If a required capability is unavailable, explain the limitation before proposing a workable alternative. Do not pretend to have performed repository changes.
+

@@ -3522,3 +3522,5 @@ Genuine `model_version`/`parameter_name`/`parameter_value`/`effective_from`/desc
 ## 6. Final Verdict
 
 **NO SUPPORTABLE CORRECTIONS — NO CODE CHANGED; 2 failures PROVEN pre-existing (1 unapproved-policy + upstream-dependency, 1 unapproved-policy ×5).** Workstreams A–E each executed to their evidence terminus; nothing defect-class found; nothing implemented without manufacturing policy. Not claimed: passing suite, completeness, freeze. Stage 7 remains unfrozen. Stop here.
+===================================================================
+
