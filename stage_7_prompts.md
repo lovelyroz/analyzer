@@ -1070,3 +1070,141 @@ End with:
 
 Stage 7 must remain unfrozen. Stop after appending the report.
 ==================================================================
+# P23 — Stage 7 Remaining Stress-Test PASS Claims Audit (READ-ONLY)
+
+You are working locally in the `analyzer` folder on a financial-data application.
+
+## Objective
+
+Independently audit the remaining PASS claims in sections 71-76 and 80-84 of `07_Stage7_Valuation.md`. P19 corrected sections 77-79 and 85, but P22 identified these remaining sections as not yet audited for possible overclaims.
+
+This task is READ-ONLY. Do not change the specification or any implementation files.
+
+## Required scope
+
+Inspect only:
+
+* `temp_report2.md`, especially P17-P22;
+* `07_Stage7_Valuation.md`, sections 71-76 and 80-84, plus only the directly referenced specification requirements;
+* relevant functions in `src/valuation/engine.py`, `models.py`, `parameters.py`, and `schema.py`;
+* the exact tests or test fixtures referenced by those stress-test sections.
+
+Do not conduct a repository-wide review.
+
+## Audit procedure
+
+For every individual test section from 71 through 76 and 80 through 84:
+
+1. Quote or precisely identify the current claimed result and expected behavior.
+2. Identify the exact implementation function and relevant input/output contract.
+3. Determine whether the behavior is implemented, partially implemented, absent, or impossible to verify from available evidence.
+4. Verify whether the test's claimed PASS has actually been supported by an executed test, a reproducible test fixture, or only a specification assertion.
+5. Identify any missing negative, boundary, missing-data, determinism, or integration checks relevant to that claim.
+6. Recommend the smallest factual correction if the claim overstates current behavior.
+7. Clearly separate factual documentation corrections from changes that would require an owner decision under D1-D9.
+
+Do not infer implementation from a specification requirement alone. Do not infer test execution from the presence of a PASS label. Do not invent formulas, thresholds, data, or acceptance criteria.
+
+## Decision firewall
+
+* Do not implement missing financial logic.
+* Do not select or infer any D1-D9 decision.
+* Do not declare features deferred to V2 without explicit owner approval.
+* Do not weaken, delete, skip, or rewrite tests to make claims pass.
+* Do not change source code, tests, schemas, configuration, dependencies, migrations, or specification.
+* Do not access remote Git/GitHub/APIs, and do not perform commits, pushes, pulls, or branch changes.
+
+## Six-layer validation
+
+Report all six layers separately:
+
+1. **Unit/formula:** static inspection of formulas and exact test claims.
+2. **Contract/boundary:** confirm the relevant inputs and outputs exist and match the claimed behavior.
+3. **Production-path/integration:** trace only the relevant production path and consumer where applicable.
+4. **Adversarial/negative:** identify whether negative, boundary, missing-data, and determinism checks exist; do not claim they ran unless they did.
+5. **Regression/full suite:** no full suite is required for this read-only audit. If tests are executed to verify a claim, report exact commands, counts, failures, skips, and exclusions. Otherwise clearly label historical counts as carried forward.
+6. **Independent audit:** cross-check every section's conclusion against both code and its cited tests.
+
+## Report
+
+Append `P23 — Stage 7 Remaining Stress-Test PASS Claims Audit Report` to `temp_report2.md`.
+
+Include a table with one row per audited section and these columns:
+
+* section;
+* claimed behavior;
+* implementation evidence;
+* test evidence;
+* verdict (`SUPPORTED`, `PARTIALLY SUPPORTED`, `UNSUPPORTED`, or `UNVERIFIABLE`);
+* minimal documentation correction, if needed;
+* D1-D9 dependency, if any.
+
+Conclude with the exact set of corrections safe to make without an owner decision, and the findings that must remain blocked.
+
+Stage 7 remains unfrozen. Preserve all prior report content and stop after appending the audit report.
+====================================================================
+# P24 — Stage 7 Evidence-Backed Stress-Test Documentation Corrections
+
+You are working locally in the `analyzer` folder on a financial-data application.
+
+## Objective
+
+Apply only factual documentation corrections supported by the completed P23 audit for stress-test sections 71-76 and 80-84 in `07_Stage7_Valuation.md`.
+
+## Mandatory prerequisite
+
+Read the complete P23 report from `temp_report2.md` first.
+
+If P23 is missing, incomplete, or does not provide specific code/test evidence for a proposed correction, do not guess. Record the blocker in the report and make no speculative edit.
+
+## Scope
+
+For each of sections 71-76 and 80-84:
+
+1. Compare its current claim against the P23 verdict and evidence.
+2. Correct a claim only if P23 demonstrates that the wording materially overstates or misrepresents actual behavior.
+3. Preserve claims that P23 found to be supported.
+4. Where behavior depends on an unresolved D1-D9 decision, state the verified current limitation and leave the policy undecided.
+5. Do not label a feature deferred to V2 unless the owner has explicitly approved that deferral.
+6. Do not convert an unexecuted test into an executed PASS claim.
+
+Modify only the minimum necessary text in `07_Stage7_Valuation.md` for the audited sections. Do not modify other specification sections unless P23 identifies a direct contradiction that cannot be corrected within the audited section; if so, report it and stop for authorization.
+
+## Prohibited changes
+
+* No Python source, tests, schemas, dependencies, migrations, or configuration changes.
+* No new financial formulas, thresholds, severities, mappings, defaults, or date-ordering policies.
+* No D1-D9 decision selection or implementation.
+* No deletion, weakening, skipping, or rewriting of failing tests.
+* No remote Git/GitHub/API access; no commits, pushes, pulls, or branch changes.
+* Do not overwrite or truncate `temp_report2.md`.
+
+## Six-layer validation
+
+Report all six layers separately:
+
+1. **Unit/formula:** prove that no formula or runtime logic changed.
+2. **Contract/boundary:** confirm public signatures, schemas, output names, and boundary behavior are unchanged.
+3. **Production-path/integration:** confirm no runtime or consumer files changed.
+4. **Adversarial/negative:** check that the revised wording preserves the actual limits and negative cases identified in P23.
+5. **Regression/full suite:** run the focused Stage 7 and Stage 9 tests. Run the applicable full suite if feasible. Report exact commands, counts, warnings, skips, exclusions, and failures. Do not describe historical results as freshly executed.
+6. **Independent audit:** compare every edited section against P23 and the actual implementation. Confirm that no unsupported PASS claim remains within the authorized scope and no unresolved decision was silently selected.
+
+If no correction is warranted, leave the specification unchanged and explain why.
+
+## Completion and report
+
+Append `P24 — Stage 7 Stress-Test Documentation Corrections Report` to `temp_report2.md`.
+
+Include:
+
+* the exact sections edited, if any;
+* before/after wording for each edit;
+* why each correction is supported by evidence;
+* sections reviewed but deliberately left unchanged;
+* six-layer validation results;
+* remaining D1-D9 blockers;
+* confirmation that Stage 7 remains unfrozen and no remote Git operation occurred.
+
+Inspect the final diff and stop after reporting. Do not implement any valuation feature as part of this task.
+========================================================================

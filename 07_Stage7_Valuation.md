@@ -1801,6 +1801,10 @@ FORECAST RISK WARNING
 
 PASS.
 
+> **V1 Implementation Status (factual annotation — P24, per P23 audit):**
+>
+> ترکیب قابل‌دستیابی در V1 عبارت است از `ATTRACTIVE` به‌همراه `valuation_confidence` / `valuation_confidence_label` در سطح LOW یا VERY_LOW، به‌همراه flag تحت عنوان `LOW_FORECAST_RELIABILITY` و alert تحت عنوان `WARNING:LOW_FORECAST_RELIABILITY` (`engine.py:162-163,514`). مقدار Reliability ورودی تابع `_valuation_status` نیست و Fair Value را تغییر نمی‌دهد. توکن تحت‌اللفظی `FORECAST RISK WARNING` / `FORECAST_RISK` هرگز صادر نمی‌شود (صفر ارجاع در کل `src` — رکوع بخش ۷۹). **تصمیم D3/D8 هنوز حل‌نشده است.** ادعای PASS بالا فقط برای ترکیب قابل‌دستیابی صادق است، نه برای توکن تحت‌اللفظی.
+
 ---
 
 # 73. Stress Test — Negative EPS
@@ -1837,6 +1841,10 @@ Industry Forward P/E = INSUFFICIENT_DATA
 و Benchmark Hierarchy به Historical Median منتقل می‌شود.
 
 PASS.
+
+> **V1 Implementation Status (factual annotation — P24, per P23 audit):**
+>
+> رفتار fallback واقعی و تست‌شده به این صورت است: با کمتر از ۸ peer معتبر، بنچمارک industry-forward برای انتخاب **رد** می‌شود (`target_pe_source` به `HISTORICAL_MEDIAN_PE` می‌رود؛ `_select_target_pe` در `engine.py:263-267` و `MIN_INDUSTRY_PEERS = 8`) و flag تحت عنوان `INSUFFICIENT_PEER_DATA` صادر می‌شود (`engine.py:164-165`). در همین حالت، فیلد `industry_forward_pe_median` همچنان median مقادیر موجود را گزارش می‌کند (مثلاً با ۷ peer مقدار 6.0) — صرفاً برای انتخاب بنچمارک استفاده نمی‌شود. برچسب `INDUSTRY_FORWARD_PE = INSUFFICIENT_DATA` در متن بالا دقیق نیست و باید به سیگنال واقعی `INSUFFICIENT_PEER_DATA` ارجاع داده شود. flag تحت عنوان `INDUSTRY_BENCHMARK_INSUFFICIENT` تنها زمانی صادر می‌شود که `target_source == "INSUFFICIENT_DATA"` باشد (یعنی هیچ بنچمارک قابل‌استفاده‌ای موجود نباشد) و نباید با `INSUFFICIENT_PEER_DATA` یکی گرفته شود — همان تفکیک ثبت‌شده در اصلاحیه P21 بخش ۵۵.
 
 ---
 
@@ -1956,6 +1964,10 @@ Strong Improvement
 
 PASS.
 
+> **V1 Implementation Status (factual annotation — P24, per P23 audit):**
+>
+> ممنوعیت scale مستقیم Target P/E برقرار است (ساختاری): امضای `calculate_valuation` (`engine.py:57-79`) هیچ ورودی trend ندارد. نیمه مثبت ادعا فقط از طریق کانال family-evidence صادق است — یک trend از نوع `Strong Improvement` در Stage 4 مستقیماً وارد مرز Stage 7 نمی‌شود و نمی‌تواند مستقیماً احتمال‌ها را جابه‌جا کند؛ ابتدا باید در بالادست (upstream) داخل family scoreها (بخش‌های ۲۳–۲۴، `probability_evidence`) تجمیع شود و سپس caller آن را به Stage 7 بدهد. **تصمیم D6 (در صورت ورود ورودی‌های sector/trend به مرز) هنوز حل‌نشده است.**
+
 ---
 
 # 82. Stress Test — Probability Confidence
@@ -1989,7 +2001,13 @@ EPS Forecast
 
 می‌تواند Positive Revision Evidence ایجاد کند.
 
-PASS.
+> **V1 Implementation Status (factual annotation — P24, per P23 audit):** **NOT PRODUCED IN STAGE 7 V1.**
+>
+> لایه Stage 7 در V1 هیچ خروجی revision-evidence تولید نمی‌کند: توکن `POSITIVE_FORECAST_REVISION` صفر ارجاع در کل `src` دارد. جهت revision در Stage 5 محاسبه می‌شود (`revision_trend` در `src/forecast/repo.py:137-148` با مقادیر `UPWARD` / `DOWNWARD` / `MIXED`) و در Stage 9 مصرف می‌شود (`src/decision/engine.py`)، اما هیچ‌چیز وارد `src/valuation` نمی‌شود. Stage 7 فقط family-level probability evidence دریافت می‌کند و هیچ توکن revision-evidence تولید نمی‌کند.
+>
+> **اینکه آیا revision evidence اصلاً باید به لایه valuation برسد — و اگر بله، از چه مسیری (تجمیع family-evidence توسط caller یا ورودی revision تاریخ‌دار جدید) و با چه نامی — یک سؤال سیاستی باز است (مرتبط با D3/D8 و الزام بخش ۲۶).** این سند deferral به V2 را اعلام نمی‌کند؛ تنها ثبت می‌کند که رفتار فوق در V1 پیاده‌سازی نشده است.
+
+~~PASS.~~ → **وضعیت: در V1 صدق نمی‌کند — Stage 7 هیچ Positive Revision Evidence تولید نمی‌کند (مرتبط با D3/D8 حل‌نشده).**
 
 ---
 
@@ -2005,6 +2023,10 @@ EPS:
 Sign-change handling اعمال می‌شود.
 
 PASS.
+
+> **V1 Implementation Status (factual annotation — P24, per P23 audit):**
+>
+> عدم تولید growth/P/E گمراه‌کننده و flagهای sign-change واقعی و تست‌شده‌اند: EPS منفی → fpe/fv برابر None (مدل‌ها) و وضعیت `NOT_APPLICABLE` (`engine.py:197-199`). برچسب‌های `LOSS_TO_PROFIT` / `PROFIT_TO_LOSS` گذارهای علامت **بین‌سناریویی** هستند (نسبت به سناریوهای دیگر در همان اجرا؛ `_scenario_sign_change_flags` در `engine.py:374-384`)، نه برچسب‌های revision زمانی؛ خوانش `-100 → +120` با مجموعه flagها بازنمایی می‌شود، نه با یک سری زمانی.
 
 ---
 
