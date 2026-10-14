@@ -3275,4 +3275,61 @@ Nothing implemented ⇒ nothing new to test (P29-3's adversarial cases presuppos
 ## 6. Final Verdict
 
 **VERSIONING NOT IMPLEMENTED — BLOCKED (R8 mechanism + effective-date provenance + R7 as_of coordination); O4/O5 ALREADY HOLD.** Two of seven outcomes verifiably satisfied without action; the other five terminate at missing approvals/dates, each named above. Not claimed: versioned parameters, as-of selection, completeness, freeze. P28/P29 verdicts stand alongside this one — all three share the single unblock path of P27-R1–R8 owner approval. Stage 7 remains unfrozen. Stop here.
+===================================================================
+# P31 — Stage 7 Root-Cause Remediation and Production-Path Integration
+
+**Date (UTC):** 2026-10-14
+**Nature:** Real-work attempt per P31, not report-only by choice: baseline → independent production-path verification (5 levels) → defect hunt for bug-class issues → fix attempt per failure → gated test plan. P28–P30 reviewed first (built on, not repeated, not discarded). Pre-check: no R1–R8 owner approval exists (approval grep zero; log top c941cfd P30). Constraints honored: frozen Stages 1–6/8–9 NOT modified; no invented formulas/thresholds/magnitudes/dates/mappings/provenance/defaults/rounding; no EPS rebuild; no buy/sell implication; missing never treated as zero; no production integration claimed without a demonstrating test. The only write is this report.
+
+## 1. Fresh Baseline (all runs this task, `.venv/Scripts/python.exe`, repo root, `-p no:warnings` unless stated)
+
+- Named pair (`test_p2_sector_driver_decomposition_missing`, `test_p2_required_flip_dependence_alerts_missing`) → **2 failed in 1.34s, exit 1.** Exact messages: `:422` subset assertion (`{'NAV','NII','REVENUE'} <= {'EPS','TARGET_PE'}`); `:465` missing-names assertion (all 5 names absent).
+- `test_stage7_valuation.py` → **2 failed, 50 passed in 0.81s, exit 1.**
+- Stage 7 + Stage 9 → **2 failed, 63 passed in 1.28s, exit 1** (Stage 9 13/13; warnings shown once, same known `utcnow` set).
+- Broad (`src/tests/ -q -rs --ignore=test_codal_pdf_extraction.py`) → **2 failed, 900 passed, 1 skipped in 115.42s, exit 1.** Skip: Codal fixture `:307`, never a pass.
+
+## 2. Production-Path Trace (independent 5-level verification — P29's finding re-proven, extended)
+
+- **L1 — callers of `calculate_valuation`:** 84 matches = the definition (`engine.py:57`) + tests only. Zero production callers.
+- **L2 — `ValuationEngine` references:** 63 matches = definition + package re-export (`__init__.py:11`) + tests only. Zero production instantiations.
+- **L3 — `ValuationResult(` constructions:** exactly 2 = inside the engine itself (`:201`) + Stage 9 TEST helper (`test_stage9_decision.py:24`). No production code ever builds one.
+- **L4 — `src/scripts/`:** DB utilities only (`init_db/migrate_db/seed_data`); sole valuation-adjacent hit is an unrelated `MappingDecision` import. No pipeline wiring.
+- **L5 — decision engine:** type-only import of `ValuationResult`; consumes an INJECTED result (status/reliability/risk/confidence/metadata — P26/P27 field list); Stage 9 tests inject hand-built results. Integration of Stage 7→9 exists ONLY in tests.
+- **Conclusion:** Stage 7 is implemented-but-unwired — a tested library with no production caller and no production-constructed inputs. Per the prompt's own rule, production integration is NOT claimed (no test can demonstrate a call path that does not exist). Wiring one necessarily touches frozen stages or adds an orchestrator — outside this task's authorization (P31-5); documented in §5 instead of built.
+
+## 3. Root Causes Classified (code defect vs contract gap vs unapproved policy vs missing dependency)
+
+- **T1 (sector drivers):** missing upstream dependency (chain source fields; industry mapping) + unapproved policy (D6). NOT a code defect — `_driver_analysis` (`:469-498`) implements exactly the approved two-driver contract. NOT a contract inconsistency — the contract is coherent, only narrower than spec §§42-44.
+- **T2 (five alerts):** unapproved policy ×5 (D1 flip rule; D2/D3 metric+threshold+precedence with proven 50/50 degeneracy; D4 margin series; D5 combination+thresholds). NOT a code defect, NOT a contract inconsistency.
+- **Integration gap:** missing upstream dependency (caller) + missing architecture decision (caller placement/sourcing/scheduling). Frozen-stage modification NOT authorized.
+
+## 4. Corrections Implemented: NONE — Defect Hunt Closed With Evidence
+
+- Full-engine re-scan for bug-class issues: every suspicious line is either pinned by passing tests (`test_p10_*_outputs_unchanged`, `test_p6_regression_prior_behavior_preserved`, golden cases — e.g. the `<` vs `<=` threshold asymmetry) or documented deliberate compatibility (`INDUSTRY_TARGET_PE={}`, neutral `SCENARIO_PE_MULTIPLIER`, `flags.extend(alerts)` channel merge). Altering any of them breaks pinned behavior without an approved basis — indistinguishable from test weakening.
+- Policy items: blocked exactly as in P28 (R-gated); re-verified, not re-argued.
+- Caller wiring: outside authorization (see §2 + §5).
+- Tests added/changed: none — approved behavior fully pinned (50 green); any new behavioral test would assert unapproved policy or duplicate pins.
+- On P31-8 ("a report without implementation is not acceptable WHEN a valid correction exists"): the condition is not met — zero valid corrections exist in scope. This report documents the completed hunt instead of manufacturing one.
+
+## 5. Cross-Stage Dependency Document (authorized documentation, not a change)
+
+- **Dependency:** no production caller; evidence §2 (5-level proof).
+- **What integration requires:** a caller that (a) sources a real `CompanyForecastResult` from Stage 5/6 outputs (never fabricated), (b) supplies benchmark series + reliability from upstream, (c) feeds the resulting `ValuationResult` to Stage 9.
+- **Required tests:** an integration test driving caller→valuation→decision on REAL Stage 5/6 outputs (fabricated forecasts prohibited); no such test can be written until the caller exists.
+- **Owner-gated choices (no speculative diff provided — writing one would invent architecture):** caller placement (new orchestrator vs Stage-9-driven vs other), data-sourcing contracts, scheduling. Gated to the WP-5/6 era under R2/R7 decisions.
+
+## 6. Six-Layer Validation (each separately, post-work)
+
+1. **Unit/formula:** failure assertions re-derived; defect hunt closed; zero logic touched (empty diff).
+2. **Contract/boundary:** zero signature/schema/output changes; boundary gaps restated unchanged.
+3. **Production-path/integration:** 5-level negative result documented with evidence; Stage 9 tests green; frozen stages untouched.
+4. **Adversarial/negative:** failing tests' hostile content executes and fails for proven reasons; passing adversarial suites (NaN/None/zero/ordering/determinism) confirm no adjacent breakage.
+5. **Regression:** four exact commands above (exits 1/1/1/1 on the two known tests only); 1 carried skip, never a pass; pre-existing failures PROVEN (identical signatures P15→P31), not weakened.
+6. **Independent audit of changed logic:** no logic changed; final diff scope verified = this section only (0 deletions; no other file touched); financial invariants preserved by inaction, not by claim.
+
+## 7. Remaining Blockers, Files, Follow-up, Verdict
+
+- **Blockers:** T1 → R2+WP-5; T2 → R1/R3/R4/R5/R6+WP-1…4; integration → caller-placement decision + R2/R7. All owner-side.
+- **Files changed:** none. **Tests added/changed:** none. **Follow-up required:** owner R1–R8 answers (P27 §5); any single R-answer immediately starts its gated WP.
+- **Verdict: NOT FULLY PASSING — 2 pre-existing failures PROVEN, ZERO supportable corrections in scope, NO CODE CHANGED.** Not claimed: production integration, completeness, freeze. Stage 7 remains unfrozen. Stop after implementation attempt + validation + report.
 

@@ -1693,3 +1693,165 @@ Include exact commands, exit statuses, and fresh test counts. Skipped tests are 
 
 No remote Git/GitHub operations, commits, pushes, pulls, or branch changes. Stage 7 remains unfrozen until the entire Stage 7 implementation and independent final audit are complete.
 =====================================================
+# P31 — ریشه‌یابی، اصلاح واقعی و یکپارچگی مسیر تولید
+# P31 — Stage 7 Root-Cause Remediation and Production-Path Integration
+
+You are working locally in the `analyzer` project folder. This is a financial-data application. Financial correctness, auditability, point-in-time correctness, determinism, and preservation of explicit financial invariants take priority over speed.
+
+## Primary objective
+
+Perform real engineering work, not another report-only investigation. Resolve every defect that can be corrected using existing, verifiable contracts and evidence. Determine whether Stage 7 valuation is connected to the actual production path and implement the smallest complete, valid corrections within the authorized scope.
+
+## Context and known issues
+
+1. The latest recorded baseline in `temp_report2.md` was:
+
+   * Broad suite: 900 passed, 2 failed, 1 skipped.
+   * Stage 7 + Stage 9: 63 passed, 2 failed.
+   * Stage 9 alone: 13 passed.
+     These are historical results, not assumed to be the current baseline. Re-run the relevant commands and record fresh results.
+2. Two known failing tests must not be deleted, skipped, weakened, or altered merely to make the suite pass:
+
+   * `test_p2_sector_driver_decomposition_missing`
+   * `test_p2_required_flip_dependence_alerts_missing`
+3. A previous investigation reported no production callers of `calculate_valuation`. Independently verify this finding and trace the real production path.
+4. Previous reports identified unresolved policies around flip-risk thresholds, dependence metrics, scenario attribution, sector-specific inputs, PIT enforcement, alert semantics, and effective-dated parameter selection. Read the relevant sections of `temp_report2.md` before acting.
+5. Stages 1–6 and 8–9 are frozen. You are NOT authorized to modify them in this task. If a verified Stage 7 integration defect requires a change to a frozen stage, document the exact dependency, evidence, proposed minimal diff, and required tests; continue all independent Stage 7 work without making that cross-stage change.
+
+## Scope
+
+Inspect only the files needed to trace the valuation entry point, its actual callers, input construction, output consumption, and the two failing tests. Begin with:
+
+* `src/valuation/engine.py`
+* `src/valuation/models.py`
+* `src/valuation/parameters.py`
+* `src/valuation/schema.py`
+* `src/tests/test_stage7_valuation.py`
+* `src/tests/test_stage9_decision.py`
+* `07_Stage7_Valuation.md`
+* relevant Stage 7 reports in `temp_report2.md`
+
+Expand the scope only when a concrete dependency requires it. Do not perform a repository-wide redesign.
+
+## Required execution
+
+1. Run fresh baseline tests before editing.
+2. Reproduce both failing tests individually and capture their exact failure messages and stack traces.
+3. Trace the production path from the actual caller through input construction, valuation calculation, result serialization, and downstream consumers. Do not infer production use from the existence of a class or function.
+4. For each failure and integration defect, identify the root cause and distinguish:
+
+   * a demonstrable code defect;
+   * a missing or inconsistent existing contract;
+   * an unapproved financial policy;
+   * a missing upstream dependency.
+5. Implement every complete correction that is supported by current contracts, existing authoritative formulas, and verifiable data. Do not stop after diagnosing a fixable defect.
+6. Add or update regression tests for each code change. Preserve existing public contracts unless evidence justifies a backward-compatible correction.
+7. If no valid implementation exists for a particular item, do not fabricate policy. State the exact missing decision and its consequences, while completing all other independent work.
+
+## Financial and testing constraints
+
+* Never invent formulas, thresholds, shock magnitudes, dates, mappings, provenance, defaults, rounding rules, or acceptance criteria.
+* Never substitute unrelated PDFs or fabricated data for genuine CODAL samples.
+* Do not rebuild Stage 5 EPS or introduce a new share-count calculation in Stage 7.
+* Do not make alerts, risk flags, or driver rankings imply buy/sell advice.
+* Do not silently treat missing values as zero.
+* Do not report static inspection, planned commands, skipped tests, or historical results as freshly executed passing tests.
+* Do not claim a production path is integrated unless tests demonstrate the actual call path.
+
+## Mandatory six-layer validation
+
+After implementing changes, execute and report all six layers:
+
+1. Unit/formula correctness.
+2. Contract and boundary validation.
+3. Production-path/integration tests.
+4. Adversarial and negative tests.
+5. Regression tests, including the relevant complete suite.
+6. Independent audit of the changed logic and its financial invariants.
+
+Run the two previously failing tests individually, then the Stage 7 suite, Stage 7 + Stage 9 suites, and the broad suite where feasible. Record exact commands and counts. Investigate every failure caused or exposed by your changes.
+
+If an unrelated or pre-existing failure remains, prove its status rather than weakening its test. Do not label the work fully passing.
+
+## Reporting
+
+Append a new, clearly dated P31 section to the END of `temp_report2.md`. Do not overwrite or rewrite earlier reports. Include:
+
+* fresh baseline and final test results;
+* root cause and exact code changes;
+* production call-path evidence;
+* tests added or changed;
+* six-layer validation results;
+* remaining blockers and the precise decisions or dependencies needed;
+* files changed and any required follow-up.
+
+A report without the corresponding implementation is not an acceptable result when a valid correction exists. Do not commit, push, pull, access GitHub, or modify remotes or branches.
+
+Continue until all work in the authorized scope is implemented and validated, then report. Do not freeze Stage 7.
+===========================================================
+# P32 — Stage 7 Point-in-Time Contract and Enforcement
+
+You are working locally in `analyzer`. Implement real point-in-time (PIT) safeguards for Stage 7 using actual data sources and existing contracts. Do not produce only a design proposal.
+
+Read the latest P31 section in `temp_report2.md`, the applicable sections of `07_Stage7_Valuation.md`, and the narrowest set of source files needed to follow PIT-sensitive inputs from their origin into valuation.
+
+## Objectives
+
+1. Identify all PIT-sensitive inputs actually used by Stage 7, including as applicable:
+
+   * valuation/market-price date;
+   * forecast cutoff;
+   * financial-report publication date and version;
+   * historical EPS availability;
+   * industry benchmark observations;
+   * parameter validity dates.
+2. Trace each field to its real source and determine whether its timestamp/provenance is authoritative, caller-supplied, inferred, or absent.
+3. Find every place where future-known information could enter a historical valuation or backtest.
+4. Implement enforceable controls for every case whose temporal contract can be established from existing evidence.
+5. Add tests proving that the controls execute on the actual valuation path, not just in isolated helper functions.
+
+## Required implementation rules
+
+* A timestamp field existing in a model is not proof of PIT enforcement.
+* Do not use current data in a historical valuation unless the existing contract explicitly permits it and the limitation is documented.
+* Do not invent date-ordering rules, publication-date semantics, missing-date defaults, or historical selection rules.
+* Do not accept a future-dated benchmark observation merely because a prior test happened to allow it. Investigate the intended contract, existing authoritative data semantics, and consumers. Correct the behavior if the correct rule is supported by evidence.
+* If a temporal rule genuinely has no authoritative basis, isolate the unresolved rule. Implement independent validations that are already justified, and identify the exact owner decision needed for the remaining rule.
+* Do not solve PIT by fabricating dates, trusting undocumented caller assertions, silently discarding observations, or substituting unrelated data.
+* Preserve the distinction between missing, invalid, estimated, restated, suspicious, and valid data.
+* Do not modify frozen Stages 1–6 or 8–9 in this task. If upstream data lacks a required authoritative field, document the precise upstream dependency and complete other independent work.
+
+## Execution
+
+1. Run a fresh baseline before editing.
+2. Build a compact input-to-output PIT trace for each relevant field.
+3. Implement all contract-supported validation and enforcement.
+4. Add positive, negative, boundary, and regression tests. Include late/future data, missing timestamps, conflicting timestamps, report-version issues, and benchmark observations where those cases apply to the actual contract.
+5. Ensure rejected or unusable observations cannot silently affect fair value, scenario probabilities, confidence, or risk classification.
+6. Test the actual production call path identified by P31. If P31 proved there is no production caller, do not invent one; implement and test the authorized integration correction only if the existing contract supports it.
+7. Run all six validation layers:
+
+   * unit/formula;
+   * contract/boundary;
+   * production integration;
+   * adversarial/negative;
+   * regression and relevant full suites;
+   * independent audit.
+
+Record exact commands and results. Do not count skipped, blocked, or static-only checks as passing.
+
+## Completion criteria
+
+A completed PIT correction must show:
+
+* the authoritative source of each enforced timestamp;
+* the exact temporal rule;
+* where validation runs;
+* the behavior for invalid or missing inputs;
+* tests that prove future-known data cannot leak into the affected calculation;
+* no unapproved financial assumptions.
+
+Append a new P32 report to the END of `temp_report2.md`. Include actual code changes, the input-to-output trace, tests, remaining upstream dependencies, and precise unresolved owner decisions. If an item is blocked, explain why it is genuinely blocked, not merely undocumented.
+
+Do not commit, push, pull, access GitHub, or modify remotes or branches. Do not freeze Stage 7.
+===========================================================
