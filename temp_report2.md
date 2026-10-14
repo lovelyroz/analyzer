@@ -2617,3 +2617,74 @@ Breakdown: Stage 7 = 50 passed / 2 failed; Stage 9 = 13 passed. The 2 failures a
 - No remote Git operations were performed (no commits, pushes, pulls, or branch changes).
 - **Stage 7 remains unfrozen.** Work stops after appending this report.
 ============================================================================
+# P24 — Stage 7 Stress-Test Documentation Corrections Report
+
+**Date (UTC):** 2026-10-14
+**Nature:** Bounded documentation-only correction task per P24. Applied only factual corrections supported by the P23 audit (2026-10-14 edition, lines 2538-2619) to stress-test sections 71-76 and 80-84 in `07_Stage7_Valuation.md`. No D1-D9 decision was selected. No Python source, test, schema, dependency, migration, or configuration file was changed.
+**Prerequisite check:** The complete P23 report was read first. The older 2026-10-13 P23 draft (line 2510) was treated as superseded; all corrections below cite the 2026-10-14 P23 verdicts and were independently re-verified against code before editing. Where P23 provided no evidence for a change, no edit was made.
+
+---
+
+## 1. Exact Sections Edited
+
+Five sections were edited. All edits are additive factual annotations inside the audited section, except S83 where the false PASS was struck through following the P19 Section-85 precedent:
+
+### S72 — Low P/E / Poor Reliability (P23: PARTIALLY SUPPORTED)
+- **Before:** claim text ending with literal token `FORECAST RISK WARNING` plus unqualified `PASS.`
+- **After:** original text preserved; added blockquote `V1 Implementation Status (factual annotation — P24, per P23 audit)` stating the reachable V1 combination is `ATTRACTIVE` + `valuation_confidence`/`valuation_confidence_label` LOW/VERY_LOW + flag `LOW_FORECAST_RELIABILITY` and alert `WARNING:LOW_FORECAST_RELIABILITY` (`engine.py:162-163,514`); reliability is not an input to `_valuation_status`; the literal token `FORECAST RISK WARNING`/`FORECAST_RISK` is never emitted (zero references in `src`); D3/D8 remain unresolved; PASS applies only to the reachable combination.
+- **Evidence:** `src/valuation/engine.py:162-163` (reliability flag), `:514` (WARNING alert), `_valuation_status` reads only upside figures; grep over `src/` returns zero hits for `FORECAST_RISK`; reliability-threshold boundaries covered by `test_p2_alert_low_reliability_threshold_boundaries`. Consistent with the P19 Section-79 annotation.
+
+### S74 — Insufficient Industry Peers (P23: SUPPORTED with precision note)
+- **Before:** `Industry Forward P/E = INSUFFICIENT_DATA` plus fallback to Historical Median, `PASS.`
+- **After:** original text preserved; added annotation stating the actual behavior: industry-forward benchmark is rejected for selection (`target_pe_source` falls back to `HISTORICAL_MEDIAN_PE`; `_select_target_pe`, `engine.py:263-267`, `MIN_INDUSTRY_PEERS = 8`), `INSUFFICIENT_PEER_DATA` is flagged (`engine.py:164-165`), while `industry_forward_pe_median` still reports the median of available peers (e.g. 6.0 with 7 peers) but is not selected; `INDUSTRY_BENCHMARK_INSUFFICIENT` fires only when `target_source == "INSUFFICIENT_DATA"` and must not be conflated with `INSUFFICIENT_PEER_DATA`; cites the P21 Section-55 refinement.
+- **Evidence:** `engine.py:92` (median computed regardless of count), `:263-267` (selection gate), `:164-165`/`:168-169` (distinct flags); tests `test_industry_forward_pe_requires_eight_valid_peers`, `test_p4_peer_count_below_minimum_falls_back`, `test_p4_peer_count_at_minimum_selects_industry_forward`, `test_p4_benchmark_fallback_ignores_forward_count_for_ttm`.
+
+### S81 — Trend (P23: PARTIALLY SUPPORTED)
+- **Before:** `Strong Improvement` can change Scenario Probability but does not directly scale Target P/E. `PASS.`
+- **After:** original text preserved; added annotation stating the direct-scale prohibition holds structurally (`calculate_valuation` signature `engine.py:57-79` has no trend input) and the positive half holds only through the caller-supplied family-evidence channel (Sections 23-24, `probability_evidence`); a Stage 4 trend never crosses the Stage 7 boundary directly and must first be folded into family scores upstream; D6 remains unresolved.
+- **Evidence:** signature inspection confirms no `fundamental_score`, `trend`, or `revision` parameter; `_resolve_probabilities` (`engine.py:272-318`) accepts only family-level evidence; direct `probability_adjustments` are rejected by ValueError.
+
+### S83 — Forecast Revision (P23: UNSUPPORTED)
+- **Before:** `EPS Forecast 1100 → 1180 → 1270` can create Positive Revision Evidence. `PASS.`
+- **After:** added `NOT PRODUCED IN STAGE 7 V1` annotation: Stage 7 produces no revision-evidence output; `POSITIVE_FORECAST_REVISION` has zero references in all of `src`; revision direction exists only in Stage 5 (`revision_trend`, `src/forecast/repo.py:137-148` → `UPWARD`/`DOWNWARD`/`MIXED`) and is consumed by Stage 9 (`src/decision/engine.py`), with nothing crossing into `src/valuation`; whether revision evidence should reach the valuation layer, via which route and under which name, is an open policy question (D3/D8, Section 26); no V2 deferral is declared. Struck the claim: `~~PASS.~~ → **Status: does not hold in V1 — Stage 7 produces no Positive Revision Evidence (unresolved D3/D8).**`
+- **Evidence:** full-`src` grep for `POSITIVE_FORECAST_REVISION` returns zero hits; `calculate_valuation` signature has no revision input; Stage 5 revision tests exist but no Stage 7 revision-output test exists. This is the only section where the PASS label was removed, because P23 verdict is UNSUPPORTED.
+
+### S84 — Loss to Profit (P23: SUPPORTED with semantics note)
+- **Before:** `EPS: -100 → +120` must not create misleading Growth/P/E; sign-change handling applies. `PASS.`
+- **After:** original text and PASS preserved; added annotation confirming no fabricated fpe/fv for negative EPS (models + `engine.py:197-199`) and clarifying that `LOSS_TO_PROFIT`/`PROFIT_TO_LOSS` are per-scenario sign transitions relative to the other scenarios in the same run (`_scenario_sign_change_flags`, `engine.py:374-384`), not temporal revision labels; the -100→+120 reading is represented by the flag set, not a time series.
+- **Evidence:** `models.py:5-16` (None for eps ≤ 0), `_eps_flags` (`engine.py:363-371`), `_scenario_sign_change_flags` (`engine.py:374-384`); tests `test_negative_eps_does_not_create_fake_pe_or_fair_value` (asserts `SIGN_CHANGE`), `test_p6_invalid_eps_variants_never_fabricate_values`.
+
+## 2. Sections Reviewed but Deliberately Left Unchanged
+
+- **S71 (SUPPORTED):** cheap-company → `ATTRACTIVE`/`VERY_ATTRACTIVE` via `_valuation_status` and `VALUATION_THRESHOLDS`. No correction required. Threshold provenance (engine constants, not spec-ratified) is already annotated in Section 48 (D9); no number was touched.
+- **S73 (SUPPORTED):** negative-EPS → NULL P/E, `NOT_APPLICABLE`, no fabricated fair value. Fully implemented and tested. Left unchanged.
+- **S75 (SUPPORTED with D8 name note):** historical-divergence capability and 1.50 threshold are real and tested (`_alerts`, `engine.py:523-527`; `test_p2_alert_divergence_ratios_boundaries`), but the emitted names are `WATCH:FORWARD_PE_ABOVE/BELOW_HISTORICAL`, not the spec name `HISTORICAL_VALUATION_DIVERGENCE`. No new edit was warranted because the mapping is already recorded in the Section-54 annotation; the report references that mapping instead of duplicating it. D8 stays open.
+- **S76 (SUPPORTED):** 20/60/20 sums to 100% and expected fair value is the weighted average (`_resolve_probabilities`, `_expected_fair_value`, `metadata["scenario_probability_sum"]`). Left unchanged.
+- **S80 (SUPPORTED, structural):** high Fundamental Score cannot directly raise Target P/E because the Stage 7 boundary has no fundamental-score input. The property holds by absence and is guaranteed structurally; no dedicated negative test exists. No edit was made to avoid overstating an unexecuted assertion; recorded here as a documentation note only.
+- **S82 (SUPPORTED):** numeric 20/60/20 probabilities with weak evidence → `probability_confidence = LOW` is possible via the independent `probability_confidence` input (default 50.0, `engine.py:75,430`; `CONFIDENCE_THRESHOLDS["low"] = 40.0`). Precision noted: evidence strength is caller-supplied; Stage 7 does not derive it and no separate evidence-strength field exists. No wording change was warranted beyond this report note.
+
+No other specification section was modified. No direct contradiction outside the audited sections was encountered that required stopping for authorization.
+
+## 3. Six-Layer Validation (freshly executed unless stated)
+
+1. **Unit/formula (fresh static + test execution):** No valuation formula or runtime logic changed. Verified `git diff HEAD --name-only -- src/` is empty (no source/test/schema/config change). Focused suites below exercise `_valuation_status`, `calculate_forward_pe`/`calculate_forward_pe_fair_value`, `_eps_flags`, `_scenario_sign_change_flags`, `_resolve_probabilities`/`_expected_fair_value`, `_alerts` divergence block, and `_select_target_pe`.
+2. **Contract/boundary (fresh static):** Public signatures, schemas, output names, and boundary behavior unchanged. `calculate_valuation` signature (`engine.py:57-79`) and `ValuationResult` (`schema.py:19-50`) inspected; only `07_Stage7_Valuation.md` sections 72/74/81/83/84 changed. No alert name, emission condition, severity, threshold, or output contract was renamed or altered.
+3. **Production-path/integration (fresh static):** No runtime or consumer file changed. Path `calculate_valuation` → `_select_target_pe` → scenario loop → `_expected_fair_value` → `_valuation_status` → `_alerts` → `ValuationResult` traced; `git diff` confirms the change set is documentation-only.
+4. **Adversarial/negative (fresh test evidence + static):** The two known P2 failing-first tests remain present and still fail as designed (see below) — they were not weakened, deleted, skipped, or rewritten. Revised wording preserves P23 negative cases: S72 (reliability cannot move status/fair value), S74 (7-peer case still yields usable historical benchmark without `INDUSTRY_BENCHMARK_INSUFFICIENT`), S81 (trend cannot directly scale target P/E), S83 (no revision output exists to misuse), S84 (negative EPS still yields None, sign flags still per-scenario).
+5. **Regression/full suite (freshly executed with `.venv/Scripts/python.exe` from project root):**
+   - `python -m pytest src/tests/test_stage7_valuation.py -q` → **2 failed, 50 passed in 1.54s.** Failures are exactly the known pre-existing P2 tests (`test_p2_sector_driver_decomposition_missing`, `test_p2_required_flip_dependence_alerts_missing`); not new regressions, unchanged from P19-P23.
+   - `python -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q` → **2 failed, 63 passed, 52 warnings in 1.64s.** Stage 9 contributes 13 passes. Warnings are the known `datetime.utcnow()` DeprecationWarnings in Stage 9/decision code (unrelated to this task; P12 scope).
+   - `python -m pytest src/tests/ -q -rs --ignore=src/tests/test_codal_pdf_extraction.py` → **2 failed, 900 passed, 1 skipped, 1068 warnings in 136.68s.** Same 2 P2 failures; 1 skip is `test_codal_extraction.py:307` (real Codal sample PDF not available in CI); PDF-extraction fixture exclusion is the established one, and no unrelated PDF was substituted. Historical counts are not presented as fresh except where re-executed above.
+6. **Independent audit (fresh):** Every edited section was compared against the 2026-10-14 P23 verdict and the actual implementation: S72 token absence re-grepped (zero `FORECAST_RISK` hits); S74 median/selection/flag logic re-read (`engine.py:89-99,164-169,256-269`); S81 signature re-inspected (no trend input); S83 zero-reference claim re-grepped (`POSITIVE_FORECAST_REVISION`, zero hits) and Stage 5/9 route confirmed (`repo.py:137-148`, `decision/engine.py`); S84 sign-flag function re-read (`engine.py:374-384`). No unsupported PASS claim remains within the authorized scope (71-76, 80-84): S71/73/76/80/82 supported claims preserved, S72/74/81/84 qualified, S75 qualified by reference to the existing Section-54 mapping, S83 struck. No unresolved D1-D9 decision was silently selected; no V2 deferral was declared; no threshold, formula, severity, mapping, or date policy was invented.
+
+## 4. Remaining D1-D9 Blockers (unchanged, none resolved here)
+
+D1 (flip risk), D2 (multiple dependence), D3 (EPS dependence incl. `FORECAST_RISK` naming), D4 (margin risk), D5 (high impact + high uncertainty), D6 (sector-driver chains incl. trend/fundamental routing), D7 (PIT enforcement), D8 (alert-name/trigger semantics incl. S72/S74/S75/S83 names), D9 (parameter registry and `as_of` selection; threshold provenance for S71/S75). S83 additionally depends on the Section-26 revision-evidence route decision.
+
+## 5. Confirmation
+
+- Only `07_Stage7_Valuation.md` sections 72, 74, 81, 83, 84 were edited (5 minimal annotations + 1 PASS strike in S83). No Python source, test, schema, dependency, migration, or configuration file was modified.
+- The two P2 failing-first tests are intact and still fail as designed; no test was weakened to obtain a pass.
+- Final diff of `07_Stage7_Valuation.md` was inspected before reporting.
+- No remote Git operation occurred (no commits, pushes, pulls, or branch changes).
+- **Stage 7 remains unfrozen.** No freeze was declared. Work stops after appending this report.
