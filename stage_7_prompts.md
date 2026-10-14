@@ -1621,3 +1621,39 @@ Append a section titled:
 `P28 — Stage 7 Baseline and Root-Cause Remediation`
 
 Include files changed, root causes, implementation rationale, test commands and counts, six-layer results, remaining concrete blockers, and a precise final verdict. Do not claim the entire Stage 7 is complete or frozen. Stop after this bounded task and its independent audit.
+==============================================================
+# P29 — تکمیل کنترل تاریخ و صحت داده‌ها (Point-in-Time)
+You are working on the local financial-data project `analyzer`.
+
+## Objective
+
+Implement and validate the Stage 7 point-in-time (PIT) correctness controls. Use the relevant findings in `temp_report2.md`, especially P26/P27, and the exact Stage 7 specification and code contracts. Inspect only the files needed for PIT inputs, benchmark data, forecast versions, parameter selection, and their tests.
+
+First review P28's appended report and the current working tree. Do not repeat completed work or discard P28 changes.
+
+## Requirements
+
+* Prevent future-known financial information from entering a historical valuation or backtest.
+* Define and enforce coherent date relationships among valuation date, data cutoff, report publication date/version, forecast availability, benchmark observations, and parameter effective dates.
+* Missing provenance must not silently become valid provenance. Invalid or future-dated inputs must produce explicit, deterministic outcomes.
+* Historical runs must select only information that was available at the requested historical as-of time.
+* Caller attestation alone must not be described as mechanically enforced PIT correctness.
+* Preserve valid current workflows where compatible with the financial invariants. If a public contract must change, trace and test all in-repository consumers.
+* Do not fabricate publication dates, observation dates, report versions, or source provenance. Do not substitute unrelated PDFs for missing CODAL fixtures.
+* Do not weaken existing tests or alter frozen stages gratuitously.
+
+## Execution
+
+1. Identify every Stage 7 input path where historical dates or provenance can affect valuation.
+2. Implement explicit date-ordering validation, missing-provenance behavior, and historical as-of selection using actual available source metadata.
+3. Add adversarial tests for future publications, stale and out-of-order observations, missing dates/provenance, conflicting versions, and boundary timestamps. Include deterministic and valid historical cases.
+4. Run focused PIT tests, the full Stage 7 suite, affected Stage 9 tests, and the full suite if feasible.
+5. Fix failures caused by this work. Do not stop with documentation alone while the required control can be implemented from available data.
+6. If the application lacks a required source field, implement the narrowest explicit contract/input change that can supply it, with validation and compatibility tests. Do not invent source values. Any genuinely unavailable external data source must be identified precisely, with a concrete integration requirement—not left as a vague unresolved limitation.
+
+## Six-layer validation
+
+Report unit/formula, contract/boundary, production-path/integration, adversarial/negative, regression/full suite, and independent final-diff audit separately. Give exact commands and fresh execution counts. Do not claim PIT is complete unless enforcement is demonstrated through the real valuation/backtest path.
+
+Append `P29 — Stage 7 Point-in-Time Enforcement` to `temp_report2.md`. Never overwrite prior reports. No remote Git/GitHub operations. Do not freeze Stage 7.
+===========================================================

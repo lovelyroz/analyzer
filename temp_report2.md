@@ -3171,4 +3171,60 @@ No code changed at any point, so the §1 runs are simultaneously pre- and post-s
 ## 8. Final Verdict
 
 **BLOCKED ON OWNER POLICY — NO CODE CHANGED.** Remediation attempted end-to-end: fresh baseline recorded, both failures traced to absent-policy roots, all four fix paths examined and rejected on evidence under P28's own constraints, zero files changed, full suite re-verified, pins preserved. Not claimed: Stage 7 complete, frozen, or remediated. Stage 7 remains unfrozen. Stop after this bounded task and its independent audit.
+===================================================================
+# P29 — Stage 7 Point-in-Time Enforcement
+
+**Date (UTC):** 2026-10-14
+**Nature:** Bounded enforcement attempt per P29. P28's report reviewed first (present, §§1–8; not repeated, not discarded — this task builds on its BLOCKED verdict). Tree verified clean at start (only the user's own `stage_7_prompts.md` staging). No R7/R8 owner approval exists (same approval grep as P28: zero records). Constraints honored: no manufactured dates/versions/provenance; no weakened tests; no gratuitous frozen-stage changes; no unrelated-PDF substitution; no remote operations. The only write is this report.
+
+## 1. Input-Path Inventory (every Stage 7 input where dates/provenance could matter)
+
+- `current_price`: undated float; dated only via echoed `market_price_date` metadata — never validated (`engine.py:104-108,213-214`).
+- Forecast EPS + `forecast_reliability_score`: via Stage 5 object carrying `data_cutoff_datetime`; no publication date, no report version.
+- `historical_pe_values` / `industry_forward_pe_values` / `industry_ttm_pe_values`: **bare floats, no dates, no provenance** (`engine.py:70-72`, sanitized `:86-93`). Zero matches for publication/report_version/provenance/observation_date/published in all of `src/valuation` (fresh grep).
+- `probability_confidence`, `data_quality_score`, `probability_evidence`, `scenario_pe_adjustments` (+rationales): undated scalars/records.
+- `valuation_date` / `market_price_date` / `data_cutoff_datetime`: real datetimes, but only normalized and echoed (`:104-108`, `:213-215`) — never compared.
+- Parameters (`parameters.py`): undated constants; no registry, no effective dates (D9 still unresolved).
+- **Result: exactly ONE orderable relationship exists among supplied data** (valuation/market-price dates vs cutoff). Everything else has nothing to order. Stronger than P13's standing finding: `calculate_valuation` has ZERO production callers (fresh grep: 84 matches = definition + tests only) — there is not even a live caller to migrate or validate.
+
+## 2. Implementation Attempts (each pursued to its evidence terminus)
+
+- **Path 1 — order the existing dated fields (valuation/market-price date vs cutoff).** BLOCKED. `test_p6_cutoff_pit_limitation_pinned` (body re-verified P26: 937-953) explicitly pins acceptance of valuation_date 2026-06-01 > cutoff 2026-01-01 with status ATTRACTIVE and no PIT flag — and it passes (inside the 900 green). Any rejection/flag behavior breaks this existing test; weakening or rewriting it is forbidden. The single enforceable check is therefore sealed shut by a passing test.
+- **Path 2 — dated benchmark observations + boundary enforcement.** BLOCKED. No observation dates exist on any input and no caller supplies any (see §1). Adding dated-input fields no supplier fills is dead code that demonstrates zero enforcement — P29 demands demonstrated enforcement through the real path, so this was rejected as theater, and recorded as IR1 instead.
+- **Path 3 — publication date/version inputs.** BLOCKED. Zero fields, zero values anywhere in the pipeline boundary; populating them would be fabrication (explicitly forbidden). Recorded as IR2.
+- **Path 4 — caller attestation field.** REJECTED. P29 itself bars describing attestation as mechanically enforced correctness — implementing it could not satisfy the objective.
+- **Path 5 — parameter effective-date selection.** BLOCKED. No registry exists (D9/R8 pending). Recorded as IR3.
+- **Path 6 — clarify `metadata["pit_inputs_required"] = True` (`:248`).** REJECTED as no-op churn. The key is informational and unread by any consumer; renaming it changes a public output's meaning without approved replacement semantics and enforces nothing. Noted risk: a reader could mistake it for a safety claim — the P19 §85 annotation already records it as non-enforcement, which stands.
+- **Result: ZERO file changes** (`git status`: no source/test/schema/spec/config modification). All 900 previously-green workflows preserved untouched.
+
+## 3. Tests Added: NONE — Planned Adversarial Set Specified Instead
+
+Nothing implemented ⇒ nothing new to test (P29-3's adversarial cases presuppose the missing contract). Gated test plan for IR1/IR2 implementation: future-dated observations rejected/downgraded per rule; stale/out-of-order/conflicting-version series; missing dates/provenance (explicit deterministic outcome, never silent validity); boundary-equal timestamps; valid historical as-of selection (only pre-cutoff datausable); determinism across repeated runs; valid-historical positive cases. Existing pin (`test_p6_cutoff_pit_limitation_pinned`) stays green and untouched unless the owner authorizes the IR4 rule change.
+
+## 4. Fresh Execution Evidence (all runs this task, project interpreter, repo root)
+
+- `python -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q` → **2 failed, 63 passed, 52 warnings in 0.92s, exit 1** (failures: only the two known P2s; Stage 9 13/13 green).
+- `python -m pytest src/tests/ -q -rs --ignore=src/tests/test_codal_pdf_extraction.py -p no:warnings` → **2 failed, 900 passed, 1 skipped in 109.96s, exit 1.** Skip: Codal fixture (`test_codal_extraction.py:307`), carried, never counted as pass.
+- Failures caused by this work: **none** — zero changes; only pre-existing P2 failures (P28 roots stand).
+
+## 5. Precise Integration Requirements (no vague limitations — fields, rules, approvals named)
+
+- **IR1 — dated benchmark observations.** Upstream (Stage 1 market/financial pipelines) must supply per-observation timestamps for all three PE series; `calculate_valuation` gains dated-record inputs; engine enforces observation ≤ approved bound (cutoff/valuation per R7 rule); violation → reject/downgrade/flag per approved response. Zero live callers today → greenfield wiring, but frozen-upstream changes need owner approval. Gated on R7 mechanism + rule.
+- **IR2 — publication/version feed.** New boundary fields for report publication date + version; upstream version plumbing (Stage 1 CODAL versions exist but are unconnected to valuation inputs); same rule machinery as IR1. Gated on R7.
+- **IR3 — parameter effective dates.** D9 registry with `effective_from` + approved `as_of` rule. Gated on R8.
+- **IR4 — valuation-vs-cutoff ordering.** Currently PINNED-accepting by a passing test; enforcement needs an owner-approved rule change PLUS authorized test update (test edits currently forbidden). Names the exact test (:937-953) and the exact conflict.
+- On R7/R8 approval, implementation needs no new discovery: fields → validation → §3 tests → suites. Each IR states its validation and compatibility tests at build time.
+
+## 6. Six-Layer Validation (each separately)
+
+1. **Unit/formula:** no formula added/changed/removed (empty diff); enforcement absence re-derived from input shapes (bare floats) rather than asserted.
+2. **Contract/boundary:** zero signature/schema/output changes; missing provenance correctly yields no-validity-claim (nothing misrepresented as valid; §85 annotation stands).
+3. **Production-path/integration:** all input paths inventoried (§1); zero production callers confirmed; Stage 9 path green; frozen stages untouched.
+4. **Adversarial/negative:** Path 1 conflict (pinned acceptance) is itself the adversarial finding; planned hostile cases specified (§3) gated on IRs; no hostile input currently producible at the boundary that the engine mishandles beyond the recorded limitation.
+5. **Regression/full suite:** exact commands, exits, counts, durations, skip reason above — all fresh, nothing carried. No failure introduced; P2 pins intact.
+6. **Independent final-diff audit:** diff scope verified = this section only (0 deletions; no other file touched). No PIT-completeness claim made — explicitly: PIT IS NOT ENFORCED. No freeze declared.
+
+## 7. Final Verdict
+
+**PIT NOT ENFORCED — NOTHING IMPLEMENTED (BLOCKED: IR1–IR4 + R7/R8).** Every implementable step terminates at missing source fields (IR1–IR3), missing owner rules (R7/R8), or a passing test that forbids the change (IR4). This is not a deferred investigation: the evidence is complete and the four requirements above are concrete. Preserve P28's verdict alongside this one — both failures AND the PIT gap now share one unblock path: owner approval of R1–R8 (P27 §5). Stage 7 remains unfrozen. Stop here.
 
