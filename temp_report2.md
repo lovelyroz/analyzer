@@ -3523,4 +3523,58 @@ Genuine `model_version`/`parameter_name`/`parameter_value`/`effective_from`/desc
 
 **NO SUPPORTABLE CORRECTIONS — NO CODE CHANGED; 2 failures PROVEN pre-existing (1 unapproved-policy + upstream-dependency, 1 unapproved-policy ×5).** Workstreams A–E each executed to their evidence terminus; nothing defect-class found; nothing implemented without manufacturing policy. Not claimed: passing suite, completeness, freeze. Stage 7 remains unfrozen. Stop here.
 ===================================================================
+# Continue Stage 7 Engineering
 
+**Date (UTC):** 2026-10-14  
+**Branch:** `stage7/remediation-2026-10-14`  
+**Nature:** Initial capability verification and repository-state inspection. This entry records only actions verified during this session. It does not claim implementation or test execution.
+
+## 1. Capability Verification
+
+- Confirmed that the connected GitHub integration can read repository files and create/update files directly.
+- Created the isolated branch `stage7/remediation-2026-10-14` from `master`; queried branches afterward and confirmed that the branch exists.
+- Repository files can be read and edited through GitHub APIs, but no local checkout of this repository is available to the execution environment. Python/pytest execution against the actual repository code was therefore **not performed and is not claimed**.
+- Confirmed the repository contains `.github/workflows/tests.yml`. It configures GitHub Actions to run `pytest src/tests -v` on pushes to `master` and pull requests targeting `master`. A fresh workflow run or current CI result was not verified in this task.
+
+## 2. Files Inspected
+
+Read the current `temp_report2.md` and inspected the relevant Stage 7 files: `07_Stage7_Valuation.md`, `src/valuation/engine.py`, `src/valuation/models.py`, `src/valuation/parameters.py`, `src/valuation/schema.py`, `src/tests/test_stage7_valuation.py`, and `src/tests/test_stage9_decision.py`. Also inspected the configured test workflow and `requirements.txt`.
+
+The historical P28/P29 reports remain in place and were not overwritten.
+
+## 3. Highest-Priority Finding: Production Integration Is Not Yet Established
+
+The reports identify the lack of a demonstrated production caller for `ValuationEngine.calculate_valuation`. The inspected test `test_p6_production_path_real_stage5_forecast` constructs a Stage 5 forecast and calls `ValuationEngine().calculate_valuation(...)` directly. This verifies a tested engine path, but by itself does not establish that the application's actual production orchestration invokes that engine.
+
+A safe integration correction has **not** yet been made: the exact supported orchestration boundary and its caller contracts must be established before wiring financial calculations into a guessed path. No new formula, EPS/share-count calculation, date policy, benchmark provenance, threshold, or sector mapping was invented.
+
+## 4. Parameter-Versioning Finding
+
+The inspected `src/valuation/parameters.py` does contain `ParameterSetVersion`, `ParameterRegistry`, `DEFAULT_REGISTRY`, `resolve_parameter_set`, and `resolve_parameter_set_as_of`. Therefore, the broad historical P29 statement that no registry exists is not accurate for the inspected current file.
+
+However, registry existence alone does not establish that the selected parameter set governs material engine calculations. The engine's consumption of module-level constants and the provenance of the emitted audit snapshot still require a traced, tested correction. No parameter behavior was changed in this task.
+
+## 5. Known Failures and Point-in-Time Controls
+
+The two known failing tests remain unresolved:
+- `test_p2_sector_driver_decomposition_missing`
+- `test_p2_required_flip_dependence_alerts_missing`
+
+No attempt was made to delete, skip, weaken, or relax either test. Their exact current outcomes were not re-executed in this session, so historical test counts are not represented as fresh evidence.
+
+Point-in-time enforcement also remains unresolved. Existing tests and input contracts must be reconciled with any proposed change; no PIT-compliance claim is made.
+
+## 6. Changes and Validation Evidence
+
+- **Source/test/spec changes:** none.
+- **Report change:** this dated entry is appended to `temp_report2.md` on the isolated remediation branch.
+- **Python/pytest:** not executed; no test counts, failures, or skips are claimed as freshly measured.
+- **CI:** workflow configuration inspected; no fresh run result verified.
+- **Commit/branch safety:** branch creation was confirmed. No merge or default-branch edit was performed.
+
+## 7. Next Priority
+
+Trace the actual production orchestration and all callers of the valuation engine using the repository's current code and contracts. Establish whether a supported production-path integration point exists. In parallel, trace the parameter version selected, the values actually consumed by each material calculation, and the exact values recorded in the audit snapshot. Implement only a bounded correction supported by those contracts, with regression tests; if execution remains unavailable, explicitly leave runtime validation unverified.
+
+**Verdict:** Initial inspection only; no remediation completed and no test suite verified. Stage 7 remains unfrozen and incomplete.
+==================================================================
