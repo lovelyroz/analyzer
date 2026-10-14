@@ -3472,3 +3472,53 @@ Genuine `model_version`/`parameter_name`/`parameter_value`/`effective_from`/desc
 ## 8. Final Verdict
 
 **VERSIONING MECHANISM IMPLEMENTED (genesis + exact resolution + explicit as_of refusal + result audit); HISTORICAL SELECTION BLOCKED (R8/R7).** Satisfied: inventory, record contracts, deterministic resolution/selection mechanics, reproducibility + historical-selection + leakage + missing-version + audit-metadata tests, backward compatibility, zero invented dates/values. Not claimed: dated history, DB registry, full PIT, completeness, freeze. Stage 7 remains unfrozen. Stop here.
+===================================================================
+# P34 — Stage 7 Valuation, Sector Drivers, Risk Alerts, and Failure Remediation
+
+**Date (UTC):** 2026-10-14
+**Nature:** Workstream execution per P34 (A–E) — fresh baseline, per-item root-cause disposition, implementation hunt for contract-supported corrections, fresh suites. P28–P33 reviewed first (built on, not repeated). Pre-check: no R1–R8 owner approval (approval grep zero). Constraints honored: no invented formulas/thresholds/magnitudes/directions/mappings/defaults; no weakened/skipped/rewritten tests; frozen stages untouched; no fabricated data; missing never zero-filled; no remote operations. Changed files: none — this report only.
+
+## 1. Mandatory Starting Point (fresh, not presumed)
+
+- Named pair → **2 failed in 0.88s, exit 1.** T1 fails at `:422` (`{'NAV','NII','REVENUE'} <= {'EPS','TARGET_PE'}`); T2 fails at `:465` (all 5 names absent). Signatures identical to every prior baseline — confirmed current, not assumed.
+- Stage 7 + Stage 9 → **2 failed, 74 passed in 0.93s, exit 1.**
+- Broad (`--ignore=test_codal_pdf_extraction.py`) → **2 failed, 911 passed, 1 skipped in 116.62s, exit 1** (skip: Codal fixture `:307`, never a pass).
+
+## 2. Workstream Results (each item: defect vs unapproved policy vs upstream dependency)
+
+**A. Root-cause remediation.** T1: missing upstream dependency (chain fields/mapping) + unapproved policy (D6) — NOT a code defect (code matches the approved two-driver contract). T2: unapproved policy ×5 (D1–D5) — NOT a code defect, NOT a contract inconsistency. Same roots as P28, re-traced, unchanged.
+
+**B. Sector-specific valuation (fresh field inventory).** Case-insensitive grep over `engine.py`: the ONLY chain-adjacent field is `nav_per_share` (signature `:67`, metadata echo `:261`, consumed by nothing). No revenue/margin/NII/NIM/loans/deposits fields exist (the single extra hit is substring noise inside `benchmark_peer_minimum`). No industry→sector mapping exists anywhere. Therefore no sector branch is implementable: branching needs mapping + formulas (both R2-gated), and wiring `nav_per_share` alone would manufacture chain policy while leaving REVENUE/NII red. Safe missing-data handling for absent chain inputs ALREADY holds (None guards, empty-driver early return `:476-477` — covered by passing tests). Exact upstream change needed: chain source fields + owner-approved mapping + EPS-consumption validation (R2-a → WP-5). Frozen upstream untouched for lack of separate authorization.
+
+**C. Dependence and flip-risk alerts.** Hunt for already-defined-but-unimplemented alert behavior: none found — every required-but-unemitted name lacks a trigger definition (`POOR_DATA_QUALITY`: 0 references repo-wide, fresh grep). The withdrawn 50/50-share metric is NOT presented as validated anywhere (P27 withdrawal stands; `impact_pct` remains plain informational driver output under passing tests) — nothing to correct, 0.60 stays inert. Shock magnitudes/directions, flip definitions, severities, dependence formulas: all still unapproved (R3/R4). Nothing implementable without manufacturing policy.
+
+**D. Alert contract.** Stage 9 non-consumption RE-VERIFIED fresh: 0 references to `alerts`/`valuation_risk_flags`/`valuation_driver_ranking` in `decision/engine.py` (same result as P26/P27, re-run this task). Reconciliation (rename/alias/spec-adopt) remains an R1 owner decision — not selectable unilaterally. No output changed, so no consumer impact exists to trace.
+
+**E. Data quality and benchmark behavior.** All listed behaviors (counts, divergence, negative EPS, sign changes, missing peers) are implemented and green inside the 911 (P23 SUPPORTED verdicts stand). Fresh grep: the VALID/MISSING/ESTIMATED/RESTATED/SUSPICIOUS/UNMAPPED vocabulary does NOT exist anywhere in `src/valuation` — quality enters only as 0–100 floats — so no required distinction can be broken; introducing such states is a contract decision for the owner, not a fix. `NOT_APPLICABLE`/`INSUFFICIENT_DATA` meanings preserved untouched.
+
+## 3. Corrections Implemented: NONE — Each Candidate Fails the Supportability Test
+
+- Sector branches → need R2 mapping/fields/formulas (absent).
+- Any of the 5 alerts → need R1/R3/R4/R5/R6 policy (absent).
+- Alert reconciliation → needs R1 strategy (absent).
+- Quality-state distinctions → need contract decision (absent).
+- Test edits → forbidden; behavior edits → would break pinned green tests. Zero file changes (`git status`: only the user's own prompt staging, pre-existing).
+
+## 4. Six-Layer Validation (each separately)
+
+1. **Unit/formula:** failure assertions re-derived; zero logic touched (empty diff).
+2. **Contract/boundary:** zero signature/schema/output changes; gaps restated, none altered.
+3. **Production-path/integration:** P31's unwired verdict stands (no new evidence of a caller); Stage 9 tests green; frozen stages untouched.
+4. **Adversarial/negative:** failing tests' hostile content executes and fails for proven reasons; passing adversarial suites confirm no adjacent breakage.
+5. **Regression/full suites:** exact commands, exits, counts, durations, skip reason above — all fresh. Only delta vs P33 baseline: none (911 = 900 + 11 P32/P33; P2s identical).
+6. **Independent audit:** failures classified per P34-7 — T1: unapproved policy + upstream dependency (NOT a code defect); T2: unapproved policy ×5 (NOT a code defect); no defect-class item found in any workstream. No partial pass misreported: suite is NOT fully passing (2 proven pre-existing failures).
+
+## 5. Remaining Blockers (per-failure classification + exact needs)
+
+- T1 → unapproved policy (D6) + upstream dependency (chain fields/mapping) → R2 + WP-5.
+- T2 → unapproved policy (D1–D5) → R1/R3/R4/R5/R6 + WP-1…4.
+- D8 reconciliation → R1. Quality-state vocabulary → contract decision. All owner-side; investigation closed (every path ends at named policy absence).
+
+## 6. Final Verdict
+
+**NO SUPPORTABLE CORRECTIONS — NO CODE CHANGED; 2 failures PROVEN pre-existing (1 unapproved-policy + upstream-dependency, 1 unapproved-policy ×5).** Workstreams A–E each executed to their evidence terminus; nothing defect-class found; nothing implemented without manufacturing policy. Not claimed: passing suite, completeness, freeze. Stage 7 remains unfrozen. Stop here.

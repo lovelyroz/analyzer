@@ -1914,3 +1914,78 @@ Append a dated P33 section to the END of `temp_report2.md`. Include the paramete
 
 Do not commit, push, pull, access GitHub, or modify remotes or branches. Do not freeze Stage 7.
 =============================================================
+# P34 — Stage 7 Valuation, Sector Drivers, Risk Alerts, and Failure Remediation
+
+Work locally in `analyzer`. This task must deliver actual code and test changes wherever the behavior is defined by an authoritative contract. It must not merely restate open design questions.
+
+Read the latest P31–P33 reports in `temp_report2.md`, `07_Stage7_Valuation.md`, and the relevant implementation and test files.
+
+## Mandatory starting point
+
+Re-run these tests individually and capture the exact failures:
+
+* `test_p2_sector_driver_decomposition_missing`
+* `test_p2_required_flip_dependence_alerts_missing`
+
+Do not presume their historical failure details are still current. Do not delete, skip, weaken, xfail, or rewrite assertions merely to make them pass.
+
+## Workstreams
+
+### A. Root-cause remediation
+
+For each failing test, trace the expected behavior to the current specification and implementation. Fix the underlying defect when the expected behavior is defined. If an assertion requires a financial policy that is genuinely unspecified, identify that exact gap, complete all separable fixes, and do not fabricate the missing policy.
+
+### B. Sector-specific valuation
+
+Verify the current production behavior for these chains:
+
+* Non-financial: Revenue → Operating Margin → Operating Profit → Net Profit → EPS → Fair Value.
+* Bank: Loans/Deposits → NII/NIM → Net Profit → EPS → Fair Value.
+* Holding: NAV → NAV Growth → Net Profit → EPS → Fair Value; P/NAV belongs to Stage 7.
+
+Determine which source fields actually exist and which are authoritative. Implement supported sector branches and input-contract changes only where the underlying data and formulas are validated. Never substitute invented values for absent inputs. Stage 7 must consume Stage 5 EPS forecasts and must not rebuild EPS using a new share count.
+
+If a required source field does not exist, implement safe missing-data handling and the contract-supported behavior; specify the exact upstream change needed. Do not alter frozen upstream stages without separate authorization.
+
+### C. Dependence and flip-risk alerts
+
+Investigate the actual driver metrics and alert semantics. A previously tested symmetric +10% one-at-a-time shock yielded approximately 50/50 driver impact shares by construction, making a proposed 0.60 threshold ineffective. Do not activate that metric or threshold without an approved, meaningful definition.
+
+Do not invent shock magnitudes, shock directions, flip definitions, severity thresholds, or dependence formulas. Implement any already-defined alert behavior and correct degenerate metrics that can be demonstrably shown to be invalid. Where policy is absent, keep the unsupported calculation from being presented as a validated risk metric and specify the exact decision required.
+
+### D. Alert contract
+
+Reconcile the specification and emitted alerts. Relevant required alert names include:
+`HIGH_IMPACT_HIGH_UNCERTAINTY`, `HIGH_SCENARIO_DISPERSION`, `LOW_FORECAST_RELIABILITY`, `VALUATION_BENCHMARK_DIVERGENCE`, `ASSESSMENT_FLIP_RISK`, `HIGH_MULTIPLE_DEPENDENCE`, `HIGH_EPS_DEPENDENCE`, `MARGIN_ASSUMPTION_RISK`, `INSUFFICIENT_PEER_DATA`, `POOR_DATA_QUALITY`, `NEGATIVE_EPS`, `SIGN_CHANGE`, and `POINT_IN_TIME_WARNING`.
+
+Verify actual consumers before changing public output. Prior evidence indicates Stage 9 currently reads valuation status, forecast reliability, scenario dispersion/expected upside metadata, risk level, data quality, confidence, cutoff, and margin of safety; it did not read `alerts`, `valuation_risk_flags`, or `valuation_driver_ranking` in `DecisionEngine.make_decision`. Re-verify before relying on this evidence.
+
+Do not treat an alert as a buy/sell recommendation. Do not claim an alert is implemented if its trigger is unreachable or its underlying metric is invalid. Preserve meaningful severity and auditability.
+
+### E. Data quality and benchmark behavior
+
+Use existing source evidence to validate benchmark counts, benchmark divergence, negative EPS, sign changes, suspicious inputs, and missing peer data. Preserve distinctions among `VALID`, `MISSING`, `ESTIMATED`, `RESTATED`, `SUSPICIOUS`, `UNMAPPED`, and `INSUFFICIENT_DATA`. Do not invent peer mappings or benchmark values.
+
+## Execution requirements
+
+1. Run fresh baseline tests before editing.
+2. Implement all independent, contract-supported corrections.
+3. Add tests for normal, boundary, missing-data, malformed-input, future-data, and adverse financial cases as applicable.
+4. Test the real production path, not just private helper functions.
+5. Run all six validation layers:
+
+   * unit/formula correctness;
+   * contract/boundary;
+   * production-path/integration;
+   * adversarial/negative;
+   * regression and relevant full suites;
+   * independent audit.
+6. Run the two known failing tests individually, the Stage 7 suite, Stage 7 + Stage 9 tests, and the broad suite where feasible.
+7. If failures remain, identify whether each is a defect, an unapproved policy, or an upstream dependency. Do not misreport a partial pass as full success.
+
+## Reporting
+
+Append a dated P34 section to the END of `temp_report2.md`. Include exact code diffs/files, test commands and counts, each alert's real implementation status, sector-chain status, and any exact remaining owner decisions. Do not report a blocker without completing independent work.
+
+Do not commit, push, pull, access GitHub, or modify remotes or branches. Do not freeze Stage 7.
+======================================================
