@@ -3117,4 +3117,58 @@ Severity template (names only; boundaries BLANK by instruction):
 6. **Independent audit — second pass (fresh, post-draft).** Re-checked every §1 correction against its P26 section and code anchor: G1↔P26-§2-G1 + probe + `:488-497`; G2↔G2 + `:481,484` upward-only; G3↔G3 + 14-ref enumeration + schema/test reads; C1↔probe symmetry; C2↔matrix-vs-code; C3↔`:282-294` vs `repo.py:137-148`; M2↔plans. Verified no surviving sentence relies on 50/50 shares, no numeric invented (template blanks confirmed blank), no policy selected (all proposals tagged PROPOSAL — NOT APPROVED or explicitly neutral), P25/P26 text untouched (diff scope: this section only).
 
 **Confirmation:** no policy chosen or implemented; only this section appended; P2 tests intact; no remote operations; Stage 7 remains unfrozen. Stop after the final readiness verdict.
+===================================================================
+# P28 — Stage 7 Baseline and Root-Cause Remediation
+
+**Date (UTC):** 2026-10-14
+**Nature:** Bounded remediation attempt per P28 — baseline, root-cause trace, fix attempt at actual root causes, re-verification. Pre-check first: NO owner approval of R1–R8 exists anywhere (grep over `temp_report2.md` for approval records: zero; `git log` top is 92612e9 P27; D1–D9 still unresolved). All P28 constraints honored: local only; no remote/Git operations of any kind; no test deleted/skipped/weakened/rewritten; no manufactured inputs, thresholds, formulas, mappings, or severities; Stages 1–6/8–9 untouched; Stage 5 EPS consumed as-is. The only write in this task is this report, appended to `temp_report2.md`.
+
+## 1. Exact Current Baseline (pre-change; tree verified unchanged throughout)
+
+Interpreter: `.venv/Scripts/python.exe` from project root. Exit statuses non-zero where failures exist; no output filtered.
+
+- `python -m pytest src/tests/test_stage7_valuation.py::test_p2_sector_driver_decomposition_missing src/tests/test_stage7_valuation.py::test_p2_required_flip_dependence_alerts_missing -q` → **2 failed in 1.85s, exit 1.** Traces: T1 fails at `test_stage7_valuation.py:422` (`{'NAV','NII','REVENUE'} <= {'EPS','TARGET_PE'}`); T2 fails at `:465` (all 5 required names missing from alerts+flags). T2's own passing asserts confirm adjacent approved constants (`SENSITIVITY_PERTURBATION == 0.10`, thresholds 15.0/5.0) — none approved for alert use.
+- `python -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q` → **2 failed, 63 passed, 52 warnings in 1.18s, exit 1.** Stage 9 contributes 13/13 passes; warnings are the known `datetime.utcnow()` DeprecationWarnings (P12 scope, untouched).
+- `python -m pytest src/tests/ -q -rs --ignore=src/tests/test_codal_pdf_extraction.py` → **2 failed, 900 passed, 1 skipped, 1068 warnings in 99.08s, exit 1.** Skip: `test_codal_extraction.py:307` (real Codal sample PDF unavailable in CI) — carried exclusion, not counted as pass. Only failures repo-wide are the two known P2 tests.
+
+## 2. Root-Cause Traces (production path, not symptoms)
+
+**T1 — sector drivers.** `calculate_valuation` → `_driver_analysis` (`engine.py:469-498`): `drivers = {"EPS": eps_effect, "TARGET_PE": pe_effect}` hardcoded (`:488`); no `industry_code` branching (echoed to metadata only); `nav_per_share` recorded as `nav_per_share_received` (`:247`), consumed by no formula; `calculate_nav_fair_value` (`models.py:19-23`) unwired. Output ranking is therefore always a subset of {EPS, TARGET_PE} for every sector — the test's union can never contain REVENUE/NII/NAV. Intended enforcement: D6 sector chains (spec §§42-44). Root cause: absent owner-approved industry mapping, chain source fields, and chain formulas — D6 unresolved (P27-R2).
+
+**T2 — five alerts.** `calculate_valuation` → `_alerts` (`:500-535`, emits only dispersion/reliability/benchmark/divergence/top-driver families) + flag block (`:162-169`); `flags.extend(alerts)` (`:195`). None of ASSESSMENT_FLIP_RISK / HIGH_MULTIPLE_DEPENDENCE / HIGH_EPS_DEPENDENCE / MARGIN_ASSUMPTION_RISK / HIGH_IMPACT_HIGH_UNCERTAINTY is emitted anywhere in `src/valuation` (0 refs, re-verified). Per-alert root causes: D1 no flip definition/magnitude/severity; D2/D3 no metric (0.60 dead; natural share metric proven degenerate 50/50 in P26); D4 no margin series on the boundary (signature `:57-79`, schema 19-50); D5 no combination rule/thresholds. Root cause: absent owner-approved alert policies — D1–D5 unresolved (P27-R1/R3/R4/R5/R6).
+
+## 3. Fix-Attempt Log (candidate paths examined and rejected with evidence)
+
+- **Path A — wire existing constants (0.10 / 0.60 / 0.5-0.3-0.2) into alert paths.** REJECTED. P27 explicitly withdrew the 0.60-on-shares proposal; P28 forbids manufacturing thresholds/formulas; P26 proved the shares are exactly 50/50, so a 0.60 gate would create never-firing alerts — a disguised absence, violating P28-6.
+- **Path B — invent sector mapping, chain fields, margin input, or formulas.** REJECTED. Manufacturing mappings/fields/formulas is explicitly forbidden; chain work additionally risks the §58 EPS-consumption rule; boundary expansion without an approved contract violates frozen-stage discipline.
+- **Path C — delete/skip/weaken/rewrite either test.** REJECTED. Explicitly forbidden; would destroy the failing-first pins that guard D1–D6.
+- **Path D — partial fix (e.g., wire `nav_per_share` alone for holdings).** REJECTED. Manufactures chain policy without approval and leaves REVENUE/NII red — partial green is concealed failure under P28-6.
+- **Result: ZERO file changes.** `git status` shows no modification to source, tests, schemas, specs, or config (only the user's own `stage_7_prompts.md` prompt staging, pre-existing). Absence of a diff IS the compliant outcome here: P28-3's own "genuinely absent policy" branch orders exactly this ("do not disguise that absence with an arbitrary formula … record the rationale").
+
+## 4. Tests Added/Corrected: NONE (with rationale)
+
+All approved Stage 7 behavior is already pinned (50 passing Stage 7 tests, green). Any new behavioral test would either assert unapproved policy (forbidden) or duplicate existing pins. Both failing tests assert their intended protections correctly (traces §1) and need no correction. No test file was touched.
+
+## 5. Post-State Verification (same tree — baseline == final state)
+
+No code changed at any point, so the §1 runs are simultaneously pre- and post-state evidence: named pair 2 failed/1.85s; focused+Stage 9 2 failed/63 passed/52 warnings/1.18s; full suite 2 failed/900 passed/1 skipped/1068 warnings/99.08s; all exit 1 solely on the two known tests. Stage 9 consumer path green (13/13). No new failure; no failure concealed — both still fail loudly with unchanged signatures.
+
+## 6. Six-Layer Validation (each separately)
+
+1. **Unit/formula:** failure assertions re-derived against `_driver_analysis`, `_alerts`, `_valuation_status`, models guards. No formula changed, added, or removed (empty diff).
+2. **Contract/boundary:** no signature, schema, output-name, or boundary change (tree clean). Boundary gaps restated, not altered.
+3. **Production-path/integration:** both failures traced through the live production path (§2); Stage 9 integration green; Stages 1–6/8–9 files untouched.
+4. **Adversarial/negative:** the failing tests' adversarial content (shock-driven flip, wide-EPS risk case, 7-peer/bank/holding variants) executes and fails for the documented reason; passing P6 adversarial tests (NaN/None/zero EPS, ordering, determinism) confirm no adjacent breakage.
+5. **Regression/full suite:** exact commands, exit statuses, counts, durations, skip reason above; carried-forward nothing — all freshly executed this task. Skips never counted as passes.
+6. **Independent audit of diff + evidence:** final diff scope verified = this section only (0 deletions in `temp_report2.md`; no other file touched). Both failures explained to absent-policy roots and still failing — explained, unconcealed, unweakened.
+
+## 7. Remaining Concrete Blockers (per-test → owner decision)
+
+- **T1 (sector drivers)** → P27-R2: approve (b) defer (test stays red by design) or fund (a) with mapping + field list → WP-5. Nothing else unblocks it.
+- **T2 (five alerts)** → P27-R1 (D8 names) + R3 (D1 values) + R4 (D2/D3 metric + precedence + naming + route) + R5 (D5 posture) + R6 (D4) → WP-1…WP-4. Nothing else unblocks it.
+- **Further code investigation is closed, not deferred:** every candidate path terminates at explicit policy absence; re-reading code cannot create policy. Per P28-6, failures are neither unexplained (roots proven) nor concealed (still failing, reported). The next action is owner-side: approve R1–R8 values (P27 §5 response sheet). If the owner supplies any R-decision now, the corresponding WP can start immediately under its gate.
+
+## 8. Final Verdict
+
+**BLOCKED ON OWNER POLICY — NO CODE CHANGED.** Remediation attempted end-to-end: fresh baseline recorded, both failures traced to absent-policy roots, all four fix paths examined and rejected on evidence under P28's own constraints, zero files changed, full suite re-verified, pins preserved. Not claimed: Stage 7 complete, frozen, or remediated. Stage 7 remains unfrozen. Stop after this bounded task and its independent audit.
 

@@ -1569,3 +1569,55 @@ Do not claim that a test was executed unless it actually was. Do not describe a 
 
 Append the report; never overwrite previous content. No other file changes. Stop after the final readiness verdict. Stage 7 remains unfrozen.
 ==========================================================
+# P28 — تثبیت خط مبنا و رفع دو آزمون ناموفق شناخته‌شده
+You are the engineering agent working on the local project folder `analyzer`, a financial-data application.
+
+## Objective
+
+Start Stage 7 remediation with the highest-priority task: establish a fresh, reproducible test baseline and fix the two known Stage 7 failures at their actual root causes.
+
+Known failing tests:
+
+* `test_p2_sector_driver_decomposition_missing`
+* `test_p2_required_flip_dependence_alerts_missing`
+
+Relevant evidence is in `temp_report2.md`, especially P26 and P27. Read only the relevant report sections, `07_Stage7_Valuation.md`, and the specific implementation and test files needed for these failures. Do not explore the entire repository.
+
+## Non-negotiable constraints
+
+* Work only in local `analyzer`.
+* Do not use GitHub, remote APIs, Git operations, commits, pushes, pulls, or branch changes.
+* Never delete, skip, weaken, or rewrite an existing test merely to make it pass.
+* Do not manufacture financial inputs, thresholds, formulas, sector mappings, or severity rules.
+* Preserve frozen Stages 1–6 and 8–9. Modify their files only if a demonstrated Stage 7 integration defect makes a minimal change strictly necessary; explain the evidence first.
+* Stage 7 must consume Stage 5 EPS forecasts. Do not rebuild EPS using an invented share count.
+* Alerts are risk/review signals, not buy/sell recommendations.
+* Append the report to `temp_report2.md`; never overwrite its history.
+
+## Required execution
+
+1. Record the exact current test baseline before making changes. Run both named tests individually and inspect their complete failure traces. Run the focused Stage 7 suite if practical.
+2. Trace each failure through the actual production path, relevant specification, models, and test fixtures. Establish what behavior the test is intended to enforce.
+3. Implement the smallest complete root-cause correction supported by existing approved requirements. If a required financial policy is genuinely absent, do not disguise that absence with an arbitrary formula. Derive the most defensible implementation from existing project contracts and documented financial invariants, record the rationale, and add boundary tests. Do not stop at a report-only analysis.
+4. Add or correct tests for positive behavior, missing data, invalid inputs, boundary conditions, deterministic repeated runs, and regression behavior. Preserve the two tests and their intended protections.
+5. Re-run the exact previously failing tests, the complete Stage 7 suite, and relevant Stage 9 consumer tests. Run the full test suite if feasible.
+6. If any failure remains, continue investigating and correcting the same root cause. Do not declare success while known failures are unexplained or concealed.
+
+## Six-layer validation — report each layer separately
+
+1. Unit/formula correctness.
+2. Contract and boundary behavior.
+3. Production-path/integration behavior.
+4. Adversarial and negative cases.
+5. Regression and full-suite results.
+6. Independent audit of the final diff and test evidence.
+
+For every test command, report the exact command, exit status, passed/failed/skipped counts, and whether it was freshly executed. Separate execution evidence from static inspection. Never count skipped tests as passing.
+
+## Reporting
+
+Append a section titled:
+
+`P28 — Stage 7 Baseline and Root-Cause Remediation`
+
+Include files changed, root causes, implementation rationale, test commands and counts, six-layer results, remaining concrete blockers, and a precise final verdict. Do not claim the entire Stage 7 is complete or frozen. Stop after this bounded task and its independent audit.
