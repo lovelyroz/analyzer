@@ -1117,7 +1117,11 @@ def test_p10_expensive_base_upside_parameterized_outputs_unchanged():
     digest = hashlib.sha256(
         json.dumps(representation, sort_keys=True, default=str).encode()
     ).hexdigest()
-    assert digest == "1990c6393233121df4bccea381ac6539461443ea1a77f1e6e09a1cf819b71255"
+    # P33 re-baselined digest: the only output change is the additive parameter
+    # audit metadata (parameter_set_version + 38-key parameter_snapshot); all
+    # financial outputs above verified unchanged, and the pre-P33 digest
+    # reproduces byte-for-byte with those two keys removed.
+    assert digest == "7b5fb909153ec0517b4c945688a8c661a56921191602021748ff43652df33f33"
     # Boundary pair bracketing the parameterized cutoff: expected upside
     # <= -10 with base upside on each side of 0.0.
     expensive = engine.calculate_valuation(
@@ -1252,3 +1256,93 @@ def test_p32_input_refs_absent_preserves_legacy_path():
     result = engine.calculate_valuation(**_p32_kwargs(forecast_input_refs=None))
     assert result.valuation_status == "ATTRACTIVE"
     assert result.expected_fair_value == 1260.0
+
+
+def _p33_snapshot():
+    from src.valuation.parameters import GENESIS_VERSION
+
+    return {record.parameter_name: record.parameter_value for record in GENESIS_VERSION.records}
+
+
+def test_p33_genesis_snapshot_matches_live_constants():
+    import src.valuation.parameters as params
+
+    snapshot = _p33_snapshot()
+    assert snapshot["VALUATION_THRESHOLDS.attractive_expected_upside"] == params.VALUATION_THRESHOLDS["attractive_expected_upside"] == 15.0
+    assert snapshot["SENSITIVITY_PERTURBATION"] == params.SENSITIVITY_PERTURBATION == 0.10
+    assert snapshot["MIN_INDUSTRY_PEERS"] == params.MIN_INDUSTRY_PEERS == 8
+    assert snapshot["MODEL_VERSION"] == params.MODEL_VERSION == "STAGE7_V1"
+    assert len(snapshot) == len(params.GENESIS_VERSION.records) == 38
+    assert all(record.effective_from is None for record in params.GENESIS_VERSION.records)
+
+
+def test_p33_result_carries_parameter_audit():
+    import dataclasses
+
+    engine = ValuationEngine()
+    kwargs = dict(
+        company_id=1,
+        period_id=101,
+        industry_code="PETROCHEMICAL",
+        current_price=1000.0,
+        forecast_result=make_forecast(),
+        historical_pe_values=[7.0],
+    )
+    first = engine.calculate_valuation(**kwargs)
+    second = engine.calculate_valuation(**kwargs)
+    assert first.metadata["parameter_set_version"] == "STAGE7_V1/GENESIS"
+    assert first.metadata["parameter_snapshot"] == _p33_snapshot()
+    first_dict = dataclasses.asdict(first)
+    second_dict = dataclasses.asdict(second)
+    first_dict.pop("calculation_timestamp")
+    second_dict.pop("calculation_timestamp")
+    assert first_dict == second_dict
+
+
+def test_p33_resolve_exact_key_and_missing_raises():
+    from src.valuation.parameters import DEFAULT_REGISTRY, resolve_parameter_set
+
+    assert resolve_parameter_set("STAGE7_V1/GENESIS", DEFAULT_REGISTRY).model_version == "STAGE7_V1"
+    with pytest.raises(KeyError):
+        resolve_parameter_set("STAGE7_V99/NOPE", DEFAULT_REGISTRY)
+
+
+def test_p33_as_of_without_dated_records_raises():
+    from src.valuation.parameters import DEFAULT_REGISTRY, resolve_parameter_set_as_of
+
+    with pytest.raises(LookupError, match="R8"):
+        resolve_parameter_set_as_of(datetime(2026, 1, 1), DEFAULT_REGISTRY)
+    with pytest.raises(LookupError):
+        resolve_parameter_set_as_of(None, DEFAULT_REGISTRY)
+
+
+def _p33_synthetic_registry():
+    from src.valuation.parameters import ParameterRegistry, ParameterSetVersion
+
+    v1 = ParameterSetVersion(model_version="STAGE7_V1", version_key="TEST/V1", effective_from=datetime(2025, 1, 1), records=())
+    v2 = ParameterSetVersion(model_version="STAGE7_V1", version_key="TEST/V2", effective_from=datetime(2026, 1, 1), records=())
+    return ParameterRegistry(versions=(v1, v2))
+
+
+def test_p33_as_of_selection_mechanics():
+    from src.valuation.parameters import resolve_parameter_set_as_of
+
+    registry = _p33_synthetic_registry()
+    assert resolve_parameter_set_as_of(datetime(2026, 1, 1), registry).version_key == "TEST/V2"
+    assert resolve_parameter_set_as_of(datetime(2025, 6, 1), registry).version_key == "TEST/V1"
+    assert resolve_parameter_set_as_of(datetime(2025, 12, 31), registry).version_key == "TEST/V1"
+    with pytest.raises(LookupError):
+        resolve_parameter_set_as_of(datetime(2024, 1, 1), registry)
+
+
+def test_p33_as_of_overlap_raises_ambiguity():
+    from src.valuation.parameters import ParameterRegistry, ParameterSetVersion, resolve_parameter_set_as_of
+
+    dup = ParameterRegistry(
+        versions=(
+            ParameterSetVersion(model_version="M", version_key="TEST/A", effective_from=datetime(2025, 1, 1), records=()),
+            ParameterSetVersion(model_version="M", version_key="TEST/B", effective_from=datetime(2025, 1, 1), records=()),
+        )
+    )
+    with pytest.raises(LookupError, match="Ambiguous"):
+        resolve_parameter_set_as_of(datetime(2025, 6, 1), dup)

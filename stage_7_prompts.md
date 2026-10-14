@@ -1855,3 +1855,62 @@ Append a new P32 report to the END of `temp_report2.md`. Include actual code cha
 
 Do not commit, push, pull, access GitHub, or modify remotes or branches. Do not freeze Stage 7.
 ===========================================================
+# P33 — Stage 7 Effective-Dated Model and Parameter Versioning
+
+Work locally in `analyzer`. Implement a deterministic, auditable parameter-versioning mechanism for Stage 7. Do not stop after documenting a proposal.
+
+Read the latest P31 and P32 reports in `temp_report2.md` and inspect the existing parameter/model configuration and tests. Keep the investigation limited to the valuation configuration path and its direct dependencies.
+
+## Objectives
+
+1. Inventory the parameters actually used by Stage 7 calculations, confidence scores, scenario logic, alert logic, and status classification.
+2. Identify where each value currently originates: explicit input, in-code constant, configuration object, persisted record, or fallback.
+3. Determine whether existing code genuinely supports `model_version`, `parameter_name`, `parameter_value`, `effective_from`, and parameter descriptions, or merely documents them.
+4. Implement versioned parameter resolution where a valid existing temporal contract supports it.
+5. Ensure a valuation can identify the exact model and parameter set that produced its result, with deterministic behavior and an auditable record.
+6. Add regression tests for reproducibility and historical selection.
+
+## Constraints
+
+* Never invent historical effective dates for existing constants.
+* Never assume that the newest version is valid for every historical valuation.
+* Do not select a database-backed registry or add a new persistence dependency without evidence that it fits the existing architecture.
+* Do not introduce a silent fallback from a missing historical parameter version to the current version.
+* Do not change a financial calculation merely to make it easier to version.
+* Do not claim full PIT support unless the relevant timestamp and as-of selection semantics are implemented and tested.
+* Preserve backward compatibility where feasible, but do not preserve an unsafe fallback merely for compatibility.
+* Do not modify frozen Stages 1–6 or 8–9 in this task.
+
+## Required execution
+
+1. Run fresh baseline tests.
+2. Trace the actual parameter resolution path from caller to valuation result.
+3. Implement all versioning and determinism corrections supported by existing contracts.
+4. Where a missing temporal rule prevents a safe historical selection, make the failure explicit and non-silent. Complete all independent implementation work instead of stopping the entire task.
+5. Add tests covering:
+
+   * reproducibility for identical inputs and identical versions;
+   * distinct explicitly versioned configurations;
+   * historical as-of selection where semantics are established;
+   * no future-effective parameter leakage;
+   * missing, overlapping, ambiguous, or invalid versions as applicable to the chosen contract;
+   * audit metadata for the exact selected configuration.
+6. Verify that existing callers and consumers handle the revised contract correctly.
+
+## Mandatory six-layer validation
+
+Run and report:
+
+1. Unit/formula correctness.
+2. Contract/boundary tests.
+3. Production-path/integration tests.
+4. Adversarial/negative tests.
+5. Regression and relevant full suites.
+6. Independent audit of version selection, deterministic replay, and financial invariants.
+
+Provide exact commands, test counts, and results. Distinguish fresh execution from static checks and earlier test results. Do not weaken tests to manufacture a pass.
+
+Append a dated P33 section to the END of `temp_report2.md`. Include the parameter inventory, code changes, resolution semantics, version metadata, tests, and any remaining owner decision with its concrete consequence. A blocked item must not prevent independent valid changes from being completed.
+
+Do not commit, push, pull, access GitHub, or modify remotes or branches. Do not freeze Stage 7.
+=============================================================

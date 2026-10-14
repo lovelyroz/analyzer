@@ -13,6 +13,7 @@ from src.valuation.parameters import (
     ALERT_THRESHOLDS,
     CONFIDENCE_THRESHOLDS,
     CONTRACT_VERSION,
+    GENESIS_VERSION_KEY,
     MIN_INDUSTRY_PEERS,
     MODEL_VERSION,
     PROBABILITY_EVIDENCE_FAMILIES,
@@ -23,6 +24,7 @@ from src.valuation.parameters import (
     SCENARIO_WEIGHTS,
     SENSITIVITY_PERTURBATION,
     VALUATION_THRESHOLDS,
+    resolve_parameter_set,
 )
 from src.valuation.schema import ScenarioValuation, ValuationResult
 
@@ -203,6 +205,8 @@ class ValuationEngine:
             if expected_fv is None:
                 status = "NOT_APPLICABLE"
 
+        parameter_set = resolve_parameter_set(GENESIS_VERSION_KEY)
+
         return ValuationResult(
             company_id=company_id,
             period_id=period_id,
@@ -249,6 +253,11 @@ class ValuationEngine:
                 "probability_evidence": probability_meta,
                 "probability_evidence_families": list(PROBABILITY_EVIDENCE_FAMILIES),
                 "scenario_multiple_policy": multiple_meta,
+            "parameter_set_version": parameter_set.version_key,
+            "parameter_snapshot": {
+                record.parameter_name: record.parameter_value
+                for record in parameter_set.records
+            },
                 "nav_per_share_received": nav_per_share,
                 "pit_inputs_required": True,
             },

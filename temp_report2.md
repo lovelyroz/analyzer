@@ -3402,3 +3402,73 @@ Nothing implemented ⇒ nothing new to test (P29-3's adversarial cases presuppos
 
 **PARTIAL PIT ENFORCEMENT IMPLEMENTED (forecast-input leg only); PIT NOT COMPLETE.** Completed per P32 criteria for the closed leg: authoritative source (`ForecastInputRef` + upstream `<=` predicate), exact rule, validation location (in-path, post-cutoff-normalization), invalid/missing behavior (explicit `ValueError`), leak-proof tests on the real path (5 green), zero unapproved assumptions. Explicitly NOT claimed: benchmark-series enforcement, parameter versioning, production enforcement, completeness, freeze. Stage 7 remains unfrozen. Stop here.
 
+===================================================================
+# P33 — Stage 7 Model and Parameter Versioning
+
+**Date (UTC):** 2026-10-14
+**Nature:** Implementation task — second runtime change of the Stage 7 arc (P32 was the first). P31/P32 reviewed (built on, not repeated). Pre-check: no R1–R8 owner approval (approval grep zero). Constraints honored: no invented historical dates; no newest-valid-for-history assumption; no DB registry (no architectural evidence); no silent fallback; no financial-calculation changes; no full-PIT claim; frozen stages untouched (import-only); no remote operations. Changed files: `src/valuation/parameters.py`, `src/valuation/engine.py`, `src/tests/test_stage7_valuation.py` (+ this report).
+
+## 1. Parameter Inventory (38 records; origins verified, values live-referenced)
+
+| Group | Leaves | Origin today |
+|---|---|---|
+| SCENARIO_WEIGHTS (bear/base/bull) | 3 | in-code constants |
+| SCENARIO_PE_MULTIPLIER (×3, neutral 1.00) | 3 | in-code constants |
+| PROBABILITY_EVIDENCE_FAMILIES + BLEND | 2 | in-code constants |
+| SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT + POLICY_VERSION | 2 | in-code constants |
+| VALUATION_THRESHOLDS | 8 | in-code constants, spec-unratified (D9) |
+| CONFIDENCE_THRESHOLDS | 4 | in-code constants, spec-unratified (D9) |
+| RISK_THRESHOLDS | 5 | in-code constants, spec-unratified (D9) |
+| ALERT_THRESHOLDS (incl. dead 0.60) | 6 | in-code constants (0.60 unwired, stays inert) |
+| SENSITIVITY_PERTURBATION / MIN_INDUSTRY_PEERS | 2 | in-code constants |
+| MODEL_VERSION / CONTRACT_VERSION / INDUSTRY_TARGET_PE | 3 | identifiers / retained-empty compat export |
+
+Genuine `model_version`/`parameter_name`/`parameter_value`/`effective_from`/description support: NONE existed — `effective_from`/`parameter_version` had 0 references repo-wide (re-verified). The structure below was built; the dates were not invented.
+
+## 2. Implementation (mechanism only; values mirrored, never set)
+
+- `parameters.py` — `ParameterRecord` (name/value/effective_from/description; §65-shaped), `ParameterSetVersion` (+ version-level `effective_from`), `ParameterRegistry`, `GENESIS_VERSION_KEY = "STAGE7_V1/GENESIS"`, `GENESIS_VERSION` (38 records built PROGRAMMATICALLY from live constants — values never retyped, drift impossible; every `effective_from=None` with the reason recorded on each record: temporal validity unknown, never valid for historical selection), `resolve_parameter_set` (exact key, missing → `KeyError`, never silent current), `resolve_parameter_set_as_of` (dated-only participation; newest covering version wins; future-effective never selected; overlap → ambiguity `LookupError`; `as_of=None` → `LookupError`; genesis-only registry → explicit R8-naming `LookupError`, never quiet fallback).
+- `engine.py` — import extended (same already-imported modules); `resolve_parameter_set(GENESIS_VERSION_KEY)` on the valuation path (registry corruption would fail loudly, not silently); two metadata keys stamped: `parameter_set_version` + full 38-entry `parameter_snapshot`. No formula, threshold, or calculation touched.
+- Deliberately NOT built: `effective_from` dates for existing constants (unknowable — P33 forbids invention); DB registry (no architectural evidence); any financial change.
+
+## 3. Golden-Digest Regression: Found, Proven, Re-baselined (Not Weakened)
+
+- The metadata addition tripped `test_p10_expensive_base_upside_parameterized_outputs_unchanged` (SHA-256 over full result dict).
+- Proof it is additive-only: recomputed digest with exactly the 2 new metadata keys removed reproduces the pinned digest byte-for-byte (`1990c639…1cf819b71255`); all substantive asserts (FVs 1050/1260/1470, MOS 26.0, ATTRACTIVE, versions) pass unchanged.
+- Action: digest updated to `7b5fb909…52df33f33` with a comment recording the proof. This is a justified golden re-baseline after an intentional additive change — the test's protections (0.0-valued key consumed, comparison exact) are intact, not loosened.
+
+## 4. Tests Added (6, all on real paths — 11/11 new P32+P33 green)
+
+- `test_p33_genesis_snapshot_matches_live_constants` — snapshot == live constants (incl. 15.0/0.10/8/`STAGE7_V1`), 38 records, all undated.
+- `test_p33_result_carries_parameter_audit` — result metadata carries version key + exact snapshot; full-dict determinism across runs.
+- `test_p33_resolve_exact_key_and_missing_raises` — exact match ok; unknown key → `KeyError` (no silent current).
+- `test_p33_as_of_without_dated_records_raises` — dated query + `None` as-of → explicit `LookupError` (R8 named).
+- `test_p33_as_of_selection_mechanics` (synthetic clearly-labeled TEST versions only) — boundary equality selects (`<=` mirror); future-effective excluded (no leakage); pre-history → explicit error.
+- `test_p33_as_of_overlap_raises_ambiguity` — identical effective dates → `LookupError`, never silent pick.
+
+## 5. Fresh Execution Evidence (all runs this task)
+
+- `-k "p32 or p33"` → **11 passed in 0.88s, exit 0.**
+- Stage 7 + Stage 9 → **2 failed, 74 passed in 1.16s, exit 1** (failures: only known P2s; p10 re-greened).
+- Broad (`--ignore=test_codal_pdf_extraction.py`) → **2 failed, 911 passed, 1 skipped in 104.70s, exit 1** (900 + 11 new; skip: Codal fixture, never a pass).
+- New vs pre-existing: 11 new passes mine; 2 P2 failures pre-date identically; 1 transient dev-time failure (my own missing import, test-side) fixed same session and disclosed.
+
+## 6. Six-Layer Validation (each separately)
+
+1. **Unit/formula:** zero formula/threshold/value changes (digest proof §3); registry mechanics unit-covered (exact/missing/boundary/future/overlap/None).
+2. **Contract/boundary:** additive-only outputs (2 metadata keys); one keyword-only pattern preserved (no signature); missing/ambiguous/future/invalid versions → explicit errors, never silent current; backward compat proven (all 52 pre-existing Stage 7 tests omit new inputs and pass).
+3. **Production-path/integration:** resolution + stamping execute inside `calculate_valuation` (proven by result-carrying + equality tests); Stage 9 green; frozen stages untouched.
+4. **Adversarial/negative:** unknown key, undated registry query, `None` as-of, future-effective, overlap, pre-history — all explicit errors; no hostile version input yields silent current values.
+5. **Regression/full suite:** exact commands/exits/counts/durations above; p10 regression caught, proven additive-only, re-baselined with recorded proof; P2 pins intact.
+6. **Independent final-diff audit:** diff = parameters registry block, engine stamp (import/resolve/2 keys), tests (+imports/helpers/6 tests/p10 digest+comment), this section. No invented dates/values/formulas; no weakened test (p10 substantive asserts intact); no freeze declared.
+
+## 7. Remaining Owner Decisions (concrete consequences)
+
+- **R8 now:** adopt this in-code registry or order DB-backed instead; supply `effective_from` discipline going forward (new/changed parameters stamped at introduction — backfill of current constants stays impossible, recorded, never to be invented later).
+- **R7+R8 jointly:** `as_of` rule + ordering invariants activate `resolve_parameter_set_as_of` for real registries (mechanics already tested).
+- **Production wiring for P32 refs:** still absent (control dormant) — caller-placement decision (P31 §5).
+- **P2 failures:** still R1–R6-gated, untouched.
+
+## 8. Final Verdict
+
+**VERSIONING MECHANISM IMPLEMENTED (genesis + exact resolution + explicit as_of refusal + result audit); HISTORICAL SELECTION BLOCKED (R8/R7).** Satisfied: inventory, record contracts, deterministic resolution/selection mechanics, reproducibility + historical-selection + leakage + missing-version + audit-metadata tests, backward compatibility, zero invented dates/values. Not claimed: dated history, DB registry, full PIT, completeness, freeze. Stage 7 remains unfrozen. Stop here.
