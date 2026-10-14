@@ -1208,3 +1208,109 @@ Include:
 
 Inspect the final diff and stop after reporting. Do not implement any valuation feature as part of this task.
 ========================================================================
+# P25 — Stage 7 D1–D9 Consolidated Owner Decision Package
+
+You are working in the existing local project folder `analyzer`, a financial-data application. Use OpenCode Desktop's available local workspace tools. Do not assume Claude Code-specific capabilities.
+
+## Objective
+
+Prepare one comprehensive, evidence-backed owner decision package covering **all unresolved Stage 7 decisions D1–D9**, so the project owner can make informed decisions in one review instead of repeated exploratory rounds.
+
+This is a READ-ONLY analysis task. Do not implement any decision or modify source code, tests, schemas, migrations, configuration, dependencies, or Stage 7 specifications.
+
+## Context and strict boundaries
+
+1. Read `temp_report2.md`, focusing on P17–P24, including the latest P23 and P24 reports. Treat any explicitly superseded draft as superseded.
+2. Read only the relevant sections of `07_Stage7_Valuation.md` and the directly relevant implementation/contracts/tests, including as needed:
+
+   * `src/valuation/engine.py`
+   * `src/valuation/models.py`
+   * `src/valuation/parameters.py`
+   * `src/valuation/schema.py`
+   * `src/forecast/repo.py`
+   * `src/decision/engine.py`
+   * `src/tests/test_stage7_valuation.py`
+   * `src/tests/test_stage9_decision.py`
+3. Do not perform a repository-wide review. Follow dependencies only when required to answer a specific D1–D9 question.
+4. Preserve the existing known failures:
+
+   * `test_p2_sector_driver_decomposition_missing`
+   * `test_p2_required_flip_dependence_alerts_missing`
+
+   Do not weaken, delete, skip, rewrite, or mask them.
+5. Do not perform GitHub/API/remote operations, commits, pushes, pulls, or branch changes.
+6. Do not invent financial formulas, thresholds, perturbation sizes, severities, mappings, defaults, effective dates, rounding policies, or acceptance criteria.
+7. Existing implementation behavior is evidence, not automatic approval of that behavior as financial policy. Clearly distinguish:
+
+   * existing verified behavior;
+   * existing but unapproved implementation choices;
+   * missing behavior;
+   * decisions requiring owner approval.
+8. Stage 7 remains unfrozen.
+
+## Required decision coverage
+
+Prepare a decision record for every item below:
+
+* **D1 — Assessment flip risk:** What constitutes a meaningful valuation-assessment flip, how it is measured, and which conditions/severity should trigger an alert.
+* **D2 — High multiple dependence:** Definition and calculation of multiple dependence; assess the existing `high_dependence_share = 0.60` and whether it has any live use. Do not activate it automatically.
+* **D3 — EPS dependence and forecast revision:** Define the unresolved EPS-dependence concept, its relation to `FORECAST_RISK`, and whether/how Stage 5 revision evidence should reach Stage 7. Account for P23/P24's finding that Stage 7 currently does not produce `POSITIVE_FORECAST_REVISION`.
+* **D4 — Margin assumption risk:** Identify the missing data/contract requirements and possible implementation boundary. Do not fabricate a margin series or infer it from unavailable data.
+* **D5 — High impact plus high uncertainty:** Identify existing sensitivity/uncertainty mechanisms, distinguish implementation constants from approved policy, and specify which decisions are required before an alert can be implemented.
+* **D6 — Sector driver chains:** Assess the required non-financial, bank, and holding chains. Identify evidenced inputs, absent inputs, source-of-truth requirements, and safe integration boundaries. Stage 7 must consume Stage 5 EPS forecasts and must not rebuild EPS using a new share count.
+* **D7 — Point-in-time correctness:** Evaluate dated benchmark observations, historical availability, report publication/version dates, forecast cutoffs, and backtest leakage. Compare viable enforcement approaches and identify required caller/contract changes.
+* **D8 — Alert contract and naming:** Reconcile required specification names with actual emitted flags/alerts, including `FORECAST_RISK`, `POSITIVE_FORECAST_REVISION`, `INSUFFICIENT_PEER_DATA`, `INDUSTRY_BENCHMARK_INSUFFICIENT`, and the P21/P23/P24 findings. Consider Stage 9 consumer compatibility. Do not rename outputs yet.
+* **D9 — Parameter/model versioning:** Evaluate the current parameter implementation against Section 64/65 requirements, including `effective_from`, `model_version`, and the unresolved as-of selection rule. Compare an in-code registry with a persistent registry only to the extent supported by the existing architecture.
+
+## Required format for EACH D1–D9 decision
+
+Provide one compact but substantive table row or clearly labeled record containing:
+
+1. Current verified behavior, with file/function/section/test evidence.
+2. Exact unresolved policy question.
+3. Two or three viable options, including a no-change/V1-limitation option when legitimate.
+4. Recommended option, explicitly marked **PROPOSAL — NOT APPROVED**.
+5. Rationale and financial correctness/auditability trade-offs.
+6. Required inputs, data provenance, contract changes, and downstream consumers.
+7. Failure modes and missing-data behavior; missing must not silently become zero.
+8. Focused positive, boundary, negative, adversarial, determinism, and regression tests needed.
+9. Dependencies on other D-items and a safe implementation order.
+10. A concise owner decision statement that can be approved or rejected without another discovery round.
+
+Do not force a decision when evidence is insufficient. State precisely what evidence is missing and propose the smallest bounded follow-up investigation.
+
+## Consolidated design requirements
+
+After the nine individual decision records, provide:
+
+A. A dependency graph and recommended implementation sequence, explaining which items can proceed independently and which must wait for decisions.
+
+B. A cross-decision contract impact matrix covering Stage 5 → Stage 7 → Stage 9, schemas, alerts, parameters, and point-in-time data.
+
+C. A proposed implementation/test plan divided into small, independently auditable work packages. Do not implement them.
+
+D. A list of decisions the owner must approve, with explicit choices and proposed defaults. Mark every default as a proposal, not an existing requirement.
+
+E. A list of items that can be resolved through factual documentation correction without changing financial policy, separated from policy decisions.
+
+F. A clear statement of which decisions are genuinely blocked and which can be resolved from existing evidence.
+
+## Validation and reporting
+
+Apply all six validation layers, adapted to this read-only task:
+
+1. **Unit/formula:** trace existing relevant formulas and identify formula gaps without inventing replacements.
+2. **Contract/boundary:** inspect required inputs, outputs, types, missing-data behavior, and downstream compatibility.
+3. **Production-path/integration:** trace only the relevant Stage 5/7/9 paths.
+4. **Adversarial/negative:** identify boundary, missing-data, stale-data, leakage, and conflicting-evidence cases.
+5. **Regression/full-suite:** inspect existing test evidence. Do not claim tests were run unless they were actually executed in this task; do not run the full suite merely for a read-only design report unless needed to resolve a specific factual question.
+6. **Independent audit:** cross-check every recommendation and claimed current behavior against code/spec/test evidence. Separate verified facts from assumptions and proposals.
+
+Append the complete report to `temp_report2.md` under the heading:
+
+`P25 — Stage 7 D1–D9 Consolidated Owner Decision Package`
+
+Never overwrite previous reports. Include the date, exact files inspected, evidence references, unresolved questions, and whether any tests were freshly executed. Make no other file changes.
+
+Finish with a concise owner decision summary. Do not start implementation, do not declare Stage 7 complete or frozen, and stop after reporting.
+=================================================================
