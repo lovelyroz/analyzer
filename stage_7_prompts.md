@@ -1394,3 +1394,178 @@ Do not edit P25 or any prior report. Append this audit only to `temp_report2.md`
 
 Stop after appending the report. Do not begin implementation, do not declare Stage 7 complete or frozen, and do not perform remote operations.
 ===========================================================================
+# P27 — Targeted Repair and Final Readiness Review of Stage 7 D1–D9 Decisions
+
+You are working in the existing local project folder `analyzer` using OpenCode Desktop.
+
+## Objective
+
+Produce one corrected, internally consistent, owner-ready decision package for Stage 7 decisions D1–D9, using the independent findings in P26.
+
+This is a bounded documentation/report task. Do not implement financial policy or change runtime behavior.
+
+The objective is to avoid another discovery round: correct the known defects, verify material claims, and produce explicit options that the owner can approve or reject.
+
+## Authoritative context
+
+Read:
+
+* `temp_report2.md`: P25 and the complete P26 independent audit, plus relevant earlier findings P17–P24.
+* Only the specification, implementation, and tests necessary to verify disputed claims.
+
+Treat P26 as the authoritative audit of P25's defects. Do not redo the full P25 investigation. Recheck underlying code where required to verify a correction.
+
+## Strict boundaries
+
+* Do not modify source code, tests, schemas, migrations, dependencies, configuration, or `07_Stage7_Valuation.md`.
+* Do not edit or rewrite P25 or P26; preserve both as historical records.
+* Append new material only to `temp_report2.md`.
+* No GitHub/API/remote operations, commits, pushes, pulls, or branch changes.
+* Do not invent financial formulas, thresholds, severity mappings, defaults, dates, rounding rules, industry mappings, or acceptance criteria.
+* Do not convert any proposal into an approved policy.
+* Preserve the known P2 failures:
+
+  * `test_p2_sector_driver_decomposition_missing`
+  * `test_p2_required_flip_dependence_alerts_missing`
+* Never weaken, delete, skip, rewrite, or mask those tests.
+* Stage 7 remains unfrozen.
+
+## Required corrections
+
+### 1. D2, D3 and D5 — Correct the exact metric degeneracy
+
+P26 verified that the current symmetric +10% one-at-a-time shocks to the multiplicative valuation `EPS × target P/E` produce equal `EPS` and `TARGET_PE` impacts in the tested path: 50% each. Their current uncertainty and review-priority values are also identical by construction.
+
+Therefore:
+
+* Explicitly withdraw the P25 recommendation to use the current `driver_impact` shares with a 0.60 threshold as a working dependence-alert formula.
+* Explain why the existing metric cannot reliably distinguish EPS dependence from multiple dependence.
+* Do not activate `high_dependence_share = 0.60`.
+* Do not claim that D2/D3 alerts will work if implemented using those shares unchanged.
+* Correct D5 to acknowledge that its current two-driver inputs cannot meaningfully discriminate between the drivers using the existing impact/uncertainty outputs.
+
+Present a small set of genuinely distinct options for D2/D3, for example:
+
+* retain the current V1 limitation and do not emit the new alerts;
+* investigate a scenario-spread or other non-degenerate attribution approach;
+* investigate an asymmetric-shock or elasticity approach.
+
+These are research/design options only. Do not present an unverified sketch as an implemented or financially validated formula. For each option, identify the additional policy choices, inputs, and tests needed.
+
+For D2/D3 alert co-occurrence, explicitly present the alternatives: both alerts may fire, a defined precedence rule may select one, or alerts may be deferred. Do not silently select precedence.
+
+For D3 forecast revisions, make clear that `UPWARD`/`DOWNWARD`/`MIXED` cannot be mapped into family-level bear/base/bull probability evidence without a defined mapping rule. Present this as an explicit owner decision or a bounded design task. Do not invent the mapping.
+
+### 2. D1 — Make the flip-risk proposal decidable
+
+Correct the D1 record so that it no longer describes an incomplete rule as implementation-ready.
+
+Explicitly separate:
+
+* shock variables;
+* shock direction (positive, negative, or both);
+* shock magnitude;
+* what constitutes a status flip;
+* severity assignment;
+* missing-data and `NOT_APPLICABLE` behavior.
+
+The existing 10% upward shock is an implementation constant used for driver analysis, not approved flip-risk policy. Present it only as a proposal requiring approval.
+
+Provide an owner-answerable severity mapping template with named severity categories but leave unapproved numeric boundaries blank. Do not invent a mapping from band distance to severity.
+
+Include integration tests in the proposed test plan. If a complete decision still requires an owner-specified value, mark it `NOT READY FOR IMPLEMENTATION`, rather than filling the gap by inference.
+
+### 3. D8 — Correct the downstream-consumer evidence
+
+Use P26's verified trace of `DecisionEngine.make_decision` in `src/decision/engine.py`.
+
+Correct all P25 statements and matrix cells that claim Stage 9 currently consumes `alerts`, `valuation_risk_flags`, or `valuation_driver_ranking`.
+
+State only the verified consumer fields, including the relevant valuation status, reliability, risk, confidence, data-quality, margin-of-safety, cutoff, and metadata fields confirmed in P26.
+
+Distinguish:
+
+* verified current Stage 9 dependencies;
+* future-consumer compatibility risk;
+* audit/history implications of renaming;
+* dashboard consumption, which remains unverified.
+
+Do not claim that renaming alert tokens currently breaks Stage 9 when no such dependency was found.
+
+Present D8 options and their trade-offs using the corrected evidence. Include the treatment of absent or mismatched tokens such as `FORECAST_RISK`, `POSITIVE_FORECAST_REVISION`, `POOR_DATA_QUALITY`, and `POINT_IN_TIME_WARNING`. Do not invent triggers for those alerts.
+
+### 4. D6 — Correct the consumer-impact assessment
+
+Remove the unsupported claim that Stage 9 consumes `valuation_driver_ranking`. Keep dashboard usage explicitly unverified.
+
+Preserve the verified contract gap and the restriction that Stage 7 must consume Stage 5 EPS forecasts without rebuilding EPS using a new share count.
+
+Keep sector-chain implementation conditional on an explicit owner decision and evidence-backed input/mapping definitions. Do not invent industry codes or source fields.
+
+### 5. D7 — Make point-in-time choices explicit
+
+Present the viable enforcement options and state what each guarantees and does not guarantee.
+
+Explicitly require the owner or a later approved design specification to determine:
+
+* date-ordering invariants between valuation date, cutoff, publication date, forecast version, and benchmark observation date;
+* behavior when an invariant is violated;
+* handling of missing dates and missing provenance;
+* backtest selection of information available at the historical date.
+
+Do not describe caller attestation as equivalent to mechanically enforced point-in-time correctness. If attestation is proposed for V1, label it as a limitation and identify the residual leakage risk.
+
+### 6. D9 — Preserve the verified evidence and remaining choices
+
+Keep the verified cutoff fallback behavior identified in P26 distinct from a formally approved `as_of` policy.
+
+Present the registry options, version-selection rule, effective-date requirements, and interaction with D7. Do not assume that the existence of a cutoff field by itself establishes complete point-in-time correctness.
+
+### 7. Preserve the valid P25 conclusions
+
+Do not reopen already verified findings without contradictory evidence. In particular:
+
+* D4's absent margin contract is supported.
+* D6's required sector inputs/mapping are not currently established.
+* D9's registry/versioning decision remains separate from implementation approval.
+* The P23/P24 stress-test documentation corrections remain historical evidence.
+* The two known P2 failures remain intact and must not be reclassified as passing.
+
+## Required final package
+
+Append the following section to `temp_report2.md`:
+
+`P27 — Corrected D1–D9 Owner Decision Package and Final Readiness Review`
+
+Include:
+
+1. **Correction log:** each P26 finding G1, G2, G3, C1, C2, C3 and M2, with the correction made and the evidence supporting it.
+2. **Nine decision records:** for each D1–D9, state verified behavior, unresolved policy, distinct viable options, a clearly labeled proposal if evidence supports one, risks, contract impact, required tests, dependencies, and an owner-answerable decision statement.
+3. **Corrected consumer matrix:** verified Stage 5 → Stage 7 → Stage 9 dependencies, separating actual fields from future or unverified consumers.
+4. **Decision readiness matrix:** assign exactly one status to each D-item:
+
+   * `READY_FOR_OWNER_DECISION`
+   * `PARTIALLY_READY`
+   * `NOT_READY`
+
+   A decision can be ready for the owner to choose a direction while remaining not ready for implementation. State this distinction explicitly.
+5. **Owner response sheet:** list the smallest practical set of explicit choices the owner must make. Group related D1–D3 choices where appropriate, but do not merge decisions that have different financial meanings. Include a `defer/no new alert in V1` option where legitimate.
+6. **Conditional work plan:** small, auditable implementation packages ordered by dependencies. State which packages cannot start until a specific owner decision is approved.
+7. **Open evidence list:** only questions that genuinely cannot be resolved from current code, spec, or reports. Do not request a broad new investigation when the gap is a policy choice.
+8. **Final verdict:** `READY_FOR_OWNER_REVIEW` only if all material options are understandable, the P26 defects are corrected, and no recommendation relies on the degenerate metrics. Otherwise `NEEDS_TARGETED_REVISION`, naming only the remaining blocking defects.
+
+## Six-layer validation
+
+Perform and report all six layers:
+
+1. Unit/formula evidence: confirm the degenerate-metric correction and do not imply the old 0.60 proposal is viable.
+2. Contract/boundary: verify the corrected fields, inputs, outputs, and missing-data constraints.
+3. Production-path/integration: verify the Stage 5/7/9 consumer claims against actual code.
+4. Adversarial/negative: cover missing values, NaN, non-applicable valuations, shock directions, alert co-occurrence, stale/future data, and absent provenance as design requirements.
+5. Regression/full suite: do not run unrelated tests for a report-only correction. Distinguish prior test results, fresh executions, static inspection, and planned tests.
+6. Independent audit: after drafting P27, perform a separate verification pass against P26 and the relevant code. Check every material correction and every consumer claim. Do not merely restate the first-pass findings.
+
+Do not claim that a test was executed unless it actually was. Do not describe a design proposal as financially validated merely because it is mathematically computable.
+
+Append the report; never overwrite previous content. No other file changes. Stop after the final readiness verdict. Stage 7 remains unfrozen.
+==========================================================
