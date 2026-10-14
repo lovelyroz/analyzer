@@ -1657,3 +1657,39 @@ Report unit/formula, contract/boundary, production-path/integration, adversarial
 
 Append `P29 — Stage 7 Point-in-Time Enforcement` to `temp_report2.md`. Never overwrite prior reports. No remote Git/GitHub operations. Do not freeze Stage 7.
 ===========================================================
+# P30 — تکمیل نسخه‌بندی مدل و پارامترها
+You are working on the local financial-data project `analyzer`.
+
+## Objective
+
+Implement complete, reproducible Stage 7 model and parameter versioning, building on P28 and P29. Read their appended reports first. Inspect only the valuation specification, parameter/model implementation, relevant schemas, and affected tests.
+
+## Required outcome
+
+1. Establish explicit model-version and parameter-record contracts consistent with the existing specification, including parameter name/value, effective-from date, description, and the model version.
+2. Implement deterministic as-of parameter selection so a historical valuation uses the parameter version valid and available at that time. Coordinate the selection rule with P29's PIT enforcement.
+3. Reject or explicitly handle missing, ambiguous, conflicting, future-effective, or invalid parameter records. Never silently fall back to a value that changes financial meaning.
+4. Preserve reproducibility: the same point-in-time inputs, model version, and parameter records must yield the same output.
+5. Ensure valuation outputs or their auditable metadata identify the model/parameter versions actually used.
+6. Trace any contract changes through all in-repository consumers. Do not change frozen stages unless a verified compatibility requirement makes it necessary.
+7. Do not introduce arbitrary financial thresholds or change existing financial formulas merely to complete versioning.
+
+## Execution and testing
+
+Inspect the current implementation before editing. Implement the complete bounded change rather than only writing a proposal. Add tests for effective-date boundaries, historical selection, missing/conflicting records, deterministic repeated runs, and backward-compatibility requirements supported by the existing contract.
+
+Run focused parameter tests, the full Stage 7 suite, affected Stage 9 tests, and the full suite if feasible. Fix failures introduced by this change and distinguish pre-existing failures from newly introduced ones.
+
+Report all six validation layers separately:
+
+* unit/formula correctness;
+* contract/boundary;
+* production-path/integration;
+* adversarial/negative;
+* regression/full suite;
+* independent final-diff audit.
+
+Include exact commands, exit statuses, and fresh test counts. Skipped tests are not passes. Append `P30 — Stage 7 Model and Parameter Versioning` to `temp_report2.md`; never overwrite earlier reports.
+
+No remote Git/GitHub operations, commits, pushes, pulls, or branch changes. Stage 7 remains unfrozen until the entire Stage 7 implementation and independent final audit are complete.
+=====================================================

@@ -3227,4 +3227,52 @@ Nothing implemented ⇒ nothing new to test (P29-3's adversarial cases presuppos
 ## 7. Final Verdict
 
 **PIT NOT ENFORCED — NOTHING IMPLEMENTED (BLOCKED: IR1–IR4 + R7/R8).** Every implementable step terminates at missing source fields (IR1–IR3), missing owner rules (R7/R8), or a passing test that forbids the change (IR4). This is not a deferred investigation: the evidence is complete and the four requirements above are concrete. Preserve P28's verdict alongside this one — both failures AND the PIT gap now share one unblock path: owner approval of R1–R8 (P27 §5). Stage 7 remains unfrozen. Stop here.
+===================================================================
+# P30 — Stage 7 Model and Parameter Versioning
+
+**Date (UTC):** 2026-10-14
+**Nature:** Bounded implementation attempt per P30, building on P28/P29 (both reviewed; neither repeated nor discarded). Pre-check: NO R7/R8 (or any R1–R8) owner approval exists (approval grep: zero; `git log` top 5ade89e P29). Current implementation inspected before any edit decision (`parameters.py`, `engine.py:57-79,201-250`, `schema.py:19-50`). Constraints honored: no arbitrary thresholds; no formula changes; no manufactured dates; frozen stages untouched; no remote operations. The only write is this report.
+
+## 1. Outcome-by-Outcome Disposition (P30 §Required outcome 1–7)
+
+- **O1 — record contracts (name/value/effective-from/description/model version).** NOT IMPLEMENTED. A record structure is writable, but every existing parameter's `effective-from` has NO evidence: thresholds' introduction dates are unknowable from code, spec, or history (constants predate versioning). Populating them = inventing dates (forbidden); omitting them fails O1's explicit field list. BLOCKED on R8 (mechanism choice) + effective-date provenance. Precision beyond prior reports: even post-R8, backfilling current constants stays impossible — only forward dating (new/changed parameters stamped at introduction) is honest versioning.
+- **O2 — deterministic as-of selection coordinated with PIT.** NOT IMPLEMENTED. There is no temporal contract to coordinate with: P29 verdict stands (PIT NOT ENFORCED, IR1–IR4 blocked). An `as_of` rule selecting among versioned records requires both the records (O1) and D7's ordering invariants — both absent. BLOCKED on R7+R8 jointly (mutual dependency per P22/P27).
+- **O3 — missing/ambiguous/conflicting/future-effective/invalid record handling.** NOT IMPLEMENTED. Handling rules are policy (reject vs downgrade vs flag; conflict precedence) with no approved content; a registry to apply them to does not exist. BLOCKED on R8 (+ R7 for date-dependent cases). No silent fallback exists today either — constants are total functions, so nothing currently changes financial meaning silently; stated to prevent misreading this gap as live misbehavior.
+- **O4 — reproducibility (same PIT inputs + versions ⇒ same output).** ALREADY HOLDS. `test_p6_repeat_runs_identical_on_full_contract` (`test_stage7_valuation.py:1035`) pins determinism and passes (inside the 900 green below). No code needed; verified, not assumed.
+- **O5 — outputs/metadata identify versions used.** ALREADY HOLDS. Every `ValuationResult` carries `model_version="STAGE7_V1"` (`engine.py:211`, from `parameters.py:80`) and `contract_version="VALUATION_CONTRACT_V1"` (`:231`, from `:81`); `calculation_timestamp` (`:212`) and `data_cutoff_datetime` (`:215`) accompany them. No code needed; verified, not assumed.
+- **O6 — consumer trace of contract changes.** VACUOUS: no contract changed (empty diff), so no consumer migration exists to trace. Stage 9 suite green (13/13 in focused run) confirms consumers unaffected.
+- **O7 — no new thresholds/formula changes.** HOLDS trivially: zero modifications of any kind.
+
+## 2. Fix-Attempt Log (paths examined, not skipped)
+
+- **Path A — in-code registry of current values with invented `effective_from`.** REJECTED: date fabrication, explicitly forbidden; P14's design remains an unapproved proposal.
+- **Path B — registry with blank/None effective dates.** REJECTED: fails O1's field requirement; as-of selection over undated records is undefined — theater, not versioning (same reasoning as P29-Path 2).
+- **Path C — DB-backed table now.** REJECTED: heavier variant of A with identical blockers (mechanism unapproved + dates unknowable + no as_of rule), plus migration/dependency cost with zero enforcing payoff.
+- **Path D — rebrand current constants as "versioned" (MODEL_VERSION label only).** REJECTED: a static label is not a registry; calling it versioning would misrepresent (P26's laundering warning applies). Current labels stay exactly what they are: build identifiers, honestly reported as such in O5.
+- **Result: ZERO file changes** (`git status`: only the user's own `stage_7_prompts.md` staging, pre-existing).
+
+## 3. Fresh Execution Evidence (all runs this task)
+
+- `python -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q -p no:warnings` → **2 failed, 63 passed in 1.01s, exit 1** (only the two known P2s; determinism + Stage 9 green inside).
+- `python -m pytest src/tests/ -q -rs --ignore=src/tests/test_codal_pdf_extraction.py -p no:warnings` → **2 failed, 900 passed, 1 skipped in 115.44s, exit 1.** Skip: Codal fixture (`:307`), carried, never a pass.
+- Failures introduced by this work: **none** (no changes). Pre-existing P2 pins stand with P28 roots.
+
+## 4. Six-Layer Validation (each separately)
+
+1. **Unit/formula:** no formula touched (O7 holds by empty diff); O4/O5 verified against cited lines, not inferred.
+2. **Contract/boundary:** zero signature/schema/output changes; O1–O3 absences restated as missing capability, never as silent behavior.
+3. **Production-path/integration:** version stamping traced on the live construction path (`:201-250`); consumers green; frozen stages untouched.
+4. **Adversarial/negative:** O3's hostile cases (conflicting/future-effective/invalid records) have no registry to attack — specified as gated requirements for the R8 implementation, not simulated against constants.
+5. **Regression/full suite:** exact commands, exits, counts, durations, skip reason above — all fresh. P2 failures preserved as designed pins.
+6. **Independent final-diff audit:** diff scope verified = this section only (0 deletions; no other file touched). No versioning-completeness claim made.
+
+## 5. Precise Unblock Path (fields, rules, approvals — no vagueness)
+
+- **R8 now:** mechanism (in-code per P14 vs DB per §65) + forward-dating discipline (new/changed parameters stamped at introduction; historical constants explicitly marked undatable-backfill rather than backfilled with invented dates).
+- **R7+R8 jointly:** `as_of` rule + ordering invariants (P29-IR1/IR2), then O2/O3 implementable with gated tests (effective-date boundaries, historical selection, missing/conflicting records, determinism, backward-compat per existing contract).
+- O4/O5 already hold and need no action. Nothing here needs new discovery — only approvals.
+
+## 6. Final Verdict
+
+**VERSIONING NOT IMPLEMENTED — BLOCKED (R8 mechanism + effective-date provenance + R7 as_of coordination); O4/O5 ALREADY HOLD.** Two of seven outcomes verifiably satisfied without action; the other five terminate at missing approvals/dates, each named above. Not claimed: versioned parameters, as-of selection, completeness, freeze. P28/P29 verdicts stand alongside this one — all three share the single unblock path of P27-R1–R8 owner approval. Stage 7 remains unfrozen. Stop here.
 
