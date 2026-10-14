@@ -2893,80 +2893,93 @@ Nine decisions, one review. The package proposes: approve the two-driver world a
 ===================================================================
 # P26 — Independent Audit of the D1–D9 Decision Package
 
-You are working in the existing local project folder `analyzer` using OpenCode Desktop.
+**Date (UTC):** 2026-10-14
+**Nature:** READ-ONLY independent audit of the P25 decision package. No policy chosen or implemented; no source, test, schema, configuration, dependency, migration, or specification file modified; no prior report edited. No formula, threshold, severity, mapping, default, or date rule invented. The only write is this audit, appended to `temp_report2.md`.
+**Evidence base:** full P25 report + P17–P24 (P23 2026-10-14, P24 corrections); `07_Stage7_Valuation.md` (sections 10, 23-24, 26, 42-57, 64-69, 77-79, 83, 85); `src/valuation/engine.py` (lines 57-79, 158-250, 256-535 — including 186-255, which P25 cited but had not read), `models.py`, `parameters.py`, `schema.py`; `src/forecast/repo.py:137-148`; `src/decision/engine.py` (full `make_decision` input/output trace, lines 31-280); `src/tests/test_stage7_valuation.py` (P2 tests at 406/425, `make_forecast` at 10, `test_p6_cutoff_pit_limitation_pinned` at 937-953 — body read); fresh diagnostic probe below. No test suite was executed; the probe is a diagnostic, not test evidence.
 
-## Objective
+---
 
-Independently audit the newly appended report `P25 — Stage 7 D1–D9 Consolidated Owner Decision Package` in `temp_report2.md`.
+## 1. Nine-Row Verdict Table
 
-The goal is to deliver a decision package that is complete enough for the owner to approve or reject the proposed choices in one review. This is a READ-ONLY audit, not an implementation task.
+| Item | Verdict | One-line rationale |
+|---|---|---|
+| D1 Flip risk | PARTIALLY_READY | Question/options explicit; recommended probe underspecified (shock sign, severity mapping) — G2 |
+| D2 Multiple dependence | PARTIALLY_READY | Question/options explicit incl. no-change; recommended metric degenerate (always 50/50, 0.60 unreachable) — G1 |
+| D3 EPS dependence + revision | PARTIALLY_READY | Naming options + route explicit; share metric shares D2's degeneracy; trend→family mapping rule missing — G1 |
+| D4 Margin risk | READY_FOR_OWNER_DECISION | Contract gap proven; (a)/(b)/(c) explicit; (c) closable as-is |
+| D5 Impact × uncertainty | PARTIALLY_READY | Tautology honestly flagged but exact degeneracy (identical outputs per driver) undisclosed — G1 |
+| D6 Sector chains | READY_FOR_OWNER_DECISION | Absent inputs/mapping evidenced; (a)/(b) explicit; section-58 constraint + test handling stated |
+| D7 PIT enforcement | PARTIALLY_READY | Mechanism choice answerable; exact ordering rule + violation response missing (declared follow-up) |
+| D8 Alert names | PARTIALLY_READY | Mapping complete/accurate; strategy options explicit; Stage-9 consumer premise false — G3 |
+| D9 Versioning | READY_FOR_OWNER_DECISION | Mechanism + `as_of` options explicit; cutoff fallback verified in code; trade-offs disclosed |
 
-## Scope
+## 2. Defects (statement → contradiction/evidence → risk → smallest correction)
 
-1. Read the entire P25 report and relevant P17–P24 findings in `temp_report2.md`.
-2. Verify disputed or material claims against the exact relevant passages in `07_Stage7_Valuation.md`, the directly relevant Stage 7/Stage 5/Stage 9 implementation, schemas, parameters, and tests.
-3. Do not repeat the whole P25 investigation unless necessary to verify a material claim.
-4. Do not perform a repository-wide review.
-5. Do not modify source code, tests, schemas, configuration, dependencies, migrations, or specification files.
-6. Do not perform remote Git/GitHub/API operations, commits, pushes, pulls, or branch changes.
-7. Do not choose or implement any owner policy. Recommendations remain proposals requiring explicit approval.
-8. Preserve the two known P2 failing tests; never weaken, delete, skip, or rewrite them.
-9. Stage 7 remains unfrozen.
+**G1 — D2-(a)/D3-(a) attribution-share metrics are degenerate (MATERIAL).**
+P25 states (D2-3/D2-4): "attribution share: `TARGET_PE` share of `impact_pct` … alert when share ≥ 0.60 (explicitly approving the existing constant)" / "Directly computable from shipped outputs".
+Verified contradiction: `_driver_analysis` (`engine.py:478-495`) applies symmetric +10% one-at-a-time shocks to a multiplicative identity (FV = EPS × PE), so both effects are always equal. Fresh probe (project interpreter, EPS 150/180/210, historical 7.0) returned `driver_impact == {'EPS': 50.0, 'TARGET_PE': 50.0}` exactly, with `driver_uncertainty` 40.0/40.0 (identical by construction, `engine.py:496`) and `review_priority` 20.0/20.0. A 0.60 threshold is therefore unreachable short of rounding dust; D2-(a) as written can never fire, and D3-(a)'s EPS-share mirror has the same fate. D5-(a) inherits it: review outputs are identical per driver, so any threshold fires for both drivers or neither — P25's "near-tautological" (D5-5) understates an exact degeneracy.
+Risk: owner approving (a) would enact never-firing alerts — silent false negatives presented as coverage.
+Smallest correction: add the degeneracy finding to D2/D3/D5; revise the proposals (e.g., scenario-spread attribution or asymmetric-shock metric — list as unapproved sketches, do NOT select); enumerate the D2/D3 joint precedence alternatives (both-fire vs higher-share-wins vs D2-priority) instead of naming the rule without options.
 
-## Audit checklist
+**G2 — D1-(a) shock direction and severity mapping unspecified (MATERIAL).**
+P25 states (D1-4): "One-at-a-time 10% shocks to forecast EPS and target P/E; alert when the recomputed status leaves its band; severity from band distance."
+Missing evidence: `_driver_analysis` shocks upward only (`1.0 + p`, `engine.py:481,484`); a flip probe needs a defined sign set (±, or stated one-sided), otherwise half the flip directions are untestable. "Band distance" severity has no mapping (which bands, what distances, what severities).
+Risk: unimplementable-as-written approval; implementer would silently choose directions/severities = hidden policy.
+Smallest correction: specify the shock sign set and a severity table skeleton (values left to owner), or downgrade (a) to a sketched option and mark the rule as follow-up alongside D7's.
 
-For every D1–D9 item, assign exactly one verdict:
+**G3 — D8's consumer-compatibility premise is factually wrong (MATERIAL to cost assessment).**
+P25 states (D8-5, D8-8, matrix B): "Stage 9 parses these outputs today" / "`alerts` and `valuation_risk_flags` are public outputs … read by Stage 9".
+Verified contradiction: full trace of `DecisionEngine.make_decision` (`decision/engine.py:31-280`) shows Stage 9 reads `valuation_status`, `forecast_reliability_score`, `valuation_risk_level`, `valuation_confidence`, `valuation_data_quality`, `margin_of_safety_pct`, `data_cutoff_datetime`, and metadata (`scenario_dispersion`, `expected_upside`) — 14 `valuation_result.*` references, zero to `alerts`, `valuation_risk_flags`, or `valuation_driver_ranking` (grep-verified). Likewise the D6 claim that ranking changes affect "Stage 9 and dashboards": the Stage 9 half is unsupported (dashboard consumption unverified either way).
+Risk direction: this overstates rename cost — an alert-vocabulary rename breaks no verified current consumer (only future consumers and audit trails). The error is conservative, not dangerous, but the owner would misprice options (a) vs (c).
+Smallest correction: replace the Stage-9-parses-alerts claim with the verified field list; restate rename risk as future-consumer/audit-trail; mark dashboard consumption as unverified.
 
-* `READY_FOR_OWNER_DECISION`
-* `PARTIALLY_READY`
-* `NOT_READY`
+**M1 — P25 evidence-base overclaims a full read (MINOR, corrected during this audit).**
+P25 claims "`src/valuation/engine.py` (full read, lines 57-535)" but the cited construction block (201-250: MODEL_VERSION/CONTRACT_VERSION wiring, cutoff fallback at 215, metadata keys) was never read in P25. Verified now in P26: `model_version=MODEL_VERSION` (211), `calculation_timestamp` (212), cutoff fallback (215), `scenario_probability_sum` (242), `nav_per_share_received` (247), `pit_inputs_required` (248) — all as cited. No content change needed; record the verification here.
 
-Verify that:
+**M2 — Test-proposal coverage gaps (MINOR, non-blocking).**
+D1 tests omit integration; D7 tests omit determinism. Add one line each; does not block review.
 
-* Every recommendation is distinguishable from verified existing behavior.
-* No formula, threshold, severity, perturbation size, default, mapping, or effective-date rule is presented as approved without evidence.
-* All unresolved owner choices are explicit and answerable.
-* Missing data is not implicitly treated as zero or as valid evidence.
-* Point-in-time constraints and provenance are addressed wherever relevant.
-* Stage 7 consumes Stage 5 EPS forecasts without rebuilding EPS using a new share count.
-* Alert changes account for Stage 9 compatibility.
-* D-item dependencies and implementation ordering are coherent.
-* Test proposals cover positive, boundary, negative, adversarial, determinism, integration, and regression behavior where applicable.
-* No known failure is misrepresented as a passing test.
-* No unsupported claim of production readiness, completeness, or freeze is made.
+## 3. Cross-Item Contradictions
 
-## Required output
+- **C1 (G1 fallout):** D2-(a) ⊕ D3-(a) ⊕ D5-(a) all build on `_driver_analysis` outputs that are exactly symmetric (50.0/50.0, verified by probe) — the three proposals share one degenerate foundation. Fixing the metric fixes all three consistently; approving any one as written silently approves a dead alert.
+- **C2 (G3 fallout):** D8's rename-cost argument and D6's ranking-change consumer argument both lean on Stage-9 consumption that does not exist for those fields. Correction lowers D8-(a) cost and removes half of D6's stated consumer impact; matrix B's "migration required" cells for alert renames need the same correction.
+- **C3 (D3 route assumption):** P25's "revision via caller-folded family evidence" assumes a ternary trend (UPWARD/DOWNWARD/MIXED, `repo.py:137-148`) can be folded into family score distributions (bear/base/bull scores in [0,1], `engine.py:286-290`). No such mapping rule exists — flagged here as a missing rule, not a contradiction; add it to D3's required inputs.
+- **C4 (consistent, no action):** D7-(b) + D9-(a) pairing is coherent (cutoff exists on every valuation path, fallback verified at `engine.py:215`); section-26 note correctly deferred to D3 approval (P25-E1).
 
-Append a new section to `temp_report2.md` titled:
+## 4. Owner Decisions Genuinely Ready for Approval
 
-`P26 — Independent Audit of the D1–D9 Decision Package`
+- **D4** (approve (c) documented non-implementation, or fund (a)/(b)).
+- **D6** (approve (b) deferral with two-driver V1 standing and P2 chain tests remaining red by design, or fund (a) with mapping + field list).
+- **D9** (approve (a) in-code registry with cutoff `as_of` + DB direction, or select (b)/(c)).
+- **D8 strategy choice**, conditional on accepting the G3 cost correction (no new evidence needed).
 
-Include:
+## 5. Decisions Not Ready (exact missing evidence)
 
-1. A nine-row verdict table, one row per D1–D9 item.
-2. For each defect, the exact P25 statement/section involved, the verified contradiction or missing evidence, its financial or integration risk, and the smallest correction needed.
-3. A list of cross-item contradictions, especially D1–D5 dependencies, D3/D8 revision naming and routing, D6 sector inputs, D7 point-in-time enforcement, and D9 parameter selection.
-4. A concise list of owner decisions that are genuinely ready for approval.
-5. A separate list of decisions that are not ready, with the exact missing evidence.
-6. A final overall verdict:
+- **D1:** shock sign set + severity mapping (G2). No code/spec value exists; must be decided, then specified.
+- **D2/D3:** non-degenerate metric definition + precedence alternatives (G1). Current proposals cannot fire.
+- **D5:** acknowledgment of exact degeneracy + owner thresholds (G1). Thresholds are the decision itself, but the package must disclose what they operate on.
+- **D7:** ordering rule + violation response (declared follow-up; mechanism itself is decidable).
+- **D8:** corrected cost assessment (G3) — one-paragraph fix, then decidable.
 
-   * `READY_FOR_OWNER_REVIEW` only if the package is internally consistent and all material choices are explicitly presented;
-   * otherwise `NEEDS_TARGETED_REVISION`, identifying only the specific gaps that prevent review.
-7. A proposed next implementation sequence conditional on owner approval, without executing it.
+## 6. Overall Verdict
 
-## Six-layer validation
+**NEEDS_TARGETED_REVISION** — gaps G1 (D2/D3/D5 metric degeneracy + precedence options), G2 (D1 shock sign/severity), G3 (D8 consumer-premise correction). All three are bounded text revisions requiring no new investigation: the evidence is cited in this audit. After them, the package is READY_FOR_OWNER_REVIEW. No re-audit of D4/D6/D9 is needed.
 
-Explicitly report:
+## 7. Conditional Implementation Sequence (proposal, NOT executed)
 
-1. Formula/unit evidence audit.
-2. Contract/boundary audit.
-3. Production-path/integration audit.
-4. Adversarial/missing-data/PIT audit.
-5. Regression-test evidence audit, clearly distinguishing freshly run tests from prior report results and static inspection.
-6. Independent consistency audit.
+On owner approval: WP-0 D8 vocabulary freeze (with corrected cost basis) → WP-1 D1 (specified signs/severity) → WP-2 D2+D3 pair (revised metric + precedence) → WP-3 D5 (revised scope note) → WP-4 D4 closure → WP-5 D6 only if (a) funded → WP-6 D7+D9 infrastructure last. D4-(c) and D9-(a) may proceed first as no-regret items since their approvals need no other decision. Each WP ends with focused Stage 7 + Stage 9 suites; P2 tests are re-baselined only inside WP-5, never before.
 
-Do not run unrelated tests simply to produce activity. If execution is required to verify a material claim, use the project's existing environment and report the exact command and outcome.
+---
 
-Do not edit P25 or any prior report. Append this audit only to `temp_report2.md`. Do not change any other file.
+## Six-Layer Validation
 
-Stop after appending the report. Do not begin implementation, do not declare Stage 7 complete or frozen, and do not perform remote operations.
+1. **Formula/unit evidence audit (fresh static + one diagnostic probe).** Re-derived `_driver_analysis` math (`engine.py:478-497`): symmetric +10% OAT shocks on FV=EPS×PE ⇒ equal effects ⇒ shares exactly 50/50 (rounding dust only); uncertainty identical per driver by construction (`:496`); review identical ⇒ both-or-neither firing. Probe executed with project interpreter: `python -c` building `CompanyForecastResult` (EPS 150/180/210, `make_forecast` shape from `test_stage7_valuation.py:10-24`) → `ValuationEngine().calculate_valuation(1,101,'PETROCHEMICAL',1000.0,f,historical_pe_values=[7.0])` → `ranking ['EPS','TARGET_PE']`, `impact {'EPS':50.0,'TARGET_PE':50.0}`, `uncertainty 40.0/40.0`, `review 20.0/20.0`. Upward-only shock confirmed (`1.0+p`, `:481,484`). All other cited formulas spot-verified against P25's line references.
+2. **Contract/boundary audit (fresh static).** Signature re-verified: no margin/trend/revision/fundamental/score inputs (`:57-79`); `ValuationResult` fields as cited (`schema.py:19-50`). Stage-9 consumption enumerated field-by-field (14 references; alerts/flags/ranking absent) ⇒ G3. D4's hard contract gap reconfirmed (no margin field anywhere on the boundary).
+3. **Production-path/integration audit (fresh static).** Construction block read for the first time (186-250): `flags.extend(alerts)` (195) merges severity alerts into the flag channel (corroborates P25's channel analysis; no defect); version/cutoff/metadata wiring as cited (211-212, 215, 242, 247-248) ⇒ M1 closed. Stage 5→7 (EPS + reliability in; revision not carried) and Stage 7→9 (status/reliability/risk/confidence/metadata out) paths re-traced; nothing modified.
+4. **Adversarial/missing-data/PIT audit (fresh static).** P25's missing-data rules match guards (`models.py:5-16`; `engine.py:197-199` NOT_APPLICABLE; `:476-477` empty-driver; `:489-490` denominator/clamp). PIT claims match code (bare floats `:70-72`; dates normalized-only `:104-108`; cutoff fallback `:215`). `test_p6_cutoff_pit_limitation_pinned` body read (937-953): pins late-valuation acceptance + no PIT flag — P25's citation accurate.
+5. **Regression-test evidence audit (no suite executed; probe is diagnostic only).** P25's carried-forward counts accepted as correctly labeled (fresh-run claims absent). Presence re-verified by grep: P2 tests at `test_stage7_valuation.py:406,425`; `make_forecast` at :10; `test_p6_cutoff_pit_limitation_pinned` at :937. Zero-ref greps re-run in P26 scope: `FORECAST_RISK`, `POSITIVE_FORECAST_REVISION`, `POOR_DATA_QUALITY`, `POINT_IN_TIME_WARNING`, `effective_from`/`parameter_version` — all zero in `src`; `alerts|valuation_risk_flags|driver_ranking` — zero in `src/decision/engine.py`. No failure misrepresented; no skip treated as pass.
+6. **Independent consistency audit (fresh).** P25 cross-checked against P17-P24, spec, code, tests. Consistent: zero-ref claims, S72/S74/S81/S83/S84 correction records, section-26 deferral note, D7/D9 pairing, D8-first ordering, no freeze/readiness overclaim, proposals tagged. Defects found: G1 (material, probe-proven), G2 (material, code-proven), G3 (material, trace-proven), M1 (closed here), M2 (trivial). No D1-D9 policy selected in this audit; all P25 recommendations remain proposals.
+
+**Confirmation:** no implementation or policy choice made; no file changed except this appended audit; the two P2 failing tests untouched; no remote operations; Stage 7 remains unfrozen. Stop after appending.
+===================================================================
+

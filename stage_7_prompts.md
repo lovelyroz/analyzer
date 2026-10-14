@@ -1314,3 +1314,83 @@ Never overwrite previous reports. Include the date, exact files inspected, evide
 
 Finish with a concise owner decision summary. Do not start implementation, do not declare Stage 7 complete or frozen, and stop after reporting.
 =================================================================
+# P26 — Independent Audit of the D1–D9 Decision Package
+
+You are working in the existing local project folder `analyzer` using OpenCode Desktop.
+
+## Objective
+
+Independently audit the newly appended report `P25 — Stage 7 D1–D9 Consolidated Owner Decision Package` in `temp_report2.md`.
+
+The goal is to deliver a decision package that is complete enough for the owner to approve or reject the proposed choices in one review. This is a READ-ONLY audit, not an implementation task.
+
+## Scope
+
+1. Read the entire P25 report and relevant P17–P24 findings in `temp_report2.md`.
+2. Verify disputed or material claims against the exact relevant passages in `07_Stage7_Valuation.md`, the directly relevant Stage 7/Stage 5/Stage 9 implementation, schemas, parameters, and tests.
+3. Do not repeat the whole P25 investigation unless necessary to verify a material claim.
+4. Do not perform a repository-wide review.
+5. Do not modify source code, tests, schemas, configuration, dependencies, migrations, or specification files.
+6. Do not perform remote Git/GitHub/API operations, commits, pushes, pulls, or branch changes.
+7. Do not choose or implement any owner policy. Recommendations remain proposals requiring explicit approval.
+8. Preserve the two known P2 failing tests; never weaken, delete, skip, or rewrite them.
+9. Stage 7 remains unfrozen.
+
+## Audit checklist
+
+For every D1–D9 item, assign exactly one verdict:
+
+* `READY_FOR_OWNER_DECISION`
+* `PARTIALLY_READY`
+* `NOT_READY`
+
+Verify that:
+
+* Every recommendation is distinguishable from verified existing behavior.
+* No formula, threshold, severity, perturbation size, default, mapping, or effective-date rule is presented as approved without evidence.
+* All unresolved owner choices are explicit and answerable.
+* Missing data is not implicitly treated as zero or as valid evidence.
+* Point-in-time constraints and provenance are addressed wherever relevant.
+* Stage 7 consumes Stage 5 EPS forecasts without rebuilding EPS using a new share count.
+* Alert changes account for Stage 9 compatibility.
+* D-item dependencies and implementation ordering are coherent.
+* Test proposals cover positive, boundary, negative, adversarial, determinism, integration, and regression behavior where applicable.
+* No known failure is misrepresented as a passing test.
+* No unsupported claim of production readiness, completeness, or freeze is made.
+
+## Required output
+
+Append a new section to `temp_report2.md` titled:
+
+`P26 — Independent Audit of the D1–D9 Decision Package`
+
+Include:
+
+1. A nine-row verdict table, one row per D1–D9 item.
+2. For each defect, the exact P25 statement/section involved, the verified contradiction or missing evidence, its financial or integration risk, and the smallest correction needed.
+3. A list of cross-item contradictions, especially D1–D5 dependencies, D3/D8 revision naming and routing, D6 sector inputs, D7 point-in-time enforcement, and D9 parameter selection.
+4. A concise list of owner decisions that are genuinely ready for approval.
+5. A separate list of decisions that are not ready, with the exact missing evidence.
+6. A final overall verdict:
+
+   * `READY_FOR_OWNER_REVIEW` only if the package is internally consistent and all material choices are explicitly presented;
+   * otherwise `NEEDS_TARGETED_REVISION`, identifying only the specific gaps that prevent review.
+7. A proposed next implementation sequence conditional on owner approval, without executing it.
+
+## Six-layer validation
+
+Explicitly report:
+
+1. Formula/unit evidence audit.
+2. Contract/boundary audit.
+3. Production-path/integration audit.
+4. Adversarial/missing-data/PIT audit.
+5. Regression-test evidence audit, clearly distinguishing freshly run tests from prior report results and static inspection.
+6. Independent consistency audit.
+
+Do not run unrelated tests simply to produce activity. If execution is required to verify a material claim, use the project's existing environment and report the exact command and outcome.
+
+Do not edit P25 or any prior report. Append this audit only to `temp_report2.md`. Do not change any other file.
+
+Stop after appending the report. Do not begin implementation, do not declare Stage 7 complete or frozen, and do not perform remote operations.
+===========================================================================
