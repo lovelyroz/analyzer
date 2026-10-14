@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.forecast.schema import CompanyForecastResult, ScenarioForecastResult, SingleForecastChain
+from src.forecast.schema import CompanyForecastResult, ForecastInputRef, ScenarioForecastResult, SingleForecastChain
 from src.valuation.engine import ValuationEngine
 from src.valuation.models import calculate_forward_pe, calculate_forward_pe_fair_value, calculate_margin_of_safety
 
@@ -1183,3 +1183,72 @@ def test_p12_calculation_timestamp_utc_aware_and_deterministic():
     assert result.scenarios["base"].fair_value == 1260.0
     assert result.expected_fair_value == 1260.0
     assert result.valuation_status == "ATTRACTIVE"
+
+
+def _p32_ref(available_at, version=7):
+    return ForecastInputRef(
+        fact_key="EPS",
+        report_version_id=version,
+        available_at=available_at,
+        source="CODAL",
+    )
+
+
+def _p32_kwargs(**overrides):
+    params = dict(
+        company_id=1,
+        period_id=101,
+        industry_code="PETROCHEMICAL",
+        current_price=1000.0,
+        forecast_result=make_forecast(),
+        historical_pe_values=[7.0],
+    )
+    params.update(overrides)
+    return params
+
+
+def test_p32_input_refs_before_cutoff_leave_results_unchanged():
+    import dataclasses
+
+    engine = ValuationEngine()
+    plain = engine.calculate_valuation(**_p32_kwargs())
+    refs = [
+        _p32_ref(datetime(2025, 12, 1)),
+        _p32_ref(datetime(2025, 6, 15, tzinfo=timezone.utc), version=9),
+    ]
+    with_refs = engine.calculate_valuation(**_p32_kwargs(forecast_input_refs=refs))
+    first = dataclasses.asdict(plain)
+    second = dataclasses.asdict(with_refs)
+    first.pop("calculation_timestamp")
+    second.pop("calculation_timestamp")
+    assert first == second
+
+
+def test_p32_input_ref_after_cutoff_rejected_on_valuation_path():
+    engine = ValuationEngine()
+    with pytest.raises(ValueError, match="after the"):
+        engine.calculate_valuation(
+            **_p32_kwargs(forecast_input_refs=[_p32_ref(datetime(2026, 3, 1))])
+        )
+
+
+def test_p32_input_ref_at_cutoff_boundary_accepted():
+    engine = ValuationEngine()
+    result = engine.calculate_valuation(
+        **_p32_kwargs(forecast_input_refs=[_p32_ref(datetime(2026, 1, 1))])
+    )
+    assert result.expected_fair_value == 1260.0
+    assert result.valuation_status == "ATTRACTIVE"
+
+
+def test_p32_input_ref_missing_date_rejected():
+    engine = ValuationEngine()
+    with pytest.raises(ValueError, match="without"):
+        engine.calculate_valuation(**_p32_kwargs(forecast_input_refs=[_p32_ref(None)]))
+
+
+def test_p32_input_refs_absent_preserves_legacy_path():
+    engine = ValuationEngine()
+    result = engine.calculate_valuation(**_p32_kwargs(forecast_input_refs=None))
+    assert result.valuation_status == "ATTRACTIVE"
+    assert result.expected_fair_value == 1260.0

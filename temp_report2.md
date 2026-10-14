@@ -3331,5 +3331,74 @@ Nothing implemented ⇒ nothing new to test (P29-3's adversarial cases presuppos
 
 - **Blockers:** T1 → R2+WP-5; T2 → R1/R3/R4/R5/R6+WP-1…4; integration → caller-placement decision + R2/R7. All owner-side.
 - **Files changed:** none. **Tests added/changed:** none. **Follow-up required:** owner R1–R8 answers (P27 §5); any single R-answer immediately starts its gated WP.
-- **Verdict: NOT FULLY PASSING — 2 pre-existing failures PROVEN, ZERO supportable corrections in scope, NO CODE CHANGED.** Not claimed: production integration, completeness, freeze. Stage 7 remains unfrozen. Stop after implementation attempt + validation + report.
+- - **Verdict: NOT FULLY PASSING — 2 pre-existing failures PROVEN, ZERO supportable corrections in scope, NO CODE CHANGED.** Not claimed: production integration, completeness, freeze. Stage 7 remains unfrozen. Stop after implementation attempt + validation + report.
+===================================================================
+# P32 — Stage 7 Point-in-Time Enforcement
+
+**Date (UTC):** 2026-10-14
+**Nature:** Real implementation task — first runtime code change of the Stage 7 arc (P19/P24 touched spec docs only; P28–P31 correctly changed nothing). P31 reviewed (not repeated, not discarded). Pre-check: no R1–R8 owner approval (approval grep zero; log top e926782 P31). Constraints honored: no invented rules/dates/defaults; no weakened tests; frozen stages untouched (imports are not modifications); no fabricated data; no remote operations. Changed files: `src/valuation/engine.py`, `src/tests/test_stage7_valuation.py` (+ this report).
+
+## 1. New Findings Beyond P29 (fresh investigation, not repetition)
+
+- **Authoritative upstream PIT machinery EXISTS (Stage 5 side):** `ForecastInputRef(report_version_id, available_at)` whose docstring states the rule itself — "a forecast whose cutoff precedes `available_at` is a Point-in-Time violation (spec §25)" (`forecast/schema.py:156-162`); `select_usable_inputs` enforces `available_at <= cutoff` (`:247-253`); append-only `ForecastVersionStore` with `valid_at`/`pit_violations` (`:273-370`); production `service.py:407-410` persists frozen records per scenario. The predicate is inherited, not invented.
+- **Boundary drop located precisely:** `CompanyForecastResult` (`:34-47`) carries IDs, cutoff, industry, EPS chains, method/version/timestamps — but NO input_refs, NO record identity, NO versions. Stage 7 reads only EPS chains + cutoff (`engine.py:80-84,106-108`). The enforcement data exists upstream and dies at the boundary.
+- **Pinned-test question answered (P32's hard push):** spec §7 requires prices be *identified* (valuation_date, market_price_date), §8/§§56-57 state the PIT *principle* (only published-and-available data per date) — but NO sentence anywhere orders `valuation_date` vs `data_cutoff_datetime`. `test_p6_cutoff_pit_limitation_pinned` (late valuation accepted, ATTRACTIVE, no PIT flag) contradicts nothing in the spec: valuation after cutoff is normal current-date operation. P29's "IR4 conflict" framing is hereby corrected — the pinned behavior STANDS as legitimate; there was never evidence it was wrong. The real gap was always the dateless series.
+- **Parameter-history leak vector (new, precise):** undated constants mean any future threshold change silently rewrites backtest history — distinct from input dating, gated on R8 forward-dating (P30).
+
+## 2. Input-to-Output PIT Trace (source classified per P32-O2)
+
+| Input class | Timestamp/provenance | Classification | Enforceable? |
+|---|---|---|---|
+| valuation/market-price date | caller datetimes, normalized, unordered | caller-supplied, unverified order | NO (no ordering rule in spec; pin stands) |
+| forecast cutoff | caller or forecast fallback (`:215` chain) | caller-supplied, verified present | As comparison bound only |
+| forecast input refs (NEW param) | caller-supplied `ForecastInputRef`s | caller-supplied, verified vs cutoff | YES — implemented below |
+| report publication/version (benchmarks) | none anywhere in `src/valuation` (0 refs) | ABSENT | NO → IR1 |
+| historical EPS availability (dated) | floats only; revision history lives Stage 5–9, never enters S7 | ABSENT at boundary | NO → route decision (D3) |
+| benchmark observations (dated) | bare floats (`:70-72`) | ABSENT | NO → IR1 |
+| parameter validity dates | constants; 0 refs effective_from | ABSENT | NO → IR3/R8 |
+
+## 3. Implementation (additive, backward-compatible, evidence-backed)
+
+- `engine.py:5` — import `ForecastInputRef` (same module already imported; zero new coupling class).
+- Signature — new keyword-only `forecast_input_refs: Optional[Sequence[ForecastInputRef]] = None` (after `scenario_pe_rationales`; positional callers unaffected).
+- Call site — `_reject_unverifiable_forecast_refs(...)` immediately after cutoff normalization (`:104-108`), i.e. ON the valuation path with the effective cutoff.
+- New `_reject_unverifiable_forecast_refs`: `None`/empty → legacy path byte-identical; each supplied ref normalized; `available_at is None` → `ValueError` (undated provenance never silently valid — P32's explicit-outcome requirement); `available_at > cutoff` → `ValueError` (mirrors upstream `<=` predicate); `None` cutoff → dated refs accepted (no bound exists; none invented). No numeric thresholds, no dates, no defaults invented. Violation response = rejection: the only non-silent deterministic option available without approved alternatives (no new output vocabulary created, so D8 untouched); owner may revise to downgrade/flag under R7 — disclosed as judgment call, one-line change.
+- Frozen stages: untouched (import-only). P2 tests: untouched, still failing as designed (D1–D6 still R-gated; this change does not address them).
+
+## 4. Tests Added (5, all through `calculate_valuation`, the real path)
+
+- `test_p32_input_refs_before_cutoff_leave_results_unchanged` — pre-cutoff refs (naive + aware mix) ⇒ full-result equality with no-refs call (minus wall-clock timestamp). Proves additive compatibility.
+- `test_p32_input_ref_after_cutoff_rejected_on_valuation_path` — post-cutoff ref ⇒ `ValueError`. Proves future-known input blocked on-path.
+- `test_p32_input_ref_at_cutoff_boundary_accepted` — equality ⇒ accepted (mirrors `<=`), FV 1260.0/ATTRACTIVE.
+- `test_p32_input_ref_missing_date_rejected` — `available_at=None` ⇒ `ValueError`. Proves missing ≠ valid.
+- `test_p32_input_refs_absent_preserves_legacy_path` — default `None` ⇒ unchanged ATTRACTIVE/1260.0 pin.
+- Development note (honest): first run went 4/5 on a missing `dataclasses` import in my own test file (test bug, not product bug); fixed; 5/5 since. No product failure was introduced at any point.
+
+## 5. Fresh Execution Evidence (all runs this task)
+
+- `-k p32` → **5 passed in 0.75s, exit 0** (after the import fix above).
+- Stage 7 + Stage 9 → **2 failed, 68 passed in 0.78s, exit 1** (63 pre-existing passes + 5 new; failures: only the two known P2s, signatures unchanged).
+- Broad (`--ignore=test_codal_pdf_extraction.py`) → **2 failed, 905 passed, 1 skipped in 114.85s, exit 1** (900 + 5 new; skip: Codal fixture, never a pass).
+- Pre-existing vs new distinguished: 2 P2 failures pre-date this task identically; 0 new failures; 5 new passes all mine.
+
+## 6. Six-Layer Validation (each separately)
+
+1. **Unit/formula:** no formula touched (FV/status/confidence paths byte-identical for refs=None — proven by full-dict equality test); new predicate mirrors upstream `<=` exactly, including naive→UTC normalization.
+2. **Contract/boundary:** one optional keyword-only parameter (backward compatible — all 52 pre-existing Stage 7 tests omit it and pass unmodified); missing/None/future inputs produce explicit `ValueError`, never silent validity and never zero-fill; `None` cutoff documented acceptance.
+3. **Production integration:** control executes inside `calculate_valuation` on the effective cutoff (proven by path-level tests, not helper-only). Plainly stated limit: NO production caller passes refs yet (P31: zero callers) — the control is live code, dormant in production until wired; NOT claimed as production enforcement.
+4. **Adversarial/negative:** future-dated, undated, boundary-equal, naive/aware-mixed, and absent-ref cases all covered; no hostile input reaches FV/probability/confidence/risk silently (rejected pre-computation).
+5. **Regression/full suite:** exact commands/exits/counts/durations above; only delta vs P31 baseline is +5 passes; P2 pins intact with identical traces.
+6. **Independent final-diff audit:** diff = `engine.py` (+import, +1 param, +1 call, +1 method ≈ 40 lines), tests (+import, +2 helpers, +5 tests ≈ 75 lines), this section. No frozen file touched (`git status` scope verified); no threshold/formula/date invented; no test weakened (P2s byte-identical in behavior); no freeze declared.
+
+## 7. Remaining Upstream Dependencies + Unresolved Owner Decisions (precise)
+
+- **IR1 (benchmark observation dating) целиком outstanding:** bare-float series still carry no dates; §8 states the principle but supplies no per-observation data. Needs upstream dating + R7 rule (unchanged from P29, now cleanly separated from the forecast leg this task closed).
+- **D3 revision route:** ternary→family mapping rule still missing (C3 stands).
+- **R7 remainder:** violation-response revision (reject→downgrade/flag), ordering invariants, IR1/IR2 rules.
+- **R8 remainder:** registry + as_of (IR3); parameter-history leak persists until forward-dating starts.
+- **Production wiring:** control dormant until a caller passes refs — needs the caller-placement decision (P31 §5) + R2/R7.
+
+## 8. Final Verdict
+
+**PARTIAL PIT ENFORCEMENT IMPLEMENTED (forecast-input leg only); PIT NOT COMPLETE.** Completed per P32 criteria for the closed leg: authoritative source (`ForecastInputRef` + upstream `<=` predicate), exact rule, validation location (in-path, post-cutoff-normalization), invalid/missing behavior (explicit `ValueError`), leak-proof tests on the real path (5 green), zero unapproved assumptions. Explicitly NOT claimed: benchmark-series enforcement, parameter versioning, production enforcement, completeness, freeze. Stage 7 remains unfrozen. Stop here.
 

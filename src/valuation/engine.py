@@ -2,7 +2,7 @@ import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Sequence
 
-from src.forecast.schema import CompanyForecastResult, normalize_datetime
+from src.forecast.schema import CompanyForecastResult, ForecastInputRef, normalize_datetime
 from src.valuation.models import (
     calculate_forward_pe,
     calculate_forward_pe_fair_value,
@@ -76,6 +76,7 @@ class ValuationEngine:
         data_quality_score: float = 100.0,
         scenario_pe_adjustments: Optional[Dict[str, float]] = None,
         scenario_pe_rationales: Optional[Dict[str, str]] = None,
+        forecast_input_refs: Optional[Sequence[ForecastInputRef]] = None,
     ) -> ValuationResult:
         scenarios_input = {
             "bear": forecast_result.scenario_forecasts.bear,
@@ -106,6 +107,10 @@ class ValuationEngine:
         if data_cutoff_datetime is None:
             data_cutoff_datetime = forecast_result.data_cutoff_datetime
         data_cutoff_datetime = normalize_datetime(data_cutoff_datetime)
+        self._reject_unverifiable_forecast_refs(
+            forecast_input_refs=forecast_input_refs,
+            data_cutoff_datetime=data_cutoff_datetime,
+        )
         probabilities, probability_meta = self._resolve_probabilities(
             probability_adjustments=probability_adjustments,
             probability_evidence=probability_evidence,
@@ -252,6 +257,42 @@ class ValuationEngine:
     @staticmethod
     def _valid_positive_count(values: Sequence[Optional[float]]) -> int:
         return sum(1 for value in values if value is not None and value == value and value > 0)
+
+    @staticmethod
+    def _reject_unverifiable_forecast_refs(
+        forecast_input_refs: Optional[Sequence[ForecastInputRef]],
+        data_cutoff_datetime: Optional[datetime],
+    ) -> None:
+        """Block future-known or undated forecast inputs on the valuation path.
+
+        Mirrors the authoritative upstream availability predicate
+        (``ForecastInputRef``: a forecast whose cutoff precedes ``available_at``
+        is a point-in-time violation): a supplied reference dated after the
+        effective cutoff carries information that was not knowable in time and
+        is rejected; a supplied reference without any date cannot be verified
+        and is likewise rejected instead of being silently treated as valid.
+        ``None`` (no references supplied) preserves the historical boundary
+        exactly. A ``None`` cutoff leaves dated references accepted — there is
+        no bound to compare against and none is invented.
+        """
+        if not forecast_input_refs:
+            return
+        for ref in forecast_input_refs:
+            available_at = normalize_datetime(getattr(ref, "available_at", None))
+            version = getattr(ref, "report_version_id", None)
+            if available_at is None:
+                raise ValueError(
+                    "Stage 7 V1 cannot verify forecast-input provenance without "
+                    f"available_at (report_version_id={version!r}); refusing to "
+                    "treat undated provenance as valid."
+                )
+            if data_cutoff_datetime is not None and available_at > data_cutoff_datetime:
+                raise ValueError(
+                    "Stage 7 V1 rejects forecast inputs published after the "
+                    f"valuation cutoff (report_version_id={version!r}, "
+                    f"available_at={available_at.isoformat()}, "
+                    f"data_cutoff_datetime={data_cutoff_datetime.isoformat()})."
+                )
 
     @staticmethod
     def _select_target_pe(
