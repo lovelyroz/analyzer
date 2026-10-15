@@ -1,107 +1,180 @@
-# P35 — Stage 7 Production-Path Integration and Parameter Consumption
+# P36 — Correct and Verify Stage 7 Parameter Consumption
 
-Repository: `lovelyroz/analyzer`
+**Repository:** `lovelyroz/analyzer`
+**Required branch:** `stage7/remediation-2026-10-14`
+**Report file:** `temp_report2.md`
+**Task type:** Focused implementation and verification — not a repository-wide redesign.
 
-You are implementing P35 from the current, committed repository state. The previous interrupted local changes were discarded and were never uploaded. Do not attempt to recover them. Treat the selected GitHub branch as the authoritative starting point.
+## 1. Critical Context and Known Discrepancy
 
-## 1. Branch and safety
+The previous P35 report claims that `ValuationEngine.calculate_valuation` resolves the parameter set using:
 
-* Work on the existing isolated branch `stage7/remediation-2026-10-14`, not `master`.
-* Verify the selected branch and starting commit before editing.
-* Do not merge into or modify `master`.
-* Do not modify frozen stages without explicit authorization.
-* Do not perform unrelated refactoring or redesign `src/valuation/engine.py`.
-* Preserve all existing tests, including known failing tests. Do not weaken, delete, skip, or relax them.
+`resolve_parameter_set_as_of(data_cutoff_datetime)`
 
-## 2. Objective A — Establish the real production path
+However, direct inspection of the committed branch showed that `src/valuation/engine.py` still contains:
 
-Trace the actual application orchestration and all relevant callers of `ValuationEngine.calculate_valuation`.
+`resolve_parameter_set(GENESIS_VERSION_KEY)`
 
-Determine whether an existing, contract-supported production integration point exists. Do not treat a test that directly invokes the valuation engine as proof of production integration.
+The implementation and report therefore disagree. Treat the actual committed source code as authoritative, not the previous report.
 
-If a valid integration point exists:
+The previous incomplete local changes were discarded and were not uploaded. Do not attempt to recover them. Do not assume that P35's claimed implementation exists.
 
-* Implement the smallest safe integration correction.
-* Preserve existing interfaces and the Stage 5 EPS forecast as the authoritative EPS input.
-* Do not calculate a replacement EPS or introduce a new share-count calculation.
-* Preserve deterministic behavior, missing-data semantics, and auditability.
-* Add regression tests that exercise the actual orchestration path.
+## 2. Branch and Repository Safety
 
-If no supported integration point exists, do not invent one. Record the exact missing contract or dependency and continue with independently implementable work under Objective B.
+Before editing:
 
-## 3. Objective B — Make versioned parameters govern actual calculations
+1. Verify that the selected branch is exactly `stage7/remediation-2026-10-14`.
+2. Record its current HEAD commit and working-tree state.
+3. Do not switch to, commit to, or modify `master`.
+4. Do not merge, rebase, or cherry-pick branches.
+5. Do not modify frozen stages or unrelated files.
+6. Inspect only the files needed for this task:
 
-Inspect `src/valuation/parameters.py` and `src/valuation/engine.py`.
+   * `src/valuation/engine.py`
+   * `src/valuation/parameters.py`
+   * `src/tests/test_stage7_valuation.py`
+   * `src/tests/test_stage9_decision.py`
+   * `07_Stage7_Valuation.md`, only where necessary to resolve the existing contract
+   * relevant callers and parameter definitions, only as needed
 
-Trace every material valuation parameter from:
+If the required branch cannot be selected or verified, stop before editing and report the exact limitation.
 
-1. Its definition or registry record.
-2. Version selection and resolution.
-3. The calculation that consumes it.
-4. The parameter audit snapshot emitted in the result.
+## 3. Objective A — Correct Parameter Resolution
 
-Determine whether the resolved parameter set actually controls calculations or whether calculations continue to use independent module-level constants.
+Trace the complete path from:
 
-Implement only the corrections supported by the existing specification and contracts. Ensure that the values recorded in the audit snapshot are exactly the values used by the calculations.
+1. `data_cutoff_datetime` normalization and fallback;
+2. parameter-registry selection;
+3. every material valuation calculation that uses a parameter;
+4. the emitted `parameter_set_version` and `parameter_snapshot`.
+
+Determine the precise behavior supported by the existing specification and contracts.
+
+Implement the smallest safe correction so that the selected parameter set actually governs the calculations and the audit snapshot records the same values used by those calculations.
 
 Requirements:
 
-* No silent fallback to an unapproved or unintended parameter version.
-* No invented historical effective dates.
-* No new financial formulas, thresholds, defaults, mappings, or rounding policies.
-* Preserve deterministic output and existing backward-compatibility contracts where required.
-* Add focused tests proving parameter consumption and audit-snapshot consistency, including missing or invalid version handling where supported by the existing contract.
+* Do not merely change the resolver call while leaving calculations dependent on unrelated module-level constants.
+* Do not claim successful parameterization unless the values consumed by calculations are demonstrably sourced from the resolved parameter set.
+* Preserve existing formulas, financial invariants, Stage 5 EPS forecasts, deterministic behavior, missing-data semantics, and backward-compatibility requirements.
+* Do not invent effective dates for existing parameters.
+* Do not silently select an unapproved version.
+* Do not silently fall back to `GENESIS_VERSION_KEY` when a dated selection is required but unavailable.
+* Do not introduce new formulas, thresholds, defaults, rounding rules, or financial policies.
+* Do not create synthetic production history to make historical selection pass.
+* If the existing contract does not authorize a required behavior, do not guess. Document the exact blocker and complete any independent, contract-supported correction.
 
-Do not merely add more registry infrastructure if the real calculations still bypass it.
+Pay particular attention to the distinction between:
 
-## 4. Point-in-time safety
+* a parameter registry that merely exists;
+* a registry that selects a version;
+* a version whose values actually govern calculations;
+* an audit snapshot that faithfully records the values actually consumed.
 
-Inspect the existing PIT contracts and the real execution path. Determine whether forecast cutoffs, report publication dates, and other required provenance are actually enforced where valuation occurs.
+These are separate requirements.
 
-Implement only checks supported by existing contracts. Do not claim complete PIT enforcement if the production path or required provenance is absent. Do not fabricate dates or benchmark observations.
+## 4. Objective B — Add Decisive Regression Tests
 
-## 5. Required validation
+Add focused tests to `src/tests/test_stage7_valuation.py` or the most appropriate existing test module.
 
-Run tests in this order, recording exact commands, exit codes, counts, and durations:
+Tests must prove, through the actual `calculate_valuation` execution path, that:
 
-1. Focused tests for every changed behavior.
-2. `src/tests/test_stage7_valuation.py`.
-3. `src/tests/test_stage9_decision.py`.
-4. The combined Stage 7 and Stage 9 test suites.
-5. The broader test suite, if the environment supports it.
-6. Independent review of the final diff and regression implications.
+1. A dated parameter version is selected correctly at the supported cutoff boundary.
+2. The selected parameter values actually govern the relevant calculations.
+3. `parameter_set_version` identifies the selected version.
+4. `parameter_snapshot` exactly matches the parameter values consumed by the calculation.
+5. A missing, ambiguous, invalid, or unavailable version follows the explicit behavior already supported by the contract, without silent fallback.
+6. Existing undated-call behavior is preserved only if that behavior is explicitly supported by the current contract.
+7. Changing a supported test parameter produces the expected, deterministic change in the relevant output, without modifying the financial formula itself.
+
+Use clearly labeled synthetic registry records only for isolated unit tests of registry mechanics. Never present synthetic dates or values as genuine historical records.
+
+Do not test only the resolver in isolation. At least one test must prove that a selected parameter changes a real calculation result or a directly observable calculation decision.
+
+Do not weaken, delete, skip, or relax any existing test, including the known failing tests.
+
+## 5. Objective C — Verify Point-in-Time Boundaries
+
+Inspect the existing `forecast_input_refs` enforcement and its relationship to `data_cutoff_datetime`.
+
+Preserve the existing check that rejects undated input references and references with `available_at` later than the effective cutoff, where the current contract requires it.
+
+Do not claim complete point-in-time correctness: benchmark observation dating, production caller wiring, and any other previously documented gaps remain open unless this task independently verifies and resolves them under existing contracts.
+
+Do not expand this task into an unsupported PIT redesign.
+
+## 6. Mandatory Validation
+
+Run and record the exact commands, exit codes, durations, and test counts. Use the repository's actual supported test environment.
+
+Run in this order:
+
+1. Newly added focused tests.
+2. `python3 -m pytest src/tests/test_stage7_valuation.py -v`
+3. `python3 -m pytest src/tests/test_stage9_decision.py -v`
+4. `python3 -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -v`
+5. `python3 -m pytest src/tests -v`, if the environment supports it.
+6. Independently inspect the final diff and the parameter flow from resolution through calculation to audit metadata.
+
+If the repository requires a different Python or pytest invocation, use the correct command and document why. Do not report tests as executed if they were not actually run.
 
 Apply all six validation layers:
 
-* Unit/formula correctness.
-* Contract and boundary validation.
-* Production-path integration.
-* Adversarial and negative cases.
-* Regression and broader-suite testing.
+1. Unit and formula correctness.
+2. Contract and boundary validation.
+3. Actual execution-path integration.
+4. Adversarial and negative testing.
+5. Regression and broader-suite testing.
+6. Independent final-diff audit.
+
+The known tests below must remain intact:
+
+* `test_p2_sector_driver_decomposition_missing`
+* `test_p2_required_flip_dependence_alerts_missing`
+
+Investigate their outcomes, but do not invent owner-controlled financial policy to force them to pass. Report them accurately as failures if they still fail.
+
+Do not describe a suite as passing if any test fails. Distinguish fresh executions, historical results, skipped tests, blocked tests, and static inspections.
+
+## 7. Reporting
+
+Append a new section titled:
+
+`# P36 — Correct and Verify Stage 7 Parameter Consumption`
+
+to the end of `temp_report2.md`. Never overwrite or rewrite historical report sections.
+
+Include:
+
+* Starting branch and commit.
+* Actual discrepancy found in the committed P35 implementation.
+* Exact files changed.
+* The parameter-selection behavior implemented and its contract basis.
+* A parameter-by-parameter trace showing which calculations consume resolved values.
+* Evidence that the audit snapshot equals the values actually consumed.
+* New regression tests and what each proves.
+* Exact test commands, exit codes, counts, and durations.
+* Known failures, skips, and remaining PIT or integration gaps.
 * Independent final-diff audit.
+* A clear verdict: COMPLETE FOR THE IMPLEMENTED SCOPE, PARTIAL, or BLOCKED.
 
-The known failures `test_p2_sector_driver_decomposition_missing` and `test_p2_required_flip_dependence_alerts_missing` must remain intact. Investigate their root causes, but do not invent owner-controlled financial policy to force them to pass.
+Do not modify earlier reports to make P35 appear correct retrospectively.
 
-Distinguish fresh test executions from historical results, static inspection, skipped tests, and blocked tests. Never report unexecuted tests as passing.
+## 8. Completion Conditions
 
-## 6. Reporting and completion
+Do not stop after writing an investigation report if a bounded, contract-supported correction can be implemented and validated.
 
-Append a new section titled `P35 — Stage 7 Production-Path Integration and Parameter Consumption` to the end of `temp_report2.md`. Never overwrite historical reports.
+Do not declare this task complete merely because the resolver call was changed or new tests pass in isolation.
 
-Document:
+P36 is complete only if:
 
-* The starting branch and commit.
-* Actual production callers and integration findings.
-* Every parameter traced and whether its resolved value controls the calculation.
-* Source and test files changed.
-* Exact test commands and results.
-* Remaining contract gaps, owner decisions, and PIT limitations.
-* Independent review findings.
+* the committed code contains the correction;
+* resolved parameters govern the relevant calculations;
+* the audit snapshot accurately reflects consumed values;
+* decisive regression tests exercise the actual calculation path;
+* validation evidence is fresh and accurately reported;
+* the final diff has been independently reviewed.
 
-Do not stop at a report-only investigation if a bounded, contract-supported correction can be implemented and tested. Complete all independently implementable parts of P35 in this task.
+If a required contract or owner decision is missing, stop only the blocked portion, document the exact missing decision, and finish all independent work that can safely be completed.
 
-If a required owner decision or missing contract blocks a particular correction, leave that correction unimplemented, document the precise blocker, and continue with independent corrections.
-
-Do not claim P35 is complete unless its implementable requirements and required validation are complete. Stage 7 remains unfrozen unless separately authorized by the project owner.
-
-Do not merge the branch. Return a concise summary with the final diff and verified test results.
+Do not merge the branch. Do not freeze Stage 7. Return a concise summary with the branch, commit, changed files, verified test results, and remaining blockers.
