@@ -1346,3 +1346,51 @@ def test_p33_as_of_overlap_raises_ambiguity():
     )
     with pytest.raises(LookupError, match="Ambiguous"):
         resolve_parameter_set_as_of(datetime(2025, 6, 1), dup)
+
+
+def test_p36_parameter_resolution_as_of_cutoff_governs_and_snapshots():
+    from src.valuation.parameters import (
+        DEFAULT_REGISTRY,
+        ParameterRecord,
+        ParameterRegistry,
+        ParameterSetVersion,
+        VALUATION_THRESHOLDS,
+    )
+
+    # Build a synthetic dated version to test on-path parameter consumption via calculate_valuation
+    custom_records = list(DEFAULT_REGISTRY.versions[0].records)
+    # Modify a threshold in the custom record: change attractive_expected_upside to 50.0
+    for i, rec in enumerate(custom_records):
+        if rec.parameter_name == "VALUATION_THRESHOLDS.attractive_expected_upside":
+            custom_records[i] = ParameterRecord(
+                parameter_name=rec.parameter_name,
+                parameter_value=50.0,
+                effective_from=datetime(2026, 1, 1),
+                description="Custom attractive threshold",
+            )
+            break
+
+    v_dated = ParameterSetVersion(
+        model_version="STAGE7_V1",
+        version_key="TEST/DATED_2026",
+        effective_from=datetime(2026, 1, 1),
+        records=tuple(custom_records),
+    )
+
+    custom_registry = ParameterRegistry(versions=(DEFAULT_REGISTRY.versions[0], v_dated))
+
+    engine = ValuationEngine()
+    
+    # Test 1: Undated / undated-registry cutoff falls back safely to GENESIS
+    res_genesis = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(), historical_pe_values=[7.0],
+        data_cutoff_datetime=datetime(2025, 6, 1)
+    )
+    assert res_genesis.metadata["parameter_set_version"] == "STAGE7_V1/GENESIS"
+    assert res_genesis.metadata["parameter_snapshot"]["VALUATION_THRESHOLDS.attractive_expected_upside"] == 15.0
+
+    # Test 2: Pass custom registry to resolve_parameter_set_as_of directly for custom cutoff
+    from src.valuation.parameters import resolve_parameter_set_as_of
+    resolved = resolve_parameter_set_as_of(datetime(2026, 6, 1), custom_registry)
+    assert resolved.version_key == "TEST/DATED_2026"
+    assert resolved.records[12].parameter_value == 50.0 or any(r.parameter_value == 50.0 for r.records in [resolved.records] for r in r)

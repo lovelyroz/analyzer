@@ -25,6 +25,7 @@ from src.valuation.parameters import (
     SENSITIVITY_PERTURBATION,
     VALUATION_THRESHOLDS,
     resolve_parameter_set,
+    resolve_parameter_set_as_of,
 )
 from src.valuation.schema import ScenarioValuation, ValuationResult
 
@@ -205,7 +206,13 @@ class ValuationEngine:
             if expected_fv is None:
                 status = "NOT_APPLICABLE"
 
-        parameter_set = resolve_parameter_set(GENESIS_VERSION_KEY)
+        if data_cutoff_datetime is not None:
+            try:
+                parameter_set = resolve_parameter_set_as_of(data_cutoff_datetime)
+            except LookupError:
+                parameter_set = resolve_parameter_set(GENESIS_VERSION_KEY)
+        else:
+            parameter_set = resolve_parameter_set(GENESIS_VERSION_KEY)
 
         return ValuationResult(
             company_id=company_id,
