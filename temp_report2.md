@@ -3623,3 +3623,56 @@ Selected Branch: master (up to date with origin/master)
     Blockers:
         Unapproved financial policy definitions for sector driver decomposition and flip-dependence alert thresholds (requires owner authorization/spec update before code modification).
 ======================================================================
+# P35 — Stage 7 Production-Path Integration and Parameter Consumption Report
+
+**Repository:** `lovelyroz/analyzer`  
+**Branch:** `stage7/remediation-2026-10-14`  
+**Starting Commit:** `13c92736c557fd734c97b28b2094afd9702ea41b`
+
+---
+
+## 1. Executive Summary & Production-Path Findings
+
+* **Objective A — Production-Path Integration:**
+  * Analyzed all call sites of `ValuationEngine.calculate_valuation` across `src/`.
+  * Verified that no production orchestrator directly invokes `calculate_valuation` at present; `ValuationEngine` operates as a tested valuation library consumed directly by tests and imported by type definitions in `src/decision/engine.py` (`ValuationResult`).
+  * Direct Stage 5 EPS forecasts remain the authoritative input for valuation scenarios; no replacement EPS or share-count calculation was introduced.
+
+* **Objective B — Parameter Versioning & Consumption:**
+  * Updated `ValuationEngine.calculate_valuation` in `src/valuation/engine.py` to dynamically resolve active parameters as-of `data_cutoff_datetime` via `resolve_parameter_set_as_of(data_cutoff_datetime)`.
+  * Preserved fallback to `GENESIS_VERSION_KEY` for undated calls.
+  * Verified that output metadata (`parameter_set_version`, `parameter_snapshot`) matches consumed parameters.
+
+* **Point-in-Time Enforcement:**
+  * Maintained forecast input reference verification (`_reject_unverifiable_forecast_refs`) enforcing `available_at <= data_cutoff_datetime`. Undated inputs raise an explicit `ValueError`.
+
+---
+
+## 2. Source Files & Report Updated
+
+* `src/valuation/engine.py`: Integrated `resolve_parameter_set_as_of` for dynamic cutoff-based parameter set resolution.
+* `temp_report2.md`: Appended dated section titled `P35 — Stage 7 Production-Path Integration and Parameter Consumption`.
+
+---
+
+## 3. Test Evidence
+
+Executed via `python3 -m pytest`:
+
+1. **Focused Stage 7 Suite:** `python3 -m pytest src/tests/test_stage7_valuation.py`
+   * **Result:** 61 passed, 2 failed in 0.80s.
+   * **Failed Tests:** `test_p2_sector_driver_decomposition_missing` & `test_p2_required_flip_dependence_alerts_missing` (intentionally preserved failing-first pins for unapproved owner policies D1–D6).
+2. **Stage 9 Decision Suite:** `python3 -m pytest src/tests/test_stage9_decision.py`
+   * **Result:** 13 passed in 0.67s.
+3. **Combined Stage 7 & 9 Suite:** `python3 -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py`
+   * **Result:** 74 passed, 2 failed in 0.80s.
+4. **Full Test Suite:** `python3 -m pytest`
+   * **Result:** 1042 passed, 1 skipped, 2 failed in 190.93s.
+   * Zero regressions introduced.
+
+---
+
+## 4. Final Verdict
+
+P35 implementation is complete on branch `stage7/remediation-2026-10-14`. Stage 7 remains unfrozen.
+===========================================================
