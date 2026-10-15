@@ -3578,3 +3578,48 @@ Trace the actual production orchestration and all callers of the valuation engin
 
 **Verdict:** Initial inspection only; no remediation completed and no test suite verified. Stage 7 remains unfrozen and incomplete.
 ==================================================================
+Stage 7 P35 Recovery — Phase 1 Inspection Report
+
+Repository: lovelyroz/analyzer
+Selected Branch: master (up to date with origin/master)
+1. Selected Branch & Repository State
+
+    Branch: master
+    Commit Baseline: 7d475aa8b90317108e590e2b7978bc203b3cd3c0 (Initial commit / current head of master)
+    Remote Branches Inspected: origin/master, origin/stage7/remediation-2026-10-14
+
+2. Presence of Interrupted Changes
+
+    Status: NOT PRESENT in working directory / master
+    Details: Working copy is completely clean (git status reports working tree clean). No uncommitted local edits, partial file modifications, or orphan artifacts exist in src/valuation/engine.py or elsewhere in the master branch working tree.
+
+3. Relevant Code and Test State
+
+    Code State (src/valuation/engine.py):
+        The production valuation engine implements forward P/E calculations, 3-tier benchmark hierarchy selection (Industry Forward P/E $\rightarrow$ Historical Median P/E $\rightarrow$ Industry TTM P/E), probabilistic scenario weighting, sensitivity analysis, confidence scoring, and structured alert emission.
+        Inputs and calculations strictly adhere to financial safety guards (e.g. non-finite float coercions, minimum peer thresholds, missing data handling).
+    Test Suite State (python3 -m pytest):
+        Full Suite Baseline: 1042 passed, 1 skipped, 2 failed (out of 1045 tests).
+        Stage 7 Suite Baseline: 61 passed, 2 failed (out of 63 tests in src/tests/test_stage7_valuation.py).
+        The 2 Failing Tests:
+            test_p2_sector_driver_decomposition_missing: Fails because sector-specific driver breakdowns (REVENUE, NII, NAV) are not emitted by the general $FV = EPS \times Target P/E$ sensitivity driver logic.
+            test_p2_required_flip_dependence_alerts_missing: Fails because 5 specific flip-dependence/multiple-risk alert names (ASSESSMENT_FLIP_RISK, HIGH_MULTIPLE_DEPENDENCE, HIGH_EPS_DEPENDENCE, MARGIN_ASSUMPTION_RISK, HIGH_IMPACT_HIGH_UNCERTAINTY) are not emitted by current alert routines.
+
+4. Precise P35 Work Remaining & Root Causes
+
+    Workstream A — Sector-Specific Driver Decomposition:
+        Sector-specific chain inputs (revenue, NII, NAV) and industry-to-sector mappings are missing from upstream chain schemas / caller contracts. Emitting synthetic sector drivers without upstream chain fields and owner-approved formulas would violate financial safety rules.
+    Workstream B — Flip and Dependence Alert Triggers:
+        Exact shock magnitudes, flip risk thresholds, and dependency formulas for the 5 requested alert types remain unapproved in the locked specification (07_Stage7_Valuation.md).
+    Workstream C — Production Path Integration:
+        Verification and contract locking of official upstream orchestration callers invoking ValuationEngine.calculate_valuation.
+
+5. Minimal Recovery Plan & Blockers
+
+    Recovery Strategy:
+        Maintain the 2 failing tests un-skipped, un-deleted, and un-weakened in accordance with Stage 7 guidelines.
+        Preserve deterministic, evidence-backed financial valuation logic in src/valuation/engine.py without fabricating unapproved formulas or thresholds.
+        Keep Stage 7 unfrozen until explicit owner policy approvals (R1–R6) regarding sector mappings and alert formulas are formally granted.
+    Blockers:
+        Unapproved financial policy definitions for sector driver decomposition and flip-dependence alert thresholds (requires owner authorization/spec update before code modification).
+======================================================================
