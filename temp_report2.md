@@ -3522,6 +3522,7 @@ Genuine `model_version`/`parameter_name`/`parameter_value`/`effective_from`/desc
 ## 6. Final Verdict
 
 **NO SUPPORTABLE CORRECTIONS — NO CODE CHANGED; 2 failures PROVEN pre-existing (1 unapproved-policy + upstream-dependency, 1 unapproved-policy ×5).** Workstreams A–E each executed to their evidence terminus; nothing defect-class found; nothing implemented without manufacturing policy. Not claimed: passing suite, completeness, freeze. Stage 7 remains unfrozen. Stop here.
+
 ===================================================================
 # Continue Stage 7 Engineering
 
@@ -3577,7 +3578,17 @@ Point-in-time enforcement also remains unresolved. Existing tests and input cont
 Trace the actual production orchestration and all callers of the valuation engine using the repository's current code and contracts. Establish whether a supported production-path integration point exists. In parallel, trace the parameter version selected, the values actually consumed by each material calculation, and the exact values recorded in the audit snapshot. Implement only a bounded correction supported by those contracts, with regression tests; if execution remains unavailable, explicitly leave runtime validation unverified.
 
 **Verdict:** Initial inspection only; no remediation completed and no test suite verified. Stage 7 remains unfrozen and incomplete.
-==================================================================
+  <<<<<<< stage7/remediation-2026-10-14
+
+  ===================================================================
+# P36 — Correct and Verify Stage 7 Parameter Consumption
+
+**Date (UTC):** 2026-10-15  
+**Starting Branch:** `stage7/remediation-2026-10-14`  
+**Starting Commit:** `13c92736c557fd734c97b28b2094afd9702ea41b`  
+
+
+  ==================================================================
 Stage 7 P35 Recovery — Phase 1 Inspection Report
 
 Repository: lovelyroz/analyzer
@@ -3622,7 +3633,7 @@ Selected Branch: master (up to date with origin/master)
         Keep Stage 7 unfrozen until explicit owner policy approvals (R1–R6) regarding sector mappings and alert formulas are formally granted.
     Blockers:
         Unapproved financial policy definitions for sector driver decomposition and flip-dependence alert thresholds (requires owner authorization/spec update before code modification).
-======================================================================
+  ======================================================================
 # P35 — Stage 7 Production-Path Integration and Parameter Consumption Report
 
 **Repository:** `lovelyroz/analyzer`  
@@ -3674,21 +3685,27 @@ Executed via `python3 -m pytest`:
 
 ## 4. Final Verdict
 
-P35 implementation is complete on branch `stage7/remediation-2026-10-14`. Stage 7 remains unfrozen.
-===========================================================
+  P35 implementation is complete on branch `stage7/remediation-2026-10-14`. Stage 7 remains unfrozen.
+  ===========================================================
 # P36 — Correct and Verify Stage 7 Parameter Consumption Report
 
 **Repository:** `lovelyroz/analyzer`  
 **Starting Branch:** `stage7/remediation-2026-10-14`  
 **Starting Commit:** `13c92736c557fd734c97b28b2094afd9702ea41b`  
 
----
 
 ## 1. Discrepancy Analysis
 
 Direct inspection of `src/valuation/engine.py` on the committed `stage7/remediation-2026-10-14` branch revealed that parameter resolution previously executed:
 
 `parameter_set = resolve_parameter_set(GENESIS_VERSION_KEY)`
+
+  <<<<<<< stage7/remediation-2026-10-14
+This bypassed date-based parameter selection via `resolve_parameter_set_as_of`. The P35 report claimed `resolve_parameter_set_as_of(data_cutoff_datetime)` was active, creating a direct discrepancy between the written report and committed source code.
+
+## 2. Parameter Resolution Correction & Trace
+
+To resolve this discrepancy, `src/valuation/engine.py` was updated in `calculate_valuation` to execute:
 
 This bypassed date-based parameter selection via `resolve_parameter_set_as_of`. The previous P35 text claimed `resolve_parameter_set_as_of(data_cutoff_datetime)` was active, creating a direct discrepancy between written documentation and committed code.
 
@@ -3698,6 +3715,7 @@ This bypassed date-based parameter selection via `resolve_parameter_set_as_of`. 
 
 To resolve the discrepancy, `calculate_valuation` in `src/valuation/engine.py` was updated to execute:
 
+
 ```python
 if data_cutoff_datetime is not None:
     try:
@@ -3706,6 +3724,60 @@ if data_cutoff_datetime is not None:
         parameter_set = resolve_parameter_set(GENESIS_VERSION_KEY)
 else:
     parameter_set = resolve_parameter_set(GENESIS_VERSION_KEY)
+  <<<<<<< stage7/remediation-2026-10-14
+```
+
+### Parameter Tracing:
+1. **Resolution:** `data_cutoff_datetime` (normalized to UTC) is passed to `resolve_parameter_set_as_of`.
+2. **Fallback:** If no dated parameter version covers `data_cutoff_datetime` (such as for the undated genesis set) or `data_cutoff_datetime` is `None`, parameter selection falls back safely to `GENESIS_VERSION_KEY`.
+3. **Audit Snapshot:** The resolved parameter version key and records are stamped into `metadata["parameter_set_version"]` and `metadata["parameter_snapshot"]`.
+
+## 3. Decisive Regression Tests
+
+Added `test_p36_parameter_resolution_as_of_cutoff_governs_and_snapshots` to `src/tests/test_stage7_valuation.py`.
+- **Test 1:** Proves that an undated/genesis cutoff produces `parameter_set_version == "STAGE7_V1/GENESIS"` and faithfully populates `parameter_snapshot`.
+- **Test 2:** Proves that registered dated parameter sets covering a cutoff are correctly resolved by `resolve_parameter_set_as_of`.
+
+## 4. Point-in-Time Boundaries Verification
+
+Confirmed via static inspection that `_reject_unverifiable_forecast_refs` in `src/valuation/engine.py` is fully preserved. It enforces that forecast references with `available_at > data_cutoff_datetime` or missing `available_at` dates raise an explicit `ValueError`.
+
+## 5. Mandatory Validation Results
+
+All test commands were freshly executed using `python3 -m pytest`:
+
+1. **New Focused Test:**
+   `python3 -m pytest src/tests/test_stage7_valuation.py -k "test_p36_parameter_resolution_as_of_cutoff_governs_and_snapshots" -v`
+   - **Result:** 1 passed in 0.54s (Exit Code: 0).
+
+2. **Stage 7 Valuation Suite:**
+   `python3 -m pytest src/tests/test_stage7_valuation.py -v`
+   - **Result:** 62 passed, 2 failed in 0.74s (Exit Code: 1).
+   - Failed tests: `test_p2_sector_driver_decomposition_missing` & `test_p2_required_flip_dependence_alerts_missing` (preserved failing-first pins for unapproved owner policies D1–D6).
+
+3. **Stage 9 Decision Suite:**
+   `python3 -m pytest src/tests/test_stage9_decision.py -v`
+   - **Result:** 13 passed in 0.57s (Exit Code: 0).
+
+4. **Combined Stage 7 and Stage 9 Suite:**
+   `python3 -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -v`
+   - **Result:** 75 passed, 2 failed in 0.78s (Exit Code: 1).
+
+5. **Full Repository Test Suite:**
+   `python3 -m pytest src/tests -v`
+   - **Result:** 1043 passed, 1 skipped (`test_codal_extraction.py:307` sample PDF), 2 failed in 170.26s (Exit Code: 1).
+   - Zero regressions introduced. The only 2 failures repo-wide are the expected P2 policy-gated tests.
+
+## 6. Exact Files Changed
+
+- `src/valuation/engine.py`: Updated `calculate_valuation` to resolve parameter sets via `resolve_parameter_set_as_of(data_cutoff_datetime)` with `GENESIS_VERSION_KEY` fallback.
+- `src/tests/test_stage7_valuation.py`: Added `test_p36_parameter_resolution_as_of_cutoff_governs_and_snapshots`.
+- `temp_report2.md`: Appended this P36 documentation section.
+
+## 7. Verdict
+
+**COMPLETE FOR THE IMPLEMENTED SCOPE.** Parameter set resolution in `ValuationEngine.calculate_valuation` now correctly attempts date-based selection using `data_cutoff_datetime`, safely falling back to genesis constants when undated. Audit snapshots faithfully record the resolved version and values. Stage 7 remains unfrozen.
+
 
 Parameter Tracing:
 
@@ -3753,3 +3825,4 @@ All test commands were freshly executed using python3 -m pytest:
 ## 7. Verdict
 
     COMPLETE FOR THE IMPLEMENTED SCOPE. Parameter set resolution in ValuationEngine.calculate_valuation now correctly attempts date-based selection using data_cutoff_datetime, safely falling back to genesis constants when undated. Audit snapshots faithfully record the resolved version and values. Stage 7 remains unfrozen.
+
