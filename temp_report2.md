@@ -3753,4 +3753,62 @@ All test commands were freshly executed using python3 -m pytest:
 ## 7. Verdict
 
     COMPLETE FOR THE IMPLEMENTED SCOPE. Parameter set resolution in ValuationEngine.calculate_valuation now correctly attempts date-based selection using data_cutoff_datetime, safely falling back to genesis constants when undated. Audit snapshots faithfully record the resolved version and values. Stage 7 remains unfrozen.
+ 
+ ======================================================================
+# Final P35 — Stage 7 Root-Cause Remediation from the P34 Baseline
+
+**Date (UTC):** 2026-10-18
+**Nature:** Implementation on the supplied diagnostic snapshot (`analyzer_stage7_diagnostic_20261018_213047.zip`), edited in an isolated sandbox copy. The user's local repository was NOT accessible; no Git, GitHub, CI or remote operation was performed. All changes are delivered as files + `final_p35.diff` for the user to apply and commit.
+
+## 1. Baseline
+- Inspected: `src/valuation/{engine,parameters,schema,models,__init__}.py`, `src/tests/test_stage7_valuation.py`, `src/forecast/schema.py`, `src/decision/engine.py`, `07_Stage7_Valuation.md` (§§35, 47, 63–65), `stage_7_prompts.md`, `PROJECT_HANDOFF_INSTRUCTIONS.md`, `temp_report2.md`.
+- The snapshot's Stage 7 test file holds 63 tests and no P35/P36 test; `engine.py` contained no `resolve_parameter_set_as_of` call. The snapshot's `temp_report2.md` ends at the "P35 Recovery Phase 1" entry (no P35/P36 report sections). Accepted as the intended P34 baseline per the task premise; commit identity is NOT verified (no `.git`).
+- Environment limits: real pytest is not installed in the sandbox and there is no network; `src/forecast/engine.py` and other modules imported by Stage 5/8/9 tests are absent from the snapshot.
+- Baseline (stand-in runner, see §7): 60 passed, 3 failed (`test_p2_sector_driver_decomposition_missing`, `test_p2_required_flip_dependence_alerts_missing`, and `test_p6_production_path_real_stage5_forecast` which fails only with `ModuleNotFoundError: src.forecast.engine`, a snapshot gap).
+
+## 2. Root causes (baseline line references)
+1. `engine.py:208` — `resolve_parameter_set(GENESIS_VERSION_KEY)` was a fixed key; `data_cutoff_datetime` never influenced parameter selection, and `resolve_parameter_set_as_of` was neither imported nor called.
+2. `engine.py:256-260` — `parameter_snapshot` was built from registry records captured at import (`parameters.py:146-194`), not from values consumed. Probe: with `VALUATION_THRESHOLDS["expensive_base_upside"]=-50` the status changed EXPENSIVE→FAIR while the snapshot still reported 0.0.
+3. `engine.py:134,169-175,313,329,351,460-468,489-496,506-514,528,561-581` — calculations read imported module-level constants directly; the selected parameter set could not govern them.
+4. `parameters.py` `_rec` stored values by reference (`INDUSTRY_TARGET_PE` dict aliased); `DEFAULT_REGISTRY` holds only undated genesis, so `resolve_parameter_set_as_of` always raises (by design, P33).
+5. Existing test `test_p33_result_carries_parameter_audit` compared the snapshot with a dict rebuilt from the same registry records (circular; cannot detect drift).
+
+## 3. Implementation (files changed)
+- `src/valuation/parameters.py` (additive): `ParameterSetInvalidError`; `LITERALS_OUTSIDE_REGISTRY`; `live_genesis_parameter_set()` (rebuilds genesis from live constants per call); `ConsumedParameters` (frozen; `MappingProxyType` groups; `snapshot()` returns a fresh deep copy); `consume_parameter_set()` (validates presence, uniqueness, finite non-bool numbers, non-empty strings/families; no fallback to constants); `select_parameter_set_for_valuation()`; `_rec` now deep-copies values.
+- `src/valuation/engine.py`: no module-level parameter constants remain (grep-verified). `calculate_valuation` selects and validates parameters FIRST (fail closed before any output), then passes a `ConsumedParameters` to every parameter-dependent step. Two new keyword-only arguments, `parameter_registry` and `parameter_as_of` (default `None`, so all existing callers are unaffected). Result `model_version`/`contract_version`, `benchmark_peer_minimum`, evidence families and the snapshot now come from the consumed set. Two additive metadata keys: `parameter_selection`, `parameter_consumption`. No formula, threshold, weight, boundary or fallback value was changed.
+- `src/tests/test_stage7_valuation.py`: `test_p10_expensive_base_upside_parameterized_outputs_unchanged` gains two `pop` lines for the new metadata keys before hashing; the ORIGINAL pinned digest `7b5fb909…df33f33` is retained unchanged (recomputed digest with the two keys removed matches it byte-for-byte). Eight new tests `test_p35_*` appended. No test was deleted, skipped or weakened.
+- `07_Stage7_Valuation.md` was NOT edited; its §47 factual annotation (says no parameter-version mechanism exists) is stale relative to code since P33.
+
+## 4. Parameter-consumption proof
+- `test_p35_as_of_selection_governs_calculation_and_snapshot_matches`: V1 (2025-01-01) vs V2 (2026-01-01, threshold −50, MODEL_VERSION override). As-of 2025-06-01 → EXPENSIVE/`TEST/V1`, snapshot 0.0, future V2 excluded; as-of 2026-06-01 → FAIR/`TEST/V2`, snapshot −50.0, `model_version` from the set.
+- `test_p35_selected_set_governs_peers_alerts_and_scenario_weights`: a selected set changes min-peers (benchmark source), alert threshold (`LOW_FORECAST_RELIABILITY`), and scenario weights (probabilities and expected fair value 1197.0 as computed by hand).
+- `test_p35_snapshot_reports_values_actually_consumed_when_module_constant_changes`: legacy path now records −50.0 when the live constant is −50.0 and discloses `module_constants_modified_since_import=True`.
+- Negative control (throwaway copy): re-introducing the module-constant read in `_valuation_status` makes `test_p35_as_of_selection_governs…` and `test_p35_isolation…` fail.
+- Differential: 672 input combinations produce output identical to the pristine baseline (excluding the two new metadata keys).
+- Not governed by the registry (no record; ownership unconfirmed by spec) and therefore disclosed in `hard_coded_literals_outside_registry`: confidence-formula weights/scores/penalty, score defaults, driver-uncertainty weights, rounding.
+- Recorded but not consumed (5): `SCENARIO_PE_MULTIPLIER.{bear,base,bull}`, `INDUSTRY_TARGET_PE`, `ALERT_THRESHOLDS.high_dependence_share`.
+
+## 5. PIT status
+- Guaranteed now: an explicit as-of request selects only dated versions with `effective_from <= as_of`; future-effective versions cannot affect it; missing/overlapping/pre-history/undated selection raises `LookupError`; an invalid or incomplete selected set raises `ParameterSetInvalidError`; provenance never claims as-of selection for the legacy path (`FIXED_GENESIS_LEGACY`, `point_in_time_selection_applied=False`, `data_cutoff_used_for_parameter_selection=False`); in as-of mode global constants cannot leak in.
+- NOT guaranteed: historical validity of the default path. It still uses undated genesis constants (labelled as such). There is no effective-dated production registry, so as-of mode raises on the default registry. `data_cutoff_datetime` is deliberately not used to select parameters because the governing date is unspecified. Benchmark observations remain undated; `valuation_date` vs cutoff ordering remains pinned as accepted.
+
+## 6. Unresolved decisions (unchanged; nothing implemented)
+- D1–D5 (flip risk, multiple/EPS dependence, margin risk, high-impact/uncertainty): shock sizes, definitions, thresholds, severities unspecified. Both known P2 tests still fail for these reasons; test `test_p3_flip_dependence_alerts_remain_explicitly_unresolved` asserts absence on `flip_base`, in tension with the P2 test.
+- D6: sector chains/mapping and source fields (revenue, NII, NAV chain) absent.
+- R8/D9: which date governs selection (cutoff vs valuation date vs other), dated records, fallback policy, DB vs in-code registry. The new `parameter_registry`/`parameter_as_of` arguments are mechanism only and disclose a judgment call: the as-of instant is caller-supplied and never inferred.
+
+## 7. Tests
+- Interpreter: Python 3.12.3 (sandbox). Real pytest NOT available. Executed with a minimal stand-in runner (`pytest.raises` shim, not pytest) over all functions in `test_stage7_valuation.py`.
+- Baseline: 60 passed, 3 failed (above). After changes: **68 passed, 3 failed** (same 3 failures; +8 new tests passing; P10 digest test green).
+- NOT run: real pytest; `test_stage9_decision.py` and Stage 5/8 tests (missing modules in snapshot); full `pytest src/tests -v`; CI. No result for any of these is claimed.
+- User must run, in the project venv: `.venv\Scripts\python.exe -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -v` then `.venv\Scripts\python.exe -m pytest src/tests -v`.
+
+## 8. Remaining risks
+- Legacy path remains mutable-global-sensitive by design (existing tested behavior); now auditable, not prevented.
+- `ConsumedParameters.values` is a read-only view but the legacy genesis set is rebuilt from mutable constants on each call.
+- No production caller of `calculate_valuation` exists in the snapshot; end-to-end integration is unverified.
+- Stage 9 impact of the two additive metadata keys is unverified (static reading: `decision/engine.py` reads only status, reliability, risk, confidence, quality, `scenario_dispersion`, `expected_upside`).
+
+## 9. Final status
+**PARTIALLY COMPLETED.** Parameter consumption, snapshot truthfulness, fail-closed as-of selection and provenance are implemented and tested against the Stage 7 file; full PIT, D1–D6/R8 behavior, production integration, real-pytest/Stage 9/full-suite/CI verification remain open. Stage 7 is not frozen.
 
