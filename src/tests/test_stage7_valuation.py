@@ -1114,6 +1114,11 @@ def test_p10_expensive_base_upside_parameterized_outputs_unchanged():
     assert golden.model_version == "STAGE7_V1"
     representation = dataclasses.asdict(golden)
     representation.pop("calculation_timestamp")
+    # Final P35: the two additive provenance keys are removed before hashing so
+    # the ORIGINAL pinned digest is retained unchanged (proof the financial
+    # outputs and the 38-key snapshot are byte-identical to the P33 baseline).
+    representation["metadata"].pop("parameter_selection")
+    representation["metadata"].pop("parameter_consumption")
     digest = hashlib.sha256(
         json.dumps(representation, sort_keys=True, default=str).encode()
     ).hexdigest()
@@ -1346,3 +1351,228 @@ def test_p33_as_of_overlap_raises_ambiguity():
     )
     with pytest.raises(LookupError, match="Ambiguous"):
         resolve_parameter_set_as_of(datetime(2025, 6, 1), dup)
+
+
+# ---------------------------------------------------------------------------
+# Final P35 — parameter consumption, explicit as-of selection, provenance.
+# All tests go through the public ValuationEngine.calculate_valuation entry
+# point. Synthetic versions are clearly labelled TEST/* and are never registered
+# in DEFAULT_REGISTRY.
+# ---------------------------------------------------------------------------
+def _p35_version(key, effective_from, overrides=None, drop=(), duplicate=None):
+    from src.valuation.parameters import ParameterRecord, ParameterSetVersion, live_genesis_parameter_set
+
+    overrides = overrides or {}
+    records = [
+        ParameterRecord(r.parameter_name, overrides.get(r.parameter_name, r.parameter_value), None, r.description)
+        for r in live_genesis_parameter_set().records
+        if r.parameter_name not in drop
+    ]
+    if duplicate:
+        records.append(ParameterRecord(duplicate, 1.0, None, "duplicate"))
+    return ParameterSetVersion("STAGE7_V1", key, effective_from, tuple(records))
+
+
+def _p35_registry(*versions):
+    from src.valuation.parameters import ParameterRegistry
+
+    return ParameterRegistry(versions=tuple(versions))
+
+
+def _p35_call(**kwargs):
+    base = dict(
+        company_id=1, period_id=101, industry_code="PETROCHEMICAL", current_price=1000.0,
+        forecast_result=make_forecast(70.0, 140.0, 150.0),
+        forecast_reliability_score=85.0, historical_pe_values=[7.0],
+    )
+    base.update(kwargs)
+    return ValuationEngine().calculate_valuation(**base)
+
+
+def test_p35_legacy_path_provenance_is_truthful_and_unchanged():
+    result = _p35_call()
+    selection = result.metadata["parameter_selection"]
+    assert selection["mode"] == "FIXED_GENESIS_LEGACY"
+    assert selection["point_in_time_selection_applied"] is False
+    assert selection["effective_from"] is None
+    assert selection["data_cutoff_datetime"] == "2026-01-01T00:00:00+00:00"
+    assert selection["data_cutoff_used_for_parameter_selection"] is False
+    assert selection["module_constants_modified_since_import"] is False
+    assert "NOT verified" in selection["caveat"]
+    assert result.metadata["parameter_snapshot"] == _p33_snapshot()
+    assert len(result.metadata["parameter_snapshot"]) == 38
+    consumption = result.metadata["parameter_consumption"]
+    assert consumption["source"] == "SELECTED_PARAMETER_SET_ONLY"
+    assert consumption["recorded_not_consumed_names"] == [
+        "ALERT_THRESHOLDS.high_dependence_share", "INDUSTRY_TARGET_PE",
+        "SCENARIO_PE_MULTIPLIER.base", "SCENARIO_PE_MULTIPLIER.bear", "SCENARIO_PE_MULTIPLIER.bull",
+    ]
+    assert len(consumption["consumed_names"]) == 33
+    assert consumption["hard_coded_literals_outside_registry"]
+
+
+def test_p35_snapshot_reports_values_actually_consumed_when_module_constant_changes():
+    from src.valuation import parameters as params
+
+    original = params.VALUATION_THRESHOLDS["expensive_base_upside"]
+    try:
+        params.VALUATION_THRESHOLDS["expensive_base_upside"] = -50.0
+        mutated = _p35_call()
+        assert mutated.valuation_status == "FAIR"
+        # Snapshot now equals the value the calculation used, and the divergence
+        # from the import-time genesis record is disclosed, not hidden.
+        assert mutated.metadata["parameter_snapshot"]["VALUATION_THRESHOLDS.expensive_base_upside"] == -50.0
+        assert mutated.metadata["parameter_selection"]["module_constants_modified_since_import"] is True
+    finally:
+        params.VALUATION_THRESHOLDS["expensive_base_upside"] = original
+    restored = _p35_call()
+    assert restored.valuation_status == "EXPENSIVE"
+    assert restored.metadata["parameter_snapshot"]["VALUATION_THRESHOLDS.expensive_base_upside"] == 0.0
+    assert restored.metadata["parameter_selection"]["module_constants_modified_since_import"] is False
+
+
+def test_p35_as_of_selection_governs_calculation_and_snapshot_matches():
+    v1 = _p35_version("TEST/V1", datetime(2025, 1, 1))
+    v2 = _p35_version(
+        "TEST/V2", datetime(2026, 1, 1),
+        overrides={"VALUATION_THRESHOLDS.expensive_base_upside": -50.0, "MODEL_VERSION": "TEST_MODEL_V2"},
+    )
+    registry = _p35_registry(v1, v2)
+    historical = _p35_call(parameter_registry=registry, parameter_as_of=datetime(2025, 6, 1))
+    current = _p35_call(parameter_registry=registry, parameter_as_of=datetime(2026, 6, 1))
+    # The selected set changes the classification (parameter genuinely consumed).
+    assert historical.valuation_status == "EXPENSIVE"
+    assert current.valuation_status == "FAIR"
+    assert historical.metadata["parameter_set_version"] == "TEST/V1"
+    assert current.metadata["parameter_set_version"] == "TEST/V2"
+    # Future-effective V2 never leaks into the historical valuation.
+    assert historical.metadata["parameter_snapshot"]["VALUATION_THRESHOLDS.expensive_base_upside"] == 0.0
+    assert historical.model_version == "STAGE7_V1"
+    # Snapshot agrees with the consumed value and identity of the selected set.
+    assert current.metadata["parameter_snapshot"]["VALUATION_THRESHOLDS.expensive_base_upside"] == -50.0
+    assert current.model_version == "TEST_MODEL_V2"
+    selection = current.metadata["parameter_selection"]
+    assert selection["mode"] == "AS_OF_EFFECTIVE_DATED"
+    assert selection["point_in_time_selection_applied"] is True
+    assert selection["as_of_requested"] == "2026-06-01T00:00:00+00:00"
+    assert selection["as_of_source"] == "CALLER_SUPPLIED"
+    assert selection["effective_from"] == "2026-01-01T00:00:00+00:00"
+    assert selection["data_cutoff_used_for_parameter_selection"] is False
+    assert selection["module_constants_modified_since_import"] is None
+
+
+def test_p35_selected_set_governs_peers_alerts_and_scenario_weights():
+    from datetime import datetime as dt
+
+    kwargs = dict(
+        forecast_result=make_forecast(),
+        forecast_reliability_score=50.0,
+        industry_forward_pe_values=[10.0, 10.0, 10.0],
+        historical_pe_values=[7.0],
+    )
+    default = _p35_call(**kwargs)
+    assert default.target_pe_source == "HISTORICAL_MEDIAN_PE"
+    assert "INSUFFICIENT_PEER_DATA" in default.valuation_risk_flags
+    assert "LOW_FORECAST_RELIABILITY" not in default.valuation_risk_flags
+    v2 = _p35_version(
+        "TEST/V2", dt(2026, 1, 1),
+        overrides={
+            "MIN_INDUSTRY_PEERS": 3,
+            "ALERT_THRESHOLDS.low_forecast_reliability": 60.0,
+            "SCENARIO_WEIGHTS.bear": 0.5, "SCENARIO_WEIGHTS.base": 0.3, "SCENARIO_WEIGHTS.bull": 0.2,
+        },
+    )
+    selected = _p35_call(parameter_registry=_p35_registry(v2), parameter_as_of=dt(2026, 6, 1), **kwargs)
+    assert selected.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert "INSUFFICIENT_PEER_DATA" not in selected.valuation_risk_flags
+    assert "LOW_FORECAST_RELIABILITY" in selected.valuation_risk_flags
+    assert [round(selected.scenarios[n].probability, 9) for n in ("bear", "base", "bull")] == [0.5, 0.3, 0.2]
+    assert selected.expected_fair_value == round(0.5 * 1500.0 + 0.3 * 1800.0 + 0.2 * 2100.0, 2)
+    assert selected.metadata["benchmark_peer_minimum"] == 3
+    assert selected.metadata["parameter_snapshot"]["MIN_INDUSTRY_PEERS"] == 3
+
+
+def test_p35_missing_or_ambiguous_as_of_selection_fails_closed():
+    from datetime import datetime as dt
+
+    v1 = _p35_version("TEST/V1", dt(2025, 1, 1))
+    # as-of before every dated version
+    with pytest.raises(LookupError):
+        _p35_call(parameter_registry=_p35_registry(v1), parameter_as_of=dt(2024, 1, 1))
+    # registry supplied without an as-of instant: none is inferred (R8/D9 open)
+    with pytest.raises(LookupError, match="as-of instant"):
+        _p35_call(parameter_registry=_p35_registry(v1))
+    # as-of requested against the default registry (undated genesis only)
+    with pytest.raises(LookupError, match="R8"):
+        _p35_call(parameter_as_of=dt(2026, 1, 1))
+    # ambiguous effective dates
+    dup = _p35_registry(_p35_version("TEST/A", dt(2025, 1, 1)), _p35_version("TEST/B", dt(2025, 1, 1)))
+    with pytest.raises(LookupError, match="Ambiguous"):
+        _p35_call(parameter_registry=dup, parameter_as_of=dt(2025, 6, 1))
+
+
+def test_p35_invalid_parameter_set_raises_without_fallback_to_constants():
+    from datetime import datetime as dt
+    from src.valuation.parameters import ParameterSetInvalidError
+
+    when = dt(2026, 6, 1)
+    cases = (
+        _p35_version("TEST/MISSING", dt(2026, 1, 1), drop=("MIN_INDUSTRY_PEERS",)),
+        _p35_version("TEST/NAN", dt(2026, 1, 1), overrides={"RISK_THRESHOLDS.high_bear_downside": float("nan")}),
+        _p35_version("TEST/BOOL", dt(2026, 1, 1), overrides={"SENSITIVITY_PERTURBATION": True}),
+        _p35_version("TEST/DUP", dt(2026, 1, 1), duplicate="MIN_INDUSTRY_PEERS"),
+    )
+    for version in cases:
+        with pytest.raises(ParameterSetInvalidError):
+            _p35_call(parameter_registry=_p35_registry(version), parameter_as_of=when)
+    with pytest.raises(ParameterSetInvalidError, match="MIN_INDUSTRY_PEERS"):
+        _p35_call(parameter_registry=_p35_registry(cases[0]), parameter_as_of=when)
+
+
+def test_p35_isolation_from_global_mutation_and_snapshot_aliasing():
+    import dataclasses
+
+    from src.valuation import parameters as params
+    from src.valuation.parameters import consume_parameter_set, live_genesis_parameter_set
+
+    v2 = _p35_version("TEST/V2", datetime(2026, 1, 1))
+    kwargs = dict(parameter_registry=_p35_registry(v2), parameter_as_of=datetime(2026, 6, 1))
+    before = _p35_call(**kwargs)
+    original = params.VALUATION_THRESHOLDS["expensive_base_upside"]
+    try:
+        params.VALUATION_THRESHOLDS["expensive_base_upside"] = -50.0
+        after = _p35_call(**kwargs)
+    finally:
+        params.VALUATION_THRESHOLDS["expensive_base_upside"] = original
+    # as-of mode reads only the selected set: global mutation cannot leak in.
+    assert after.valuation_status == before.valuation_status == "EXPENSIVE"
+    # Mutating a returned snapshot cannot alter later results or module state.
+    before.metadata["parameter_snapshot"]["INDUSTRY_TARGET_PE"]["LEAK"] = 1.0
+    before.metadata["parameter_snapshot"]["SCENARIO_WEIGHTS.bear"] = 99.0
+    assert params.INDUSTRY_TARGET_PE == {}
+    again = _p35_call(**kwargs)
+    assert again.metadata["parameter_snapshot"]["INDUSTRY_TARGET_PE"] == {}
+    assert again.metadata["parameter_snapshot"]["SCENARIO_WEIGHTS.bear"] == 0.20
+    # Genesis records do not alias the live mutable dict either.
+    assert all(
+        record.parameter_value is not params.INDUSTRY_TARGET_PE
+        for record in params.GENESIS_VERSION.records
+    )
+    consumed = consume_parameter_set(live_genesis_parameter_set())
+    with pytest.raises(TypeError):
+        consumed.scenario_weights["bear"] = 1.0
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        consumed.min_industry_peers = 1
+
+
+def test_p35_repeated_as_of_calculations_are_deterministic():
+    import dataclasses
+
+    registry = _p35_registry(_p35_version("TEST/V1", datetime(2025, 1, 1)))
+    runs = []
+    for _ in range(3):
+        result = _p35_call(parameter_registry=registry, parameter_as_of=datetime(2025, 6, 1))
+        payload = dataclasses.asdict(result)
+        payload.pop("calculation_timestamp")
+        runs.append(payload)
+    assert runs[0] == runs[1] == runs[2]

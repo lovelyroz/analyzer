@@ -1,6 +1,9 @@
+import copy
+import math
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Optional, Tuple
+from types import MappingProxyType
+from typing import Dict, Mapping, Optional, Tuple
 
 from src.forecast.schema import normalize_datetime
 
@@ -137,7 +140,7 @@ class ParameterSetVersion:
 def _rec(name: str, value: object, description: str) -> ParameterRecord:
     return ParameterRecord(
         parameter_name=name,
-        parameter_value=value,
+        parameter_value=copy.deepcopy(value),
         effective_from=None,
         description=description + " " + _UNVERSIONED_GENESIS_NOTE,
     )
@@ -192,6 +195,22 @@ GENESIS_VERSION = ParameterSetVersion(
     effective_from=None,
     records=_genesis_records(),
 )
+
+
+def live_genesis_parameter_set() -> ParameterSetVersion:
+    """Genesis set rebuilt from the CURRENT module constants (not import time).
+
+    The legacy, non-point-in-time valuation path calculates with the live module
+    constants (existing, tested behavior). Rebuilding the set on every call makes
+    the recorded values equal the values the calculation actually consumes, even
+    if a module constant was modified after import.
+    """
+    return ParameterSetVersion(
+        model_version=MODEL_VERSION,
+        version_key=GENESIS_VERSION_KEY,
+        effective_from=None,
+        records=_genesis_records(),
+    )
 
 
 @dataclass(frozen=True)
@@ -259,3 +278,216 @@ def resolve_parameter_set_as_of(
             f"{moment.isoformat()}: {[v.version_key for v in tied]}."
         )
     return best
+
+
+# ---------------------------------------------------------------------------
+# Final P35 — consumed-parameter object and explicit selection (mechanism only)
+# ---------------------------------------------------------------------------
+
+class ParameterSetInvalidError(ValueError):
+    """A selected parameter set lacks, duplicates, or malforms a consumed record.
+
+    There is deliberately NO fallback to module constants or to another version.
+    """
+
+
+# Literals still hard-coded in ``engine.py`` formulas. They have no registry
+# record and their ownership is not confirmed by the specification, so they are
+# NOT governed by a parameter set; they are listed so audit metadata cannot
+# imply that the snapshot covers them.
+LITERALS_OUTSIDE_REGISTRY: Tuple[str, ...] = (
+    "CONFIDENCE_FORMULA: component weights 0.40/0.20/0.20/0.20, benchmark scores 100/25, dispersion penalty min(40, dispersion*50)",
+    "SCORE_DEFAULTS: reliability 50, probability confidence 50, data quality 100, clamp range 0-100",
+    "DRIVER_UNCERTAINTY_FORMULA: weights 0.5/0.3/0.2 and impact normalization floor 1e-9",
+    "ROUNDING: fair value 2 decimals, target/forward P/E and driver outputs 4 decimals",
+)
+
+_GROUP_SPECS: Dict[str, Tuple[str, Tuple[str, ...]]] = {
+    "scenario_weights": ("SCENARIO_WEIGHTS", ("bear", "base", "bull")),
+    "valuation_thresholds": (
+        "VALUATION_THRESHOLDS",
+        (
+            "very_attractive_expected_upside", "very_attractive_base_upside",
+            "attractive_expected_upside", "attractive_base_upside",
+            "expensive_expected_upside", "expensive_base_upside",
+            "very_expensive_expected_upside", "very_expensive_base_upside",
+        ),
+    ),
+    "confidence_thresholds": ("CONFIDENCE_THRESHOLDS", ("very_high", "high", "moderate", "low")),
+    "risk_thresholds": (
+        "RISK_THRESHOLDS",
+        ("extreme_confidence", "high_scenario_dispersion", "high_bear_downside",
+         "medium_confidence", "medium_bear_downside"),
+    ),
+    "alert_thresholds": (
+        "ALERT_THRESHOLDS",
+        ("high_scenario_dispersion", "low_forecast_reliability", "benchmark_divergence_ratio",
+         "historical_divergence_ratio", "industry_divergence_ratio"),
+    ),
+}
+_SCALAR_NAMES: Tuple[str, ...] = (
+    "PROBABILITY_EVIDENCE_BLEND",
+    "SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT",
+    "SENSITIVITY_PERTURBATION",
+    "MIN_INDUSTRY_PEERS",
+)
+_STRING_NAMES: Tuple[str, ...] = ("SCENARIO_MULTIPLE_POLICY_VERSION", "MODEL_VERSION", "CONTRACT_VERSION")
+_FAMILIES_NAME = "PROBABILITY_EVIDENCE_FAMILIES"
+
+
+def _number(name: str, value: object) -> object:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ParameterSetInvalidError(f"Parameter {name!r} must be a finite number, got {value!r}.")
+    return value
+
+
+@dataclass(frozen=True)
+class ConsumedParameters:
+    """Immutable view of the parameter values the valuation actually consumes.
+
+    The engine reads ONLY from this object for registry-governed values, and the
+    audit snapshot is produced from the same ``values`` mapping, so recorded and
+    consumed values cannot disagree.
+    """
+
+    version_key: str
+    set_model_version: str
+    effective_from: Optional[datetime]
+    values: Mapping[str, object]
+    consumed_names: Tuple[str, ...]
+    recorded_not_consumed_names: Tuple[str, ...]
+    scenario_weights: Mapping[str, object]
+    valuation_thresholds: Mapping[str, object]
+    confidence_thresholds: Mapping[str, object]
+    risk_thresholds: Mapping[str, object]
+    alert_thresholds: Mapping[str, object]
+    probability_evidence_blend: object
+    probability_evidence_families: Tuple[str, ...]
+    scenario_multiple_max_abs_adjustment: object
+    scenario_multiple_policy_version: str
+    sensitivity_perturbation: object
+    min_industry_peers: object
+    model_version: str
+    contract_version: str
+
+    def snapshot(self) -> Dict[str, object]:
+        """Fresh deep copy of every recorded value; mutating it cannot alter this object."""
+        return copy.deepcopy(dict(self.values))
+
+
+def consume_parameter_set(version: ParameterSetVersion) -> ConsumedParameters:
+    """Validate ``version`` and freeze the values the valuation will consume.
+
+    Missing, duplicated or non-numeric consumed records raise
+    ``ParameterSetInvalidError``; nothing is ever filled from module constants.
+    """
+    values: Dict[str, object] = {}
+    for record in version.records:
+        if record.parameter_name in values:
+            raise ParameterSetInvalidError(
+                f"Duplicate parameter {record.parameter_name!r} in version {version.version_key!r}."
+            )
+        values[record.parameter_name] = copy.deepcopy(record.parameter_value)
+
+    consumed: list = []
+    groups: Dict[str, Mapping[str, object]] = {}
+    missing: list = []
+    for attr, (prefix, keys) in _GROUP_SPECS.items():
+        group: Dict[str, object] = {}
+        for key in keys:
+            full = f"{prefix}.{key}"
+            consumed.append(full)
+            if full not in values:
+                missing.append(full)
+            else:
+                group[key] = _number(full, values[full])
+        groups[attr] = MappingProxyType(group)
+    for name in _SCALAR_NAMES + _STRING_NAMES + (_FAMILIES_NAME,):
+        consumed.append(name)
+        if name not in values:
+            missing.append(name)
+    if missing:
+        raise ParameterSetInvalidError(
+            f"Parameter set {version.version_key!r} is missing consumed records: {sorted(missing)}."
+        )
+    scalars = {name: _number(name, values[name]) for name in _SCALAR_NAMES}
+    strings = {}
+    for name in _STRING_NAMES:
+        if not isinstance(values[name], str) or not values[name].strip():
+            raise ParameterSetInvalidError(f"Parameter {name!r} must be a non-empty string.")
+        strings[name] = values[name]
+    families = values[_FAMILIES_NAME]
+    if (
+        not isinstance(families, (tuple, list))
+        or not families
+        or not all(isinstance(item, str) and item.strip() for item in families)
+    ):
+        raise ParameterSetInvalidError(f"Parameter {_FAMILIES_NAME!r} must be a non-empty sequence of strings.")
+
+    consumed_names = tuple(sorted(consumed))
+    return ConsumedParameters(
+        version_key=version.version_key,
+        set_model_version=version.model_version,
+        effective_from=version.effective_from,
+        values=MappingProxyType(values),
+        consumed_names=consumed_names,
+        recorded_not_consumed_names=tuple(sorted(set(values) - set(consumed_names))),
+        scenario_weights=groups["scenario_weights"],
+        valuation_thresholds=groups["valuation_thresholds"],
+        confidence_thresholds=groups["confidence_thresholds"],
+        risk_thresholds=groups["risk_thresholds"],
+        alert_thresholds=groups["alert_thresholds"],
+        probability_evidence_blend=scalars["PROBABILITY_EVIDENCE_BLEND"],
+        probability_evidence_families=tuple(families),
+        scenario_multiple_max_abs_adjustment=scalars["SCENARIO_MULTIPLE_MAX_ABS_ADJUSTMENT"],
+        scenario_multiple_policy_version=strings["SCENARIO_MULTIPLE_POLICY_VERSION"],
+        sensitivity_perturbation=scalars["SENSITIVITY_PERTURBATION"],
+        min_industry_peers=scalars["MIN_INDUSTRY_PEERS"],
+        model_version=strings["MODEL_VERSION"],
+        contract_version=strings["CONTRACT_VERSION"],
+    )
+
+
+def select_parameter_set_for_valuation(
+    parameter_registry: Optional[ParameterRegistry] = None,
+    parameter_as_of: Optional[datetime] = None,
+) -> Tuple[ParameterSetVersion, Dict[str, object]]:
+    """Choose the parameter set for one valuation, with truthful provenance.
+
+    * Neither argument supplied (legacy): live genesis constants, labelled
+      ``FIXED_GENESIS_LEGACY`` and ``point_in_time_selection_applied=False``.
+      This never claims historical validity.
+    * Either argument supplied: explicit effective-dated selection through
+      ``resolve_parameter_set_as_of``. A missing as-of instant, an empty or
+      overlapping registry, or a registry holding only undated genesis raises
+      ``LookupError`` — no silent fallback to genesis or to a newer version.
+
+    Which date governs selection (cutoff, valuation date, other) is the
+    unresolved R8/D9 decision, so the as-of instant is never inferred here; the
+    caller supplies it and provenance records it as caller-supplied.
+    """
+    if parameter_registry is None and parameter_as_of is None:
+        live = live_genesis_parameter_set()
+        live_values = {r.parameter_name: r.parameter_value for r in live.records}
+        import_values = {r.parameter_name: r.parameter_value for r in GENESIS_VERSION.records}
+        return live, {
+            "mode": "FIXED_GENESIS_LEGACY",
+            "point_in_time_selection_applied": False,
+            "as_of_requested": None,
+            "as_of_source": None,
+            "module_constants_modified_since_import": live_values != import_values,
+            "caveat": (
+                "Undated genesis constants; temporal validity for historical "
+                "valuation is NOT verified (R8/D9 pending)."
+            ),
+        }
+    registry = DEFAULT_REGISTRY if parameter_registry is None else parameter_registry
+    version = resolve_parameter_set_as_of(parameter_as_of, registry)
+    return version, {
+        "mode": "AS_OF_EFFECTIVE_DATED",
+        "point_in_time_selection_applied": True,
+        "as_of_requested": normalize_datetime(parameter_as_of).isoformat(),
+        "as_of_source": "CALLER_SUPPLIED",
+        "module_constants_modified_since_import": None,
+        "caveat": None,
+    }
