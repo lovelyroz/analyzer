@@ -260,3 +260,28 @@ At line:1 char:141
 Missing property name after reference operator.
     + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
     + FullyQualifiedErrorId : MissingPropertyName
+# Report 5
+## (analyzer) PS D:\winprojects\analyzer> Resolve-Path .\.venv_test\Scripts\python.exe
+
+Path                                                 
+----                                                 
+D:\winprojects\analyzer\.venv_test\Scripts\python.exe
+## (analyzer) PS D:\winprojects\analyzer> Get-ChildItem .\src -Directory | Select-Object Name
+
+Name         
+----         
+.pytest_cache
+core         
+decision     
+evaluation   
+forecast     
+ingestion    
+kpi          
+market       
+migrations   
+models       
+scoring      
+scripts      
+tests        
+trend        
+valuation  
