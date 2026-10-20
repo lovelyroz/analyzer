@@ -1,4 +1,5 @@
-# task 1 :
+# REPORT 1
+## task 1 :
     "pytest.ini",
     "pyproject.toml",
     "setup.cfg",
@@ -7,7 +8,7 @@
    result :  No such above files 
 
 
-# task مرحله سوم: اگر هیچ تنظیماتی پیدا نشد :
+## task مرحله سوم: اگر هیچ تنظیماتی پیدا نشد :
 
 .\.venv\Scripts\python.exe -m pytest --version
 pytest 9.1.1
@@ -35,3 +36,20 @@ ERROR Lib/site-packages/greenlet/tests/test_version.py
 ERROR Lib/site-packages/greenlet/tests/test_weakref.py
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Interrupted: 20 errors during collection !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ========================================== 1054 tests collected, 20 errors in 4.88s 
+
+# Report 2
+## Get-Location
+Path                   
+----                   
+D:\winprojects\analyzer
+
+## Resolve-Path .\.venv\Scripts\python.exe
+
+Path                                            
+----                                            
+D:\winprojects\analyzer\.venv\Scripts\python.exe
+## Get-ChildItem -Force
+
+
+    Directory: D:\winprojects\analyzer
+
