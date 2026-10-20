@@ -1059,3 +1059,225 @@ src/tests/test_stage9_decision.py::test_dashboard_contract_carries_required_fiel
 (analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest -q .\src\tests\test_codal_digit_normalization.py
 ..                                                                                                                       [100%]
 2 passed in 0.63s
+
+# Report 3
+(analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest -q .\src\tests\test_codal_acquisition.py .\src\tests\test_codal_extraction.py
+.............s                                                                                                   [100%]
+================================================== warnings summary ===================================================
+src/tests/test_codal_extraction.py::test_pipeline_persists_report_version_and_raw
+src/tests/test_codal_extraction.py::test_pipeline_acquisition_failure_is_audited_without_partial_writes
+src/tests/test_codal_extraction.py::test_pipeline_extraction_failure_is_audited_without_partial_writes
+src/tests/test_codal_extraction.py::test_pipeline_idempotent_version_chain
+  D:\winprojects\analyzer\src\migrations\runner.py:175: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    {"version": 1, "name": "legacy_baseline", "applied_at": datetime.utcnow()},
+
+src/tests/test_codal_extraction.py: 28 warnings
+  D:\winprojects\analyzer\.venv_test\Lib\site-packages\sqlalchemy\engine\default.py:1192: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes
+    cursor.execute(statement, parameters)
+
+src/tests/test_codal_extraction.py: 24 warnings
+  D:\winprojects\analyzer\src\migrations\runner.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    {"version": migration.version, "name": migration.name, "applied_at": datetime.utcnow()},
+
+src/tests/test_codal_extraction.py: 14 warnings
+  D:\winprojects\analyzer\.venv_test\Lib\site-packages\sqlalchemy\sql\schema.py:4296: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore[call-arg, no-any-return, no-untyped-call]  # noqa: E501
+
+src/tests/test_codal_extraction.py::test_pipeline_persists_report_version_and_raw
+src/tests/test_codal_extraction.py::test_pipeline_idempotent_version_chain
+src/tests/test_codal_extraction.py::test_pipeline_idempotent_version_chain
+  D:\winprojects\analyzer\src\ingestion\service.py:229: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    run.finished_at = datetime.utcnow()
+
+src/tests/test_codal_extraction.py::test_pipeline_acquisition_failure_is_audited_without_partial_writes
+src/tests/test_codal_extraction.py::test_pipeline_extraction_failure_is_audited_without_partial_writes
+  D:\winprojects\analyzer\src\ingestion\codal\pipeline.py:33: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    finished_at=datetime.utcnow(),
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+13 passed, 1 skipped, 75 warnings in 1.30s
+# Report 4
+(analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest -q .\src\tests\test_ingestion_fx.py .\src\tests\test_ingestion_ohlc.py
+.............                                                                                                    [100%]
+================================================== warnings summary ===================================================
+src/tests/test_ingestion_fx.py: 7 warnings
+src/tests/test_ingestion_ohlc.py: 4 warnings
+  D:\winprojects\analyzer\src\migrations\runner.py:175: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    {"version": 1, "name": "legacy_baseline", "applied_at": datetime.utcnow()},
+
+src/tests/test_ingestion_fx.py: 56 warnings
+src/tests/test_ingestion_ohlc.py: 28 warnings
+  D:\winprojects\analyzer\.venv_test\Lib\site-packages\sqlalchemy\engine\default.py:1192: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes
+    cursor.execute(statement, parameters)
+
+src/tests/test_ingestion_fx.py: 49 warnings
+src/tests/test_ingestion_ohlc.py: 24 warnings
+  D:\winprojects\analyzer\src\migrations\runner.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    {"version": migration.version, "name": migration.name, "applied_at": datetime.utcnow()},
+
+src/tests/test_ingestion_fx.py: 9 warnings
+src/tests/test_ingestion_ohlc.py: 7 warnings
+  D:\winprojects\analyzer\.venv_test\Lib\site-packages\sqlalchemy\sql\schema.py:4296: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore[call-arg, no-any-return, no-untyped-call]  # noqa: E501
+
+src/tests/test_ingestion_fx.py::test_free_market_and_operational_are_stored_separately
+src/tests/test_ingestion_fx.py::test_fx_idempotent_upsert_jalali
+src/tests/test_ingestion_fx.py::test_fx_idempotent_upsert_jalali
+src/tests/test_ingestion_fx.py::test_invalid_rate_type_and_non_positive_rate_fail_explicitly
+src/tests/test_ingestion_fx.py::test_operational_never_defaults_to_free_market
+src/tests/test_ingestion_fx.py::test_fx_ingestion_run_audit
+src/tests/test_ingestion_fx.py::test_same_month_across_years_fx
+src/tests/test_ingestion_fx.py::test_ingest_fx_xlsx_toman_and_rial
+src/tests/test_ingestion_fx.py::test_ingest_fx_xlsx_toman_and_rial
+  D:\winprojects\analyzer\src\ingestion\service.py:374: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    run.finished_at = datetime.utcnow()
+
+src/tests/test_ingestion_ohlc.py::test_null_not_zero
+src/tests/test_ingestion_ohlc.py::test_same_month_across_years
+src/tests/test_ingestion_ohlc.py::test_ingest_ohlc_idempotent
+src/tests/test_ingestion_ohlc.py::test_ingest_ohlc_idempotent
+  D:\winprojects\analyzer\src\ingestion\market\ingestion.py:132: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    run.finished_at = datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+13 passed, 197 warnings in 1.91s
+# Report 5
+(analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest -q .\src\tests\test_stage1_database_architecture.py .\src\tests\test_stage1_database_integrity.py .\src\tests\test_stage1_rules.py
+.................                                                                                                [100%]
+================================================== warnings summary ===================================================
+src/tests/test_stage1_database_architecture.py: 3 warnings
+src/tests/test_stage1_database_integrity.py: 4 warnings
+src/tests/test_stage1_rules.py: 19 warnings
+  D:\winprojects\analyzer\.venv_test\Lib\site-packages\sqlalchemy\sql\schema.py:4296: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore[call-arg, no-any-return, no-untyped-call]  # noqa: E501
+
+src/tests/test_stage1_database_integrity.py: 7 warnings
+src/tests/test_stage1_rules.py: 13 warnings
+  D:\winprojects\analyzer\src\migrations\runner.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    {"version": migration.version, "name": migration.name, "applied_at": datetime.utcnow()},
+
+src/tests/test_stage1_database_integrity.py: 7 warnings
+src/tests/test_stage1_rules.py: 14 warnings
+  D:\winprojects\analyzer\.venv_test\Lib\site-packages\sqlalchemy\engine\default.py:1192: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes
+    cursor.execute(statement, parameters)
+
+src/tests/test_stage1_rules.py::test_ingestion_run_contract
+  D:\winprojects\analyzer\src\tests\test_stage1_rules.py:234: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    run = IngestionRun(source="CODAL", status="COMPLETED", records_found=10, records_inserted=9, records_updated=1, records_failed=0, finished_at=datetime.utcnow())
+
+src/tests/test_stage1_rules.py::test_migration_runner_upgrades_legacy_stage1_schema
+  D:\winprojects\analyzer\src\migrations\runner.py:175: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    {"version": 1, "name": "legacy_baseline", "applied_at": datetime.utcnow()},
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+17 passed, 69 warnings in 143.82s (0:02:23)
+# Report 6
+(analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest -q .\src\tests\test_stage7_valuation.py .\src\tests\test_stage9_decision.py
+..................FF................................................................                             [100%]
+====================================================== FAILURES =======================================================
+_____________________________________ test_p2_sector_driver_decomposition_missing _____________________________________
+
+    def test_p2_sector_driver_decomposition_missing():
+        engine = ValuationEngine()
+        nonfin = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+            historical_pe_values=[7.0],
+        )
+        bank = engine.calculate_valuation(
+            1, 101, "BANK", 1000.0, make_forecast(),
+            historical_pe_values=[7.0],
+        )
+        holding = engine.calculate_valuation(
+            1, 101, "HOLDING", 1000.0, make_forecast(),
+            forecast_reliability_score=80.0, historical_pe_values=[7.0],
+            nav_per_share=500.0,
+        )
+        observed = set(nonfin.valuation_driver_ranking) | set(bank.valuation_driver_ranking) | set(holding.valuation_driver_ranking)
+>       assert {"REVENUE", "NII", "NAV"} <= observed
+E       AssertionError: assert {'NAV', 'NII', 'REVENUE'} <= {'EPS', 'TARGET_PE'}
+E
+E         Extra items in the left set:
+E         'REVENUE'
+E         'NAV'
+E         'NII'
+
+src\tests\test_stage7_valuation.py:422: AssertionError
+___________________________________ test_p2_required_flip_dependence_alerts_missing ___________________________________
+
+    def test_p2_required_flip_dependence_alerts_missing():
+        from src.valuation.parameters import SENSITIVITY_PERTURBATION, VALUATION_THRESHOLDS
+
+        assert SENSITIVITY_PERTURBATION == 0.10
+        assert VALUATION_THRESHOLDS["attractive_expected_upside"] == 15.0
+        assert VALUATION_THRESHOLDS["attractive_base_upside"] == 5.0
+        engine = ValuationEngine()
+        flip_base = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0,
+            make_forecast(150.0, 150.0, 250.0), historical_pe_values=[7.0],
+        )
+        assert flip_base.valuation_status == "ATTRACTIVE"
+        shocked = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0,
+            make_forecast(135.0, 135.0, 225.0), historical_pe_values=[7.0],
+        )
+        assert shocked.valuation_status == "FAIR"
+        stable = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(180.0, 180.0, 180.0),
+            historical_pe_values=[7.0],
+            scenario_pe_adjustments={"bear": -0.10, "base": 0.0, "bull": 0.20},
+            scenario_pe_rationales={
+                "bear": "Higher risk compresses justified multiple.",
+                "base": "Historical median is neutral.",
+                "bull": "Better quality supports premium.",
+            },
+        )
+        eps_risk = engine.calculate_valuation(
+            1, 101, "PETROCHEMICAL", 1000.0, make_forecast(80.0, 180.0, 320.0),
+            forecast_reliability_score=20.0, historical_pe_values=[7.0],
+            probability_confidence=50.0, data_quality_score=20.0,
+        )
+        vocab = []
+        for result in (flip_base, shocked, stable, eps_risk):
+            vocab.extend(result.alerts)
+            vocab.extend(result.valuation_risk_flags)
+        required = ["ASSESSMENT_FLIP_RISK", "HIGH_MULTIPLE_DEPENDENCE",
+                    "HIGH_EPS_DEPENDENCE", "MARGIN_ASSUMPTION_RISK",
+                    "HIGH_IMPACT_HIGH_UNCERTAINTY"]
+        missing = [name for name in required if not any(name in item for item in vocab)]
+>       assert not missing, f"Missing required alerts: {missing}"
+E       AssertionError: Missing required alerts: ['ASSESSMENT_FLIP_RISK', 'HIGH_MULTIPLE_DEPENDENCE', 'HIGH_EPS_DEPENDENCE', 'MARGIN_ASSUMPTION_RISK', 'HIGH_IMPACT_HIGH_UNCERTAINTY']
+E       assert not ['ASSESSMENT_FLIP_RISK', 'HIGH_MULTIPLE_DEPENDENCE', 'HIGH_EPS_DEPENDENCE', 'MARGIN_ASSUMPTION_RISK', 'HIGH_IMPACT_HIGH_UNCERTAINTY']
+
+src\tests\test_stage7_valuation.py:465: AssertionError
+================================================== warnings summary ===================================================
+src/tests/test_stage9_decision.py: 13 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:16: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp=datetime.utcnow(),
+
+src/tests/test_stage9_decision.py: 13 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:35: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp=datetime.utcnow(),
+
+src/tests/test_stage9_decision.py: 13 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:45: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    as_of_date=datetime.utcnow(),
+
+src/tests/test_stage9_decision.py: 13 warnings
+  D:\winprojects\analyzer\src\decision\engine.py:260: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp = datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=============================================== short test summary info ===============================================
+FAILED src/tests/test_stage7_valuation.py::test_p2_sector_driver_decomposition_missing - AssertionError: assert {'NAV', 'NII', 'REVENUE'} <= {'EPS', 'TARGET_PE'}
+FAILED src/tests/test_stage7_valuation.py::test_p2_required_flip_dependence_alerts_missing - AssertionError: Missing required alerts: ['ASSESSMENT_FLIP_RISK', 'HIGH_MULTIPLE_DEPENDENCE', 'HIGH_EPS_DEPENDENCE'...
+2 failed, 82 passed, 52 warnings in 1.37s
+# Report 7
+(analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest -q .\src\tests\test_stage8_market.py .\src\tests\test_stage8_market_parameters.py
+.................                                                                                                [100%]
+================================================== warnings summary ===================================================
+src/tests/test_stage8_market.py: 10 warnings
+  D:\winprojects\analyzer\src\market\engine.py:137: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp=datetime.utcnow(),
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+17 passed, 10 warnings in 0.11s
