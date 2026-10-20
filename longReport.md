@@ -1052,3 +1052,9 @@ src/tests/test_stage9_decision.py::test_hysteresis_allows_material_deterioration
 src/tests/test_stage9_decision.py::test_decision_history_contract
 src/tests/test_stage9_decision.py::test_ranking_contract_has_no_new_score
 src/tests/test_stage9_decision.py::test_dashboard_contract_carries_required_fields
+
+1053 tests collected in 1.56s
+
+(analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest -q .\src\tests\test_codal_digit_normalization.py
+..                                                                                                                       [100%]
+2 passed in 0.63s
