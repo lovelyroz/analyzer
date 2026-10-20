@@ -1,3 +1,4 @@
+# Report 2 — Digit normalization smoke test
 (analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest --collect-only -q .\src\tests
 src/tests/test_codal_acquisition.py::test_local_pdf_acquisition_preserves_source_and_bytes
 src/tests/test_codal_acquisition.py::test_missing_source_is_distinguished_as_acquisition_failure
