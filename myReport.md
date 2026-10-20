@@ -243,3 +243,20 @@ ERROR Lib/site-packages/greenlet/tests/test_throw.py
 ERROR Lib/site-packages/greenlet/tests/test_tracing.py
 ERROR Lib/site-packages/greenlet/tests/test_version.py
 ERROR Lib/site-packages/greenlet/tests/test_weakref.py
+# Report 4
+## (analyzer) PS D:\winprojects\analyzer> Get-ChildItem .\Lib -Force | Select-Object Mode, Name
+
+Mode   Name         
+----   ----         
+d----- site-packages
+## (analyzer) PS D:\winprojects\analyzer> Test-Path .\Lib\site-packages\colorama\tests
+True
+## (analyzer) PS D:\winprojects\analyzer> Test-Path .\.venv\Lib\site-packages\colorama\tests
+True
+## (analyzer) PS D:\winprojects\analyzer> .\.venv\Scripts\python.exe -m pytest --trace-config --collect-only -q 2>&1 | Select-String "rootdir:|configfile:|inifile:|ERROR collecting".\.venv\Scripts\python.exe -m pytest --trace-config --collect-only -q 2>&1 | Select-String "rootdir:|configfile:|inifile:|ERROR collecting"
+At line:1 char:141
++ ... lect-String "rootdir:|configfile:|inifile:|ERROR collecting".\.venv\S ...
++                                                                  ~
+Missing property name after reference operator.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : MissingPropertyName
