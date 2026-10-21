@@ -1,253 +1,202 @@
+# گزارش ممیزی یکپارچه و آماده‌سازی تصمیم‌های اجرایی Stage 7 پروژه analyzer
 
-=====================================
-وضعیت فایل‌های تست
-
-test_p2_sector_driver_decomposition_missing.py:  ناموجود
-
-test_p2_required_flip_dependence_alerts_missing.py: ناموجود
-
-----------------------------------------
-
-من چیزی به اسم Sector Driver Decomposition پیدا نکردم ولی موارد زیر را پیدا کردم
-# 42. EPS Driver Decomposition
-
-برای شرکت‌های Non-Financial:
-
-```text
-Revenue
-→
-Operating Margin
-→
-Operating Profit
-→
-Net Profit
-→
-EPS
-→
-Fair Value
-```
+بر اساس بررسی فایل **PROMPT** و تحلیل تطبیقی تمام مستندات و گزارش‌های موجود در منابع پروژه (شامل `07_Stage7_Valuation.md`، `stepsForStage7.md`، `reply.md`، `temp_report2.md` و کدهای موتور ارزش‌گذاری)، گزارش ممیزی جامع به شرح زیر ارائه می‌شود:
 
 ---
 
-# 43. Bank Driver Decomposition
+## بخش اول — وضعیت و اعتبار منابع
 
-برای Bank:
+### ۱. منابع در دسترس و نقش هر کدام
+* **`07_Stage7_Valuation.md`:** سند اصلی مشخصات فنی و مالی Stage 7 (تعریف فرمول‌ها، آستانه‌ها، Alertها و منطق ارزش‌گذاری).
+* **`stepsForStage7.md`:** پیشنهادات سیاست‌گذار/مالک پروژه برای تعیین تکلیف تصمیم‌های باز D1 تا D9.
+* **`reply.md`:** ممیزی فنی واقعیت‌های V1 کد در برابر مشخصات (ثبت دقیق غیاب برخی Alertها و درایورهای صنعت).
+* **`temp_report2.md`:** تاریخچه گزارش‌های ممیزی فنی و اجرایی P1 تا P36 (شامل آخرین وضعیت ثبت‌شده در P35/P36).
+* **کدهای موتور و تست‌ها (`src/valuation/` و `src/tests/test_stage7_valuation.py`):** مرجع واقعی پیاده‌سازی.
 
-```text
-Loans / Deposits
-→
-NII / NIM
-→
-Net Profit
-→
-EPS
-→
-Fair Value
-```
+### ۲. آخرین وضعیت گزارش‌شده Stage 7
+طبق آخرین گزارش‌های ثبت‌شده (P35/P36 در `temp_report2.md` بر روی شاخه `stage7/remediation-2026-10-14`):
+* قابلیت ثبت و مصرف پارامترها به‌صورت As-Of (اعتبار زمانی) پیاده‌سازی شده است.
+* تعداد ۶۸ تست پاس و ۳ تست شکست روی یک محیط شبیه‌سازی‌شده محلی ثبت شده است.
+* **Stage 7 تثبیت نشده است (NOT FROZEN).**
+
+### ۳. محدودیت‌های شواهد و اعتبارسنجی
+* **عدم اجرای pytest واقعی:** گزارش‌های P35/P36 صریحاً قید کرده‌اند که تست‌ها با یک اجرای شبیه‌سازی‌شده (stand-in runner) انجام شده و pytest واقعی پروژه روی محیط venv اجرا نشده است.
+* **تغییرات منحصر به Snapshot:** تغییرات گزارش‌شده در P35/P36 روی شاخه موقت `stage7/remediation-2026-10-14` بوده و حضور آن‌ها در شاخه اصلی (master) یا کد محلی کاربر نیازمند بررسی مستقیم است.
+* **عدم اثبات یکپارچگی تولید:** هیچ فراخوان واقعی تولیدی برای `calculate_valuation` در مسیر اصلی برنامه (مانند `src/decision/engine.py`) یا Integration Test پویا وجود ندارد.
+
+---
+
+## بخش دوم — تطبیق مشخصات با کد و تست‌ها
+
+جدول زیر تطبیق الزامات سند `07_Stage7_Valuation.md` با کد موتور (`src/valuation/engine.py`، `parameters.py`، `schema.py`، `models.py`) و تست‌ها را نشان می‌دهد:
+
+| حوزه الزام | رفتار مورد انتظار طبق مشخصات | شواهد کد | شواهد تست | وضعیت فعلی | اثر بر صحت مالی | اقدام لازم برای رفع ابهام/نقص |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **۱. Forward P/E و Fair Value** | محاسبه ارزش منصفانه از ضرب EPS پیش‌بینی‌شده در Target P/E | اجرای فرمول در `engine.py` و `models.py` | پاس در تست‌های واحد پایه | **پیاده‌سازی‌شده** | درست در حالات استاندارد | عدم نیاز به تغییر فرمول پایه |
+| **۲. EPS منفی/صفر/تغییر علامت** | صدور Alert و مدیریت سناریوهای بحرانی | صدور فقط در سطح Flag (`_eps_flags` و `_scenario_sign_change_flags`) | تست Flag وجود دارد | **ناقص (Flag-level only)** | بالا (عدم هشدار ریسک مالی) | تعیین تکلیف ارتقا به Alert یا پذیرش Flag در V1 |
+| **۳. سلسله‌مراتب Benchmark و Peer** | اولویت‌بندی Benchmark و حداقل تعداد Peer | صدور `INSUFFICIENT_PEER_DATA` فقط در سطح Flag | تست Flag وجود دارد | **ناقص (Flag-level only)** | متوسط | تعیین تکلیف پذیرش سطح Flag برای V1 |
+| **۴. احتمال سناریوها و ترتیب** | مجموع احتمال‌ها = ۱، ترتیب Bear <= Base <= Bull | چک‌های سناریویی در `engine.py` | تست‌های سناریو پاس شده‌اند | **پیاده‌سازی‌شده** | کنترل‌شده | حفظ رفتار موجود |
+| **۵. Expected Fair Value & Upside** | میانگین موزون ارزش و Upside نسبت به قیمت روز | فرمول‌های موزون در `engine.py` اجرا شده‌اند | پاس شده است | **پیاده‌سازی‌شده** | درست | حفظ رفتار موجود |
+| **۶. Valuation Assessment & Risk** | دسته‌بندی قیمت (ATTRACTIVE/FAIR/EXPENSIVE) و نمره‌دهی | نمره‌دهی محاسبه می‌شود ولی جریمه‌ها هاردکد خارج از پارامترهاست | تست شده است | **پیاده‌سازی‌شده با هاردکد** | متوسط | انتقال ثابت‌ها به registry در V2 |
+| **۷. نام هشدارهای ریسک** | صدور ۱۴ Alert الزامی (از جمله Flip, Dependence, Margin) | صفر ارجاع به `ASSESSMENT_FLIP_RISK` و `HIGH_EPS_DEPENDENCE`؛ نام‌گذاری متفاوت در سایرین | شکست ۲ تست P2 به دلیل غیاب این Alertها | **ناقص / غایب (Name Mismatch & Absent)** | **شدید** | اعمال تصمیم D1 تا D4 (تعویق به V2) و هماهنگی نام‌ها (D8) |
+| **۸. رفتار قطعی و اجرای مجدد** | ورودی یکسان باید خروجی کاملاً همسان بدهد | رفتار قطعی است اما متکی بر ثوابت سراسری قابل تغییر است | تست‌های P10 و P35 تأیید کرده‌اند | **پیاده‌سازی‌شده** | کم در اجرای ایزوله | حفظ ایزولاسیون پارامترها |
+| **۹. نسخه مدل و پارامترها** | ثبت شناسه نسخه و قابلیت ممیزی | در P35 ساختار `parameter_registry` اضافه شده است | تست‌های P35 پاس می‌شوند | **پیاده‌سازی نسبی** | متوسط | تکمیل ثبت پارامترهای هاردکدشده در V2 |
+| **۱۰. محدودیت‌های Point-in-Time** | عدم استفاده از داده‌های منتشرشده پس از تاریخ مبنا | مکانیسم As-of اضافه شده اما مسیر default متکی بر ثوابت بدون تاریخ است | تست‌های P35 اضافه شده‌اند | **ناقص در مسیر اصلی** | بالا (خطر Look-ahead bias) | ثبت صریح محدودیت PIT در مستندات V1 |
+| **۱۱. مرز با Forecast و Stage 9** | دریافت ForecastData و تحویل به Stage 9 | Stage 9 فقط فیلدهای کلیدی خروجی را می‌خواند | بررسی استاتیک انجام شده | **مبهم** | متوسط | اجرای تست پویا بین Stage 7 و Stage 9 |
+| **۱۲. مسیر اجرای تولیدی** | فراخوانی `calculate_valuation` در pipeline اصلی | هیچ کد فراخوان تولیدی در اسنپ‌شات یافت نشد | هیچ Integration Test واقعی وجود ندارد | **غایب / غیرقابل تأیید** | **حیاتی** | ایجاد Integration Test واقعی در مسیر تولید |
 
 ---
 
-# 44. Holding Driver Decomposition
+## بخش سوم — بررسی تصمیم‌های D1 تا D9
 
-برای Investment / Holding:
+بر اساس بررسی فایل `stepsForStage7.md` و تطبیق آن با شواهد کد (`reply.md`):
 
-```text
-NAV
-→
-NAV Growth
-→
-Net Profit
-→
-EPS
-→
-Fair Value
-```
-
-P/NAV تحلیل Valuation است و متعلق به Stage 7 است، نه Forecast Stage.
-
-> **V1 Implementation Status (factual annotation — بخش‌های ۴۲ تا ۴۴):**
->
-> **این زنجیره‌های Driver در V1 پیاده‌سازی نشده‌اند.** تحلیل Driver فعلی (`_driver_analysis` در `src/valuation/engine.py`) دقیقاً دو Driver را تولید می‌کند:
->
-> ```text
-> EPS
-> TARGET_PE
-> ```
->
-> و هیچ شاخه‌گیری بر اساس `industry_code` وجود ندارد (این فیلد فقط در metadata بازنویسی می‌شود). `nav_per_share` نیز فقط در metadata به‌صورت `nav_per_share_received` ثبت می‌شود و در هیچ فرمولی مصرف نمی‌شود. تابع `calculate_nav_fair_value` در `src/valuation/models.py` صرفاً یک export متصل‌نشده است.
->
-> در نتیجه `valuation_driver_ranking` برای یک شرکت غیرمالی، یک Bank و یک Holding یکسان است. **تصمیم D6 (نگاشت industry و فرمول‌های sector-specific) هنوز حل‌نشده است.**
-
-----------------------------------------------------------------
-# 77. Stress Test — Assessment Flip
-
-تغییر کوچک Margin یا EPS:
-
-```text
-ATTRACTIVE → FAIR
-```
-
-نتیجه مورد انتظار:
-
-```text
-ASSESSMENT_FLIP_RISK
-```
-
-> **V1 Implementation Status (factual annotation):** **NOT IMPLEMENTED.**
->
-> موتور فعلی Stage 7 هرگز `ASSESSMENT_FLIP_RISK` تولید نمی‌کند (صفر ارجاع در کل `src/valuation`). آزمون `test_p2_required_flip_dependence_alerts_missing` نشان می‌دهد که یک شوک ۱۰٪ در EPS، وضعیت را از `ATTRACTIVE` به `FAIR` تغییر می‌دهد بدون اینکه هیچ Alertای صادر شود.
->
-> **تصمیم D1 (اندازه شوک، تعریف Flip، فرمول، Severity) هنوز حل‌نشده است.** ادعای PASS بالا نامعتبر است و تا زمان پیاده‌سازی یا تعویق صریح به V2، باید به‌عنوان الزام حل‌نشده در نظر گرفته شود.
-
-==================================
-
-sector_driver_decomposition : No result
-
-required_flip_dependence : # 77. Stress Test — Assessment Flip
-
-تغییر کوچک Margin یا EPS:
-
-```text
-ATTRACTIVE → FAIR
-```
-
-نتیجه مورد انتظار:
-
-```text
-ASSESSMENT_FLIP_RISK
-```
-
-> **V1 Implementation Status (factual annotation):** **NOT IMPLEMENTED.**
->
-> موتور فعلی Stage 7 هرگز `ASSESSMENT_FLIP_RISK` تولید نمی‌کند (صفر ارجاع در کل `src/valuation`). آزمون `test_p2_required_flip_dependence_alerts_missing` نشان می‌دهد که یک شوک ۱۰٪ در EPS، وضعیت را از `ATTRACTIVE` به `FAIR` تغییر می‌دهد بدون اینکه هیچ Alertای صادر شود.
->
-> **تصمیم D1 (اندازه شوک، تعریف Flip، فرمول، Severity) هنوز حل‌نشده است.** ادعای PASS بالا نامعتبر است و تا زمان پیاده‌سازی یا تعویق صریح به V2، باید به‌عنوان الزام حل‌نشده در نظر گرفته شود.
+* **D1 — تغییر وضعیت ارزش‌گذاری (Assessment Flip Risk):**
+  * *تصمیم پیشنهادی:* تعویق صدور Alert جدید تا زمان تعریف آستانه‌ها و شوک‌های معتبر.
+  * *شواهد:* صفر ارجاع به `ASSESSMENT_FLIP_RISK` در کد. تست P2 نشان می‌دهد شوک ۱۰٪ EPS وضعیت را تغییر می‌دهد ولی Alertی صادر نمی‌شود.
+  * *اقدام:* ثبت تعویق رسمی به V2 در مشخصات.
+* **D2 — وابستگی به ضریب P/E (HIGH_MULTIPLE_DEPENDENCE):**
+  * *تصمیم پیشنهادی:* عدم پذیرش شاخص فعلی و غیرفعال ماندن هشدار و آستانه ۰٫۶۰.
+  * *شواهد:* صفر ارجاع در کد.
+  * *اقدام:* ثبت تعویق رسمی به V2.
+* **D3 — وابستگی به EPS (HIGH_EPS_DEPENDENCE) و حفظ EPS ورودی:**
+  * *تصمیم پیشنهادی:* تعویق هشدار؛ حفظ EPS ورودی از Stage 5 بدون محاسبه مجدد.
+  * *شواهد:* صفر ارجاع در کد. EPS ورودی دست‌نخورده باقی می‌ماند.
+  * *اقدام:* ثبت عدم محاسبه مجدد EPS در مشخصات V1.
+* **D4 — ریسک حاشیه سود (MARGIN_ASSUMPTION_RISK):**
+  * *تصمیم پیشنهادی:* عدم پیاده‌سازی در V1 به دلیل نبود ورودی‌های معتبر تاریخ‌دار.
+  * *شواهد:* عدم وجود فیلدهای ورودی در Schema و صفر ارجاع در کد.
+  * *اقدام:* ثبت محدودیت در مستندات V1.
+* **D5 — تفکیک review_priority از هشدار HIGH_IMPACT_HIGH_UNCERTAINTY:**
+  * *تصمیم پیشنهادی:* حفظ خروجی تحلیلی `review_priority` و عدم صدور Alert جدید.
+  * *شواهد:* `review_priority` در کد محاسبه می‌شود؛ Alert مذکور ۰ ارجاع دارد.
+  * *اقدام:* تصویب عدم افزودن Alert جدید در V1.
+* **D6 — تحلیل اختصاصی صنعت (Sector Driver Decomposition):**
+  * *تصمیم پیشنهادی:* حفظ دو درایور فعلی (EPS و TARGET_PE)؛ تعویق زنجیره‌های بانک، هلدینگ و شرکت‌های غیرمالی به V2.
+  * *شواهد:* کد `_driver_analysis` فقط EPS و TARGET_PE تولید می‌کند و هیچ شاخه‌گیری بر اساس `industry_code` ندارد.
+  * *اقدام:* به‌روزرسانی مشخصات مطابق واقعیت دو درایوری V1.
+* **D7 — اعتبار زمانی داده‌ها (Point-in-Time):**
+  * *تصمیم پیشنهادی:* اعلام صریح محدودیت PIT در مستندات و عدم ادعای حفاظت کامل.
+  * *شواهد:* داده‌های بازار و پارامترها فاقد تاریخ انتشار اثبات‌شده هستند.
+  * *اقدام:* ثبت رسمی محدودیت PIT در مستندات V1.
+* **D8 — یکسان‌سازی نام هشدارها و مشخصات:**
+  * *تصمیم پیشنهادی:* حفظ نام‌های موجود در کد (`WATCH:VALUATION_ABOVE_TARGET_PE` و ...) و اصلاح مشخصات مطابق کد فعلی.
+  * *شواهد:* ثبت عدم تطابق نام‌ها در `reply.md`.
+  * *اقدام:* اصلاح جدول هشدارهای مشخصات مطابق کد فعلی.
+* **D9 — نسخه‌بندی پارامترهای مدل:**
+  * *تصمیم پیشنهادی:* حفظ شناسه نسخه فعلی و تعویق نسخه‌بندی کامل تاریخی.
+  * *شواهد:* ساختار پایه اضافه شده اما سابقه تاریخی کامل پارامترها وجود ندارد.
+  * *اقدام:* ثبت تعویق به V2.
 
 ---
-ASSESSMENT_FLIP_RISK : 
-# 49. Required Alert Categories
 
-Stage 7 باید قابلیت تولید Alert برای موارد زیر را داشته باشد:
+## بخش چهارم — بررسی دو تست مورد اختلاف
 
-```text
-HIGH_IMPACT_HIGH_UNCERTAINTY
-HIGH_SCENARIO_DISPERSION
-LOW_FORECAST_RELIABILITY
-VALUATION_BENCHMARK_DIVERGENCE
-ASSESSMENT_FLIP_RISK
-HIGH_MULTIPLE_DEPENDENCE
-HIGH_EPS_DEPENDENCE
-MARGIN_ASSUMPTION_RISK
-INSUFFICIENT_PEER_DATA
-POOR_DATA_QUALITY
-NEGATIVE_EPS
-SIGN_CHANGE
-POINT_IN_TIME_WARNING
-```
+دو تست زیر در گزارش‌ها مورد بحث بوده‌اند:
+1. `test_p2_sector_driver_decomposition_missing`
+2. `test_p2_required_flip_dependence_alerts_missing`
 
-> **V1 Implementation-Status Annotation (factual — بدون تغییر نام، بدون ادغام، بدون تصمیم)**
->
-> این فهرست الزامات نام‌گذاری را حفظ می‌کند. جدول زیر فقط وضعیت فعلی موتور را ثبت می‌کند و هیچ تصمیمی نمی‌گیرد.
->
-> | نام الزامی (این سند) | وضعیت در V1 | توضیح مستند |
-> |---|---|---|
-> | `HIGH_SCENARIO_DISPERSION` | **IMPLEMENTED** | به‌صورت severity-bearing از `_alerts` صادر می‌شود (`WARNING:HIGH_SCENARIO_DISPERSION`) و هم در flag channel. |
-> | `LOW_FORECAST_RELIABILITY` | **IMPLEMENTED** | به‌صورت severity-bearing از `_alerts` صادر می‌شود (`WARNING:LOW_FORECAST_RELIABILITY`) و هم در flag channel. |
-> | `INSUFFICIENT_PEER_DATA` | **FLAG-LEVEL ONLY** | فقط در `valuation_risk_flags` صادر می‌شود (`engine.py:165`)، نه به‌عنوان severity-bearing alert. آیا این برای «قابلیت Alert» کافی است، بخشی از تصمیم D8 است. |
-> | `NEGATIVE_EPS` | **FLAG-LEVEL ONLY** | فقط از `_eps_flags` در flag channel. |
-> | `SIGN_CHANGE` | **FLAG-LEVEL ONLY** | فقط از `_scenario_sign_change_flags` در flag channel. |
-> | `VALUATION_BENCHMARK_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:VALUATION_ABOVE_TARGET_PE` / `WATCH:VALUATION_BELOW_TARGET_PE` است. عدم تطابق در بخش ۵۴ ثبت شده. |
-> | `HISTORICAL_VALUATION_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:FORWARD_PE_ABOVE_HISTORICAL` / `WATCH:FORWARD_PE_BELOW_HISTORICAL` است (بخش ۵۴). |
-> | `INDUSTRY_VALUATION_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:FORWARD_PE_ABOVE_INDUSTRY` / `WATCH:FORWARD_PE_BELOW_INDUSTRY` است (بخش ۵۵). |
-> | `ASSESSMENT_FLIP_RISK` | **ABSENT** | صفر ارجاع در `src/valuation` — **D1 حل‌نشده**. |
-> | `HIGH_MULTIPLE_DEPENDENCE` | **ABSENT** | صفر ارجاع در `src/valuation` — **D2 حل‌نشده**. |
-> | `HIGH_EPS_DEPENDENCE` | **ABSENT** | صفر ارجاع در `src/valuation` — **D3 حل‌نشده**. |
-> | `MARGIN_ASSUMPTION_RISK` | **ABSENT** | صفر ارجاع در `src/valuation` — **D4 حل‌نشده**. |
-> | `HIGH_IMPACT_HIGH_UNCERTAINTY` | **ABSENT** | صفر ارجاع در `src/valuation` — **D5 حل‌نشده**. |
-> | `POOR_DATA_QUALITY` | **ABSENT** | در مشخصات هیچ تعریف تریگری وجود ندارد و صفر ارجاع در کد. |
-> | `POINT_IN_TIME_WARNING` | **ABSENT** | صفر ارجاع در کد؛ تریگر آن به تصمیم D7 گره خورده است. |
->
-> **تفاوت مهم:** یک flag بدون Severity معادل یک severity-bearing Alert نیست. فهرست بالا این دو را به‌طور جداگانه نشان می‌دهد و هیچ تصمیمی درباره اینکه آیا flag-level کافی است یا خیر، نمی‌گیرد (D8).
->
-> **تصمیم باز (D8):** انتخاب بین rename، alias، یا پذیرش نام‌های فعلی در مشخصات، و همچنین اینکه آیا emission در سطح flag برای قابلیت بخش ۴۹ کافی است، هنوز انجام نشده و در این سند اتخاذ نشده است.
-# 50. Assessment Flip Risk
-
-یکی از مهم‌ترین Alertهای Stage 7:
-
-```text
-ASSESSMENT_FLIP_RISK
-```
-
-اگر یک تغییر نسبتاً کوچک و منطقی در Assumption باعث شود:
-
-```text
-ATTRACTIVE
-→
-FAIR
-```
-
-یا:
-
-```text
-ATTRACTIVE
-→
-EXPENSIVE
-```
-
-سیستم باید این موضوع را برجسته کند.
-
-این وضعیت نشان می‌دهد Valuation شکننده است.
+**نتایج بررسی دقیق:**
+* **ماهیت:** این دو، توابع تست واقعی هستند که در فایل `src/tests/test_stage7_valuation.py` قرار دارند (تحت گزارش P2 با رویکرد failing-first اضافه شده‌اند). فایل مجزایی به این نام‌ها وجود ندارد.
+* **علت شکست:** 
+  * تست اول وجود درایورهای اختصاصی صنعت (بانک/هلدینگ) را چک می‌کند که طبق تصمیم D6 به V2 موکول شده است.
+  * تست دوم صدور Alertهای `ASSESSMENT_FLIP_RISK` و `HIGH_EPS_DEPENDENCE` را چک می‌کند که طبق تصمیم‌های D1 و D3 به V2 موکول شده‌اند.
+* **نتیجه قطعی:** این دو تست، "تست‌های افشاگر نقص مشخصات" هستند. تا زمانی که تصمیم‌های D1 و D6 در مشخصات ثبت نشده و assertionهای این دو تست مطابق سیاست V1 به‌روزرسانی نشوند، این تست‌ها شکست خواهند خورد.
 
 ---
-# 77. Stress Test — Assessment Flip
 
-تغییر کوچک Margin یا EPS:
+## بخش پنجم — بررسی گزارش‌های قبلی و تناقض‌ها
 
-```text
-ATTRACTIVE → FAIR
-```
+| ادعای اول | ادعای متعارض | منبع ادعاها | شواهد مستقل موجود | نتیجه فعلی | کوچک‌ترین اقدام لازم |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Stage 7 سبز کامل و PASS شده است.** | ۲ تست P2 شکست می‌خورند و Stage 7 تثبیت‌نشده (NOT FROZEN) است. | گزارش‌های اولیه در برابر `temp_report2.md` و `reply.md` | اجرای ۶۸ پاس و ۳ شکست. ثبت غیاب کد D1/D6 در `reply.md`. | **حل‌نشده در ادعاها / حل‌شده در واقعیت** | پذیرش رسمی عدم تثبیت و شکست ۲ تست P2 به دلیل غیاب D1/D6. |
+| **تحلیل درایورها برای بانک و هلدینگ پیاده شده است.** | درایور ارزش‌گذاری فقط ۲ مورد ثابت (EPS, Target PE) تولید می‌کند. | مشخصات اولیه در برابر `reply.md` بخش ۴۴ | تابع `_driver_analysis` هیچ شاخه‌گیری بر اساس صنعت ندارد. | **تعارض مشخصات با کد** | اعمال تصمیم D6 (تعویق درایورهای صنعت به V2) و اصلاح مشخصات. |
+| **سیستم Alert جامع برای Flip و Dependence دارد.** | کد صفر ارجاع به `ASSESSMENT_FLIP_RISK` و `HIGH_EPS_DEPENDENCE` دارد. | مشخصات بخش ۴۹ در برابر `reply.md` و کد | جستجوی متنی در کدهای `src/valuation` صفر نتیجه برمی‌گرداند. | **غیاب کامل در کد** | اعمال تصمیم‌های D1 تا D4 (تعویق Alertها به V2). |
+| **تست‌ها با pytest واقعی پروژه پاس شده‌اند.** | تست‌ها با یک stand-in runner ساده اجرا شده‌اند. | `temp_report2.md` (P35/P36) | متون انتهای `temp_report2.md` صریحاً قید کرده‌اند pytest واقعی اجرا نشده است. | **محدودیت ابزار اجرا** | الزام کاربر به اجرای pytest محلی در محیط venv واقعی. |
 
-نتیجه مورد انتظار:
+---
 
-```text
-ASSESSMENT_FLIP_RISK
-```
+## بخش ششم — طرح اعتبارسنجی چندلایه
 
-> **V1 Implementation Status (factual annotation):** **NOT IMPLEMENTED.**
->
-> موتور فعلی Stage 7 هرگز `ASSESSMENT_FLIP_RISK` تولید نمی‌کند (صفر ارجاع در کل `src/valuation`). آزمون `test_p2_required_flip_dependence_alerts_missing` نشان می‌دهد که یک شوک ۱۰٪ در EPS، وضعیت را از `ATTRACTIVE` به `FAIR` تغییر می‌دهد بدون اینکه هیچ Alertای صادر شود.
->
-> **تصمیم D1 (اندازه شوک، تعریف Flip، فرمول، Severity) هنوز حل‌نشده است.** ادعای PASS بالا نامعتبر است و تا زمان پیاده‌سازی یا تعویق صریح به V2، باید به‌عنوان الزام حل‌نشده در نظر گرفته شود.
+برای بررسی صحت کامل Stage 7، برنامه ۷ لایه‌ای زیر طراحی می‌شود:
 
+1. **لایه اول — تست‌های واحد فرمول‌ها:** اعتبارسنجی ریاضی Fair Value و Expected Upside با ورودی‌های استاندارد.
+2. **لایه دوم — تست‌های قرارداد Schema:** اعتبارسنجی pydantic models برای ورودی و خروجی بدون ValidationError.
+3. **لایه سوم — تست‌های منفی و داده‌های نامعتبر:** بررسی رفتار در برابر EPS صفر/منفی و peerهای ناافی (تأیید صدور Flagهای مربوطه).
+4. **لایه چهارم — تست‌های سناریو و رفتار قطعی:** تأیید جمع احتمال سناریوها (=۱)، ترتیب Bear<=Base<=Bull و قطعی بودن ۱۰۰٪ خروجی در اجرای مجدد.
+5. **لایه پنجم — تست یکپارچگی با Forecast:** پردازش مستقیم شیء واقعی `ForecastData` تولیدشده توسط Stage 5.
+6. **لایه ششم — تست‌های رگرسیون کل پروژه:** اجرای suite کامل تست‌ها به ویژه `test_stage9_decision.py` برای اطمینان از عدم شکست Stage 9.
+7. **لایه هفتم — بررسی مستقل Freeze Gate:** بررسی نهایی عدم وجود failure و تصویب رسمی سیاست V1 پیش از تثبیت کد.
 
-valuation_driver_ranking :
-# 44. Holding Driver Decomposition
+---
 
-برای Investment / Holding:
+## بخش هفتم — برنامه اجرایی برای کاربر
 
-```text
-NAV
-→
-NAV Growth
-→
-Net Profit
-→
-EPS
-→
-Fair Value
-```
+### تقسیم وظایف
+* **فرماندهی و تصمیم‌گیری مالی:** ChatGPT
+* **تحلیل یکپارچه و تهیه گزارش:** Gemini Notebook (این گزارش)
+* **تغییر کد و تست:** Claude (از طریق وب‌سایت)
+* **اجرای تست‌ها روی محیط محلی:** کاربر
 
-P/NAV تحلیل Valuation است و متعلق به Stage 7 است، نه Forecast Stage.
+### گام‌های اجرایی به ترتیب دقیق:
 
-> **V1 Implementation Status (factual annotation — بخش‌های ۴۲ تا ۴۴):**
->
-> **این زنجیره‌های Driver در V1 پیاده‌سازی نشده‌اند.** تحلیل Driver فعلی (`_driver_analysis` در `src/valuation/engine.py`) دقیقاً دو Driver را تولید می‌کند:
->
-> ```text
-> EPS
-> TARGET_PE
-> ```
->
-> و هیچ شاخه‌گیری بر اساس `industry_code` وجود ندارد (این فیلد فقط در metadata بازنویسی می‌شود). `nav_per_share` نیز فقط در metadata به‌صورت `nav_per_share_received` ثبت می‌شود و در هیچ فرمولی مصرف نمی‌شود. تابع `calculate_nav_fair_value` در `src/valuation/models.py` صرفاً یک export متصل‌نشده است.
->
-> در نتیجه `valuation_driver_ranking` برای یک شرکت غیرمالی، یک Bank و یک Holding یکسان است. **تصمیم D6 (نگاشت industry و فرمول‌های sector-specific) هنوز حل‌نشده است.**
+#### گام ۱: ثبت رسمی سیاست‌های D1 تا D9 در مشخصات (سند V1)
+* **فایل‌های مجاز:** `07_Stage7_Valuation.md` و `stepsForStage7.md`
+* **هدف:** به‌روزرسانی متن مشخصات برای ثبت تعویق رسمی Alertهای غایب و درایورهای صنعت به V2.
+* **دستور به Claude:**
+  > "لطفاً متن سند `07_Stage7_Valuation.md` را بر اساس تصمیم‌های D1 تا D9 به‌روزرسانی کن تا تعویق رسمی Alertهای غایب (Flip Risk, Dependence, Margin Risk) و درایورهای اختصاصی صنعت به نسخه V2 صریحاً قید شود و نام هشدارهای موجود با کد هماهنگ گردد."
+* **تست محلی:** نیازی نیست.
+* **خروجی برای ChatGPT:** متن سند اصلاح‌شده برای تأیید.
+
+#### گام ۲: به‌روزرسانی ۲ تست P2 مطابق سیاست مصوب V1
+* **فایل مجاز:** `src/tests/test_stage7_valuation.py`
+* **هدف:** اصلاح assertionهای ۲ تست شکست‌خورده P2 تا به‌جای الزام Alertهای تعویق‌افتاده، تعویق رسمی آن‌ها در V1 را چک کنند.
+* **دستور به Claude:**
+  > "دو تابع تست `test_p2_sector_driver_decomposition_missing` و `test_p2_required_flip_dependence_alerts_missing` را طوری به‌روزرسانی کن که تعویق این موارد در V1 را تست کنند (Assert عدم صدور هشدارها و رفتار V1)."
+* **تست محلی کاربر:**
+  ```bash
+  .venv\Scripts\python.exe -m pytest src/tests/test_stage7_valuation.py -v
+  ```
+* **خروجی برای ChatGPT:** خروجی متنی کامل اجرای pytest محلی.
+
+#### گام ۳: اجرای تست‌های یکپارچگی و مجموعه کامل پروژه
+* **فایل مجاز:** هیچ (فقط اجرای تست)
+* **هدف:** اطمینان از عدم شکست Stage 9 و سایر بخش‌های پروژه.
+* **دستور تست محلی کاربر:**
+  1. `.venv\Scripts\python.exe -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -v`
+  2. `.venv\Scripts\python.exe -m pytest src/tests -v`
+* **خروجی برای ChatGPT:** تعداد تست‌های passed و failed از کل پروژه.
+
+* **معیار توقف فوری:** اگر در هر گام تستی غیر از موارد شناخته‌شده شکست خورد، کار متوقف شده و متن خطا برای ChatGPT ارسال می‌شود. هیچ بازنگری کلی در `engine.py` پیش از طی این گام‌ها انجام ندهید.
+
+---
+
+## بخش هشتم — جمع‌بندی مدیریتی
+
+۱. **وضعیت واقعی Stage 7:**
+   * محاسبات پایه ارزش‌گذاری (Fair Value و Expected Upside) درست عمل می‌کنند.
+   * هشدارهای پیشرفته (Flip, Dependence, Margin) و درایورهای اختصاصی صنعت در کد وجود ندارند.
+   * دو تست P2 به دلیل غیاب این قابلیت‌ها شکست می‌خورند.
+   * گزارش‌های قبلی روی محیط شبیه‌سازی‌شده بوده‌اند و اجرای pytest واقعی در venv محلی ضروری است.
+   * فراخوان یکپارچه تولیدی اثبات‌شده‌ای برای Stage 7 در مسیر اصلی برنامه یافت نشده است.
+
+۲. **مهم‌ترین موانع به ترتیب اثر بر صحت مالی:**
+   * عدم هماهنگی مشخصات با کد (وجود الزامات پیاده‌نشده در سند مشخصات).
+   * عدم اجرای تست‌ها با pytest واقعی و عدم سنجش یکپارچگی پویا با Stage 9.
+   * محدودیت‌های Point-in-Time در داده‌های بازار و پارامترها.
+
+۳. **تصمیم‌های نیازمند تأیید:**
+   * تأیید تعویق رسمی D1 تا D6 (Alertهای غایب و درایورهای صنعت) به V2.
+   * تصویب یکسان‌سازی نام Alertها مطابق کد فعلی (D8).
+
+۴. **سه اقدام بعدی:**
+   1. ثبت سیاست V1 (D1-D9) در مشخصات توسط Claude.
+   2. اصلاح ۲ تست P2 مطابق سیاست V1 و اجرای pytest محلی توسط کاربر.
+   3. اجرای suite کامل تست‌ها (Stage 7 + Stage 9 + کل پروژه) و ارسال خروجی به ChatGPT.
+
+۵. **وضعیت Freeze:**
+   `NOT READY FOR FREEZE`
+
+---
+
+💡 **پیشنهاد گام بعدی:** یک گزارش اختصاصی تحت عنوان **Audit Report** در پنل Studio پروژه شما ثبت شد. می‌توانید گام ۱ از برنامه اجرایی فوق را به Claude بنویسید و پس از دریافت خروجی اجرای pytest محلی، نتیجه را جهت تصمیم‌گیری نهایی ارسال نمایید.
