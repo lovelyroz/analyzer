@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +10,10 @@ from src.decision.engine import DecisionEngine
 from src.decision import service as decision_service
 
 
+def utc_now_naive():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def make_fundamental(score):
     return FundamentalScoreResult(
         company_id=1,
@@ -17,7 +21,7 @@ def make_fundamental(score):
         overall_score=score,
         category_scores={},
         kpi_scores=[],
-        calculation_timestamp=datetime.utcnow(),
+        calculation_timestamp=utc_now_naive(),
     )
 
 
@@ -36,7 +40,7 @@ def make_valuation(status="ATTRACTIVE", risk="LOW", reliability=85.0, dispersion
         valuation_risk_level=risk,
         scenarios={},
         model_version="STAGE7_V1",
-        calculation_timestamp=datetime.utcnow(),
+        calculation_timestamp=utc_now_naive(),
         forecast_reliability_score=reliability,
         valuation_data_quality=100.0,
         metadata=metadata,
@@ -46,7 +50,7 @@ def make_valuation(status="ATTRACTIVE", risk="LOW", reliability=85.0, dispersion
 def make_market(trend="UPTREND", momentum="POSITIVE", liquidity="NORMAL"):
     return MarketSignalResult(
         company_id=1,
-        as_of_date=datetime.utcnow(),
+        as_of_date=utc_now_naive(),
         trend_state=trend,
         momentum_state=momentum,
         liquidity_state=liquidity,

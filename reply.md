@@ -1,75 +1,21 @@
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_missing_or_invalid_requested_date
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
 collected 1 item
 
-src\tests\test_ingestion_ohlc.py .                                                                               [100%]
+src\tests\test_stage9_decision.py .                                                                              [100%]
 
-================================================== 1 passed in 0.98s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_discards_impossible_stored_date
+================================================== 1 passed in 1.02s
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
-collected 1 item
+collected 75 items
 
-src\tests\test_ingestion_ohlc.py .                                                                               [100%]
+src\tests\test_stage7_valuation.py ...........................................................................   [100%]
 
-================================================== 1 passed in 0.60s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_accepts_valid_jalali_month_end_and_leap_boundary
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
-rootdir: D:\winprojects\analyzer
-collected 1 item
-
-src\tests\test_ingestion_ohlc.py .                                                                               [100%]
-
-================================================== 1 passed in 0.61s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_accepts_valid_jalali_month_end_and_leap_boundary
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
-rootdir: D:\winprojects\analyzer
-collected 1 item
-
-src\tests\test_ingestion_ohlc.py .                                                                               [100%]
-
-================================================== 1 passed in 0.61s ==================================================
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
-rootdir: D:\winprojects\analyzer
-collected 1 item
-
-src\tests\test_ingestion_ohlc.py .                                                                               [100%]
-
-================================================== 1 passed in 0.60s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
-rootdir: D:\winprojects\analyzer
-collected 1 item
-
-src\tests\test_ingestion_ohlc.py .                                                                               [100%]
-
-================================================== 1 passed in 0.60s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_isolates_company_and_ignores_undated_rows
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
-rootdir: D:\winprojects\analyzer
-collected 1 item
-
-src\tests\test_ingestion_ohlc.py .                                                                               [100%]
-
-================================================== 1 passed in 0.95s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_migration_5_adds_jalali_columns
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
-rootdir: D:\winprojects\analyzer
-collected 1 item
-
-src\tests\test_ingestion_ohlc.py .                                                                               [100%]
-
-================================================== 1 passed in 0.63s
+================================================= 75 passed in 0.84s ==================================================
 (analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0

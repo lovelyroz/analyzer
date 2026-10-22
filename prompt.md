@@ -1,77 +1,102 @@
-# P45 — Implement Reliable Jalali Calendar Validation for Market-Price Selection
+# P46 — Trace and Complete the Real Application Path Through Stage 7 → Stage 9
 
 You are continuing Stage 7 remediation in the local project directory `analyzer`.
 
-## Context and confirmed P44 outcome
+## Confirmed state
 
-P44 corrected the Stage 7 → Stage 9 orchestration test. The user subsequently ran `src/tests/test_stage9_decision.py`; all 15 tests passed.
+P44 added and corrected tests for the callable Stage 7 → Stage 9 orchestration boundary.
 
-The market-price selector is implemented in `src/ingestion/market/queries.py` as `select_market_price_as_of(...)`. Its current date parsing relies on `parse_jalali_components`, which checks the date format and basic month/day ranges but does not guarantee that the date exists in the Jalali calendar.
+P45 added `jdatetime` to `requirements.txt`, strengthened `parse_jalali_components`, and excluded impossible stored Jalali dates in `select_market_price_as_of`.
 
-P44 confirmed that no complete Jalali calendar validator was identified during its inspection. Impossible stored dates could therefore be considered by the selector.
+The user reports that all 14 tests in `src/tests/test_ingestion_ohlc.py` passed after P45.
+
+The current orchestration boundary is `calculate_decision_as_of_jalali` in `src/decision/service.py`. It accepts a Stage 5 forecast and Stage 3/Stage 8 results, invokes the Stage 7 Jalali valuation service, and passes the resulting valuation to `DecisionEngine.make_decision`.
+
+However, previous targeted inspection did not establish a real application caller for this orchestration boundary. A callable function and mock-based unit tests do not prove that the application's actual execution path reaches Stage 9.
 
 ## Mandatory operating constraints
 
-- Work locally and only inside the existing `analyzer` project.
+- Work locally and only in `analyzer`.
 - Do not use GitHub, GitHub CLI/API, remotes, push, pull, commit, or branch-changing operations.
-- Do not run tests or CI. The user will run tests and provide the actual results.
+- Do not run tests or CI. The user runs tests and shares the actual outputs.
 - Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `ClaudeReports/`, `stepsForStage7.md`, or `stage_7_prompts.md`.
-- Do not perform a repository-wide scan. Inspect only the date parser, market-price selector, dependency manifests, and directly relevant tests.
-- Do not redesign `engine.py`, change valuation formulas, alter EPS, convert Jalali dates to Gregorian dates, or change the market-price selection policy.
-- Do not weaken, delete, skip, or rewrite existing tests merely to make them pass.
+- Do not scan the entire repository. Trace only the relevant application entry point(s), Stage 5 forecast service, Stage 3 fundamental result producer, Stage 8 market result producer, Stage 7 valuation service, Stage 9 decision service, and their directly relevant tests.
+- Do not redesign `engine.py`; its comprehensive review is reserved for the end of Stage 7 as specified in `stepsForStage7.md`.
+- Do not change valuation formulas, EPS behavior, financial thresholds, alert policy, or output contracts to make integration easier.
+- Do not invent fundamental or market evidence, silently substitute missing inputs, or claim Point-in-Time guarantees without evidence.
+- Do not weaken, delete, or skip existing tests.
 
-## Required implementation
+## Task A — Trace the real execution path
 
-### 1. Select a reliable calendar validator
+Identify the actual entry point(s) through which the application performs analysis or generates a decision. Follow the relevant calls far enough to determine:
 
-Inspect the existing dependency manifests and current date-related imports. Determine whether the project already has a dependable Jalali calendar validator.
+1. Whether a Stage 5 forecast is generated or retrieved.
+2. Where the actual Stage 3 fundamental result is produced or retrieved.
+3. Where the actual Stage 8 market result is produced or retrieved.
+4. Whether the company identity and reporting/forecast period are consistent across those inputs.
+5. Where the valuation and decision results are consumed or returned.
+6. Whether the current execution path uses a Gregorian datetime boundary, a Jalali date boundary, or another explicit as-of contract.
 
-- Prefer a suitable validator already declared and used by the project.
-- If none exists, evaluate whether a maintained Jalali-date library can be added consistently with the project's dependency-management conventions. If you add one, update the correct dependency manifest and use its actual calendar-validation behavior.
-- Do not implement a homemade Jalali leap-year or month-length algorithm.
-- Do not claim a dependency is available merely because it appears importable in your environment; account for whether it is declared for project installation.
+Use targeted searches and inspect the smallest relevant set of files. Do not treat a test fixture, example, or mock as a production caller.
 
-### 2. Validate both requested and stored dates
+## Task B — Implement the smallest safe integration
 
-Use the reliable validator at the narrowest appropriate boundary so that:
+If a genuine application execution path already supplies the required Stage 5, Stage 3, and Stage 8 results, connect it to `calculate_decision_as_of_jalali` with the smallest justified change.
 
-- An impossible requested as-of Jalali date is rejected clearly.
-- An impossible stored market observation cannot be selected.
-- Valid Jalali dates, including valid leap-year boundary dates, remain supported.
-- Existing behavior for company isolation, latest eligible prior date, adjusted-close preference, close fallback, missing observations, duplicate latest-date observations, and provenance is preserved.
-- Existing malformed or undated records are handled consistently with the established ingestion and selection contract.
-- No Jalali date is silently converted to Gregorian or written into a Gregorian database field.
+Preserve existing interfaces where possible. Validate company and period identity before valuation. Ensure the selected market-price observation and its provenance reach Stage 7, and ensure the exact resulting valuation object reaches Stage 9 without Stage 9 recalculating or reconstructing the valuation.
 
-### 3. Add focused regression tests
+Do not silently change date semantics or convert Jalali dates into Gregorian fields.
 
-Add tests for at least:
+If a real execution path exists but lacks a required input, determine whether that input can be supplied from an existing authoritative producer or persisted record without fabricating evidence. Implement the safe connection if possible.
 
-- A requested Jalali date with an impossible month/day combination.
-- An impossible Jalali date already stored as a market observation; prove it cannot be selected.
-- A valid month-end date.
-- A valid leap-year boundary case, using the chosen library's authoritative behavior.
-- No regression to existing ordering, company isolation, price fallback, duplicate detection, or provenance.
+If no genuine application path or no authoritative producer for a required input exists, do not create a fake production flow or manufacture financial evidence. Report the exact missing producer/interface and the smallest justified next implementation step. Still implement any independent, safe integration work that is supported by existing code.
 
-Tests must exercise the actual selector and its date-validation boundary, not only a standalone library call.
+## Task C — Add integration-level regression coverage
 
-## Scope and completion standard
+Where a genuine entry point can be connected, add a test that exercises that entry point and the real service orchestration, using the project's existing test conventions and database fixtures where practical.
 
-Make the smallest complete code change that safely resolves this date-validation defect. Do not stop at a report describing the missing dependency if a suitable implementation can be made within the project conventions.
+The test must establish that:
 
-If dependency governance or another concrete constraint prevents a safe implementation, do not invent a calendar algorithm. State the exact blocker and the minimum decision needed.
+- The real entry point invokes the Stage 7 → Stage 9 boundary.
+- Real application-produced or persisted inputs are passed through the relevant interfaces.
+- Company and period mismatches fail closed.
+- The selected market-price observation and provenance are preserved.
+- The exact Stage 7 valuation result is passed to Stage 9.
+- Missing required inputs cannot silently trigger a fabricated or unrelated valuation.
 
-Do not attempt to connect the main application flow to Stage 9 in this prompt; that is the next separate task.
+Use mocks only for external dependencies that genuinely need isolation. A test that directly calls `calculate_decision_as_of_jalali` with fabricated Stage 3/Stage 8 objects is not sufficient evidence of end-to-end application integration.
+
+Do not claim an end-to-end test exists unless it traverses the actual application entry point.
+
+## Task D — Review date and Point-in-Time limitations
+
+Determine whether the real caller provides a defensible Jalali as-of date and whether the required upstream inputs have trustworthy observation/availability provenance.
+
+Do not infer historical availability from the calculation cutoff alone. If the existing data model cannot prove Point-in-Time availability, preserve the current explicit limitation and identify what evidence or schema is missing.
+
+Do not expand this task into full historical parameter versioning or the final `engine.py` review.
+
+## Completion requirements
+
+Make concrete, safe code changes wherever existing authoritative interfaces permit. Do not stop after producing an architectural report if a valid implementation is possible.
+
+If full integration is blocked, provide exact evidence:
+- the actual entry point inspected;
+- the functions it calls;
+- the required producer or interface that is missing;
+- why creating a substitute would be financially unsafe;
+- the minimum next change needed.
 
 ## Final response
 
 Report:
 
-1. Exact files changed and the purpose of each.
-2. The validator selected and whether its dependency is declared.
-3. Which requested and stored date cases are now rejected or accepted.
-4. The new regression tests added.
-5. The exact test commands the user should run.
+1. The real execution path found, with exact file and function names.
+2. Files changed and the specific behavior implemented.
+3. Whether Stage 7 → Stage 9 is now called from a genuine application entry point, or why it remains blocked.
+4. The integration tests added and exactly what they exercise.
+5. The precise test commands the user should run.
 6. Explicitly confirm that you did not run tests or CI.
-7. Any remaining date-validation limitations.
+7. Remaining Point-in-Time, historical parameter-versioning, alert-contract, and known Stage 7 test blockers.
 
-Do not claim the Stage 7 → Stage 9 production path is connected, and do not declare Stage 7 frozen.
+Do not edit report files. Do not declare Stage 7 frozen.

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from src.scoring.schema import FundamentalScoreResult
@@ -257,7 +257,7 @@ class DecisionEngine:
             decision_change = "UNCHANGED" if previous_decision == recommendation else "CHANGED"
             if decision_change == "CHANGED":
                 change_reasons = list(conflicts[:5]) or ["Decision evidence changed"]
-        calculation_timestamp = datetime.utcnow()
+        calculation_timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
         decision_change_date = calculation_timestamp if decision_change == "CHANGED" else None
         expected_upside = valuation_result.metadata.get("expected_upside", valuation_result.margin_of_safety_pct)
         usd_relative_context = fx.get("usd_relative_valuation_context")

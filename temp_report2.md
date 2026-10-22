@@ -3952,3 +3952,16 @@ The assistant did not run tests. No report file was created or edited as part of
 ## Remaining Limitations
 
 This work validates Jalali calendar dates for parsing and market-price selection. It does not establish a real application caller for the Stage 7 → Stage 9 orchestration, claim Point-in-Time completeness, or provide historical parameter-version reconstruction. The project’s supported Python-version floor is not declared in `requirements.txt`.
+======================================================
+# P46 — Trace and Complete the Real Application Path Through Stage 7 → Stage 9
+### Stage 9 Deprecation Warning Fix
+
+The first test passed but emitted four deprecation warnings because it used `datetime.utcnow()`.
+
+Replaced those calls with UTC-aware timestamp creation, converted to naive UTC to preserve the existing timestamp format:
+
+- `src/decision/engine.py`: updated the Stage 9 calculation timestamp.
+- `src/tests/test_stage9_decision.py`: updated the three timestamps used by test fixtures.
+
+Static diff checks were performed. No tests were run during the fix; you confirmed the warning is resolved.
+=============================================================
