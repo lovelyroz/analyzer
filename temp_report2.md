@@ -3847,4 +3847,30 @@ Result: **72 passed in 2.08s** (pytest 9.1.1, Python 3.12.9).
 No production code, schema, parameter, or existing documentation file was modified. The only task changes are `src/tests/test_stage7_valuation.py` and this report.
 
 Stage 7 freeze blockers remain, including production-path integration and end-to-end evidence, Point-in-Time guarantees and date-safe provenance, and complete historical parameter versioning. Alert naming/consumer contract review and broader CI evidence also remain outstanding. This test reconciliation does not establish those guarantees or resolve those blockers. **Stage 7 remains NOT FROZEN.**
+========================================================
+# P41 — Implement Jalali-Date-Based Market Price Selection
+Implemented Jalali as-of market-price selection. No tests were run.
 
+Files changed
+src/ingestion/market/queries.py adds select_market_price_as_of(...). It filters by company, compares Jalali year/month/day numerically, and returns the latest usable observation at or before the requested date. It prefers adjusted close, falls back to close, returns None when no eligible price exists, and raises ValueError for invalid requested dates or duplicate observations on the selected date. The result preserves the selected Jalali date, source, price basis, and record ID.
+src/ingestion/market/__init__.py exports the selector and MarketPriceObservation.
+src/tests/test_ingestion_ohlc.py adds focused selection and ingestion coverage.
+The selector signature is:
+
+python
+select_market_price_as_of(
+    session: Session,
+    company_id: int,
+    as_of_jalali_date: Tuple[int, int, int],
+) -> Optional[MarketPriceObservation]
+Tests added or updated
+test_market_price_as_of_selects_exact_date_and_preserves_provenance — exact-date selection, adjusted-close preference, and provenance.
+test_market_price_as_of_uses_latest_prior_date_across_year_boundary — latest prior observation, future exclusion, and numeric ordering across the Jalali year boundary.
+test_market_price_as_of_returns_none_when_no_eligible_price — explicit no-result behavior.
+test_market_price_as_of_rejects_missing_or_invalid_requested_date — rejects missing and invalid as-of dates.
+test_market_price_as_of_isolates_company_and_ignores_undated_rows — prevents cross-company leakage and ignores undated or invalid-year rows.
+test_market_price_as_of_rejects_duplicate_latest_jalali_observations — rejects ambiguous duplicates.
+test_ohlc_ingestion_skips_missing_and_malformed_jalali_dates — confirms those CSV rows are not persisted.
+Updated test_ingest_ohlc_idempotent to check selection stays stable after repeated ingestion.
+Production connection
+No existing caller could be connected safely. The Stage 7 contract accepts market_price_date as a datetime; it has no Jalali-date field or observation/provenance input. The selector is available for callers through src.ingestion.market, but connecting it to Stage 7 would require a justified interface change.
