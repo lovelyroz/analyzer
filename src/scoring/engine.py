@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional, Sequence, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from statistics import median
 
 from src.kpi.schema import KPIResult
@@ -159,7 +159,7 @@ class FundamentalScoringEngine:
             overall_score=round(overall_score, 2) if overall_score is not None else None,
             category_scores=category_scores,
             kpi_scores=kpi_scores,
-            calculation_timestamp=datetime.utcnow(),
+            calculation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             score_data_quality=score_quality,
             scoring_method_version="STAGE3_V1",
         )

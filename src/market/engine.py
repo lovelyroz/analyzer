@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from statistics import pstdev
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -64,7 +64,7 @@ class MarketEngine:
             return MarketSignalResult(
                 company_id=company_id,
                 as_of_date=as_of_date,
-                calculation_timestamp=datetime.utcnow(),
+                calculation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
                 market_data_quality="INSUFFICIENT_DATA",
             )
 
@@ -134,7 +134,7 @@ class MarketEngine:
             as_of_date=as_of_date,
             trend_alignment=trend_state,
             indicators=indicators,
-            calculation_timestamp=datetime.utcnow(),
+            calculation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             trend_state=trend_state,
             trend_short=trend_short,
             trend_medium=trend_medium,

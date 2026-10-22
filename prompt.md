@@ -1,102 +1,89 @@
-# P46 — Trace and Complete the Real Application Path Through Stage 7 → Stage 9
+# P47 — Complete the Real Application Integration Path (Follow-up to P46)
 
-You are continuing Stage 7 remediation in the local project directory `analyzer`.
+You are continuing Stage 7 remediation in the local working directory `analyzer` for the financial-data application.
 
-## Confirmed state
+## Objective
 
-P44 added and corrected tests for the callable Stage 7 → Stage 9 orchestration boundary.
+P46 did not establish the real application execution path from upstream data production through Stage 7 valuation into Stage 9 decision-making. The current test `test_jalali_orchestration_passes_stage7_result_to_stage9` monkeypatches the Stage 7 valuation service and therefore does not prove real application integration.
 
-P45 added `jdatetime` to `requirements.txt`, strengthened `parse_jalali_components`, and excluded impossible stored Jalali dates in `select_market_price_as_of`.
+Complete this task rather than repeating the previous report.
 
-The user reports that all 14 tests in `src/tests/test_ingestion_ohlc.py` passed after P45.
+## Mandatory boundaries
 
-The current orchestration boundary is `calculate_decision_as_of_jalali` in `src/decision/service.py`. It accepts a Stage 5 forecast and Stage 3/Stage 8 results, invokes the Stage 7 Jalali valuation service, and passes the resulting valuation to `DecisionEngine.make_decision`.
-
-However, previous targeted inspection did not establish a real application caller for this orchestration boundary. A callable function and mock-based unit tests do not prove that the application's actual execution path reaches Stage 9.
-
-## Mandatory operating constraints
-
-- Work locally and only in `analyzer`.
-- Do not use GitHub, GitHub CLI/API, remotes, push, pull, commit, or branch-changing operations.
-- Do not run tests or CI. The user runs tests and shares the actual outputs.
+- Work only in the existing local repository.
+- Do not use GitHub, GitHub CLI/API, remote operations, push, pull, commit, or branch changes.
+- Do not run tests. The user will run them and provide the actual output.
 - Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `ClaudeReports/`, `stepsForStage7.md`, or `stage_7_prompts.md`.
-- Do not scan the entire repository. Trace only the relevant application entry point(s), Stage 5 forecast service, Stage 3 fundamental result producer, Stage 8 market result producer, Stage 7 valuation service, Stage 9 decision service, and their directly relevant tests.
-- Do not redesign `engine.py`; its comprehensive review is reserved for the end of Stage 7 as specified in `stepsForStage7.md`.
-- Do not change valuation formulas, EPS behavior, financial thresholds, alert policy, or output contracts to make integration easier.
-- Do not invent fundamental or market evidence, silently substitute missing inputs, or claim Point-in-Time guarantees without evidence.
-- Do not weaken, delete, or skip existing tests.
+- Do not perform a repository-wide scan. Trace only the relevant application entry point and the specific upstream/downstream modules needed.
+- Do not redesign or centralize `engine.py`; its review is reserved for the end of Stage 7.
+- Do not change financial formulas, EPS behavior, thresholds, alert policies, output contracts, or established Jalali market-price semantics.
+- Do not fabricate Stage 3, Stage 5, or Stage 8 data or treat mock-only tests as proof of production integration.
+- Do not claim that tests, CI, or runtime flows passed when you did not execute them.
 
-## Task A — Trace the real execution path
+## Task 1 — Establish the actual execution path
 
-Identify the actual entry point(s) through which the application performs analysis or generates a decision. Follow the relevant calls far enough to determine:
+Trace the narrowest real application entry point that should lead to a Stage 9 decision.
 
-1. Whether a Stage 5 forecast is generated or retrieved.
-2. Where the actual Stage 3 fundamental result is produced or retrieved.
-3. Where the actual Stage 8 market result is produced or retrieved.
-4. Whether the company identity and reporting/forecast period are consistent across those inputs.
-5. Where the valuation and decision results are consumed or returned.
-6. Whether the current execution path uses a Gregorian datetime boundary, a Jalali date boundary, or another explicit as-of contract.
+Follow actual imports and calls to establish:
 
-Use targeted searches and inspect the smallest relevant set of files. Do not treat a test fixture, example, or mock as a production caller.
+1. How the application obtains or produces the Stage 5 `CompanyForecastResult`.
+2. How the real Stage 3 `FundamentalScoreResult` is produced or retrieved.
+3. How the real Stage 8 `MarketSignalResult` is produced or retrieved.
+4. Where the database session and requested Jalali as-of date originate.
+5. Whether the application invokes `calculate_decision_as_of_jalali`.
+6. Whether the resulting Stage 9 decision is returned, persisted, or consumed by the actual caller.
 
-## Task B — Implement the smallest safe integration
+Use the existing implementation and contracts. Do not infer a caller merely because a service function exists.
 
-If a genuine application execution path already supplies the required Stage 5, Stage 3, and Stage 8 results, connect it to `calculate_decision_as_of_jalali` with the smallest justified change.
+## Task 2 — Implement the real connection when supported
 
-Preserve existing interfaces where possible. Validate company and period identity before valuation. Ensure the selected market-price observation and its provenance reach Stage 7, and ensure the exact resulting valuation object reaches Stage 9 without Stage 9 recalculating or reconstructing the valuation.
+If the actual application has the authoritative inputs and interfaces needed, connect the real entry point to the existing orchestration boundary.
 
-Do not silently change date semantics or convert Jalali dates into Gregorian fields.
+Preserve:
+- company and forecast-period identity checks;
+- fail-closed behavior when required inputs or an eligible market price are missing;
+- the selected market-price provenance;
+- the exact Stage 7 valuation result passed into Stage 9;
+- existing financial calculations and output contracts.
 
-If a real execution path exists but lacks a required input, determine whether that input can be supplied from an existing authoritative producer or persisted record without fabricating evidence. Implement the safe connection if possible.
+Do not silently substitute mock data, stale results, or results from a different company or period.
 
-If no genuine application path or no authoritative producer for a required input exists, do not create a fake production flow or manufacture financial evidence. Report the exact missing producer/interface and the smallest justified next implementation step. Still implement any independent, safe integration work that is supported by existing code.
+If a required upstream producer or interface genuinely does not exist, do not invent one. Make any independently safe implementation changes, then identify the exact missing interface, its expected data contract, and why a safe connection cannot yet be made.
 
-## Task C — Add integration-level regression coverage
+## Task 3 — Add meaningful integration coverage
 
-Where a genuine entry point can be connected, add a test that exercises that entry point and the real service orchestration, using the project's existing test conventions and database fixtures where practical.
+Add a focused test that exercises the actual application entry point and its real orchestration path, using the project's existing fixtures and production interfaces wherever possible.
 
-The test must establish that:
+The test must distinguish actual integration from a unit test that directly calls the orchestration function with fabricated objects.
 
-- The real entry point invokes the Stage 7 → Stage 9 boundary.
-- Real application-produced or persisted inputs are passed through the relevant interfaces.
-- Company and period mismatches fail closed.
-- The selected market-price observation and provenance are preserved.
-- The exact Stage 7 valuation result is passed to Stage 9.
-- Missing required inputs cannot silently trigger a fabricated or unrelated valuation.
+Verify, as applicable:
+- the actual entry point reaches Stage 7 and Stage 9;
+- upstream company/period mismatches fail closed;
+- the as-of market price is selected from persisted eligible observations;
+- market-price provenance survives into the valuation result;
+- the same valuation result reaches Stage 9;
+- missing mandatory inputs or missing eligible prices do not silently produce a decision.
 
-Use mocks only for external dependencies that genuinely need isolation. A test that directly calls `calculate_decision_as_of_jalali` with fabricated Stage 3/Stage 8 objects is not sufficient evidence of end-to-end application integration.
+Use mocks only for external boundaries that genuinely require isolation. Do not mock away the integration being tested.
 
-Do not claim an end-to-end test exists unless it traverses the actual application entry point.
+If actual integration is impossible because a required producer or application entry point is absent, add only tests that can be grounded in existing real interfaces and explicitly document the missing piece. Do not label such tests end-to-end coverage.
 
-## Task D — Review date and Point-in-Time limitations
+## Task 4 — Keep scope controlled
 
-Determine whether the real caller provides a defensible Jalali as-of date and whether the required upstream inputs have trustworthy observation/availability provenance.
+Do not attempt to solve the entire historical Point-in-Time problem in this task. A Jalali as-of price selection is not proof that every upstream input was available at that time.
 
-Do not infer historical availability from the calculation cutoff alone. If the existing data model cannot prove Point-in-Time availability, preserve the current explicit limitation and identify what evidence or schema is missing.
-
-Do not expand this task into full historical parameter versioning or the final `engine.py` review.
-
-## Completion requirements
-
-Make concrete, safe code changes wherever existing authoritative interfaces permit. Do not stop after producing an architectural report if a valid implementation is possible.
-
-If full integration is blocked, provide exact evidence:
-- the actual entry point inspected;
-- the functions it calls;
-- the required producer or interface that is missing;
-- why creating a substitute would be financially unsafe;
-- the minimum next change needed.
+Do not claim complete historical parameter versioning. Do not alter the deferred D1–D6 policies or resolve the separate known Stage 7 policy/test blockers by weakening tests.
 
 ## Final response
 
 Report:
+1. The exact real application entry point and call chain found.
+2. Every production file changed and why.
+3. The exact integration test added and what real path it exercises.
+4. The exact command(s) the user should run locally; do not run them yourself.
+5. Any missing producer/interface that prevents a complete connection.
+6. Remaining Point-in-Time, historical-versioning, alert-contract, and Stage 7 freeze blockers.
 
-1. The real execution path found, with exact file and function names.
-2. Files changed and the specific behavior implemented.
-3. Whether Stage 7 → Stage 9 is now called from a genuine application entry point, or why it remains blocked.
-4. The integration tests added and exactly what they exercise.
-5. The precise test commands the user should run.
-6. Explicitly confirm that you did not run tests or CI.
-7. Remaining Point-in-Time, historical parameter-versioning, alert-contract, and known Stage 7 test blockers.
+A report-only response is insufficient if a safe, supported implementation is possible. Do not claim completion without concrete code changes and a test that meaningfully verifies the connection.
 
-Do not edit report files. Do not declare Stage 7 frozen.
+Stage 7 must remain unfrozen until the documented requirements and blockers have been resolved or explicitly accepted.

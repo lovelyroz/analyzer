@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -14,6 +14,11 @@ from sqlalchemy import (
 from src.core.database import Base
 
 
+def _utc_now_naive() -> datetime:
+    """Return naive UTC for the existing DateTime storage convention."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class Report(Base):
     __tablename__ = "reports"
 
@@ -26,7 +31,7 @@ class Report(Base):
     source_url = Column(String(500), nullable=True)
     original_report_id = Column(Integer, ForeignKey("reports.report_id"), nullable=True)
     is_correction = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utc_now_naive)
 
 
 class ReportVersion(Base):
@@ -39,7 +44,7 @@ class ReportVersion(Base):
     is_current_version = Column(Boolean, nullable=False, default=True)
     is_restated = Column(Boolean, nullable=False, default=False)
     supersedes_version_id = Column(Integer, ForeignKey("report_versions.report_version_id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utc_now_naive)
 
     __table_args__ = (
         UniqueConstraint("report_id", "version_number", name="uq_report_version"),

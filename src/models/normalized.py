@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -13,6 +13,11 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from src.core.database import Base
+
+
+def _utc_now_naive() -> datetime:
+    """Return naive UTC for the existing DateTime storage convention."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class RawFinancialFact(Base):
@@ -149,7 +154,7 @@ class DerivedFinancialFact(Base):
     source_report_version_id = Column(Integer, ForeignKey("report_versions.report_version_id"), nullable=False)
     quality_status = Column(String(20), nullable=False, default="VALID")
     data_cutoff_datetime = Column(DateTime, nullable=False)
-    calculated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    calculated_at = Column(DateTime, nullable=False, default=_utc_now_naive)
 
     __table_args__ = (
         UniqueConstraint(

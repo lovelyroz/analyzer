@@ -3965,3 +3965,41 @@ Replaced those calls with UTC-aware timestamp creation, converted to naive UTC t
 
 Static diff checks were performed. No tests were run during the fix; you confirmed the warning is resolved.
 =============================================================
+# P47 — Real Application Integration Path Report
+
+## Findings
+
+No real application entry point currently coordinates the complete flow from upstream data production through Stage 7 valuation to a Stage 9 decision. The existing code contains service and engine interfaces, but no production caller joins them.
+
+- **Stage 5:** `generate_and_persist_forecast` in `src/forecast/service.py` builds a `CompanyForecastResult` from Stage 1 data and a supplied Stage 4 `TrendResult`, then persists forecast records. No production caller of this service was found. The result is returned in memory.
+- **Stage 3:** `KPIEngine` accepts an already assembled financial data dictionary, while `FundamentalScoringEngine` accepts already produced KPI results. No production loader or caller was found to assemble and deliver a real `FundamentalScoreResult` to Stage 9.
+- **Stage 8:** `MarketEngine` accepts prepared market rows and optional benchmark rows. No production loader or caller was found to retrieve persisted market history and benchmarks and produce a `MarketSignalResult` for Stage 9.
+- **Stage 7:** `calculate_valuation_as_of_jalali` in `src/valuation/service.py` selects an eligible persisted price for the requested Jalali date and retains the selected observation’s provenance in the valuation metadata.
+- **Stage 9:** `calculate_decision_as_of_jalali` in `src/decision/service.py` passes its Stage 7 valuation result to `DecisionEngine`. The function is called by tests, but no production application caller was found. No production consumer or persistence path for its result was found either.
+- **Session and as-of date:** Since no coordinating entry point was found, there is no real application path that supplies both the database session and requested Jalali date to the Stage 7→9 orchestration.
+
+The current Stage 9 test, `test_jalali_orchestration_passes_stage7_result_to_stage9`, calls the orchestration function directly and mocks Stage 7. It does not exercise an application entry point or prove production integration.
+
+## Changes
+
+No production files or tests were changed for P47. The required upstream producers and application entry point are absent, so connecting the existing interfaces would require inventing an orchestration path or supplying data without an authoritative producer. The existing mock-based test was not relabeled as integration coverage.
+
+## Commands to Run
+
+No tests were run as part of this review. To check the existing related suites, run:
+
+```text
+pytest src/tests/test_stage9_decision.py
+pytest src/tests/test_stage7_valuation.py
+pytest src/tests/test_stage5_forecast.py
+pytest src/tests/test_stage3_scoring.py
+pytest src/tests/test_stage8_market.py
+```
+
+## Remaining Blockers
+
+- **Integration:** A real entry point must coordinate the session, forecast, fundamental score, market signal, and requested Jalali date, then return or persist the decision.
+- **Point-in-Time integrity:** Selecting a Jalali as-of market price does not establish that all Stage 3, Stage 5, and Stage 8 inputs were available by that date.
+- **Historical versioning:** The full chain does not yet demonstrate historically versioned parameters and model inputs.
+- **Alert contract:** Deferred Stage 7 alert policies remain unresolved, including the documented D1–D6 items.
+- **Stage 7 freeze:** Stage 7 should remain unfrozen until its documented requirements and blockers are resolved or explicitly accepted.

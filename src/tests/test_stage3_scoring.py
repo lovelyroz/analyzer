@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.kpi.schema import KPIResult
 from src.scoring.engine import FundamentalScoringEngine
@@ -13,7 +13,7 @@ def kpi(code, value, status="VALID"):
         value=value,
         unit="PERCENTAGE",
         quality_status=status,
-        calculation_timestamp=datetime.utcnow(),
+        calculation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
 
