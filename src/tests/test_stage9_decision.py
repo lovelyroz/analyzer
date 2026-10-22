@@ -1,6 +1,8 @@
 from datetime import datetime
 from types import SimpleNamespace
 
+import pytest
+
 from src.market.schema import MarketSignalResult
 from src.scoring.schema import FundamentalScoreResult
 from src.valuation.schema import ValuationResult
@@ -66,10 +68,16 @@ def test_strong_buy_requires_aligned_families():
 
 def test_jalali_orchestration_passes_stage7_result_to_stage9(monkeypatch):
     valuation = make_valuation()
+    stage7_calls = []
+
+    def calculate_valuation(*args, **kwargs):
+        stage7_calls.append((args, kwargs))
+        return valuation
+
     monkeypatch.setattr(
         decision_service,
         "calculate_valuation_as_of_jalali",
-        lambda *args, **kwargs: valuation,
+        calculate_valuation,
     )
     original_make_decision = DecisionEngine.make_decision
     received = {}
@@ -94,8 +102,32 @@ def test_jalali_orchestration_passes_stage7_result_to_stage9(monkeypatch):
     assert result.valuation is valuation
     assert received["valuation"] is valuation
     assert result.decision.valuation_status == valuation.valuation_status
-    assert result.metadata["market_score_used"] is False
-    assert result.metadata["position_sizing_used"] is False
+    assert len(stage7_calls) == 1
+    assert stage7_calls[0][0] == (None, 1, 10, forecast, (1405, 2, 11))
+    assert result.decision.metadata["market_score_used"] is False
+    assert result.decision.metadata["position_sizing_used"] is False
+
+
+def test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity(monkeypatch):
+    def stage7_must_not_run(*args, **kwargs):
+        raise AssertionError("Stage 7 must not run when upstream identities disagree")
+
+    monkeypatch.setattr(decision_service, "calculate_valuation_as_of_jalali", stage7_must_not_run)
+    forecast = SimpleNamespace(company_id=1, forecast_period_id=10)
+
+    wrong_period_fundamental = make_fundamental(85)
+    wrong_period_fundamental.period_id = 11
+    with pytest.raises(ValueError, match="fundamental result identity"):
+        decision_service.calculate_decision_as_of_jalali(
+            None, forecast, (1405, 2, 11), wrong_period_fundamental, make_market()
+        )
+
+    wrong_company_market = make_market()
+    wrong_company_market.company_id = 2
+    with pytest.raises(ValueError, match="market result company_id"):
+        decision_service.calculate_decision_as_of_jalali(
+            None, forecast, (1405, 2, 11), make_fundamental(85), wrong_company_market
+        )
 
 
 def test_value_trap_does_not_become_buy():

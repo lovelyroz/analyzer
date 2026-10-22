@@ -1,98 +1,112 @@
-# P43 — Verify and Complete the Real Stage 7 → Stage 9 Integration
+# P44 — Stabilize Stage 7 → Stage 9 Integration and Validate Jalali Market Dates
 
-You are continuing Stage 7 remediation in the local project directory `analyzer`. The GitHub repository name is `lovelyroz/analyzer`.
+You are continuing Stage 7 remediation in the local working directory `analyzer` for the GitHub repository `analyzer`.
+
+Read `stepsForStage7.md` first. It defines the agreed work sequence. Follow it strictly: **do not redesign or refactor `src/decision/engine.py` or `src/valuation/engine.py` in this prompt.** Engine review and any justified redesign belong at the end of Stage 7, after the outstanding integration, specification, and validation issues have been resolved.
 
 ## Operating rules
 
-- Work locally only. Do not use GitHub, GitHub CLI/API, push, pull, commit, or remote operations. Do not change branches.
-- Do not run pytest or CI. The user will run tests and provide the actual output.
+- Work locally only. Do not use GitHub, GitHub CLI/API, remotes, pushes, commits, or branch operations.
+- Do not run pytest, CI, or other test suites. I will run tests and provide the actual output.
 - Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `ClaudeReports/`, `stepsForStage7.md`, or `stage_7_prompts.md`.
-- Do not scan the entire repository. Inspect only the relevant files listed below and follow imports/calls only when needed.
-- Do not redesign or centralize `src/valuation/engine.py`.
-- Preserve financial formulas, thresholds, weights, Stage 5 EPS, output contracts, and existing behavior unless a demonstrated defect requires a narrowly scoped correction.
-- Do not invent financial data, date conversions, industry mappings, or PIT guarantees.
-- Do not claim production integration is complete unless an actual callable path is established and tested.
+- Avoid repository-wide scans. Inspect only the files and narrowly related entry points needed for this task.
+- Preserve financial formulas, thresholds, weights, scenario probabilities, Stage 5 EPS, output contracts, and existing behavior unless a demonstrated defect requires a narrowly scoped correction.
+- Do not invent financial inputs, date conversions, calendar rules, or claims of Point-in-Time correctness.
+- Do not delete, skip, weaken, or rewrite unrelated tests merely to obtain passing results.
+- Make concrete, minimal code changes wherever the evidence supports a safe fix. Do not stop at a report if a supported implementation is possible.
 
-## Confirmed P42 baseline
+## Confirmed P43 findings
 
-`src/valuation/service.py` now defines `calculate_valuation_as_of_jalali(...)`. It selects a persisted market price using `select_market_price_as_of(...)`, checks company and forecast-period identity, passes the selected price to Stage 7, and stores the Jalali date, selected source date, price basis, source, and market-data record ID in result metadata.
+1. `src/decision/service.py` introduces `calculate_decision_as_of_jalali(...)`, which calls `calculate_valuation_as_of_jalali(...)` and passes that exact valuation result to `DecisionEngine.make_decision(...)`.
+2. `src/tests/test_stage9_decision.py` has a new test named `test_jalali_orchestration_passes_stage7_result_to_stage9`.
+3. My actual local test run reported **13 passed, 1 failed** in `src/tests/test_stage9_decision.py`. The failure is:
+   `AttributeError: 'ValuationDecisionResult' object has no attribute 'metadata'`
+   at these assertions:
+   `assert result.metadata["market_score_used"] is False`
+   `assert result.metadata["position_sizing_used"] is False`
+   `ValuationDecisionResult` contains `valuation` and `decision`; the Stage 9 metadata belongs to `result.decision.metadata`.
+4. P43 did not establish that the new orchestration function is called by the application's real execution path.
+5. `src/ingestion/market/queries.py` filters stored Jalali components using broad month/day ranges. `parse_jalali_components` also checks numeric ranges, not full calendar validity. An impossible stored date could therefore be selected.
+6. Do not convert Jalali dates to Gregorian dates to bypass this issue. Existing project behavior intentionally preserves Jalali dates without fabricating Gregorian values.
 
-The user ran these tests successfully:
-- Three focused P42 tests: each passed.
-- `pytest src/tests/test_stage7_valuation.py`: **75 passed, 3 warnings**.
+## Task A — Correct and strengthen the P43 regression test
 
-These results establish the tested service behavior, not end-to-end production integration.
+Inspect only:
+- `src/decision/service.py`
+- `src/decision/schema.py`
+- `src/decision/engine.py` where needed to confirm the result contract
+- `src/tests/test_stage9_decision.py`
 
-## Files to inspect first
+Correct the failing assertions to inspect the actual Stage 9 result contract, without changing that contract merely to satisfy the test.
 
-1. `src/valuation/service.py`
-2. `src/ingestion/market/queries.py`
-3. `src/ingestion/market/adapter.py`
-4. `src/models/market.py`
-5. `src/forecast/service.py`
-6. `src/forecast/repo.py`
-7. `src/decision/engine.py`
-8. `src/decision/schema.py`
-9. Relevant existing Stage 7, Stage 9, and market-ingestion tests only.
+Ensure the test verifies all of the following:
+- The orchestration service calls the Stage 7 valuation boundary.
+- The exact returned `ValuationResult` object is passed to Stage 9.
+- The final wrapper returns that valuation and the Stage 9 decision.
+- `market_score_used` and `position_sizing_used` are checked through the actual Stage 9 metadata location.
+- Existing company and forecast-period identity checks remain intact.
 
-Trace the actual callable path and identify whether any existing application/service boundary invokes valuation and passes the result to Stage 9. Do not infer a caller from imports or from the existence of a new function.
+Add or adjust only narrowly relevant tests if needed. Do not run them.
 
-## Task A — Establish the real integration boundary
+## Task B — Correctly handle impossible stored Jalali dates
 
-Determine whether the existing application flow can supply all required inputs to:
-1. generate or retrieve the correct persisted forecast;
-2. select a market price using the requested Jalali as-of date;
-3. calculate Stage 7 valuation;
-4. pass the resulting `ValuationResult` into Stage 9 with its required existing inputs.
+Inspect:
+- `src/ingestion/market/queries.py`
+- `src/ingestion/market/adapter.py`
+- `src/ingestion/common/parsing.py`
+- the existing dependency declarations and directly relevant date/calendar utilities, if any
 
-If a real, appropriate caller exists, connect it to `calculate_valuation_as_of_jalali` using the actual existing interfaces and data. Preserve existing callers and their behavior where possible.
+Determine whether the project already has a reliable Jalali calendar validator available. If it does, use it consistently and narrowly to prevent invalid persisted dates from being selected.
 
-If no suitable caller exists, do not fabricate missing inputs or claim end-to-end integration. Implement the smallest safe, reusable orchestration boundary that is supported by existing interfaces, with focused tests. Explicitly identify what still prevents a complete Stage 7 → Stage 9 production path.
+Requirements:
+- Validate the full calendar date, not just `1 <= month <= 12` and `1 <= day <= 31`.
+- Apply the validation to stored observations before selecting a price.
+- Preserve the existing numeric Jalali ordering, company isolation, adjusted-close/close fallback, duplicate-date failure behavior, and provenance.
+- Do not add a new calendar implementation or Gregorian conversion.
+- Do not add a dependency without a clear justification and compatibility evidence.
+- Add focused tests for impossible stored Jalali dates and valid dates near calendar boundaries.
 
-## Task B — Validate the market-price selector
+If the repository has no reliable validator and a safe solution cannot be established from the existing dependencies, do not invent one. Make any independently safe fixes, then state the precise blocker and the smallest justified next step.
 
-Review `select_market_price_as_of` in `src/ingestion/market/queries.py`.
+## Task C — Establish the actual application call path
 
-The selector must:
-- isolate the requested company;
-- never select an observation after the requested Jalali date;
-- deterministically select the latest eligible observation;
-- preserve selected price and provenance;
-- fail closed for missing prices and ambiguous duplicate observations;
-- not assign or fabricate Gregorian dates.
+Inspect the orchestration service and only the relevant application entry points/callers needed to determine whether there is a real route from forecast generation/retrieval through Stage 7 and into Stage 9.
 
-Check whether stored rows with impossible Jalali calendar dates (for example, a day that does not exist in the given month) can pass the SQL component-range filters and be selected. Use the existing Jalali parser/calendar validation; do not implement a new calendar or Gregorian conversion. If a real defect exists, fix it narrowly and add focused regression tests. Do not change valid existing Jalali ingestion behavior.
+The known interfaces are:
+- Stage 5 forecast generation/retrieval produces a forecast result.
+- Stage 7 accepts the forecast plus an as-of Jalali date and a database session for market-price selection.
+- Stage 9 requires matching fundamental and market evidence in addition to the Stage 7 valuation.
 
-## Required integration and regression coverage
+Determine whether a real caller already has these inputs and can safely call `calculate_decision_as_of_jalali(...)`.
 
-Add only tests justified by the inspected interfaces. Cover as applicable:
+If a real caller exists, connect it with the smallest safe change and add a focused integration test that exercises the actual call path rather than mocking away the orchestration itself.
 
-- the actual caller invokes the Jalali valuation service;
-- the selected market price is the price used by Stage 7;
-- selected Jalali date and source provenance remain auditable;
-- missing prices fail closed without silently using an unrelated or stale fallback;
-- company and forecast-period identity mismatches are rejected;
-- future market observations cannot affect an earlier as-of valuation;
-- impossible Jalali dates cannot be selected;
-- the resulting valuation reaches Stage 9 if a real supported caller exists;
-- existing direct `ValuationEngine.calculate_valuation` callers remain compatible;
-- Gregorian date fields are not populated with fabricated Jalali dates.
+If no suitable caller exists, do not fabricate Stage 3/Stage 8 results, invent data, or claim the production path is connected. Implement only a safe, useful integration step that existing interfaces support, and identify exactly what real caller/input contract is missing.
 
-Do not duplicate tests that already establish these exact behaviors. Do not weaken or delete existing tests.
+Do not create a new application entry point merely to make a test pass unless its place in the existing architecture is justified by concrete evidence.
 
-## Validation and reporting
+## Validation expectations
 
-After making changes, perform static inspection only. Do not run tests.
+Do not execute tests. Add or update focused tests covering, where supported:
+- The corrected Stage 9 metadata assertions.
+- The same Stage 7 result reaching Stage 9.
+- Company/period mismatch rejection.
+- Missing eligible market price failing closed.
+- Impossible stored Jalali dates not being selected.
+- Existing valid Jalali-date selection and provenance remaining intact.
+- The real application call path, only if an actual caller can be connected.
+
+Do not claim the tests pass. Report the exact test commands I should run locally.
+
+## Required final response
 
 Report:
-1. Exact files changed and why.
-2. The actual caller and call path, with function names, if one exists.
-3. Whether Stage 7 → Stage 9 is now genuinely connected or what precise blocker remains.
-4. Tests added and the behavior each test proves.
-5. Exact PowerShell commands for the user to run.
-6. Confirmation that you did not run tests or CI.
-7. Any remaining financial-correctness, date, provenance, or PIT limitations.
+1. Each file changed and the reason.
+2. The exact P43 test defect corrected.
+3. Whether impossible stored Jalali dates are now reliably rejected and which validator provides that guarantee.
+4. Whether a real application caller now invokes the Stage 7 → Stage 9 orchestration. Show the exact call path or the specific missing interface.
+5. Tests added/modified and the exact commands for me to run.
+6. Explicitly confirm that you did not run tests or CI.
+7. Remaining financial-correctness, Point-in-Time, historical-parameter-versioning, or output-contract blockers.
 
-Do not declare Stage 7 frozen. Stop after providing the implementation summary and test commands; wait for the user's actual test output.
-
-
+Do not update reports or freeze Stage 7. Stage 7 remains NOT FROZEN until the documented blockers are resolved or explicitly accepted through the project's decision process.
