@@ -243,3 +243,45 @@ src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_late
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================================== 1 passed, 15 warnings in 0.59s
+(analyzer) PS D:\winprojects\analyzer> .venv\Scripts\python.exe -m pytest src/tests/test_stage9_decision.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 15 items
+
+src/tests/test_stage9_decision.py::test_strong_buy_requires_aligned_families PASSED                              [  6%]
+src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9 PASSED               [ 13%]
+src/tests/test_stage9_decision.py::test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity PASSED [ 20%]
+src/tests/test_stage9_decision.py::test_value_trap_does_not_become_buy PASSED                                    [ 26%]
+src/tests/test_stage9_decision.py::test_strong_but_expensive_is_not_buy PASSED                                   [ 33%]
+src/tests/test_stage9_decision.py::test_low_forecast_reliability_limits_strong_conviction PASSED                 [ 40%]
+src/tests/test_stage9_decision.py::test_market_does_not_override_strong_fundamentals PASSED                      [ 46%]
+src/tests/test_stage9_decision.py::test_usd_share_value_is_context_not_a_new_score PASSED                        [ 53%]
+src/tests/test_stage9_decision.py::test_negative_eps_valuation_is_not_reconstructed_by_stage9 PASSED             [ 60%]
+src/tests/test_stage9_decision.py::test_no_position_sizing_contract PASSED                                       [ 66%]
+src/tests/test_stage9_decision.py::test_hysteresis_prevents_small_buy_to_hold_change PASSED                      [ 73%]
+src/tests/test_stage9_decision.py::test_hysteresis_allows_material_deterioration PASSED                          [ 80%]
+src/tests/test_stage9_decision.py::test_decision_history_contract PASSED                                         [ 86%]
+src/tests/test_stage9_decision.py::test_ranking_contract_has_no_new_score PASSED                                 [ 93%]
+src/tests/test_stage9_decision.py::test_dashboard_contract_carries_required_fields PASSED                        [100%]
+
+================================================== warnings summary ===================================================
+src/tests/test_stage9_decision.py: 16 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:20: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp=datetime.utcnow(),
+
+src/tests/test_stage9_decision.py: 14 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:39: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp=datetime.utcnow(),
+
+src/tests/test_stage9_decision.py: 16 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:49: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    as_of_date=datetime.utcnow(),
+
+src/tests/test_stage9_decision.py: 14 warnings
+  D:\winprojects\analyzer\src\decision\engine.py:260: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp = datetime.utcnow()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================================== 15 passed, 60 warnings in 1.25s
