@@ -1,126 +1,97 @@
-# P48 — Targeted Application Entry-Point and Runtime-Path Investigation
+# P49 — Evidence-Based Data Source and Interface Mapping
 
-You are continuing Stage 7 remediation in the local project directory `analyzer`.
+You are continuing Stage 7 remediation in the local project folder `analyzer`.
 
-This is a financial-data application. Financial correctness, auditability, deterministic behavior, point-in-time correctness, and preservation of existing financial contracts are mandatory.
+## Objective
 
-## 1. Objective
+Following P48, determine which missing runtime inputs and interfaces can be supported by existing, authoritative project data and which are genuinely absent.
 
-Determine, using concrete repository evidence, whether the project currently has a real application entry point and whether the required stages can execute as a connected runtime path.
+This is a targeted architecture and data-lineage investigation. Do not implement the runtime orchestration yet.
 
-P47 already reported that no coordinating production entry point or complete Stage 3/Stage 8 input producers were found in its investigation. Do not repeat P47 blindly. Verify the remaining question through a narrowly scoped inspection of application startup and runtime wiring.
+## Mandatory constraints
 
-This is an investigation task. Do not implement a new architecture in P48.
-
-## 2. Strict Scope
-
-Inspect only the following, expanding the scope only when a specific reference requires it:
-
-1. Root-level files and project configuration that identify application startup or execution.
-2. README or setup documentation that describes how the application is launched.
-3. Explicit CLI, API, web-application, worker, scheduler, or other runtime entry-point modules, if present.
-4. The specific service or producer files needed to trace the runtime flow through Stages 3, 5, 7, 8, and 9.
-5. Direct callers and consumers of those functions, only as needed to establish the actual call path.
-
-Do not perform a repository-wide scan. Do not inspect unrelated modules. Do not repeat completed Stage 5, Stage 7, Stage 8, or Stage 9 unit-test reviews unless a specific reference is essential to this investigation.
-
-## 3. Required Questions
-
-Answer each question with file paths and relevant function/class names.
-
-### A. Application entry point
-
-- Does a real runnable application entry point exist?
-- If so, identify the exact file, callable, and launch mechanism.
-- Is it used by the application, or is it merely a module or test helper?
-- If no entry point is found in the inspected scope, state exactly what was inspected. Do not claim that no entry point exists anywhere unless the evidence supports that conclusion.
-
-### B. Stage 3 inputs
-
-- Where is `FundamentalScoreResult` created in the real runtime path?
-- Trace the required input data back to its actual producer or persistence source.
-- Identify any missing producer, loader, or caller.
-- Distinguish existing calculation engines from code that actually supplies their inputs.
-
-### C. Stage 5 forecast
-
-- Locate `generate_and_persist_forecast` and its direct callers.
-- Determine whether it is invoked by the actual application runtime.
-- Identify how Stage 1 data and Stage 4 `TrendResult` are supplied.
-- Determine whether its returned forecast is consumed by the subsequent runtime path or only returned to a caller that has not been identified.
-
-### D. Stage 8 market inputs
-
-- Identify how `MarketSignalResult` is produced in the actual runtime path.
-- Trace its required market and benchmark inputs to real producers, loaders, or persisted data.
-- Identify missing links without fabricating data or assuming that an engine is a data producer.
-
-### E. Session and Jalali as-of date
-
-- Identify where the SQLAlchemy session used by the relevant services originates.
-- Identify where the Jalali as-of date is chosen and validated.
-- Determine whether those values are passed through an actual application runtime path or are only supplied manually by callers/tests.
-- Do not infer historical data availability from an as-of date alone.
-
-### F. Stage 7 → Stage 9 execution and result handling
-
-- Trace the actual caller chain into `calculate_valuation_as_of_jalali` and `calculate_decision_as_of_jalali`, where applicable.
-- Determine whether Stage 9 receives the exact valuation result generated for the same company, forecast, market price, and as-of date.
-- Identify where the final decision is consumed, returned to an application boundary, or persisted.
-- Distinguish a tested orchestration service from a production caller.
-
-## 4. Evidence Rules
-
-For every claimed runtime connection, provide:
-
-- The exact file path.
-- The relevant callable or class.
-- The direct caller or invocation mechanism.
-- The evidence showing how inputs and outputs cross the boundary.
-
-Use labels such as:
-
-- `CONFIRMED`: directly supported by the inspected code.
-- `PARTIAL`: some links exist, but the full path is not established.
-- `MISSING`: a required link was not found within the explicitly inspected scope.
-- `UNKNOWN`: available evidence is insufficient.
-
-Do not describe a path as production-integrated merely because the individual functions exist or their unit tests pass.
-
-## 5. If the runtime path is incomplete
-
-Produce a precise gap list. For each missing link, state:
-
-1. The required responsibility.
-2. The data or interface it must accept.
-3. The authoritative source that should supply the data, if identifiable.
-4. The expected output or downstream consumer.
-5. What evidence is still needed before implementation can safely begin.
-
-Do not invent a source, financial input, formula, threshold, industry mapping, or historical timestamp. Do not add a duplicate orchestration service simply to make the path appear connected.
-
-If the project currently consists mainly of calculation modules without a coordinating runtime layer, state that as an architectural finding and identify the minimum missing interfaces. Do not implement those interfaces in P48.
-
-## 6. Prohibited Actions
-
-- Do not edit application code or tests.
-- Do not redesign, refactor, or centralize `engine.py`.
-- Do not change financial formulas, thresholds, warning names, or public contracts.
-- Do not run tests or CI; the user runs tests and provides actual outputs.
-- Do not access GitHub, GitHub CLI/API, remotes, push/pull, commits, or branch operations.
+- Work only in the local `analyzer` project.
+- Do not access GitHub, GitHub CLI/API, remotes, or perform any Git operations.
+- Do not run tests or CI. The user runs tests.
+- Do not inspect the entire repository indiscriminately. Follow only the source files and direct dependencies needed to establish each data path.
+- Do not edit code, tests, dependencies, configuration, or reports.
 - Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `ClaudeReports/`, `stepsForStage7.md`, or `stage_7_prompts.md`.
-- Do not create or modify report files.
-- Do not claim tests passed or runtime execution was verified unless actual evidence exists.
+- Do not redesign or centralize `engine.py`.
+- Do not invent financial inputs, formulas, thresholds, industry mappings, benchmark values, publication timestamps, or historical parameter dates.
+- Do not treat sample/debug data or unit-test fixtures as production data sources.
+- Do not claim that a data source is authoritative unless the code and its provenance support that conclusion.
 
-## 7. Required Final Response
+## Investigation scope
 
-Return a concise but evidence-based report with these sections:
+Start from the exact gaps identified by P48. Inspect only the relevant models, database queries, ingestion modules, schemas, and service contracts needed to establish the following.
 
-1. **Entry-point finding** — confirmed entry point, or precisely scoped negative finding.
-2. **Runtime trace** — the confirmed and unconfirmed links across Stages 3, 5, 7, 8, and 9.
-3. **Session and as-of date** — actual origins and remaining gaps.
-4. **Missing interfaces and responsibilities** — an ordered list of concrete gaps.
-5. **Implementation readiness** — whether a safe real integration can begin now, and why.
-6. **Recommended next step** — the single highest-priority action after P48.
+### A. Stage 3 — Fundamental scoring
 
-Clearly list any files inspected. Make no code changes. Finish the investigation before reporting; do not stop at the first missing link if the remaining questions can be answered within the defined scope.
+Determine:
+- Which persisted financial records can supply the inputs required by the KPI and scoring engines.
+- Whether existing queries can retrieve those records for a specific company and reporting period.
+- Whether the source data is sufficient to produce the required KPI results without fabricated or inferred financial values.
+- What is missing between persisted records and `FundamentalScoreResult`.
+
+### B. Stage 4 and Stage 5 — Trend and forecast
+
+Determine:
+- Whether an existing authoritative source supplies the historical series required by `TrendEngine`.
+- Whether the source can be filtered using a defensible evaluation cutoff.
+- What existing interfaces can supply `TrendResult` to `generate_and_persist_forecast`.
+- Whether the forecast service's current persistence and return contracts support downstream consumption without duplicating forecast calculations.
+
+### C. Stage 8 — Market signal
+
+Determine:
+- How persisted `MarketDaily` records can be queried for the required evaluation date.
+- Whether existing code can construct the exact inputs required by `MarketEngine`.
+- Whether an authoritative benchmark source and compatible date contract actually exist.
+- Which missing inputs cannot safely be supplied from the current repository.
+
+Do not convert Jalali dates to Gregorian dates merely for convenience. Preserve existing date contracts unless concrete code evidence proves a necessary correction.
+
+### D. Stage 7 and Stage 9 — Orchestration inputs and output
+
+Using the existing services, establish:
+- The required inputs and validation rules for `calculate_valuation_as_of_jalali` and `calculate_decision_as_of_jalali`.
+- Which upstream results must be supplied by callers.
+- What is already returned by `ValuationDecisionResult`.
+- Whether any existing persistence model or consumer is suitable for the decision result. Do not assume that one exists.
+
+### E. Shared execution contract
+
+Identify the minimum contract a future runtime entry point would need:
+- company and reporting-period identifiers;
+- evaluation/as-of Jalali date and its legitimate source;
+- SQLAlchemy session ownership and lifecycle;
+- upstream result construction and validation;
+- output delivery or persistence.
+
+Separate existing, reusable interfaces from interfaces that would have to be introduced. Do not prescribe a new web API, CLI, scheduler, or user interface without repository evidence or an explicit product requirement.
+
+## Required evidence standard
+
+For every finding, use one of these statuses:
+
+- `CONFIRMED`: directly supported by inspected code and call/data paths.
+- `PARTIAL`: some required pieces exist, but the full path is not established.
+- `MISSING`: the required source or interface was not found within the targeted inspection.
+- `UNKNOWN`: evidence is insufficient to determine the answer.
+
+Cite concrete file paths, functions/classes, relevant fields, and direct callers or queries. Distinguish persisted production data from fixtures, debug examples, and in-memory service inputs.
+
+Do not interpret “not found” as proof that a capability is impossible. State the scope of each negative finding.
+
+## Required final report
+
+1. **Stage 3 data lineage:** source records → queries → KPI/scoring inputs → `FundamentalScoreResult`.
+2. **Stage 4/5 data lineage:** historical source → `TrendResult` → forecast service → forecast consumer/persistence.
+3. **Stage 8 data lineage:** `MarketDaily` and benchmark sources → `MarketEngine` inputs → `MarketSignalResult`.
+4. **Stage 7/9 contract:** existing service inputs, validations, returned results, and any confirmed consumer/persistence path.
+5. **Shared runtime contract:** session ownership, as-of date source, identifiers, output destination.
+6. **Gap classification:** what can be reused, what is missing, and what remains unknown.
+7. **Implementation readiness:** whether any real connection can be implemented without assumptions; identify the smallest safe next implementation unit, if supported by evidence.
+8. **Files inspected:** exact list, with a brief reason for each.
+
+Do not modify files or run tests. Finish the investigation and provide the complete report in the response. Do not stop at a generic blocker message.
