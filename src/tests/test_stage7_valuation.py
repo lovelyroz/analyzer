@@ -403,7 +403,7 @@ def test_p2_alert_divergence_ratios_boundaries():
     assert not any("FORWARD_PE_ABOVE_HISTORICAL" in a for a in missing.alerts)
 
 
-def test_p2_sector_driver_decomposition_missing():
+def test_v1_sector_examples_use_only_eps_and_target_pe_drivers():
     engine = ValuationEngine()
     nonfin = engine.calculate_valuation(
         1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
@@ -418,11 +418,31 @@ def test_p2_sector_driver_decomposition_missing():
         forecast_reliability_score=80.0, historical_pe_values=[7.0],
         nav_per_share=500.0,
     )
-    observed = set(nonfin.valuation_driver_ranking) | set(bank.valuation_driver_ranking) | set(holding.valuation_driver_ranking)
-    assert {"REVENUE", "NII", "NAV"} <= observed
+    for result in (nonfin, bank, holding):
+        assert set(result.valuation_driver_ranking) == {"EPS", "TARGET_PE"}
+        assert set(result.driver_impact) == {"EPS", "TARGET_PE"}
+        assert result.scenarios["base"].fair_value == 1260.0
+    # D6 defers industry-specific decomposition. NAV is accepted as input
+    # metadata but does not change the V1 EPS x target P/E valuation.
+    assert holding.metadata["nav_per_share_received"] == 500.0
+    assert holding.expected_fair_value == nonfin.expected_fair_value
+    assert holding.scenarios["base"].fair_value == nonfin.scenarios["base"].fair_value
 
 
-def test_p2_required_flip_dependence_alerts_missing():
+def test_v1_uses_stage5_eps_without_recalculating_from_net_profit():
+    forecast = make_forecast(150.0, 180.0, 210.0)
+    # Deliberately make net profit inconsistent with the supplied Stage 5 EPS.
+    forecast.scenario_forecasts.bear.net_profit = 9_000.0
+    forecast.scenario_forecasts.base.net_profit = 12_000.0
+    forecast.scenario_forecasts.bull.net_profit = 15_000.0
+    result = ValuationEngine().calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, forecast, historical_pe_values=[7.0],
+    )
+    assert [result.scenarios[name].eps_forecast for name in ("bear", "base", "bull")] == [150.0, 180.0, 210.0]
+    assert [result.scenarios[name].fair_value for name in ("bear", "base", "bull")] == [1050.0, 1260.0, 1470.0]
+
+
+def test_v1_defers_undefined_flip_dependence_and_assumption_alerts():
     from src.valuation.parameters import SENSITIVITY_PERTURBATION, VALUATION_THRESHOLDS
 
     assert SENSITIVITY_PERTURBATION == 0.10
@@ -454,15 +474,23 @@ def test_p2_required_flip_dependence_alerts_missing():
         forecast_reliability_score=20.0, historical_pe_values=[7.0],
         probability_confidence=50.0, data_quality_score=20.0,
     )
-    vocab = []
+    deferred = (
+        "ASSESSMENT_FLIP_RISK", "HIGH_MULTIPLE_DEPENDENCE",
+        "HIGH_EPS_DEPENDENCE", "MARGIN_ASSUMPTION_RISK",
+        "HIGH_IMPACT_HIGH_UNCERTAINTY",
+    )
     for result in (flip_base, shocked, stable, eps_risk):
-        vocab.extend(result.alerts)
-        vocab.extend(result.valuation_risk_flags)
-    required = ["ASSESSMENT_FLIP_RISK", "HIGH_MULTIPLE_DEPENDENCE",
-                "HIGH_EPS_DEPENDENCE", "MARGIN_ASSUMPTION_RISK",
-                "HIGH_IMPACT_HIGH_UNCERTAINTY"]
-    missing = [name for name in required if not any(name in item for item in vocab)]
-    assert not missing, f"Missing required alerts: {missing}"
+        for name in deferred:
+            assert not any(name in item for item in result.alerts)
+            assert not any(name in item for item in result.valuation_risk_flags)
+    # Historical P2 failing-first cases are retained as meaningful V1 status
+    # and sensitivity checks; D1-D5 defer undefined alert formulas/thresholds.
+    assert flip_base.valuation_status == "ATTRACTIVE"
+    assert shocked.valuation_status == "FAIR"
+    assert flip_base.scenarios["base"].fair_value != shocked.scenarios["base"].fair_value
+    assert stable.scenarios["bear"].fair_value < stable.scenarios["base"].fair_value
+    assert stable.scenarios["base"].fair_value < stable.scenarios["bull"].fair_value
+    assert eps_risk.driver_impact
 
 
 # P3 additions: traceable one-at-a-time sensitivity + non-finite input guards.
@@ -571,8 +599,8 @@ def test_p3_flip_dependence_alerts_remain_explicitly_unresolved():
     for name in ("ASSESSMENT_FLIP_RISK", "HIGH_MULTIPLE_DEPENDENCE",
                  "HIGH_EPS_DEPENDENCE", "MARGIN_ASSUMPTION_RISK",
                  "HIGH_IMPACT_HIGH_UNCERTAINTY"):
-        # Per P3 requirement 5: no invented formula may emit these alerts.
-        # They stay absent until the locked spec defines their formulas.
+        # P3 independently pins the attractive classification case: no
+        # invented formula may emit these deferred alerts under V1.
         assert name not in vocab
 
 

@@ -3811,4 +3811,40 @@ All test commands were freshly executed using python3 -m pytest:
 
 ## 9. Final status
 **PARTIALLY COMPLETED.** Parameter consumption, snapshot truthfulness, fail-closed as-of selection and provenance are implemented and tested against the Stage 7 file; full PIT, D1–D6/R8 behavior, production integration, real-pytest/Stage 9/full-suite/CI verification remain open. Stage 7 is not frozen.
+====================================================================
+# P37 — Stage 7 Test Reconciliation
+
+## Outcome
+
+Stage 7 remains **NOT FROZEN**. This change reconciles the test suite with the recorded V1 policy; it does not remove the underlying requirements for deferred capabilities or clear the remaining freeze blockers.
+
+## Original contradiction and root cause
+
+The two P2 tests, `test_p2_sector_driver_decomposition_missing` and `test_p2_required_flip_dependence_alerts_missing`, were failing-first tests that required sector-specific `REVENUE`, `NII`, and `NAV` drivers and five undefined flip, dependence, margin, and impact/uncertainty alerts. Those expectations conflict with the later Stage 7 V1 decisions D1–D6: do not invent formulas, thresholds, or dependence metrics, and keep the supported driver set to `EPS` and `TARGET_PE`. P3 independently asserted that the five deferred alerts remain absent.
+
+The root cause was retaining implementation-gap assertions after V1 policy had been reconciled. The requirements are still deferred capabilities and remain documented as open requirements; their absence under V1 is now tested as policy behavior. The P3 regression test remains intact and independently pins alert absence for the attractive-status scenario.
+
+## Test changes
+
+- Renamed `test_p2_sector_driver_decomposition_missing` to `test_v1_sector_examples_use_only_eps_and_target_pe_drivers`. It checks non-financial, bank, and holding examples expose only the two supported drivers; confirms the output has valid base fair value; and confirms supplying `nav_per_share` is recorded but does not change the EPS × target P/E valuation.
+- Added `test_v1_uses_stage5_eps_without_recalculating_from_net_profit`. It deliberately makes forecast net profit inconsistent with the supplied Stage 5 EPS, then verifies all scenario EPS values and fair values follow the supplied EPS.
+- Renamed `test_p2_required_flip_dependence_alerts_missing` to `test_v1_defers_undefined_flip_dependence_and_assumption_alerts`. It verifies all five D1–D5 deferred alert names are absent from both `alerts` and `valuation_risk_flags` across the selected cases, while retaining valuation-status and scenario-sensitivity checks.
+- Kept `test_p3_flip_dependence_alerts_remain_explicitly_unresolved` and its absence assertions. Its separate regression purpose is the attractive valuation case; it was not weakened.
+- Existing coverage was retained for the implemented driver set and driver outputs (`test_p2_sensitivity_drivers_present_and_bounded`), repeated-run determinism (`test_p2_sensitivity_deterministic_repeated_runs` and `test_p6_repeat_runs_identical_on_full_contract`), and scenario probability, fair value, and expected-value behavior (`test_valuation_engine_forward_pe_and_expected_fair_value`, `test_p6_scenario_ordering_flag_and_probability_normalization`, and `test_p6_regression_prior_behavior_preserved`). No redundant copies were added.
+
+## Validation
+
+Command run:
+
+```text
+.venv\Scripts\python.exe -m pytest src/tests/test_stage7_valuation.py -v
+```
+
+Result: **72 passed in 2.08s** (pytest 9.1.1, Python 3.12.9).
+
+## Scope and remaining blockers
+
+No production code, schema, parameter, or existing documentation file was modified. The only task changes are `src/tests/test_stage7_valuation.py` and this report.
+
+Stage 7 freeze blockers remain, including production-path integration and end-to-end evidence, Point-in-Time guarantees and date-safe provenance, and complete historical parameter versioning. Alert naming/consumer contract review and broader CI evidence also remain outstanding. This test reconciliation does not establish those guarantees or resolve those blockers. **Stage 7 remains NOT FROZEN.**
 
