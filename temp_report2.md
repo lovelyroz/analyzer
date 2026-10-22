@@ -4003,3 +4003,16 @@ pytest src/tests/test_stage8_market.py
 - **Historical versioning:** The full chain does not yet demonstrate historically versioned parameters and model inputs.
 - **Alert contract:** Deferred Stage 7 alert policies remain unresolved, including the documented D1–D6 items.
 - **Stage 7 freeze:** Stage 7 should remain unfrozen until its documented requirements and blockers are resolved or explicitly accepted.
+گزارش قبلی فایل‌هایی را که در اصلاح هشدارهای تست‌ها تغییر دادم ذکر نکرد. این فایل‌ها بودند:
+
+src/models/report.py
+ و 
+src/models/normalized.py
+ — اصلاح defaultهای زمانی SQLAlchemy که هشدارهای تست Stage 5 ایجاد می‌کردند.
+src/scoring/engine.py
+ و 
+src/tests/test_stage3_scoring.py
+ — اصلاح timestamp موتور و fixtureهای Stage 3.
+src/market/engine.py
+ — اصلاح timestampهای Stage 8.
+این تغییرها مربوط به رفع warningها بودند، نه اتصال مسیر واقعی Stage 7→9 در پرامپت ۴۷. برای خود اتصال، در پرامپت ۴۷ هیچ فایلی تغییر نکرد؛ چون entry point و تولیدکننده‌های لازم برای Stage 3 و Stage 8 پیدا نشدند.

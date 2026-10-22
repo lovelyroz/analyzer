@@ -1,89 +1,126 @@
-# P47 — Complete the Real Application Integration Path (Follow-up to P46)
+# P48 — Targeted Application Entry-Point and Runtime-Path Investigation
 
-You are continuing Stage 7 remediation in the local working directory `analyzer` for the financial-data application.
+You are continuing Stage 7 remediation in the local project directory `analyzer`.
 
-## Objective
+This is a financial-data application. Financial correctness, auditability, deterministic behavior, point-in-time correctness, and preservation of existing financial contracts are mandatory.
 
-P46 did not establish the real application execution path from upstream data production through Stage 7 valuation into Stage 9 decision-making. The current test `test_jalali_orchestration_passes_stage7_result_to_stage9` monkeypatches the Stage 7 valuation service and therefore does not prove real application integration.
+## 1. Objective
 
-Complete this task rather than repeating the previous report.
+Determine, using concrete repository evidence, whether the project currently has a real application entry point and whether the required stages can execute as a connected runtime path.
 
-## Mandatory boundaries
+P47 already reported that no coordinating production entry point or complete Stage 3/Stage 8 input producers were found in its investigation. Do not repeat P47 blindly. Verify the remaining question through a narrowly scoped inspection of application startup and runtime wiring.
 
-- Work only in the existing local repository.
-- Do not use GitHub, GitHub CLI/API, remote operations, push, pull, commit, or branch changes.
-- Do not run tests. The user will run them and provide the actual output.
+This is an investigation task. Do not implement a new architecture in P48.
+
+## 2. Strict Scope
+
+Inspect only the following, expanding the scope only when a specific reference requires it:
+
+1. Root-level files and project configuration that identify application startup or execution.
+2. README or setup documentation that describes how the application is launched.
+3. Explicit CLI, API, web-application, worker, scheduler, or other runtime entry-point modules, if present.
+4. The specific service or producer files needed to trace the runtime flow through Stages 3, 5, 7, 8, and 9.
+5. Direct callers and consumers of those functions, only as needed to establish the actual call path.
+
+Do not perform a repository-wide scan. Do not inspect unrelated modules. Do not repeat completed Stage 5, Stage 7, Stage 8, or Stage 9 unit-test reviews unless a specific reference is essential to this investigation.
+
+## 3. Required Questions
+
+Answer each question with file paths and relevant function/class names.
+
+### A. Application entry point
+
+- Does a real runnable application entry point exist?
+- If so, identify the exact file, callable, and launch mechanism.
+- Is it used by the application, or is it merely a module or test helper?
+- If no entry point is found in the inspected scope, state exactly what was inspected. Do not claim that no entry point exists anywhere unless the evidence supports that conclusion.
+
+### B. Stage 3 inputs
+
+- Where is `FundamentalScoreResult` created in the real runtime path?
+- Trace the required input data back to its actual producer or persistence source.
+- Identify any missing producer, loader, or caller.
+- Distinguish existing calculation engines from code that actually supplies their inputs.
+
+### C. Stage 5 forecast
+
+- Locate `generate_and_persist_forecast` and its direct callers.
+- Determine whether it is invoked by the actual application runtime.
+- Identify how Stage 1 data and Stage 4 `TrendResult` are supplied.
+- Determine whether its returned forecast is consumed by the subsequent runtime path or only returned to a caller that has not been identified.
+
+### D. Stage 8 market inputs
+
+- Identify how `MarketSignalResult` is produced in the actual runtime path.
+- Trace its required market and benchmark inputs to real producers, loaders, or persisted data.
+- Identify missing links without fabricating data or assuming that an engine is a data producer.
+
+### E. Session and Jalali as-of date
+
+- Identify where the SQLAlchemy session used by the relevant services originates.
+- Identify where the Jalali as-of date is chosen and validated.
+- Determine whether those values are passed through an actual application runtime path or are only supplied manually by callers/tests.
+- Do not infer historical data availability from an as-of date alone.
+
+### F. Stage 7 → Stage 9 execution and result handling
+
+- Trace the actual caller chain into `calculate_valuation_as_of_jalali` and `calculate_decision_as_of_jalali`, where applicable.
+- Determine whether Stage 9 receives the exact valuation result generated for the same company, forecast, market price, and as-of date.
+- Identify where the final decision is consumed, returned to an application boundary, or persisted.
+- Distinguish a tested orchestration service from a production caller.
+
+## 4. Evidence Rules
+
+For every claimed runtime connection, provide:
+
+- The exact file path.
+- The relevant callable or class.
+- The direct caller or invocation mechanism.
+- The evidence showing how inputs and outputs cross the boundary.
+
+Use labels such as:
+
+- `CONFIRMED`: directly supported by the inspected code.
+- `PARTIAL`: some links exist, but the full path is not established.
+- `MISSING`: a required link was not found within the explicitly inspected scope.
+- `UNKNOWN`: available evidence is insufficient.
+
+Do not describe a path as production-integrated merely because the individual functions exist or their unit tests pass.
+
+## 5. If the runtime path is incomplete
+
+Produce a precise gap list. For each missing link, state:
+
+1. The required responsibility.
+2. The data or interface it must accept.
+3. The authoritative source that should supply the data, if identifiable.
+4. The expected output or downstream consumer.
+5. What evidence is still needed before implementation can safely begin.
+
+Do not invent a source, financial input, formula, threshold, industry mapping, or historical timestamp. Do not add a duplicate orchestration service simply to make the path appear connected.
+
+If the project currently consists mainly of calculation modules without a coordinating runtime layer, state that as an architectural finding and identify the minimum missing interfaces. Do not implement those interfaces in P48.
+
+## 6. Prohibited Actions
+
+- Do not edit application code or tests.
+- Do not redesign, refactor, or centralize `engine.py`.
+- Do not change financial formulas, thresholds, warning names, or public contracts.
+- Do not run tests or CI; the user runs tests and provides actual outputs.
+- Do not access GitHub, GitHub CLI/API, remotes, push/pull, commits, or branch operations.
 - Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `ClaudeReports/`, `stepsForStage7.md`, or `stage_7_prompts.md`.
-- Do not perform a repository-wide scan. Trace only the relevant application entry point and the specific upstream/downstream modules needed.
-- Do not redesign or centralize `engine.py`; its review is reserved for the end of Stage 7.
-- Do not change financial formulas, EPS behavior, thresholds, alert policies, output contracts, or established Jalali market-price semantics.
-- Do not fabricate Stage 3, Stage 5, or Stage 8 data or treat mock-only tests as proof of production integration.
-- Do not claim that tests, CI, or runtime flows passed when you did not execute them.
+- Do not create or modify report files.
+- Do not claim tests passed or runtime execution was verified unless actual evidence exists.
 
-## Task 1 — Establish the actual execution path
+## 7. Required Final Response
 
-Trace the narrowest real application entry point that should lead to a Stage 9 decision.
+Return a concise but evidence-based report with these sections:
 
-Follow actual imports and calls to establish:
+1. **Entry-point finding** — confirmed entry point, or precisely scoped negative finding.
+2. **Runtime trace** — the confirmed and unconfirmed links across Stages 3, 5, 7, 8, and 9.
+3. **Session and as-of date** — actual origins and remaining gaps.
+4. **Missing interfaces and responsibilities** — an ordered list of concrete gaps.
+5. **Implementation readiness** — whether a safe real integration can begin now, and why.
+6. **Recommended next step** — the single highest-priority action after P48.
 
-1. How the application obtains or produces the Stage 5 `CompanyForecastResult`.
-2. How the real Stage 3 `FundamentalScoreResult` is produced or retrieved.
-3. How the real Stage 8 `MarketSignalResult` is produced or retrieved.
-4. Where the database session and requested Jalali as-of date originate.
-5. Whether the application invokes `calculate_decision_as_of_jalali`.
-6. Whether the resulting Stage 9 decision is returned, persisted, or consumed by the actual caller.
-
-Use the existing implementation and contracts. Do not infer a caller merely because a service function exists.
-
-## Task 2 — Implement the real connection when supported
-
-If the actual application has the authoritative inputs and interfaces needed, connect the real entry point to the existing orchestration boundary.
-
-Preserve:
-- company and forecast-period identity checks;
-- fail-closed behavior when required inputs or an eligible market price are missing;
-- the selected market-price provenance;
-- the exact Stage 7 valuation result passed into Stage 9;
-- existing financial calculations and output contracts.
-
-Do not silently substitute mock data, stale results, or results from a different company or period.
-
-If a required upstream producer or interface genuinely does not exist, do not invent one. Make any independently safe implementation changes, then identify the exact missing interface, its expected data contract, and why a safe connection cannot yet be made.
-
-## Task 3 — Add meaningful integration coverage
-
-Add a focused test that exercises the actual application entry point and its real orchestration path, using the project's existing fixtures and production interfaces wherever possible.
-
-The test must distinguish actual integration from a unit test that directly calls the orchestration function with fabricated objects.
-
-Verify, as applicable:
-- the actual entry point reaches Stage 7 and Stage 9;
-- upstream company/period mismatches fail closed;
-- the as-of market price is selected from persisted eligible observations;
-- market-price provenance survives into the valuation result;
-- the same valuation result reaches Stage 9;
-- missing mandatory inputs or missing eligible prices do not silently produce a decision.
-
-Use mocks only for external boundaries that genuinely require isolation. Do not mock away the integration being tested.
-
-If actual integration is impossible because a required producer or application entry point is absent, add only tests that can be grounded in existing real interfaces and explicitly document the missing piece. Do not label such tests end-to-end coverage.
-
-## Task 4 — Keep scope controlled
-
-Do not attempt to solve the entire historical Point-in-Time problem in this task. A Jalali as-of price selection is not proof that every upstream input was available at that time.
-
-Do not claim complete historical parameter versioning. Do not alter the deferred D1–D6 policies or resolve the separate known Stage 7 policy/test blockers by weakening tests.
-
-## Final response
-
-Report:
-1. The exact real application entry point and call chain found.
-2. Every production file changed and why.
-3. The exact integration test added and what real path it exercises.
-4. The exact command(s) the user should run locally; do not run them yourself.
-5. Any missing producer/interface that prevents a complete connection.
-6. Remaining Point-in-Time, historical-versioning, alert-contract, and Stage 7 freeze blockers.
-
-A report-only response is insufficient if a safe, supported implementation is possible. Do not claim completion without concrete code changes and a test that meaningfully verifies the connection.
-
-Stage 7 must remain unfrozen until the documented requirements and blockers have been resolved or explicitly accepted.
+Clearly list any files inspected. Make no code changes. Finish the investigation before reporting; do not stop at the first missing link if the remaining questions can be answered within the defined scope.
