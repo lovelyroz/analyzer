@@ -9,6 +9,7 @@ from src.valuation.models import (
     calculate_margin_of_safety,
 )
 from src.valuation.engine import ValuationEngine
+from src.valuation.service import MarketPriceUnavailableError, calculate_valuation_as_of_jalali
 
 __all__ = [
     "ScenarioValuation",
@@ -22,4 +23,6 @@ __all__ = [
     "calculate_nav_fair_value",
     "calculate_margin_of_safety",
     "ValuationEngine",
+    "MarketPriceUnavailableError",
+    "calculate_valuation_as_of_jalali",
 ]

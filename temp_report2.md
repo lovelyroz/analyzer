@@ -3874,3 +3874,18 @@ test_ohlc_ingestion_skips_missing_and_malformed_jalali_dates — confirms those 
 Updated test_ingest_ohlc_idempotent to check selection stays stable after repeated ingestion.
 Production connection
 No existing caller could be connected safely. The Stage 7 contract accepts market_price_date as a datetime; it has no Jalali-date field or observation/provenance input. The selector is available for callers through src.ingestion.market, but connecting it to Stage 7 would require a justified interface change.
+======================================================
+# P42 — Connect Jalali Market-Price Selection to the Valuation Boundary
+P42 اجرا شد. هیچ تستی اجرا نکردم؛ فقط تغییرات را بازبینی ایستا کردم و git diff --check را اجرا کردم.
+
+فایل‌های تغییرکرده:
+
+src/valuation/service.py
+ — سرویس calculate_valuation_as_of_jalali را اضافه می‌کند: قیمت را با selector موجود و بر اساس تاریخ جلالی انتخاب می‌کند، سازگاری شناسهٔ شرکت و دورهٔ پیش‌بینی را بررسی می‌کند و نتیجهٔ Stage 7 را همراه با تاریخ، منبع و مبنای قیمت در metadata برمی‌گرداند. تاریخ جلالی را به فیلدهای تاریخ میلادی نسبت نمی‌دهد؛ نبود قیمت هم با MarketPriceUnavailableError متوقف می‌شود.
+src/valuation/init.py
+ — سرویس و خطای نبود قیمت را export می‌کند.
+src/tests/test_stage7_valuation.py
+ — سه تست اضافه شده:
+test_jalali_service_uses_selected_price_and_preserves_provenance
+test_jalali_service_fails_closed_without_eligible_observation
+test_jalali_service_rejects_forecast_from_another_company

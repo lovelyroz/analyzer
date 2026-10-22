@@ -1,16 +1,86 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from src.forecast.schema import CompanyForecastResult, ForecastInputRef, ScenarioForecastResult, SingleForecastChain
+from src.core.database import Base
+from src.models.entity import Company, Industry
+from src.models.market import MarketDaily
 from src.valuation.engine import ValuationEngine
 from src.valuation.models import calculate_forward_pe, calculate_forward_pe_fair_value, calculate_margin_of_safety
+from src.valuation.service import MarketPriceUnavailableError, calculate_valuation_as_of_jalali
 
 
-def make_forecast(eps_bear=150.0, eps_base=180.0, eps_bull=210.0):
+@pytest.fixture
+def market_session():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        industry = Industry(industry_code="PETROCHEMICAL", industry_name="Petrochemical")
+        session.add(industry)
+        session.flush()
+        company = Company(ticker="TEST", company_name="Test", industry_id=industry.industry_id)
+        session.add(company)
+        session.flush()
+        yield session, company.company_id
+    engine.dispose()
+
+
+def test_jalali_service_uses_selected_price_and_preserves_provenance(market_session):
+    session, company_id = market_session
+    session.add(MarketDaily(
+        company_id=company_id,
+        jalali_year=1405,
+        jalali_month=2,
+        jalali_day=10,
+        close_price=Decimal("990.00"),
+        adjusted_close=Decimal("1000.00"),
+        source="CSV_PROVIDER",
+    ))
+    session.flush()
+
+    result = calculate_valuation_as_of_jalali(
+        session, company_id, 101, make_forecast(), (1405, 2, 11), historical_pe_values=[7.0]
+    )
+
+    assert result.current_price == 1000.0
+    assert result.scenarios["base"].forward_pe == round(1000.0 / 180.0, 4)
+    assert result.scenarios["base"].fair_value == 1260.0
+    assert result.market_price_date is None
+    assert result.metadata["market_price_observation"] == {
+        "calendar": "JALALI",
+        "as_of_jalali_date": (1405, 2, 11),
+        "source_jalali_date": (1405, 2, 10),
+        "price": "1000.00",
+        "price_basis": "ADJUSTED_CLOSE",
+        "source": "CSV_PROVIDER",
+        "market_data_id": 1,
+    }
+
+
+def test_jalali_service_fails_closed_without_eligible_observation(market_session):
+    session, company_id = market_session
+    with pytest.raises(MarketPriceUnavailableError):
+        calculate_valuation_as_of_jalali(
+            session, company_id, 101, make_forecast(), (1405, 2, 11), historical_pe_values=[7.0]
+        )
+
+
+def test_jalali_service_rejects_forecast_from_another_company(market_session):
+    session, company_id = market_session
+    with pytest.raises(ValueError, match="forecast company_id"):
+        calculate_valuation_as_of_jalali(
+            session, company_id, 101, make_forecast(company_id=company_id + 1), (1405, 2, 11), historical_pe_values=[7.0]
+        )
+
+
+def make_forecast(eps_bear=150.0, eps_base=180.0, eps_bull=210.0, company_id=1, period_id=101):
     return CompanyForecastResult(
-        company_id=1,
-        forecast_period_id=101,
+        company_id=company_id,
+        forecast_period_id=period_id,
         data_cutoff_datetime=datetime(2026, 1, 1),
         industry_code="PETROCHEMICAL",
         scenario_forecasts=ScenarioForecastResult(
