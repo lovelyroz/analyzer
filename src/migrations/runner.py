@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, Iterable
 
-from sqlalchemy import inspect, text
+from sqlalchemy import DateTime, bindparam, inspect, text
 from sqlalchemy.engine import Engine
 
 from src.core.database import Base
@@ -36,6 +36,17 @@ class Migration:
 
 
 MIGRATION_TABLE = "schema_migrations"
+
+
+def _utc_now_naive() -> datetime:
+    """Return naive UTC for the existing migration timestamp column."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+_INSERT_MIGRATION = text(
+    "INSERT INTO schema_migrations(version, name, applied_at) "
+    "VALUES (:version, :name, :applied_at)"
+).bindparams(bindparam("applied_at", type_=DateTime()))
 
 
 def _ensure_migration_table(engine: Engine) -> None:
@@ -171,8 +182,8 @@ class MigrationRunner:
         if current == 0 and _baseline_exists(self.engine):
             with self.engine.begin() as connection:
                 connection.execute(
-                    text("INSERT INTO schema_migrations(version, name, applied_at) VALUES (:version, :name, :applied_at)"),
-                    {"version": 1, "name": "legacy_baseline", "applied_at": datetime.utcnow()},
+                    _INSERT_MIGRATION,
+                    {"version": 1, "name": "legacy_baseline", "applied_at": _utc_now_naive()},
                 )
             current = 1
 
@@ -182,8 +193,8 @@ class MigrationRunner:
             migration.apply(self.engine)
             with self.engine.begin() as connection:
                 connection.execute(
-                    text("INSERT INTO schema_migrations(version, name, applied_at) VALUES (:version, :name, :applied_at)"),
-                    {"version": migration.version, "name": migration.name, "applied_at": datetime.utcnow()},
+                    _INSERT_MIGRATION,
+                    {"version": migration.version, "name": migration.name, "applied_at": _utc_now_naive()},
                 )
             current = migration.version
         return current

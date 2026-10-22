@@ -5,6 +5,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional, Tuple
 
+import jdatetime
+
 
 def to_decimal(raw: Optional[str]) -> Optional[Decimal]:
     if raw is None or str(raw).strip() == "":
@@ -42,6 +44,12 @@ def parse_jalali_components(s: str) -> Optional[Tuple[int, int, int]]:
         y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
     except ValueError:
         return None
-    if not (1 <= m <= 12 and 1 <= d <= 31):
+    if y < 1 or not (1 <= m <= 12 and 1 <= d <= 31):
+        return None
+    try:
+        # Constructor validates the Jalali month length and leap-year boundary;
+        # it does not convert or persist the date in another calendar.
+        jdatetime.date(y, m, d)
+    except (TypeError, ValueError, OverflowError):
         return None
     return y, m, d

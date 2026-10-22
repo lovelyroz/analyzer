@@ -1,96 +1,39 @@
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_missing_or_invalid_requested_date
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
 collected 1 item
 
-src\tests\test_stage9_decision.py .                                                                              [100%]
+src\tests\test_ingestion_ohlc.py .                                                                               [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9
-  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:39: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    calculation_timestamp=datetime.utcnow(),
-
-src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9
-  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:20: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    calculation_timestamp=datetime.utcnow(),
-
-src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9
-  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:49: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    as_of_date=datetime.utcnow(),
-
-src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9
-  D:\winprojects\analyzer\src\decision\engine.py:260: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    calculation_timestamp = datetime.utcnow()
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-============================================ 1 passed, 4 warnings in 0.66s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage9_decision.py::test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity
+================================================== 1 passed in 0.98s
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_discards_impossible_stored_date
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
 collected 1 item
 
-src\tests\test_stage9_decision.py .                                                                              [100%]
+src\tests\test_ingestion_ohlc.py .                                                                               [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_stage9_decision.py::test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity
-src/tests/test_stage9_decision.py::test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity
-  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:20: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    calculation_timestamp=datetime.utcnow(),
-
-src/tests/test_stage9_decision.py::test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity
-src/tests/test_stage9_decision.py::test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity
-  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:49: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    as_of_date=datetime.utcnow(),
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-============================================ 1 passed, 4 warnings in 0.65s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py::test_jalali_service_uses_selected_price_and_preserves_provenance
+================================================== 1 passed in 0.60s
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_accepts_valid_jalali_month_end_and_leap_boundary
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
 collected 1 item
 
-src\tests\test_stage7_valuation.py .                                                                             [100%]
+src\tests\test_ingestion_ohlc.py .                                                                               [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_stage7_valuation.py::test_jalali_service_uses_selected_price_and_preserves_provenance
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-============================================ 1 passed, 1 warning in 0.68s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py::test_jalali_service_fails_closed_without_eligible_observation
+================================================== 1 passed in 0.61s
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_accepts_valid_jalali_month_end_and_leap_boundary
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
 collected 1 item
 
-src\tests\test_stage7_valuation.py .                                                                             [100%]
+src\tests\test_ingestion_ohlc.py .                                                                               [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_stage7_valuation.py::test_jalali_service_fails_closed_without_eligible_observation
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-============================================ 1 passed, 1 warning in 0.63s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py::test_jalali_service_rejects_forecast_from_another_company
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
-rootdir: D:\winprojects\analyzer
-collected 1 item
-
-src\tests\test_stage7_valuation.py .                                                                             [100%]
-
-================================================== warnings summary ===================================================
-src/tests/test_stage7_valuation.py::test_jalali_service_rejects_forecast_from_another_company
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-============================================ 1 passed, 1 warning in 0.64s
+================================================== 1 passed in 0.61s ==================================================
 (analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
@@ -99,36 +42,7 @@ collected 1 item
 
 src\tests\test_ingestion_ohlc.py .                                                                               [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-  D:\winprojects\analyzer\src\migrations\runner.py:175: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    {"version": 1, "name": "legacy_baseline", "applied_at": datetime.utcnow()},
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\engine\default.py:952: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes
-    cursor.execute(statement, parameters)
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-  D:\winprojects\analyzer\src\migrations\runner.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    {"version": migration.version, "name": migration.name, "applied_at": datetime.utcnow()},
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_selects_exact_date_and_preserves_provenance
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================================== 1 passed, 15 warnings in 0.90s
+================================================== 1 passed in 0.60s
 (analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
@@ -137,37 +51,8 @@ collected 1 item
 
 src\tests\test_ingestion_ohlc.py .                                                                               [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-  D:\winprojects\analyzer\src\migrations\runner.py:175: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    {"version": 1, "name": "legacy_baseline", "applied_at": datetime.utcnow()},
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\engine\default.py:952: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes
-    cursor.execute(statement, parameters)
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-  D:\winprojects\analyzer\src\migrations\runner.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    {"version": migration.version, "name": migration.name, "applied_at": datetime.utcnow()},
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_uses_latest_prior_date_across_year_boundary
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================================== 1 passed, 15 warnings in 0.58s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
+================================================== 1 passed in 0.60s
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_isolates_company_and_ignores_undated_rows
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
@@ -175,37 +60,8 @@ collected 1 item
 
 src\tests\test_ingestion_ohlc.py .                                                                               [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-  D:\winprojects\analyzer\src\migrations\runner.py:175: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    {"version": 1, "name": "legacy_baseline", "applied_at": datetime.utcnow()},
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\engine\default.py:952: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes
-    cursor.execute(statement, parameters)
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-  D:\winprojects\analyzer\src\migrations\runner.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    {"version": migration.version, "name": migration.name, "applied_at": datetime.utcnow()},
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_returns_none_when_no_eligible_price
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================================== 1 passed, 15 warnings in 0.60s
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
+================================================== 1 passed in 0.95s
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py::test_migration_5_adds_jalali_columns
 ================================================= test session starts =================================================
 platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
@@ -213,75 +69,13 @@ collected 1 item
 
 src\tests\test_ingestion_ohlc.py .                                                                               [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-  D:\winprojects\analyzer\src\migrations\runner.py:175: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    {"version": 1, "name": "legacy_baseline", "applied_at": datetime.utcnow()},
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\engine\default.py:952: DeprecationWarning: The default datetime adapter is deprecated as of Python 3.12; see the sqlite3 documentation for suggested replacement recipes
-    cursor.execute(statement, parameters)
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-  D:\winprojects\analyzer\src\migrations\runner.py:186: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    {"version": migration.version, "name": migration.name, "applied_at": datetime.utcnow()},
-
-src/tests/test_ingestion_ohlc.py::test_market_price_as_of_rejects_duplicate_latest_jalali_observations
-  D:\winprojects\analyzer\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================================== 1 passed, 15 warnings in 0.59s
-(analyzer) PS D:\winprojects\analyzer> .venv\Scripts\python.exe -m pytest src/tests/test_stage9_decision.py -v
+================================================== 1 passed in 0.63s
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_ingestion_ohlc.py
 ================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\.venv\Scripts\python.exe
-cachedir: .pytest_cache
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
 rootdir: D:\winprojects\analyzer
-collected 15 items
+collected 14 items
 
-src/tests/test_stage9_decision.py::test_strong_buy_requires_aligned_families PASSED                              [  6%]
-src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9 PASSED               [ 13%]
-src/tests/test_stage9_decision.py::test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity PASSED [ 20%]
-src/tests/test_stage9_decision.py::test_value_trap_does_not_become_buy PASSED                                    [ 26%]
-src/tests/test_stage9_decision.py::test_strong_but_expensive_is_not_buy PASSED                                   [ 33%]
-src/tests/test_stage9_decision.py::test_low_forecast_reliability_limits_strong_conviction PASSED                 [ 40%]
-src/tests/test_stage9_decision.py::test_market_does_not_override_strong_fundamentals PASSED                      [ 46%]
-src/tests/test_stage9_decision.py::test_usd_share_value_is_context_not_a_new_score PASSED                        [ 53%]
-src/tests/test_stage9_decision.py::test_negative_eps_valuation_is_not_reconstructed_by_stage9 PASSED             [ 60%]
-src/tests/test_stage9_decision.py::test_no_position_sizing_contract PASSED                                       [ 66%]
-src/tests/test_stage9_decision.py::test_hysteresis_prevents_small_buy_to_hold_change PASSED                      [ 73%]
-src/tests/test_stage9_decision.py::test_hysteresis_allows_material_deterioration PASSED                          [ 80%]
-src/tests/test_stage9_decision.py::test_decision_history_contract PASSED                                         [ 86%]
-src/tests/test_stage9_decision.py::test_ranking_contract_has_no_new_score PASSED                                 [ 93%]
-src/tests/test_stage9_decision.py::test_dashboard_contract_carries_required_fields PASSED                        [100%]
+src\tests\test_ingestion_ohlc.py ..............                                                                  [100%]
 
-================================================== warnings summary ===================================================
-src/tests/test_stage9_decision.py: 16 warnings
-  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:20: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    calculation_timestamp=datetime.utcnow(),
-
-src/tests/test_stage9_decision.py: 14 warnings
-  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:39: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    calculation_timestamp=datetime.utcnow(),
-
-src/tests/test_stage9_decision.py: 16 warnings
-  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:49: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    as_of_date=datetime.utcnow(),
-
-src/tests/test_stage9_decision.py: 14 warnings
-  D:\winprojects\analyzer\src\decision\engine.py:260: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    calculation_timestamp = datetime.utcnow()
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-=========================================== 15 passed, 60 warnings in 1.25s
+================================================= 14 passed in 0.87s

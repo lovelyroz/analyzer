@@ -82,7 +82,11 @@ def select_market_price_as_of(
             MarketDaily.market_data_id.asc(),
         )
     )
-    rows = list(session.scalars(stmt))
+    rows = []
+    for row in session.scalars(stmt):
+        stored_date = (row.jalali_year, row.jalali_month, row.jalali_day)
+        if _is_valid_stored_jalali_date(stored_date):
+            rows.append(row)
     if not rows:
         return None
 
@@ -117,3 +121,12 @@ def select_market_price_as_of(
         source=selected.source,
         market_data_id=selected.market_data_id,
     )
+
+
+def _is_valid_stored_jalali_date(value: object) -> bool:
+    """Discard legacy/impossible persisted date tuples from price selection."""
+    try:
+        _validate_jalali_date(value, label="stored_jalali_date")
+    except (TypeError, ValueError):
+        return False
+    return True

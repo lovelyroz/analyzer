@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Union
 
@@ -14,6 +14,11 @@ from src.ingestion.market.adapter import load_ohlc_csv_rows
 from src.models.audit import IngestionRun
 from src.models.entity import Company
 from src.models.market import MarketDaily
+
+
+def _utc_now_naive() -> datetime:
+    """Return naive UTC to preserve the existing audit timestamp contract."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # Result type kept compatible with service.OhlcIngestionResult fields
@@ -54,7 +59,7 @@ def ingest_ohlc_csv(
             # Distinguish empty/invalid file (no fieldnames) from empty data rows
             run.status = "FAILED"
             run.error_log = "empty or invalid CSV"
-            run.finished_at = datetime.utcnow()
+            run.finished_at = _utc_now_naive()
             session.commit()
             return OhlcIngestionResult(
                 ingestion_id=run.ingestion_id,
@@ -129,7 +134,7 @@ def ingest_ohlc_csv(
         run.records_failed = failed
         run.error_log = "\n".join(errors[:50]) if errors else None
         run.status = "COMPLETED"
-        run.finished_at = datetime.utcnow()
+        run.finished_at = _utc_now_naive()
         session.commit()
 
         return OhlcIngestionResult(
@@ -149,7 +154,7 @@ def ingest_ohlc_csv(
             records_found=0,
             records_failed=0,
             error_log=str(exc),
-            finished_at=datetime.utcnow(),
+            finished_at=_utc_now_naive(),
         )
         session.add(failed_run)
         session.commit()

@@ -22,9 +22,8 @@ from src.models.market import MarketDaily
 def session():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    # Apply migrations so jalali columns exist even on metadata-created tables
-    runner = MigrationRunner(engine)
-    runner.upgrade()
+    # The mapped schema already includes the Jalali columns. Migration behavior
+    # is covered separately; keep migration timestamps out of this fixture.
     Session = sessionmaker(bind=engine)
     s = Session()
     ind = Industry(industry_code="BANK", industry_name="بانک‌ها")
@@ -36,8 +35,14 @@ def session():
         industry_id=ind.industry_id,
         codal_symbol="سامان",
         status="ACTIVE",
+        is_active=True,
     )
-    s.add(co)
+    company_values = {
+        column.name: getattr(co, column.name)
+        for column in Company.__table__.columns
+        if column.name != "created_at"
+    }
+    s.execute(Company.__table__.insert().values(**company_values, created_at=None))
     s.commit()
     yield s
     s.close()
@@ -131,9 +136,55 @@ def test_market_price_as_of_returns_none_when_no_eligible_price(session):
 
 def test_market_price_as_of_rejects_missing_or_invalid_requested_date(session):
     company = session.query(Company).one()
-    for requested in (None, (1403, 13, 1), (1403, 2, 0), (True, 1, 1)):
+    for requested in (
+        None,
+        (1403, 13, 1),
+        (1403, 2, 0),
+        (True, 1, 1),
+        (1402, 7, 31),  # Mehr has 30 days
+        (1402, 12, 30),  # Esfand 30 is invalid in this non-leap year
+    ):
         with pytest.raises(ValueError):
             select_market_price_as_of(session, company.company_id, requested)
+
+
+def test_market_price_as_of_discards_impossible_stored_date(session):
+    company = session.query(Company).one()
+    _add_market_observation(session, company.company_id, (1402, 7, 30), close_price=30)
+    invalid = _add_market_observation(
+        session, company.company_id, (1402, 7, 31), close_price=31,
+    )
+
+    selected = select_market_price_as_of(session, company.company_id, (1402, 8, 1))
+
+    assert selected is not None
+    assert selected.market_data_id != invalid.market_data_id
+    assert selected.source_jalali_date == (1402, 7, 30)
+    assert selected.price == Decimal("30")
+
+
+def test_market_price_as_of_accepts_valid_jalali_month_end_and_leap_boundary(session):
+    company = session.query(Company).one()
+    month_end = _add_market_observation(
+        session, company.company_id, (1402, 6, 31), close_price=61,
+    )
+    leap_day = _add_market_observation(
+        session, company.company_id, (1403, 12, 30), close_price=1230,
+    )
+
+    selected_month_end = select_market_price_as_of(
+        session, company.company_id, (1402, 6, 31),
+    )
+    selected_leap_day = select_market_price_as_of(
+        session, company.company_id, (1403, 12, 30),
+    )
+
+    assert selected_month_end is not None
+    assert selected_month_end.market_data_id == month_end.market_data_id
+    assert selected_month_end.source_jalali_date == (1402, 6, 31)
+    assert selected_leap_day is not None
+    assert selected_leap_day.market_data_id == leap_day.market_data_id
+    assert selected_leap_day.source_jalali_date == (1403, 12, 30)
 
 
 def test_market_price_as_of_isolates_company_and_ignores_undated_rows(session):

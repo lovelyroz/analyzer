@@ -3922,3 +3922,33 @@ generate_and_persist_forecast در Stage 5 وجود دارد، و مرز calcula
 هیچ تغییری در فایل‌های engine، فرمول‌های مالی، EPS، قرارداد خروجی یا selector قیمت انجام نشد. محدودیت‌های PIT و نسخه‌بندی تاریخی پارامترها نیز همچنان پابرجا هستند؛ تاریخ قطع داده به‌تنهایی دسترس‌پذیری واقعی همهٔ ورودی‌ها در آن تاریخ را اثبات نمی‌کند. دو مانع مستند دیگر Stage 7 دربارهٔ تفکیک عوامل ارزش‌گذاری و هشدارهای ریسک نیز در این تغییر حل نشده‌اند.
 =====================================================
 
+# P45 — Implement Reliable Jalali Calendar Validation for Market-Price Selection
+
+## Objective
+
+Prevent impossible Jalali dates from being accepted as market-price dates while preserving the project’s Jalali date convention and existing price-selection behavior.
+
+## Implementation
+
+Added `jdatetime` to `requirements.txt`. The shared `parse_jalali_components` parser now validates parsed dates using `jdatetime.date(year, month, day)`. Invalid dates return `None`; no Jalali-to-Gregorian conversion or Gregorian date assignment is performed.
+
+The market-price selector now validates stored Jalali dates before considering observations. Invalid stored rows are excluded, while company filtering, latest eligible date ordering, adjusted-close preference, close fallback, duplicate-date failure, and provenance behavior remain in place.
+
+## Files Changed
+
+- `requirements.txt` — declared the calendar-validation dependency.
+- `src/ingestion/common/parsing.py` — added full Jalali calendar validation to the shared parser.
+- `src/ingestion/market/queries.py` — filtered invalid stored Jalali dates before selecting a price.
+- `src/tests/test_ingestion_ohlc.py` — added regression coverage for invalid requested and stored dates, a valid month end, and a valid leap-year boundary.
+- `src/tests/test_ingestion_ohlc.py` fixture — removed migration work from the selector setup and avoided creating an unnecessary timestamp, eliminating setup warnings for the focused selector tests.
+- `src/models/entity.py`, `src/models/audit.py`, `src/ingestion/market/ingestion.py`, and `src/migrations/runner.py` — replaced deprecated UTC timestamp creation while preserving naive UTC storage; migration timestamps now use a typed `DateTime` bind to avoid SQLite adapter deprecation warnings.
+
+## Validation Results
+
+The user reports that all tests passed. The earlier `reply.md` output showed the three new date-validation tests passing; later output identified timestamp deprecation warnings in the selector setup and full OHLC module. Those warning sources were then addressed.
+
+The assistant did not run tests. No report file was created or edited as part of this archive summary.
+
+## Remaining Limitations
+
+This work validates Jalali calendar dates for parsing and market-price selection. It does not establish a real application caller for the Stage 7 → Stage 9 orchestration, claim Point-in-Time completeness, or provide historical parameter-version reconstruction. The project’s supported Python-version floor is not declared in `requirements.txt`.

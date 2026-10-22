@@ -1,6 +1,11 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
-from datetime import datetime
+from datetime import datetime, timezone
 from src.core.database import Base
+
+
+def _utc_now_naive() -> datetime:
+    """Return naive UTC for the existing DateTime storage convention."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Industry(Base):
@@ -24,4 +29,4 @@ class Company(Base):
     fiscal_year_end = Column(String(10), nullable=True)
     status = Column(String(30), nullable=False, default="ACTIVE")
     is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utc_now_naive)
