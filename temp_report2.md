@@ -3889,3 +3889,20 @@ src/tests/test_stage7_valuation.py
 test_jalali_service_uses_selected_price_and_preserves_provenance
 test_jalali_service_fails_closed_without_eligible_observation
 test_jalali_service_rejects_forecast_from_another_company
+=======================================================
+# P43 — Verify and Complete the Real Stage 7 → Stage 9 Integration
+تغییرات P43
+src/decision/service.py
+ — تابع calculate_decision_as_of_jalali را اضافه کردم. این مرز اجرایی یک پیش‌بینی Stage 5 و ورودی‌های معتبر Stage 3 و Stage 8 را می‌گیرد، سرویس Stage 7 را فراخوانی می‌کند و همان ValuationResult را به DecisionEngine.make_decision می‌دهد. نتیجهٔ ارزش‌گذاری و تصمیم هر دو برگردانده می‌شوند.
+src/decision/init.py
+ — تابع و نوع نتیجهٔ جدید را export می‌کند.
+src/tests/test_stage9_decision.py
+ — تست test_jalali_orchestration_passes_stage7_result_to_stage9 اضافه شد؛ بررسی می‌کند همان نتیجهٔ Stage 7 به Stage 9 می‌رسد و وضعیت ارزش‌گذاری در تصمیم حفظ می‌شود.
+مسیر اجرا و محدودیت باقی‌مانده
+در کد برنامه، پیش از این تغییری، callerای برای calculate_valuation_as_of_jalali یا DecisionEngine.make_decision پیدا نشد. اکنون یک مرز orchestration قابل‌فراخوانی وجود دارد، اما هنوز callerای از جریان اجرای برنامه آن را فراخوانی نمی‌کند؛ بنابراین اتصال واقعی Stage 7 → Stage 9 در مسیر اجرای برنامه برقرار نشده است. این تابع پیش‌بینی را خودش تولید یا از مخزن بازیابی نمی‌کند؛ ورودی Stage 5 و نتایج Stage 3 و Stage 8 باید از caller تأمین شوند.
+
+همچنین selector تاریخ‌های ذخیره‌شده را فقط با parser موجود بررسی می‌کند؛ آن parser محدودهٔ ماه و روز را می‌سنجد، نه اعتبار تقویمی کامل هر تاریخ. جست‌وجوی کدهای مربوط، ابزار موجودی برای اعتبارسنجی تقویمی کامل جلالی نشان نداد. پس تاریخ‌هایی که از نظر تقویمی ناممکن‌اند ممکن است انتخاب شوند؛ برای رفع این مورد، اعتبارسنج معتبر جلالی لازم است و من تقویم تازه یا تبدیل تاریخ جایگزین اضافه نکردم.
+
+تست‌های موجود selector برای جداسازی شرکت، انتخاب آخرین تاریخ واجد شرایط، نبود قیمت و رکوردهای تکراری در 
+src/tests/test_ingestion_ohlc.py
+ هستند. تست‌های Stage 7 نیز قبلاً سازگاری مستقیم ValuationEngine.calculate_valuation و خالی‌ماندن فیلد تاریخ میلادی را پوشش می‌دهند.

@@ -1,9 +1,11 @@
 from datetime import datetime
+from types import SimpleNamespace
 
 from src.market.schema import MarketSignalResult
 from src.scoring.schema import FundamentalScoreResult
 from src.valuation.schema import ValuationResult
 from src.decision.engine import DecisionEngine
+from src.decision import service as decision_service
 
 
 def make_fundamental(score):
@@ -60,6 +62,38 @@ def test_strong_buy_requires_aligned_families():
     assert result.recommendation == "STRONG_BUY"
     assert result.holding_status == "STRONG_HOLD"
     assert result.decision_confidence >= 75
+
+
+def test_jalali_orchestration_passes_stage7_result_to_stage9(monkeypatch):
+    valuation = make_valuation()
+    monkeypatch.setattr(
+        decision_service,
+        "calculate_valuation_as_of_jalali",
+        lambda *args, **kwargs: valuation,
+    )
+    original_make_decision = DecisionEngine.make_decision
+    received = {}
+
+    def capture_valuation(self, company_id, period_id, fundamental, valuation_result, market, reliability=None, **kwargs):
+        received["valuation"] = valuation_result
+        return original_make_decision(
+            self, company_id, period_id, fundamental, valuation_result, market, reliability, **kwargs
+        )
+
+    monkeypatch.setattr(DecisionEngine, "make_decision", capture_valuation)
+    forecast = SimpleNamespace(company_id=1, forecast_period_id=10)
+
+    result = decision_service.calculate_decision_as_of_jalali(
+        session=None,
+        forecast_result=forecast,
+        as_of_jalali_date=(1405, 2, 11),
+        fundamental_result=make_fundamental(85),
+        market_result=make_market(),
+    )
+
+    assert result.valuation is valuation
+    assert received["valuation"] is valuation
+    assert result.decision.valuation_status == valuation.valuation_status
     assert result.metadata["market_score_used"] is False
     assert result.metadata["position_sizing_used"] is False
 
