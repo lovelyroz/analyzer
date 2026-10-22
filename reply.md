@@ -1,202 +1,130 @@
-# گزارش ممیزی یکپارچه و آماده‌سازی تصمیم‌های اجرایی Stage 7 پروژه analyzer
+(analyzer) PS D:\winprojects\analyzer> .\.venv_test\Scripts\python.exe -m pytest -q .\src\tests\test_stage8_market.py .\src\tests\test_stage8_market_parameters.py
+.................                                                                                                [100%]
+================================================== warnings summary ===================================================
+src/tests/test_stage8_market.py: 10 warnings
+  D:\winprojects\analyzer\src\market\engine.py:137: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp=datetime.utcnow(),
 
-بر اساس بررسی فایل **PROMPT** و تحلیل تطبیقی تمام مستندات و گزارش‌های موجود در منابع پروژه (شامل `07_Stage7_Valuation.md`، `stepsForStage7.md`، `reply.md`، `temp_report2.md` و کدهای موتور ارزش‌گذاری)، گزارش ممیزی جامع به شرح زیر ارائه می‌شود:
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+17 passed, 10 warnings in 0.11s
+(analyzer) PS D:\winprojects\analyzer> .venv\Scripts\python.exe -m pytest src/tests/test_stage7_valuation.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 72 items
 
----
+src/tests/test_stage7_valuation.py::test_valuation_models PASSED                                                 [  1%]
+src/tests/test_stage7_valuation.py::test_valuation_engine_forward_pe_and_expected_fair_value PASSED              [  2%]
+src/tests/test_stage7_valuation.py::test_industry_forward_pe_requires_eight_valid_peers PASSED                   [  4%]
+src/tests/test_stage7_valuation.py::test_industry_ttm_is_fallback_after_historical_median PASSED                 [  5%]
+src/tests/test_stage7_valuation.py::test_negative_eps_does_not_create_fake_pe_or_fair_value PASSED               [  6%]
+src/tests/test_stage7_valuation.py::test_reliability_does_not_change_forward_pe_or_fair_value PASSED             [  8%]
+src/tests/test_stage7_valuation.py::test_direct_probability_adjustments_are_rejected_in_favor_of_family_evidence PASSED [  9%]
+src/tests/test_stage7_valuation.py::test_probability_evidence_is_family_level_and_equal_weighted PASSED          [ 11%]
+src/tests/test_stage7_valuation.py::test_probability_evidence_rejects_unknown_or_incomplete_family_data PASSED   [ 12%]
+src/tests/test_stage7_valuation.py::test_scenario_multiple_adjustments_require_economic_rationale_and_are_bounded PASSED [ 13%]
+src/tests/test_stage7_valuation.py::test_alerts_include_severity_and_driver_focus PASSED                         [ 15%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_drivers_present_and_bounded PASSED                       [ 16%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_missing_data_empty_drivers PASSED                        [ 18%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_deterministic_repeated_runs PASSED                       [ 19%]
+src/tests/test_stage7_valuation.py::test_p2_alert_severity_levels_valid PASSED                                   [ 20%]
+src/tests/test_stage7_valuation.py::test_p2_alert_low_reliability_threshold_boundaries PASSED                    [ 22%]
+src/tests/test_stage7_valuation.py::test_p2_alert_high_dispersion_threshold_boundaries PASSED                    [ 23%]
+src/tests/test_stage7_valuation.py::test_p2_alert_divergence_ratios_boundaries PASSED                            [ 25%]
+src/tests/test_stage7_valuation.py::test_v1_sector_examples_use_only_eps_and_target_pe_drivers PASSED            [ 26%]
+src/tests/test_stage7_valuation.py::test_v1_uses_stage5_eps_without_recalculating_from_net_profit PASSED         [ 27%]
+src/tests/test_stage7_valuation.py::test_v1_defers_undefined_flip_dependence_and_assumption_alerts PASSED        [ 29%]
+src/tests/test_stage7_valuation.py::test_p3_sensitivity_recomputes_from_valuation_identity PASSED                [ 30%]
+src/tests/test_stage7_valuation.py::test_p3_nan_eps_is_guarded_as_invalid PASSED                                 [ 31%]
+src/tests/test_stage7_valuation.py::test_p3_zero_and_negative_price_guarded PASSED                               [ 33%]
+src/tests/test_stage7_valuation.py::test_p3_nonfinite_benchmark_series_filtered PASSED                           [ 34%]
+src/tests/test_stage7_valuation.py::test_p3_nonfinite_scores_fall_back_to_defaults PASSED                        [ 36%]
+src/tests/test_stage7_valuation.py::test_p3_flip_dependence_alerts_remain_explicitly_unresolved PASSED           [ 37%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_below_minimum_falls_back PASSED                           [ 38%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_at_minimum_selects_industry_forward PASSED                [ 40%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_above_minimum_and_median_provenance PASSED                [ 41%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_filters_invalid_values PASSED                             [ 43%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_empty_data_reports_zero_and_falls_back PASSED             [ 44%]
+src/tests/test_stage7_valuation.py::test_p4_benchmark_fallback_ignores_forward_count_for_ttm PASSED              [ 45%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_price_yields_null_outputs PASSED                           [ 47%]
+src/tests/test_stage7_valuation.py::test_p5_missing_eps_is_not_applicable_not_zero PASSED                        [ 48%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_reliability_echo_sanitized PASSED                          [ 50%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_probability_confidence_echo_finite PASSED                  [ 51%]
+src/tests/test_stage7_valuation.py::test_p5_missing_data_quality_does_not_crash PASSED                           [ 52%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_multiple_adjustment_rejected PASSED                        [ 54%]
+src/tests/test_stage7_valuation.py::test_p5_nan_probability_evidence_rejected PASSED                             [ 55%]
+src/tests/test_stage7_valuation.py::test_p5_datetime_echoes_normalized_to_utc PASSED                             [ 56%]
+src/tests/test_stage7_valuation.py::test_p5_default_cutoff_inherits_forecast_cutoff_normalized PASSED            [ 58%]
+src/tests/test_stage7_valuation.py::test_p5_undated_benchmark_series_carry_no_provenance PASSED                  [ 59%]
+src/tests/test_stage7_valuation.py::test_p6_production_path_real_stage5_forecast PASSED                          [ 61%]
+src/tests/test_stage7_valuation.py::test_p6_cutoff_pit_limitation_pinned PASSED                                  [ 62%]
+src/tests/test_stage7_valuation.py::test_p6_missing_benchmarks_yield_guarded_nulls PASSED                        [ 63%]
+src/tests/test_stage7_valuation.py::test_p6_scenario_ordering_flag_and_probability_normalization PASSED          [ 65%]
+src/tests/test_stage7_valuation.py::test_p6_invalid_eps_variants_never_fabricate_values PASSED                   [ 66%]
+src/tests/test_stage7_valuation.py::test_p6_repeat_runs_identical_on_full_contract PASSED                        [ 68%]
+src/tests/test_stage7_valuation.py::test_p6_regression_prior_behavior_preserved PASSED                           [ 69%]
+src/tests/test_stage7_valuation.py::test_p10_expensive_base_upside_parameterized_outputs_unchanged PASSED        [ 70%]
+src/tests/test_stage7_valuation.py::test_p10_expensive_threshold_consumed_from_parameters PASSED                 [ 72%]
+src/tests/test_stage7_valuation.py::test_p12_calculation_timestamp_utc_aware_and_deterministic PASSED            [ 73%]
+src/tests/test_stage7_valuation.py::test_p32_input_refs_before_cutoff_leave_results_unchanged PASSED             [ 75%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_after_cutoff_rejected_on_valuation_path PASSED            [ 76%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_at_cutoff_boundary_accepted PASSED                        [ 77%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_missing_date_rejected PASSED                              [ 79%]
+src/tests/test_stage7_valuation.py::test_p32_input_refs_absent_preserves_legacy_path PASSED                      [ 80%]
+src/tests/test_stage7_valuation.py::test_p33_genesis_snapshot_matches_live_constants PASSED                      [ 81%]
+src/tests/test_stage7_valuation.py::test_p33_result_carries_parameter_audit PASSED                               [ 83%]
+src/tests/test_stage7_valuation.py::test_p33_resolve_exact_key_and_missing_raises PASSED                         [ 84%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_without_dated_records_raises PASSED                           [ 86%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_selection_mechanics PASSED                                    [ 87%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_overlap_raises_ambiguity PASSED                               [ 88%]
+src/tests/test_stage7_valuation.py::test_p35_legacy_path_provenance_is_truthful_and_unchanged PASSED             [ 90%]
+src/tests/test_stage7_valuation.py::test_p35_snapshot_reports_values_actually_consumed_when_module_constant_changes PASSED [ 91%]
+src/tests/test_stage7_valuation.py::test_p35_as_of_selection_governs_calculation_and_snapshot_matches PASSED     [ 93%]
+src/tests/test_stage7_valuation.py::test_p35_selected_set_governs_peers_alerts_and_scenario_weights PASSED       [ 94%]
+src/tests/test_stage7_valuation.py::test_p35_missing_or_ambiguous_as_of_selection_fails_closed PASSED            [ 95%]
+src/tests/test_stage7_valuation.py::test_p35_invalid_parameter_set_raises_without_fallback_to_constants PASSED   [ 97%]
+src/tests/test_stage7_valuation.py::test_p35_isolation_from_global_mutation_and_snapshot_aliasing PASSED         [ 98%]
+src/tests/test_stage7_valuation.py::test_p35_repeated_as_of_calculations_are_deterministic PASSED                [100%]
 
-## بخش اول — وضعیت و اعتبار منابع
+================================================= 72 passed in 0.72s 
+(analyzer) PS D:\winprojects\analyzer> .venv\Scripts\python.exe -m pytest src/tests/test_stage9_decision.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 13 items
 
-### ۱. منابع در دسترس و نقش هر کدام
-* **`07_Stage7_Valuation.md`:** سند اصلی مشخصات فنی و مالی Stage 7 (تعریف فرمول‌ها، آستانه‌ها، Alertها و منطق ارزش‌گذاری).
-* **`stepsForStage7.md`:** پیشنهادات سیاست‌گذار/مالک پروژه برای تعیین تکلیف تصمیم‌های باز D1 تا D9.
-* **`reply.md`:** ممیزی فنی واقعیت‌های V1 کد در برابر مشخصات (ثبت دقیق غیاب برخی Alertها و درایورهای صنعت).
-* **`temp_report2.md`:** تاریخچه گزارش‌های ممیزی فنی و اجرایی P1 تا P36 (شامل آخرین وضعیت ثبت‌شده در P35/P36).
-* **کدهای موتور و تست‌ها (`src/valuation/` و `src/tests/test_stage7_valuation.py`):** مرجع واقعی پیاده‌سازی.
+src/tests/test_stage9_decision.py::test_strong_buy_requires_aligned_families PASSED                              [  7%]
+src/tests/test_stage9_decision.py::test_value_trap_does_not_become_buy PASSED                                    [ 15%]
+src/tests/test_stage9_decision.py::test_strong_but_expensive_is_not_buy PASSED                                   [ 23%]
+src/tests/test_stage9_decision.py::test_low_forecast_reliability_limits_strong_conviction PASSED                 [ 30%]
+src/tests/test_stage9_decision.py::test_market_does_not_override_strong_fundamentals PASSED                      [ 38%]
+src/tests/test_stage9_decision.py::test_usd_share_value_is_context_not_a_new_score PASSED                        [ 46%]
+src/tests/test_stage9_decision.py::test_negative_eps_valuation_is_not_reconstructed_by_stage9 PASSED             [ 53%]
+src/tests/test_stage9_decision.py::test_no_position_sizing_contract PASSED                                       [ 61%]
+src/tests/test_stage9_decision.py::test_hysteresis_prevents_small_buy_to_hold_change PASSED                      [ 69%]
+src/tests/test_stage9_decision.py::test_hysteresis_allows_material_deterioration PASSED                          [ 76%]
+src/tests/test_stage9_decision.py::test_decision_history_contract PASSED                                         [ 84%]
+src/tests/test_stage9_decision.py::test_ranking_contract_has_no_new_score PASSED                                 [ 92%]
+src/tests/test_stage9_decision.py::test_dashboard_contract_carries_required_fields PASSED                        [100%]
 
-### ۲. آخرین وضعیت گزارش‌شده Stage 7
-طبق آخرین گزارش‌های ثبت‌شده (P35/P36 در `temp_report2.md` بر روی شاخه `stage7/remediation-2026-10-14`):
-* قابلیت ثبت و مصرف پارامترها به‌صورت As-Of (اعتبار زمانی) پیاده‌سازی شده است.
-* تعداد ۶۸ تست پاس و ۳ تست شکست روی یک محیط شبیه‌سازی‌شده محلی ثبت شده است.
-* **Stage 7 تثبیت نشده است (NOT FROZEN).**
+================================================== warnings summary ===================================================
+src/tests/test_stage9_decision.py: 13 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:16: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp=datetime.utcnow(),
 
-### ۳. محدودیت‌های شواهد و اعتبارسنجی
-* **عدم اجرای pytest واقعی:** گزارش‌های P35/P36 صریحاً قید کرده‌اند که تست‌ها با یک اجرای شبیه‌سازی‌شده (stand-in runner) انجام شده و pytest واقعی پروژه روی محیط venv اجرا نشده است.
-* **تغییرات منحصر به Snapshot:** تغییرات گزارش‌شده در P35/P36 روی شاخه موقت `stage7/remediation-2026-10-14` بوده و حضور آن‌ها در شاخه اصلی (master) یا کد محلی کاربر نیازمند بررسی مستقیم است.
-* **عدم اثبات یکپارچگی تولید:** هیچ فراخوان واقعی تولیدی برای `calculate_valuation` در مسیر اصلی برنامه (مانند `src/decision/engine.py`) یا Integration Test پویا وجود ندارد.
+src/tests/test_stage9_decision.py: 13 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:35: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp=datetime.utcnow(),
 
----
+src/tests/test_stage9_decision.py: 13 warnings
+  D:\winprojects\analyzer\src\tests\test_stage9_decision.py:45: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    as_of_date=datetime.utcnow(),
 
-## بخش دوم — تطبیق مشخصات با کد و تست‌ها
+src/tests/test_stage9_decision.py: 13 warnings
+  D:\winprojects\analyzer\src\decision\engine.py:260: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    calculation_timestamp = datetime.utcnow()
 
-جدول زیر تطبیق الزامات سند `07_Stage7_Valuation.md` با کد موتور (`src/valuation/engine.py`، `parameters.py`، `schema.py`، `models.py`) و تست‌ها را نشان می‌دهد:
-
-| حوزه الزام | رفتار مورد انتظار طبق مشخصات | شواهد کد | شواهد تست | وضعیت فعلی | اثر بر صحت مالی | اقدام لازم برای رفع ابهام/نقص |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **۱. Forward P/E و Fair Value** | محاسبه ارزش منصفانه از ضرب EPS پیش‌بینی‌شده در Target P/E | اجرای فرمول در `engine.py` و `models.py` | پاس در تست‌های واحد پایه | **پیاده‌سازی‌شده** | درست در حالات استاندارد | عدم نیاز به تغییر فرمول پایه |
-| **۲. EPS منفی/صفر/تغییر علامت** | صدور Alert و مدیریت سناریوهای بحرانی | صدور فقط در سطح Flag (`_eps_flags` و `_scenario_sign_change_flags`) | تست Flag وجود دارد | **ناقص (Flag-level only)** | بالا (عدم هشدار ریسک مالی) | تعیین تکلیف ارتقا به Alert یا پذیرش Flag در V1 |
-| **۳. سلسله‌مراتب Benchmark و Peer** | اولویت‌بندی Benchmark و حداقل تعداد Peer | صدور `INSUFFICIENT_PEER_DATA` فقط در سطح Flag | تست Flag وجود دارد | **ناقص (Flag-level only)** | متوسط | تعیین تکلیف پذیرش سطح Flag برای V1 |
-| **۴. احتمال سناریوها و ترتیب** | مجموع احتمال‌ها = ۱، ترتیب Bear <= Base <= Bull | چک‌های سناریویی در `engine.py` | تست‌های سناریو پاس شده‌اند | **پیاده‌سازی‌شده** | کنترل‌شده | حفظ رفتار موجود |
-| **۵. Expected Fair Value & Upside** | میانگین موزون ارزش و Upside نسبت به قیمت روز | فرمول‌های موزون در `engine.py` اجرا شده‌اند | پاس شده است | **پیاده‌سازی‌شده** | درست | حفظ رفتار موجود |
-| **۶. Valuation Assessment & Risk** | دسته‌بندی قیمت (ATTRACTIVE/FAIR/EXPENSIVE) و نمره‌دهی | نمره‌دهی محاسبه می‌شود ولی جریمه‌ها هاردکد خارج از پارامترهاست | تست شده است | **پیاده‌سازی‌شده با هاردکد** | متوسط | انتقال ثابت‌ها به registry در V2 |
-| **۷. نام هشدارهای ریسک** | صدور ۱۴ Alert الزامی (از جمله Flip, Dependence, Margin) | صفر ارجاع به `ASSESSMENT_FLIP_RISK` و `HIGH_EPS_DEPENDENCE`؛ نام‌گذاری متفاوت در سایرین | شکست ۲ تست P2 به دلیل غیاب این Alertها | **ناقص / غایب (Name Mismatch & Absent)** | **شدید** | اعمال تصمیم D1 تا D4 (تعویق به V2) و هماهنگی نام‌ها (D8) |
-| **۸. رفتار قطعی و اجرای مجدد** | ورودی یکسان باید خروجی کاملاً همسان بدهد | رفتار قطعی است اما متکی بر ثوابت سراسری قابل تغییر است | تست‌های P10 و P35 تأیید کرده‌اند | **پیاده‌سازی‌شده** | کم در اجرای ایزوله | حفظ ایزولاسیون پارامترها |
-| **۹. نسخه مدل و پارامترها** | ثبت شناسه نسخه و قابلیت ممیزی | در P35 ساختار `parameter_registry` اضافه شده است | تست‌های P35 پاس می‌شوند | **پیاده‌سازی نسبی** | متوسط | تکمیل ثبت پارامترهای هاردکدشده در V2 |
-| **۱۰. محدودیت‌های Point-in-Time** | عدم استفاده از داده‌های منتشرشده پس از تاریخ مبنا | مکانیسم As-of اضافه شده اما مسیر default متکی بر ثوابت بدون تاریخ است | تست‌های P35 اضافه شده‌اند | **ناقص در مسیر اصلی** | بالا (خطر Look-ahead bias) | ثبت صریح محدودیت PIT در مستندات V1 |
-| **۱۱. مرز با Forecast و Stage 9** | دریافت ForecastData و تحویل به Stage 9 | Stage 9 فقط فیلدهای کلیدی خروجی را می‌خواند | بررسی استاتیک انجام شده | **مبهم** | متوسط | اجرای تست پویا بین Stage 7 و Stage 9 |
-| **۱۲. مسیر اجرای تولیدی** | فراخوانی `calculate_valuation` در pipeline اصلی | هیچ کد فراخوان تولیدی در اسنپ‌شات یافت نشد | هیچ Integration Test واقعی وجود ندارد | **غایب / غیرقابل تأیید** | **حیاتی** | ایجاد Integration Test واقعی در مسیر تولید |
-
----
-
-## بخش سوم — بررسی تصمیم‌های D1 تا D9
-
-بر اساس بررسی فایل `stepsForStage7.md` و تطبیق آن با شواهد کد (`reply.md`):
-
-* **D1 — تغییر وضعیت ارزش‌گذاری (Assessment Flip Risk):**
-  * *تصمیم پیشنهادی:* تعویق صدور Alert جدید تا زمان تعریف آستانه‌ها و شوک‌های معتبر.
-  * *شواهد:* صفر ارجاع به `ASSESSMENT_FLIP_RISK` در کد. تست P2 نشان می‌دهد شوک ۱۰٪ EPS وضعیت را تغییر می‌دهد ولی Alertی صادر نمی‌شود.
-  * *اقدام:* ثبت تعویق رسمی به V2 در مشخصات.
-* **D2 — وابستگی به ضریب P/E (HIGH_MULTIPLE_DEPENDENCE):**
-  * *تصمیم پیشنهادی:* عدم پذیرش شاخص فعلی و غیرفعال ماندن هشدار و آستانه ۰٫۶۰.
-  * *شواهد:* صفر ارجاع در کد.
-  * *اقدام:* ثبت تعویق رسمی به V2.
-* **D3 — وابستگی به EPS (HIGH_EPS_DEPENDENCE) و حفظ EPS ورودی:**
-  * *تصمیم پیشنهادی:* تعویق هشدار؛ حفظ EPS ورودی از Stage 5 بدون محاسبه مجدد.
-  * *شواهد:* صفر ارجاع در کد. EPS ورودی دست‌نخورده باقی می‌ماند.
-  * *اقدام:* ثبت عدم محاسبه مجدد EPS در مشخصات V1.
-* **D4 — ریسک حاشیه سود (MARGIN_ASSUMPTION_RISK):**
-  * *تصمیم پیشنهادی:* عدم پیاده‌سازی در V1 به دلیل نبود ورودی‌های معتبر تاریخ‌دار.
-  * *شواهد:* عدم وجود فیلدهای ورودی در Schema و صفر ارجاع در کد.
-  * *اقدام:* ثبت محدودیت در مستندات V1.
-* **D5 — تفکیک review_priority از هشدار HIGH_IMPACT_HIGH_UNCERTAINTY:**
-  * *تصمیم پیشنهادی:* حفظ خروجی تحلیلی `review_priority` و عدم صدور Alert جدید.
-  * *شواهد:* `review_priority` در کد محاسبه می‌شود؛ Alert مذکور ۰ ارجاع دارد.
-  * *اقدام:* تصویب عدم افزودن Alert جدید در V1.
-* **D6 — تحلیل اختصاصی صنعت (Sector Driver Decomposition):**
-  * *تصمیم پیشنهادی:* حفظ دو درایور فعلی (EPS و TARGET_PE)؛ تعویق زنجیره‌های بانک، هلدینگ و شرکت‌های غیرمالی به V2.
-  * *شواهد:* کد `_driver_analysis` فقط EPS و TARGET_PE تولید می‌کند و هیچ شاخه‌گیری بر اساس `industry_code` ندارد.
-  * *اقدام:* به‌روزرسانی مشخصات مطابق واقعیت دو درایوری V1.
-* **D7 — اعتبار زمانی داده‌ها (Point-in-Time):**
-  * *تصمیم پیشنهادی:* اعلام صریح محدودیت PIT در مستندات و عدم ادعای حفاظت کامل.
-  * *شواهد:* داده‌های بازار و پارامترها فاقد تاریخ انتشار اثبات‌شده هستند.
-  * *اقدام:* ثبت رسمی محدودیت PIT در مستندات V1.
-* **D8 — یکسان‌سازی نام هشدارها و مشخصات:**
-  * *تصمیم پیشنهادی:* حفظ نام‌های موجود در کد (`WATCH:VALUATION_ABOVE_TARGET_PE` و ...) و اصلاح مشخصات مطابق کد فعلی.
-  * *شواهد:* ثبت عدم تطابق نام‌ها در `reply.md`.
-  * *اقدام:* اصلاح جدول هشدارهای مشخصات مطابق کد فعلی.
-* **D9 — نسخه‌بندی پارامترهای مدل:**
-  * *تصمیم پیشنهادی:* حفظ شناسه نسخه فعلی و تعویق نسخه‌بندی کامل تاریخی.
-  * *شواهد:* ساختار پایه اضافه شده اما سابقه تاریخی کامل پارامترها وجود ندارد.
-  * *اقدام:* ثبت تعویق به V2.
-
----
-
-## بخش چهارم — بررسی دو تست مورد اختلاف
-
-دو تست زیر در گزارش‌ها مورد بحث بوده‌اند:
-1. `test_p2_sector_driver_decomposition_missing`
-2. `test_p2_required_flip_dependence_alerts_missing`
-
-**نتایج بررسی دقیق:**
-* **ماهیت:** این دو، توابع تست واقعی هستند که در فایل `src/tests/test_stage7_valuation.py` قرار دارند (تحت گزارش P2 با رویکرد failing-first اضافه شده‌اند). فایل مجزایی به این نام‌ها وجود ندارد.
-* **علت شکست:** 
-  * تست اول وجود درایورهای اختصاصی صنعت (بانک/هلدینگ) را چک می‌کند که طبق تصمیم D6 به V2 موکول شده است.
-  * تست دوم صدور Alertهای `ASSESSMENT_FLIP_RISK` و `HIGH_EPS_DEPENDENCE` را چک می‌کند که طبق تصمیم‌های D1 و D3 به V2 موکول شده‌اند.
-* **نتیجه قطعی:** این دو تست، "تست‌های افشاگر نقص مشخصات" هستند. تا زمانی که تصمیم‌های D1 و D6 در مشخصات ثبت نشده و assertionهای این دو تست مطابق سیاست V1 به‌روزرسانی نشوند، این تست‌ها شکست خواهند خورد.
-
----
-
-## بخش پنجم — بررسی گزارش‌های قبلی و تناقض‌ها
-
-| ادعای اول | ادعای متعارض | منبع ادعاها | شواهد مستقل موجود | نتیجه فعلی | کوچک‌ترین اقدام لازم |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Stage 7 سبز کامل و PASS شده است.** | ۲ تست P2 شکست می‌خورند و Stage 7 تثبیت‌نشده (NOT FROZEN) است. | گزارش‌های اولیه در برابر `temp_report2.md` و `reply.md` | اجرای ۶۸ پاس و ۳ شکست. ثبت غیاب کد D1/D6 در `reply.md`. | **حل‌نشده در ادعاها / حل‌شده در واقعیت** | پذیرش رسمی عدم تثبیت و شکست ۲ تست P2 به دلیل غیاب D1/D6. |
-| **تحلیل درایورها برای بانک و هلدینگ پیاده شده است.** | درایور ارزش‌گذاری فقط ۲ مورد ثابت (EPS, Target PE) تولید می‌کند. | مشخصات اولیه در برابر `reply.md` بخش ۴۴ | تابع `_driver_analysis` هیچ شاخه‌گیری بر اساس صنعت ندارد. | **تعارض مشخصات با کد** | اعمال تصمیم D6 (تعویق درایورهای صنعت به V2) و اصلاح مشخصات. |
-| **سیستم Alert جامع برای Flip و Dependence دارد.** | کد صفر ارجاع به `ASSESSMENT_FLIP_RISK` و `HIGH_EPS_DEPENDENCE` دارد. | مشخصات بخش ۴۹ در برابر `reply.md` و کد | جستجوی متنی در کدهای `src/valuation` صفر نتیجه برمی‌گرداند. | **غیاب کامل در کد** | اعمال تصمیم‌های D1 تا D4 (تعویق Alertها به V2). |
-| **تست‌ها با pytest واقعی پروژه پاس شده‌اند.** | تست‌ها با یک stand-in runner ساده اجرا شده‌اند. | `temp_report2.md` (P35/P36) | متون انتهای `temp_report2.md` صریحاً قید کرده‌اند pytest واقعی اجرا نشده است. | **محدودیت ابزار اجرا** | الزام کاربر به اجرای pytest محلی در محیط venv واقعی. |
-
----
-
-## بخش ششم — طرح اعتبارسنجی چندلایه
-
-برای بررسی صحت کامل Stage 7، برنامه ۷ لایه‌ای زیر طراحی می‌شود:
-
-1. **لایه اول — تست‌های واحد فرمول‌ها:** اعتبارسنجی ریاضی Fair Value و Expected Upside با ورودی‌های استاندارد.
-2. **لایه دوم — تست‌های قرارداد Schema:** اعتبارسنجی pydantic models برای ورودی و خروجی بدون ValidationError.
-3. **لایه سوم — تست‌های منفی و داده‌های نامعتبر:** بررسی رفتار در برابر EPS صفر/منفی و peerهای ناافی (تأیید صدور Flagهای مربوطه).
-4. **لایه چهارم — تست‌های سناریو و رفتار قطعی:** تأیید جمع احتمال سناریوها (=۱)، ترتیب Bear<=Base<=Bull و قطعی بودن ۱۰۰٪ خروجی در اجرای مجدد.
-5. **لایه پنجم — تست یکپارچگی با Forecast:** پردازش مستقیم شیء واقعی `ForecastData` تولیدشده توسط Stage 5.
-6. **لایه ششم — تست‌های رگرسیون کل پروژه:** اجرای suite کامل تست‌ها به ویژه `test_stage9_decision.py` برای اطمینان از عدم شکست Stage 9.
-7. **لایه هفتم — بررسی مستقل Freeze Gate:** بررسی نهایی عدم وجود failure و تصویب رسمی سیاست V1 پیش از تثبیت کد.
-
----
-
-## بخش هفتم — برنامه اجرایی برای کاربر
-
-### تقسیم وظایف
-* **فرماندهی و تصمیم‌گیری مالی:** ChatGPT
-* **تحلیل یکپارچه و تهیه گزارش:** Gemini Notebook (این گزارش)
-* **تغییر کد و تست:** Claude (از طریق وب‌سایت)
-* **اجرای تست‌ها روی محیط محلی:** کاربر
-
-### گام‌های اجرایی به ترتیب دقیق:
-
-#### گام ۱: ثبت رسمی سیاست‌های D1 تا D9 در مشخصات (سند V1)
-* **فایل‌های مجاز:** `07_Stage7_Valuation.md` و `stepsForStage7.md`
-* **هدف:** به‌روزرسانی متن مشخصات برای ثبت تعویق رسمی Alertهای غایب و درایورهای صنعت به V2.
-* **دستور به Claude:**
-  > "لطفاً متن سند `07_Stage7_Valuation.md` را بر اساس تصمیم‌های D1 تا D9 به‌روزرسانی کن تا تعویق رسمی Alertهای غایب (Flip Risk, Dependence, Margin Risk) و درایورهای اختصاصی صنعت به نسخه V2 صریحاً قید شود و نام هشدارهای موجود با کد هماهنگ گردد."
-* **تست محلی:** نیازی نیست.
-* **خروجی برای ChatGPT:** متن سند اصلاح‌شده برای تأیید.
-
-#### گام ۲: به‌روزرسانی ۲ تست P2 مطابق سیاست مصوب V1
-* **فایل مجاز:** `src/tests/test_stage7_valuation.py`
-* **هدف:** اصلاح assertionهای ۲ تست شکست‌خورده P2 تا به‌جای الزام Alertهای تعویق‌افتاده، تعویق رسمی آن‌ها در V1 را چک کنند.
-* **دستور به Claude:**
-  > "دو تابع تست `test_p2_sector_driver_decomposition_missing` و `test_p2_required_flip_dependence_alerts_missing` را طوری به‌روزرسانی کن که تعویق این موارد در V1 را تست کنند (Assert عدم صدور هشدارها و رفتار V1)."
-* **تست محلی کاربر:**
-  ```bash
-  .venv\Scripts\python.exe -m pytest src/tests/test_stage7_valuation.py -v
-  ```
-* **خروجی برای ChatGPT:** خروجی متنی کامل اجرای pytest محلی.
-
-#### گام ۳: اجرای تست‌های یکپارچگی و مجموعه کامل پروژه
-* **فایل مجاز:** هیچ (فقط اجرای تست)
-* **هدف:** اطمینان از عدم شکست Stage 9 و سایر بخش‌های پروژه.
-* **دستور تست محلی کاربر:**
-  1. `.venv\Scripts\python.exe -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -v`
-  2. `.venv\Scripts\python.exe -m pytest src/tests -v`
-* **خروجی برای ChatGPT:** تعداد تست‌های passed و failed از کل پروژه.
-
-* **معیار توقف فوری:** اگر در هر گام تستی غیر از موارد شناخته‌شده شکست خورد، کار متوقف شده و متن خطا برای ChatGPT ارسال می‌شود. هیچ بازنگری کلی در `engine.py` پیش از طی این گام‌ها انجام ندهید.
-
----
-
-## بخش هشتم — جمع‌بندی مدیریتی
-
-۱. **وضعیت واقعی Stage 7:**
-   * محاسبات پایه ارزش‌گذاری (Fair Value و Expected Upside) درست عمل می‌کنند.
-   * هشدارهای پیشرفته (Flip, Dependence, Margin) و درایورهای اختصاصی صنعت در کد وجود ندارند.
-   * دو تست P2 به دلیل غیاب این قابلیت‌ها شکست می‌خورند.
-   * گزارش‌های قبلی روی محیط شبیه‌سازی‌شده بوده‌اند و اجرای pytest واقعی در venv محلی ضروری است.
-   * فراخوان یکپارچه تولیدی اثبات‌شده‌ای برای Stage 7 در مسیر اصلی برنامه یافت نشده است.
-
-۲. **مهم‌ترین موانع به ترتیب اثر بر صحت مالی:**
-   * عدم هماهنگی مشخصات با کد (وجود الزامات پیاده‌نشده در سند مشخصات).
-   * عدم اجرای تست‌ها با pytest واقعی و عدم سنجش یکپارچگی پویا با Stage 9.
-   * محدودیت‌های Point-in-Time در داده‌های بازار و پارامترها.
-
-۳. **تصمیم‌های نیازمند تأیید:**
-   * تأیید تعویق رسمی D1 تا D6 (Alertهای غایب و درایورهای صنعت) به V2.
-   * تصویب یکسان‌سازی نام Alertها مطابق کد فعلی (D8).
-
-۴. **سه اقدام بعدی:**
-   1. ثبت سیاست V1 (D1-D9) در مشخصات توسط Claude.
-   2. اصلاح ۲ تست P2 مطابق سیاست V1 و اجرای pytest محلی توسط کاربر.
-   3. اجرای suite کامل تست‌ها (Stage 7 + Stage 9 + کل پروژه) و ارسال خروجی به ChatGPT.
-
-۵. **وضعیت Freeze:**
-   `NOT READY FOR FREEZE`
-
----
-
-💡 **پیشنهاد گام بعدی:** یک گزارش اختصاصی تحت عنوان **Audit Report** در پنل Studio پروژه شما ثبت شد. می‌توانید گام ۱ از برنامه اجرایی فوق را به Claude بنویسید و پس از دریافت خروجی اجرای pytest محلی، نتیجه را جهت تصمیم‌گیری نهایی ارسال نمایید.
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================================== 13 passed, 52 warnings in 0.62s
