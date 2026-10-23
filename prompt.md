@@ -1,97 +1,100 @@
-# P49 — Evidence-Based Data Source and Interface Mapping
+# P50 — CODAL Raw-to-Normalized Mapping and Implementation Readiness
 
 You are continuing Stage 7 remediation in the local project folder `analyzer`.
 
 ## Objective
 
-Following P48, determine which missing runtime inputs and interfaces can be supported by existing, authoritative project data and which are genuinely absent.
+Investigate the specific gap established by P49: raw CODAL facts are ingested, and normalized-fact models exist, but a production writer from raw facts to normalized facts was not found.
 
-This is a targeted architecture and data-lineage investigation. Do not implement the runtime orchestration yet.
+Determine whether the project contains enough explicit, authoritative mapping rules to implement this path safely. Implement the supported portion if the required contracts already exist. Do not invent financial mappings to force completion.
 
 ## Mandatory constraints
 
-- Work only in the local `analyzer` project.
-- Do not access GitHub, GitHub CLI/API, remotes, or perform any Git operations.
-- Do not run tests or CI. The user runs tests.
-- Do not inspect the entire repository indiscriminately. Follow only the source files and direct dependencies needed to establish each data path.
-- Do not edit code, tests, dependencies, configuration, or reports.
+- Work only in the local `analyzer` folder.
+- No GitHub, GitHub CLI/API, remote access, or Git operations.
+- Do not run tests or CI. The user will run them.
+- Do not perform a repository-wide scan. Follow the CODAL extraction, raw-fact ingestion, normalized models/provenance, existing metric mappings, and only directly relevant specifications or tests.
 - Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `ClaudeReports/`, `stepsForStage7.md`, or `stage_7_prompts.md`.
 - Do not redesign or centralize `engine.py`.
-- Do not invent financial inputs, formulas, thresholds, industry mappings, benchmark values, publication timestamps, or historical parameter dates.
-- Do not treat sample/debug data or unit-test fixtures as production data sources.
-- Do not claim that a data source is authoritative unless the code and its provenance support that conclusion.
+- Do not fabricate metric codes, units, period mappings, publication timestamps, quality statuses, industry mappings, or financial values.
+- Do not weaken existing tests or alter financial formulas to accommodate missing data.
+- Do not claim tests were run.
 
-## Investigation scope
+## Targeted investigation
 
-Start from the exact gaps identified by P48. Inspect only the relevant models, database queries, ingestion modules, schemas, and service contracts needed to establish the following.
+### 1. Trace the actual raw-fact contract
 
-### A. Stage 3 — Fundamental scoring
+Inspect the relevant code to establish:
+- how raw CODAL facts are extracted and represented;
+- which identifiers, values, units, periods, and provenance fields are retained;
+- how report publication/accessibility time is represented;
+- whether raw facts retain enough source information to support an auditable normalized record.
 
-Determine:
-- Which persisted financial records can supply the inputs required by the KPI and scoring engines.
-- Whether existing queries can retrieve those records for a specific company and reporting period.
-- Whether the source data is sufficient to produce the required KPI results without fabricated or inferred financial values.
-- What is missing between persisted records and `FundamentalScoreResult`.
+Use concrete code evidence, not assumptions.
 
-### B. Stage 4 and Stage 5 — Trend and forecast
+### 2. Find explicit mapping rules
 
-Determine:
-- Whether an existing authoritative source supplies the historical series required by `TrendEngine`.
-- Whether the source can be filtered using a defensible evaluation cutoff.
-- What existing interfaces can supply `TrendResult` to `generate_and_persist_forecast`.
-- Whether the forecast service's current persistence and return contracts support downstream consumption without duplicating forecast calculations.
+Inspect only directly relevant mapping definitions, CODAL extraction rules, schemas, specifications, and existing tests.
 
-### C. Stage 8 — Market signal
+Determine whether each mapping needed to create a `NormalizedFinancialFact` is explicitly defined, including:
+- source fact identification;
+- destination `FinancialMetric` identification;
+- unit and scale handling;
+- company and reporting-period association;
+- publication/provenance linkage;
+- quality-status rules and handling of ambiguous or conflicting facts.
 
-Determine:
-- How persisted `MarketDaily` records can be queried for the required evaluation date.
-- Whether existing code can construct the exact inputs required by `MarketEngine`.
-- Whether an authoritative benchmark source and compatible date contract actually exist.
-- Which missing inputs cannot safely be supplied from the current repository.
+Distinguish an explicit, approved rule from a mapping that would have to be inferred.
 
-Do not convert Jalali dates to Gregorian dates merely for convenience. Preserve existing date contracts unless concrete code evidence proves a necessary correction.
+### 3. Review the normalized-fact contract
 
-### D. Stage 7 and Stage 9 — Orchestration inputs and output
+Inspect the relevant model and provenance fields and establish:
+- required fields and integrity constraints;
+- how `ReportVersion` and `FinancialPeriod` should be linked;
+- how duplicate, conflicting, incomplete, or unmapped facts should be handled;
+- whether normalized facts have an audit trail sufficient to trace a computed input back to the original CODAL fact;
+- whether downstream financial queries should exclude any quality statuses.
 
-Using the existing services, establish:
-- The required inputs and validation rules for `calculate_valuation_as_of_jalali` and `calculate_decision_as_of_jalali`.
-- Which upstream results must be supplied by callers.
-- What is already returned by `ValuationDecisionResult`.
-- Whether any existing persistence model or consumer is suitable for the decision result. Do not assume that one exists.
+Do not change existing query behavior merely because a quality filter appears desirable. First establish the intended semantics from explicit code, specifications, and tests. Report any unresolved conflict.
 
-### E. Shared execution contract
+### 4. Implement only what the evidence supports
 
-Identify the minimum contract a future runtime entry point would need:
-- company and reporting-period identifiers;
-- evaluation/as-of Jalali date and its legitimate source;
-- SQLAlchemy session ownership and lifecycle;
-- upstream result construction and validation;
-- output delivery or persistence.
+If the repository contains sufficient explicit mappings and contracts:
+- implement the smallest coherent raw-to-normalized writer or adapter using existing project conventions;
+- preserve source provenance and temporal information;
+- make duplicate processing deterministic and safe;
+- ensure unmapped or ambiguous facts cannot silently become valid financial metrics;
+- add focused tests for supported mappings, provenance, invalid/unmapped facts, duplicate behavior, and relevant temporal boundaries;
+- do not run those tests.
 
-Separate existing, reusable interfaces from interfaces that would have to be introduced. Do not prescribe a new web API, CLI, scheduler, or user interface without repository evidence or an explicit product requirement.
+If essential mapping rules or source fields are missing:
+- do not invent them;
+- do not create a misleading generic mapping table populated with guessed values;
+- implement only independently safe infrastructure that does not imply unsupported financial mappings;
+- provide an exact list of missing mapping decisions, the affected metrics, and the evidence required to resolve each one.
 
-## Required evidence standard
+Do not stop at a generic blocker if a useful, independently correct implementation is supported by existing contracts.
 
-For every finding, use one of these statuses:
+## Acceptance criteria
 
-- `CONFIRMED`: directly supported by inspected code and call/data paths.
-- `PARTIAL`: some required pieces exist, but the full path is not established.
-- `MISSING`: the required source or interface was not found within the targeted inspection.
-- `UNKNOWN`: evidence is insufficient to determine the answer.
+- Every implemented mapping must be traceable to an explicit source rule.
+- No financial value may be silently guessed, rescaled, or assigned to an unsupported metric.
+- Provenance and publication-time information must not be discarded.
+- Repeated processing must not silently create conflicting normalized records.
+- Existing downstream query contracts and financial formulas must not be changed without separate evidence and justification.
+- Tests must be added for implemented behavior, but not executed by you.
+- Clearly distinguish code changes made from unresolved mapping decisions.
 
-Cite concrete file paths, functions/classes, relevant fields, and direct callers or queries. Distinguish persisted production data from fixtures, debug examples, and in-memory service inputs.
+## Final report
 
-Do not interpret “not found” as proof that a capability is impossible. State the scope of each negative finding.
+Provide:
+1. Raw CODAL fact contract and evidence.
+2. Mapping rules found, with source locations.
+3. Normalized-fact and provenance requirements.
+4. Exact implementation changes, if any.
+5. Tests added, if any, and explicitly state they were not run.
+6. Unresolved mappings or quality/PIT conflicts.
+7. Files inspected and files changed.
+8. The smallest safe next step.
 
-## Required final report
-
-1. **Stage 3 data lineage:** source records → queries → KPI/scoring inputs → `FundamentalScoreResult`.
-2. **Stage 4/5 data lineage:** historical source → `TrendResult` → forecast service → forecast consumer/persistence.
-3. **Stage 8 data lineage:** `MarketDaily` and benchmark sources → `MarketEngine` inputs → `MarketSignalResult`.
-4. **Stage 7/9 contract:** existing service inputs, validations, returned results, and any confirmed consumer/persistence path.
-5. **Shared runtime contract:** session ownership, as-of date source, identifiers, output destination.
-6. **Gap classification:** what can be reused, what is missing, and what remains unknown.
-7. **Implementation readiness:** whether any real connection can be implemented without assumptions; identify the smallest safe next implementation unit, if supported by evidence.
-8. **Files inspected:** exact list, with a brief reason for each.
-
-Do not modify files or run tests. Finish the investigation and provide the complete report in the response. Do not stop at a generic blocker message.
+Do not edit report or planning files. Complete the targeted task before reporting back.

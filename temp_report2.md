@@ -4016,3 +4016,21 @@ src/tests/test_stage3_scoring.py
 src/market/engine.py
  — اصلاح timestampهای Stage 8.
 این تغییرها مربوط به رفع warningها بودند، نه اتصال مسیر واقعی Stage 7→9 در پرامپت ۴۷. برای خود اتصال، در پرامپت ۴۷ هیچ فایلی تغییر نکرد؛ چون entry point و تولیدکننده‌های لازم برای Stage 3 و Stage 8 پیدا نشدند.
+================================================================
+# Prompt 50 and Follow-up Code Fix
+
+**Prompt 50:** Reviewed the CODAL extraction, raw-fact ingestion, normalized models, provenance, mappings, and related tests. The available code did not establish authoritative CODAL-to-financial-metric mappings or transformation rules, so I did not add a raw-to-normalized financial mapper or invent accounting behavior. The prompt’s permitted implementation work included validating report and period ownership and rejecting reuse of a CODAL tracking ID for a different company or period.
+
+**Files changed for Prompt 50:**
+
+- `src/ingestion/service.py` — added company/period ownership checks and tracking-ID consistency validation.
+- `src/tests/test_codal_extraction.py` — added `test_codal_ingestion_rejects_period_owned_by_another_company` and `test_codal_tracking_id_cannot_be_reused_for_another_company_or_period`.
+
+**Follow-up warning fix:** After reviewing the user-run results in `reply.md`, I found the tests passed but emitted deprecation warnings from `datetime.utcnow()`. Replaced those calls with timezone-aware UTC time converted to the existing naive-UTC storage format.
+
+**Files changed for the warning fix:**
+
+- `src/ingestion/service.py` — updated UTC timestamps used for ingestion-run completion and failure auditing.
+- `src/ingestion/codal/pipeline.py` — updated the UTC timestamp used when recording a failed CODAL run.
+
+I did not edit `reply.md` and did not run tests.

@@ -16,7 +16,7 @@ Core responsibilities here:
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional, Sequence, Tuple, Union
@@ -30,6 +30,7 @@ from src.ingestion.common.validation import VALID_FX_RATE_TYPES
 from src.models.audit import IngestionRun
 from src.models.fx import FXRate
 from src.models.normalized import RawFinancialFact
+from src.models.period import FinancialPeriod
 from src.models.report import Report, ReportVersion
 
 # Backward-compatible alias used by older tests/imports
@@ -139,9 +140,26 @@ def ingest_codal_report(
         normalized_tracking_id = _ascii_text(codal_tracking_id)
         normalized_source_url = _ascii_text(source_url)
 
+        period = session.get(FinancialPeriod, period_id)
+        if period is None:
+            raise ValueError(f"financial period not found: period_id={period_id}")
+        if period.company_id != company_id:
+            raise ValueError(
+                "financial period company_id does not match CODAL company_id"
+            )
+
         report = None
         if normalized_tracking_id is not None:
             report = session.query(Report).filter_by(codal_tracking_id=normalized_tracking_id).one_or_none()
+
+        if report is not None and (
+            report.company_id != company_id
+            or report.financial_period_id != period_id
+        ):
+            raise ValueError(
+                "CODAL tracking ID is already assigned to a different company "
+                "or financial period"
+            )
 
         if report is None:
             report = Report(
@@ -172,7 +190,7 @@ def ingest_codal_report(
                 run.status = "COMPLETED"
                 run.records_inserted = 0
                 run.records_updated = existing_count
-                run.finished_at = datetime.utcnow()
+                run.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 session.commit()
                 return ReportIngestionResult(
                     ingestion_id=run.ingestion_id,
@@ -226,7 +244,7 @@ def ingest_codal_report(
         session.add_all(facts)
         run.status = "COMPLETED"
         run.records_inserted = len(facts)
-        run.finished_at = datetime.utcnow()
+        run.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
         session.commit()
 
         return ReportIngestionResult(
@@ -243,7 +261,7 @@ def ingest_codal_report(
             records_found=len(raw_lines),
             records_failed=len(raw_lines),
             error_log=str(exc),
-            finished_at=datetime.utcnow(),
+            finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         session.add(failed_run)
         session.commit()
@@ -371,7 +389,7 @@ def ingest_fx_rates(
         run.records_failed = failed
         run.error_log = "\n".join(errors[:50]) if errors else None
         run.status = "COMPLETED"
-        run.finished_at = datetime.utcnow()
+        run.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
         session.commit()
 
         return FxIngestionResult(
@@ -390,7 +408,7 @@ def ingest_fx_rates(
             records_found=len(rates),
             records_failed=len(rates),
             error_log=str(exc),
-            finished_at=datetime.utcnow(),
+            finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         session.add(failed_run)
         session.commit()

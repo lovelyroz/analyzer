@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -17,6 +17,7 @@ from src.ingestion.codal.adapter import extract_raw_lines_from_pdf
 from src.ingestion.codal.numbers import normalize_digits, parse_amount
 from src.ingestion.codal.pdf_extract import CodalExtractionError, fix_persian_rtl
 from src.ingestion.codal.pipeline import load_codal_pdf
+from src.ingestion.service import RawLineInput, ingest_codal_report
 from src.migrations.runner import MigrationRunner
 from src.models.entity import Company, Industry
 from src.models.normalized import RawFinancialFact
@@ -288,6 +289,96 @@ def test_pipeline_idempotent_version_chain(session, tmp_path):
     assert versions[1].is_current_version is True
     assert versions[1].version_number == versions[0].version_number + 1
     assert r1.report_id == r2.report_id
+
+
+def test_codal_ingestion_rejects_period_owned_by_another_company(session):
+    industry_id = session.query(Industry).one().industry_id
+    other_company = Company(
+        ticker="OTHER",
+        company_name="Other Co",
+        industry_id=industry_id,
+        codal_symbol="OTHER",
+    )
+    session.add(other_company)
+    session.flush()
+    other_period = FinancialPeriod(
+        company_id=other_company.company_id,
+        period_type="QUARTER",
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 3, 31),
+        fiscal_year=1403,
+        fiscal_quarter=1,
+        months_length=3,
+        is_ytd=False,
+    )
+    session.add(other_period)
+    session.commit()
+
+    with pytest.raises(ValueError, match="period company_id does not match"):
+        ingest_codal_report(
+            session,
+            company_id=session._test_company_id,
+            period_id=other_period.period_id,
+            report_type="QUARTERLY",
+            title="Identity check",
+            publication_datetime=datetime(2024, 4, 15),
+            raw_lines=[RawLineInput(item_name="unmapped source row")],
+        )
+
+    assert session.query(Report).count() == 0
+    assert session.query(RawFinancialFact).count() == 0
+
+
+def test_codal_tracking_id_cannot_be_reused_for_another_company_or_period(session):
+    first = ingest_codal_report(
+        session,
+        company_id=session._test_company_id,
+        period_id=session._test_period_id,
+        report_type="QUARTERLY",
+        title="Original report identity",
+        publication_datetime=datetime(2024, 4, 15),
+        codal_tracking_id="CODAL-IDENTITY",
+        raw_lines=[RawLineInput(item_name="unmapped source row")],
+    )
+
+    industry_id = session.query(Industry).one().industry_id
+    other_company = Company(
+        ticker="OTHER",
+        company_name="Other Co",
+        industry_id=industry_id,
+        codal_symbol="OTHER",
+    )
+    session.add(other_company)
+    session.flush()
+    other_period = FinancialPeriod(
+        company_id=other_company.company_id,
+        period_type="QUARTER",
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 3, 31),
+        fiscal_year=1403,
+        fiscal_quarter=1,
+        months_length=3,
+        is_ytd=False,
+    )
+    session.add(other_period)
+    session.commit()
+
+    with pytest.raises(ValueError, match="tracking ID is already assigned"):
+        ingest_codal_report(
+            session,
+            company_id=other_company.company_id,
+            period_id=other_period.period_id,
+            report_type="QUARTERLY",
+            title="Conflicting report identity",
+            publication_datetime=datetime(2024, 5, 15),
+            codal_tracking_id="CODAL-IDENTITY",
+            raw_lines=[RawLineInput(item_name="unmapped source row")],
+        )
+
+    assert session.query(Report).count() == 1
+    assert session.query(ReportVersion).count() == 1
+    assert session.query(RawFinancialFact).count() == 1
+    assert first.report_id == session.query(Report).one().report_id
 
 
 def _candidate_real_codal_paths() -> list[Path]:

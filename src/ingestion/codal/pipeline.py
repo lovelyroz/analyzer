@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
@@ -30,7 +30,7 @@ def _audit_failed_run(session: Session, *, records_found: int, error_code: str, 
             records_found=records_found,
             records_failed=1,
             error_log=f"{error_code}: {error}",
-            finished_at=datetime.utcnow(),
+            finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
     )
     session.commit()
