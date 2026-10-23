@@ -1361,6 +1361,69 @@ def test_p32_input_refs_absent_preserves_legacy_path():
     assert result.expected_fair_value == 1260.0
 
 
+def test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted():
+    forecast = make_forecast()
+    forecast.assumptions["input_refs"] = [{
+        "fact_key": "EPS",
+        "report_version_id": 7,
+        "available_at": "2026-01-01T00:00:00+00:00",
+        "source": "CODAL",
+    }]
+
+    result = ValuationEngine().calculate_valuation(
+        **_p32_kwargs(forecast_result=forecast)
+    )
+    repeated = ValuationEngine().calculate_valuation(
+        **_p32_kwargs(forecast_result=forecast)
+    )
+
+    assert result.expected_fair_value == 1260.0
+    assert result.valuation_status == repeated.valuation_status
+    assert result.expected_fair_value == repeated.expected_fair_value
+    assert result.valuation_risk_flags == repeated.valuation_risk_flags
+
+
+def test_p53_embedded_forecast_input_ref_after_cutoff_is_rejected():
+    forecast = make_forecast()
+    forecast.assumptions["input_refs"] = [{
+        "fact_key": "EPS",
+        "report_version_id": 7,
+        "available_at": "2026-01-02T00:00:00+00:00",
+        "source": "CODAL",
+    }]
+
+    with pytest.raises(ValueError, match="after the"):
+        ValuationEngine().calculate_valuation(**_p32_kwargs(forecast_result=forecast))
+
+
+def test_p53_embedded_forecast_input_ref_without_availability_is_rejected():
+    forecast = make_forecast()
+    forecast.assumptions["input_refs"] = [{
+        "fact_key": "EPS",
+        "report_version_id": 7,
+        "available_at": None,
+        "source": "CODAL",
+    }]
+
+    with pytest.raises(ValueError, match="without"):
+        ValuationEngine().calculate_valuation(**_p32_kwargs(forecast_result=forecast))
+
+
+def test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance():
+    forecast = make_forecast()
+    forecast.assumptions["input_refs"] = [{
+        "fact_key": "EPS",
+        "report_version_id": 7,
+        "available_at": "2026-01-02T00:00:00+00:00",
+        "source": "CODAL",
+    }]
+
+    with pytest.raises(ValueError, match="after the"):
+        ValuationEngine().calculate_valuation(
+            **_p32_kwargs(forecast_result=forecast, forecast_input_refs=[])
+        )
+
+
 def _p33_snapshot():
     from src.valuation.parameters import GENESIS_VERSION
 
