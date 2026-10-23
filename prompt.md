@@ -1,100 +1,74 @@
-# P50 — CODAL Raw-to-Normalized Mapping and Implementation Readiness
+# P51 — Reconcile Stage 7 Alert Contract (D8)
 
-You are continuing Stage 7 remediation in the local project folder `analyzer`.
+You are working in the local project folder `analyzer`, a financial-data application where correctness, auditability, deterministic behavior, and preservation of financial invariants are mandatory.
 
 ## Objective
 
-Investigate the specific gap established by P49: raw CODAL facts are ingested, and normalized-fact models exist, but a production writer from raw facts to normalized facts was not found.
+Resolve the Stage 7 alert-contract discrepancies under policy D8 in `stepsForStage7.md`. Determine which alert names and behaviors are required, which are actually emitted, and whether any safe implementation changes are justified.
 
-Determine whether the project contains enough explicit, authoritative mapping rules to implement this path safely. Implement the supported portion if the required contracts already exist. Do not invent financial mappings to force completion.
+This is a bounded implementation task, not a repository-wide audit.
 
-## Mandatory constraints
+## Required reading
 
-- Work only in the local `analyzer` folder.
-- No GitHub, GitHub CLI/API, remote access, or Git operations.
-- Do not run tests or CI. The user will run them.
-- Do not perform a repository-wide scan. Follow the CODAL extraction, raw-fact ingestion, normalized models/provenance, existing metric mappings, and only directly relevant specifications or tests.
+Read only the relevant sections of:
+
+- `stepsForStage7.md` — especially D1–D9, D8, and the execution sequence.
+- `temp_report2.md` — the baseline Stage 7 audit, P2/P3 findings, P37 reconciliation, and the latest reports.
+- `07_Stage7_Valuation.md` — alert requirements and output contract.
+- `src/valuation/engine.py`
+- `src/valuation/schema.py`
+- `src/valuation/parameters.py`
+- `src/decision/engine.py`
+- Relevant tests in `src/tests/test_stage7_valuation.py` and `src/tests/test_stage9_decision.py`.
+
+Inspect additional files only when needed to establish a specific alert consumer or dependency.
+
+## Work to perform
+
+1. Build an evidence-based comparison of:
+   - Alert names required by the specification.
+   - Alert names emitted by the current valuation engine.
+   - Alert fields and severity values exposed by the output schema.
+   - Alert information actually consumed by Stage 9 or other directly identified callers.
+
+2. For each discrepancy, classify it as:
+   - A demonstrable implementation defect against a sufficiently precise requirement.
+   - A naming or contract mismatch that can be corrected without changing financial meaning.
+   - An unresolved specification ambiguity.
+   - A capability intentionally deferred by D1–D6 under V1.
+
+3. Implement safe, specification-backed corrections where the expected behavior is unambiguous. Add focused regression tests for each correction.
+
+4. Preserve the following constraints:
+   - Do not invent alert triggers, financial formulas, thresholds, severities, or industry mappings.
+   - Do not reactivate the deferred D1–D5 alerts unless the locked specification provides valid criteria.
+   - Preserve the current two-driver contract, EPS × target-P/E valuation, scenario probabilities, invalid-EPS safeguards, and benchmark hierarchy.
+   - Do not rename or remove an alert if that could silently break an identified consumer. Establish compatibility first.
+   - Do not weaken or delete existing tests merely to obtain a passing result.
+   - Do not redesign or centralize `engine.py`; final engine review belongs at the end of Stage 7.
+   - Do not claim full Point-in-Time correctness or production integration based on this task.
+
+5. If a discrepancy cannot safely be corrected, leave its behavior unchanged and record the exact missing specification or compatibility decision. Still complete all independent, safe implementation work; do not stop with a generic blocker report.
+
+## Scope and execution restrictions
+
+- Work only in local `analyzer`.
+- No GitHub, GitHub CLI/API, remote operations, push, pull, commit, or branch changes.
+- Do not run tests or CI; the user will execute them and provide actual output.
+- Add or update focused tests, but clearly state that they were not executed.
 - Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `ClaudeReports/`, `stepsForStage7.md`, or `stage_7_prompts.md`.
-- Do not redesign or centralize `engine.py`.
-- Do not fabricate metric codes, units, period mappings, publication timestamps, quality statuses, industry mappings, or financial values.
-- Do not weaken existing tests or alter financial formulas to accommodate missing data.
-- Do not claim tests were run.
+- Do not explore the entire repository.
+- Do not claim that a production caller or consumer exists without identifying its actual call site.
 
-## Targeted investigation
+## Completion report
 
-### 1. Trace the actual raw-fact contract
+When the implementation and static review are complete, report:
 
-Inspect the relevant code to establish:
-- how raw CODAL facts are extracted and represented;
-- which identifiers, values, units, periods, and provenance fields are retained;
-- how report publication/accessibility time is represented;
-- whether raw facts retain enough source information to support an auditable normalized record.
+1. The required-versus-actual alert comparison.
+2. Every confirmed discrepancy and its classification.
+3. Files changed and the purpose of each change.
+4. Tests added or modified, with an explicit statement that they were not run.
+5. Remaining D8 issues and the precise evidence or decision needed to resolve them.
+6. The next recommended step in the existing Stage 7 execution plan.
 
-Use concrete code evidence, not assumptions.
-
-### 2. Find explicit mapping rules
-
-Inspect only directly relevant mapping definitions, CODAL extraction rules, schemas, specifications, and existing tests.
-
-Determine whether each mapping needed to create a `NormalizedFinancialFact` is explicitly defined, including:
-- source fact identification;
-- destination `FinancialMetric` identification;
-- unit and scale handling;
-- company and reporting-period association;
-- publication/provenance linkage;
-- quality-status rules and handling of ambiguous or conflicting facts.
-
-Distinguish an explicit, approved rule from a mapping that would have to be inferred.
-
-### 3. Review the normalized-fact contract
-
-Inspect the relevant model and provenance fields and establish:
-- required fields and integrity constraints;
-- how `ReportVersion` and `FinancialPeriod` should be linked;
-- how duplicate, conflicting, incomplete, or unmapped facts should be handled;
-- whether normalized facts have an audit trail sufficient to trace a computed input back to the original CODAL fact;
-- whether downstream financial queries should exclude any quality statuses.
-
-Do not change existing query behavior merely because a quality filter appears desirable. First establish the intended semantics from explicit code, specifications, and tests. Report any unresolved conflict.
-
-### 4. Implement only what the evidence supports
-
-If the repository contains sufficient explicit mappings and contracts:
-- implement the smallest coherent raw-to-normalized writer or adapter using existing project conventions;
-- preserve source provenance and temporal information;
-- make duplicate processing deterministic and safe;
-- ensure unmapped or ambiguous facts cannot silently become valid financial metrics;
-- add focused tests for supported mappings, provenance, invalid/unmapped facts, duplicate behavior, and relevant temporal boundaries;
-- do not run those tests.
-
-If essential mapping rules or source fields are missing:
-- do not invent them;
-- do not create a misleading generic mapping table populated with guessed values;
-- implement only independently safe infrastructure that does not imply unsupported financial mappings;
-- provide an exact list of missing mapping decisions, the affected metrics, and the evidence required to resolve each one.
-
-Do not stop at a generic blocker if a useful, independently correct implementation is supported by existing contracts.
-
-## Acceptance criteria
-
-- Every implemented mapping must be traceable to an explicit source rule.
-- No financial value may be silently guessed, rescaled, or assigned to an unsupported metric.
-- Provenance and publication-time information must not be discarded.
-- Repeated processing must not silently create conflicting normalized records.
-- Existing downstream query contracts and financial formulas must not be changed without separate evidence and justification.
-- Tests must be added for implemented behavior, but not executed by you.
-- Clearly distinguish code changes made from unresolved mapping decisions.
-
-## Final report
-
-Provide:
-1. Raw CODAL fact contract and evidence.
-2. Mapping rules found, with source locations.
-3. Normalized-fact and provenance requirements.
-4. Exact implementation changes, if any.
-5. Tests added, if any, and explicitly state they were not run.
-6. Unresolved mappings or quality/PIT conflicts.
-7. Files inspected and files changed.
-8. The smallest safe next step.
-
-Do not edit report or planning files. Complete the targeted task before reporting back.
+Do not modify report files. Finish the entire bounded task before reporting. Stage 7 remains OPEN and must not be declared frozen.
