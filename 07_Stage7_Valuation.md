@@ -1228,55 +1228,54 @@ Alerts فقط Risk/Review Alert هستند.
 
 ---
 
-# 49. Required Alert Categories
+# 49. V1 Alert and Flag Vocabulary
 
-Stage 7 باید قابلیت تولید Alert برای موارد زیر را داشته باشد:
+This section freezes the concrete vocabulary currently emitted by the V1 valuation engine. Where earlier sections use generic divergence labels, the concrete above/below tokens below are the emitted names; directional pairs remain separate.
+
+**`alerts` channel (severity-prefixed strings):**
 
 ```text
-HIGH_IMPACT_HIGH_UNCERTAINTY
-HIGH_SCENARIO_DISPERSION
-LOW_FORECAST_RELIABILITY
-VALUATION_BENCHMARK_DIVERGENCE
-ASSESSMENT_FLIP_RISK
-HIGH_MULTIPLE_DEPENDENCE
-HIGH_EPS_DEPENDENCE
-MARGIN_ASSUMPTION_RISK
-INSUFFICIENT_PEER_DATA
-POOR_DATA_QUALITY
-NEGATIVE_EPS
-SIGN_CHANGE
-POINT_IN_TIME_WARNING
+WARNING:HIGH_SCENARIO_DISPERSION
+WARNING:LOW_FORECAST_RELIABILITY
+CRITICAL:INSUFFICIENT_BENCHMARK_DATA
+WATCH:VALUATION_ABOVE_TARGET_PE
+WATCH:VALUATION_BELOW_TARGET_PE
+WATCH:FORWARD_PE_ABOVE_HISTORICAL
+WATCH:FORWARD_PE_BELOW_HISTORICAL
+WATCH:FORWARD_PE_ABOVE_INDUSTRY
+WATCH:FORWARD_PE_BELOW_INDUSTRY
+INFO:TOP_DRIVER:<driver>
 ```
 
-> **V1 Implementation-Status Annotation (factual — بدون تغییر نام، بدون ادغام، بدون تصمیم)**
->
-> این فهرست الزامات نام‌گذاری را حفظ می‌کند. جدول زیر فقط وضعیت فعلی موتور را ثبت می‌کند و هیچ تصمیمی نمی‌گیرد.
->
-> | نام الزامی (این سند) | وضعیت در V1 | توضیح مستند |
-> |---|---|---|
-> | `HIGH_SCENARIO_DISPERSION` | **IMPLEMENTED** | به‌صورت severity-bearing از `_alerts` صادر می‌شود (`WARNING:HIGH_SCENARIO_DISPERSION`) و هم در flag channel. |
-> | `LOW_FORECAST_RELIABILITY` | **IMPLEMENTED** | به‌صورت severity-bearing از `_alerts` صادر می‌شود (`WARNING:LOW_FORECAST_RELIABILITY`) و هم در flag channel. |
-> | `INSUFFICIENT_PEER_DATA` | **FLAG-LEVEL ONLY** | فقط در `valuation_risk_flags` صادر می‌شود (`engine.py:165`)، نه به‌عنوان severity-bearing alert. آیا این برای «قابلیت Alert» کافی است، بخشی از تصمیم D8 است. |
-> | `NEGATIVE_EPS` | **FLAG-LEVEL ONLY** | فقط از `_eps_flags` در flag channel. |
-> | `SIGN_CHANGE` | **FLAG-LEVEL ONLY** | فقط از `_scenario_sign_change_flags` در flag channel. |
-> | `VALUATION_BENCHMARK_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:VALUATION_ABOVE_TARGET_PE` / `WATCH:VALUATION_BELOW_TARGET_PE` است. عدم تطابق در بخش ۵۴ ثبت شده. |
-> | `HISTORICAL_VALUATION_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:FORWARD_PE_ABOVE_HISTORICAL` / `WATCH:FORWARD_PE_BELOW_HISTORICAL` است (بخش ۵۴). |
-> | `INDUSTRY_VALUATION_DIVERGENCE` | **NAME MISMATCH** | نامی که موتور صادر می‌کند `WATCH:FORWARD_PE_ABOVE_INDUSTRY` / `WATCH:FORWARD_PE_BELOW_INDUSTRY` است (بخش ۵۵). |
-> | `ASSESSMENT_FLIP_RISK` | **ABSENT** | صفر ارجاع در `src/valuation` — **D1 حل‌نشده**. |
-> | `HIGH_MULTIPLE_DEPENDENCE` | **ABSENT** | صفر ارجاع در `src/valuation` — **D2 حل‌نشده**. |
-> | `HIGH_EPS_DEPENDENCE` | **ABSENT** | صفر ارجاع در `src/valuation` — **D3 حل‌نشده**. |
-> | `MARGIN_ASSUMPTION_RISK` | **ABSENT** | صفر ارجاع در `src/valuation` — **D4 حل‌نشده**. |
-> | `HIGH_IMPACT_HIGH_UNCERTAINTY` | **ABSENT** | صفر ارجاع در `src/valuation` — **D5 حل‌نشده**. |
-> | `POOR_DATA_QUALITY` | **ABSENT** | در مشخصات هیچ تعریف تریگری وجود ندارد و صفر ارجاع در کد. |
-> | `POINT_IN_TIME_WARNING` | **ABSENT** | صفر ارجاع در کد؛ تریگر آن به تصمیم D7 گره خورده است. |
->
-> **تفاوت مهم:** یک flag بدون Severity معادل یک severity-bearing Alert نیست. فهرست بالا این دو را به‌طور جداگانه نشان می‌دهد و هیچ تصمیمی درباره اینکه آیا flag-level کافی است یا خیر، نمی‌گیرد (D8).
->
-> **تصمیم باز (D8):** انتخاب بین rename، alias، یا پذیرش نام‌های فعلی در مشخصات، و همچنین اینکه آیا emission در سطح flag برای قابلیت بخش ۴۹ کافی است، هنوز انجام نشده و در این سند اتخاذ نشده است.
+The three pairs of directional tokens report whether base Forward P/E is above or below target P/E, historical median P/E, or industry Forward P/E, respectively. `INSUFFICIENT_BENCHMARK_DATA` reports that no usable benchmark was selected; it is distinct from a low peer count. `TOP_DRIVER` is an informational driver note. These tokens describe review context and are not Buy/Sell signals.
+
+**`valuation_risk_flags` channel (strings):**
+
+The engine emits flag-only tokens including:
+
+```text
+INSUFFICIENT_PEER_DATA
+NEGATIVE_EPS
+SIGN_CHANGE
+```
+
+These are flags, not severity-prefixed alerts. `ValuationResult.alerts` and `ValuationResult.valuation_risk_flags` are separate `List[str]` fields. The engine also copies emitted alert strings into `valuation_risk_flags`; therefore the channels overlap for emitted alerts, but a flag-only token is not promoted into `alerts`.
+
+**Deferred or undefined categories:**
+
+- Deferred under V1 policy D1–D5; not emitted because the required criteria remain unapproved or the needed inputs are unavailable: `ASSESSMENT_FLIP_RISK`, `HIGH_MULTIPLE_DEPENDENCE`, `HIGH_EPS_DEPENDENCE`, `MARGIN_ASSUMPTION_RISK`, and `HIGH_IMPACT_HIGH_UNCERTAINTY`.
+- `POOR_DATA_QUALITY` is not implemented because a valid trigger is not established. Its absence does not establish that input data is good.
+- `POINT_IN_TIME_WARNING` is not implemented because a valid trigger is not established and D7 does not establish complete Point-in-Time evidence. Its absence does not establish Point-in-Time correctness.
+
+This section documents the current V1 output vocabulary and its channels. It does not define new triggers, thresholds, severities, formulas, or financial policy.
 
 ---
 
 # 50. Assessment Flip Risk
+
+> **V1 status (D1): DEFERRED.** This section describes a policy category; the engine does not emit `ASSESSMENT_FLIP_RISK`. The perturbation, flip definition, severity, and missing-data behavior are not approved.
+
+
 
 یکی از مهم‌ترین Alertهای Stage 7:
 
@@ -1308,6 +1307,10 @@ EXPENSIVE
 
 # 51. Multiple Dependence
 
+> **V1 status (D2): DEFERRED.** The engine does not emit `HIGH_MULTIPLE_DEPENDENCE`; no approved dependence measure or trigger is defined.
+
+
+
 اگر Fair Value بیش از حد به Target P/E وابسته باشد و نه رشد EPS:
 
 ```text
@@ -1330,6 +1333,10 @@ Bull Case فقط با P/E Expansion بسیار بالا ایجاد شده
 
 # 52. EPS / Forecast Dependence
 
+> **V1 status (D3): DEFERRED.** The engine does not emit `HIGH_EPS_DEPENDENCE`; no approved EPS-dependence measure, severity escalation, or precedence rule is defined. Stage 5 EPS remains unchanged.
+
+
+
 اگر Valuation عمدتاً به Forecast EPS حساس باشد:
 
 ```text
@@ -1343,6 +1350,10 @@ HIGH_EPS_DEPENDENCE
 ---
 
 # 53. Margin Assumption Risk
+
+> **V1 status (D4): DEFERRED.** The engine does not emit `MARGIN_ASSUMPTION_RISK`; valid, dated margin inputs and an approved trigger are unavailable.
+
+
 
 اگر Fair Value به شدت وابسته به Operating Margin یا Net Margin Forecast باشد:
 
@@ -1366,14 +1377,14 @@ HISTORICAL_VALUATION_DIVERGENCE
 
 این Alert به خودی خود Cheap/Expensive Signal قطعی نیست.
 
-> **V1 Name Mapping (factual — بدون rename، بدون alias، بدون تغییر contract)**
+> **V1 emitted vocabulary (D8 decision):** The specification adopts the current engine tokens; production output is unchanged.
 >
-> | نام الزامی این سند | نامی که موتور فعلی صادر می‌کند | کانال | تمایز بالا/پایین حفظ شده؟ |
-> |---|---|---|---|
-> | `HISTORICAL_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_ABOVE_HISTORICAL` | severity-bearing alert | بله — بالا مجزا از پایین |
-> | `HISTORICAL_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_BELOW_HISTORICAL` | severity-bearing alert | بله — پایین مجزا از بالا |
+> | Direction | Emitted alert token | Meaning |
+> |---|---|---|
+> | Above | `WATCH:FORWARD_PE_ABOVE_HISTORICAL` | Base Forward P/E is above the historical median benchmark. |
+> | Below | `WATCH:FORWARD_PE_BELOW_HISTORICAL` | Base Forward P/E is below the historical median benchmark. |
 >
-> **تصمیم باز (D8):** آیا spec نام‌های فعلی را می‌پذیرد، یا rename یا alias معرفی می‌شود، هنوز اتخاذ نشده است. این سند فقط عدم تطابق را ثبت می‌کند و خروجی‌های مصرف‌کننده را تغییر نمی‌دهد.
+> The above/below distinction is preserved. Trigger behavior remains the existing engine behavior; this documentation does not ratify its numeric threshold.
 
 ---
 
@@ -1389,24 +1400,22 @@ INDUSTRY_VALUATION_DIVERGENCE
 
 علت Divergence باید قابل بررسی باشد.
 
-> **V1 Name Mapping (factual — بدون rename، بدون alias، بدون تغییر contract)**
+> **V1 emitted vocabulary (D8 decision):** The specification adopts the current engine tokens; production output is unchanged.
 >
-> | نام الزامی این سند | نامی که موتور فعلی صادر می‌کند | کانال | تمایز بالا/پایین حفظ شده؟ |
-> |---|---|---|---|
-> | `INDUSTRY_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_ABOVE_INDUSTRY` | severity-bearing alert | بله — بالا مجزا از پایین |
-> | `INDUSTRY_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_BELOW_INDUSTRY` | severity-bearing alert | بله — پایین مجزا از بالا |
+> | Direction | Emitted alert token | Meaning |
+> |---|---|---|
+> | Above | `WATCH:FORWARD_PE_ABOVE_INDUSTRY` | Base Forward P/E is above the industry Forward P/E median. |
+> | Below | `WATCH:FORWARD_PE_BELOW_INDUSTRY` | Base Forward P/E is below the industry Forward P/E median. |
 >
-> علاوه بر این، تریگر `INDUSTRY_BENCHMARK_INSUFFICIENT` (بخش ۱۰، «کمتر از ۸ Peer معتبر») در کد تحت **شرط متفاوتی** صادر می‌شود. موتور این flag را **صادر می‌کند**، اما تنها زمانی که `target_source == "INSUFFICIENT_DATA"` باشد — یعنی هیچ Industry Forward P/E با حداقل ۸ Peer معتبر، هیچ Historical Median معتبر و هیچ Industry TTM P/E معتبر در دسترس نباشد (`_select_target_pe` در `src/valuation/engine.py`).
+> The above/below distinction is preserved. Trigger behavior remains the existing engine behavior; this documentation does not ratify its numeric threshold.
 >
-> این شرط emission با شرط Peer Count بخش ۱۰ **معادل نیست**: با ۷ Peer معتبر ولی یک Historical Median معتبر، `target_source` برابر `HISTORICAL_MEDIAN_PE` می‌شود، در نتیجه `INDUSTRY_BENCHMARK_INSUFFICIENT` صادر **نمی‌شود** — حتی اگر یک benchmark جایگزین و قابل‌استفاده انتخاب شده باشد. بنابراین یک مورد «کمتر از ۸ Peer معتبر» می‌تواند یک benchmark قابل‌استفاده داشته باشد و باز هم این flag را دریافت نکند. تریگر کامل بخش ۱۰ (مبتنی بر Peer Count) در کد پیاده‌سازی نشده است.
->
-> `INSUFFICIENT_PEER_DATA` یک سیگنال **مجزا** است و نباید با `INDUSTRY_BENCHMARK_INSUFFICIENT` یکی گرفته شود: اولی زمانی صادر می‌شود که `forward_values` موجود باشد و تعداد peerهای Forward معتبر کمتر از `MIN_INDUSTRY_PEERS = 8` باشد (`engine.py:164-165`) و صرفاً کمبود تعداد Peer را گزارش می‌کند، دومی صرفاً نبود هر گونه benchmark قابل‌استفاده را گزارش می‌کند. این دو flag هم می‌توانند هم‌زمان صادر شوند و هم می‌توانند مستقل از یکدیگر صادر شوند.
->
-> **تصمیم باز (D8):** انتخاب rename / alias / پذیرش spec، هنوز اتخاذ نشده است.
+> The separate flag `INSUFFICIENT_PEER_DATA` reports that valid Forward P/E peer count is below `MIN_INDUSTRY_PEERS = 8`, when Forward peer values exist. `INDUSTRY_BENCHMARK_INSUFFICIENT` is emitted only when no usable target benchmark is available (`target_source` equals `INSUFFICIENT_DATA`). These conditions are not equivalent: a fallback historical or industry-TTM benchmark can be available even when the Forward peer count is below eight. Both flags may appear together or independently. Neither flag is a severity-prefixed alert.
 
 ---
 
 # 56. Point-in-Time Requirement
+
+> **V1 alert status:** `POINT_IN_TIME_WARNING` is not emitted. This absence is not evidence of Point-in-Time completeness or correctness.
 
 تمام Historical Valuation و Backtestها باید Point-in-Time باشند.
 
@@ -1803,7 +1812,7 @@ PASS.
 
 > **V1 Implementation Status (factual annotation — P24, per P23 audit):**
 >
-> ترکیب قابل‌دستیابی در V1 عبارت است از `ATTRACTIVE` به‌همراه `valuation_confidence` / `valuation_confidence_label` در سطح LOW یا VERY_LOW، به‌همراه flag تحت عنوان `LOW_FORECAST_RELIABILITY` و alert تحت عنوان `WARNING:LOW_FORECAST_RELIABILITY` (`engine.py:162-163,514`). مقدار Reliability ورودی تابع `_valuation_status` نیست و Fair Value را تغییر نمی‌دهد. توکن تحت‌اللفظی `FORECAST RISK WARNING` / `FORECAST_RISK` هرگز صادر نمی‌شود (صفر ارجاع در کل `src` — رکوع بخش ۷۹). **تصمیم D3/D8 هنوز حل‌نشده است.** ادعای PASS بالا فقط برای ترکیب قابل‌دستیابی صادق است، نه برای توکن تحت‌اللفظی.
+> ترکیب قابل‌دستیابی در V1 عبارت است از `ATTRACTIVE` به‌همراه `valuation_confidence` / `valuation_confidence_label` در سطح LOW یا VERY_LOW، به‌همراه flag تحت عنوان `LOW_FORECAST_RELIABILITY` و alert تحت عنوان `WARNING:LOW_FORECAST_RELIABILITY` (`engine.py:162-163,514`). مقدار Reliability ورودی تابع `_valuation_status` نیست و Fair Value را تغییر نمی‌دهد. توکن تحت‌اللفظی `FORECAST RISK WARNING` / `FORECAST_RISK` هرگز صادر نمی‌شود (صفر ارجاع در کل `src` — رکوع بخش ۷۹). **تصمیم D3 هنوز حل‌نشده است.** ادعای PASS بالا فقط برای ترکیب قابل‌دستیابی صادق است، نه برای توکن تحت‌اللفظی.
 
 ---
 
@@ -1940,7 +1949,7 @@ FORECAST_RISK
 >
 > `HIGH_EPS_DEPENDENCE` هیچ‌گاه صادر نمی‌شود (صفر ارجاع در `src/valuation`)؛ هیچ فرمول سهم EPS، قانون تشدید Severity بر اساس Reliability، و قانون تقدم D2/D3 وجود ندارد.
 >
-> نام `FORECAST_RISK` در هیچ فایل تولیدی یا آزمونی تعریف نشده است (صفر ارجاع در کل `src`) و هیچ مصرف‌کننده‌ای ندارد. این سند نام `FORECAST_RISK` را تعریف نکرده و هیچ تصمیمی درباره حذف، نگه‌داشتن یا جایگزینی آن نمی‌گیرد — تعیین اینکه آیا این نام به‌عنوان جایگزین `HIGH_EPS_DEPENDENCE` مورد قبول است، بخشی از تصمیم D3/D8 است.
+> نام `FORECAST_RISK` در هیچ فایل تولیدی یا آزمونی تعریف نشده و از واژگان خروجی V1 که در D8 پذیرفته شد نیست. این نام alias برای `HIGH_EPS_DEPENDENCE` محسوب نمی‌شود؛ هر دو trigger مربوط به این دسته تا تعیین معیارهای D3 غیرفعال می‌مانند. این مستندسازی trigger یا severity تازه‌ای اضافه نمی‌کند.
 >
 > **تصمیم D3 هنوز حل‌نشده است.** ادعای PASS بالا نامعتبر است.
 
