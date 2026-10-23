@@ -1,58 +1,49 @@
-## نتیجهٔ بررسی P51
+## جمع‌بندی P53
 
-در D8 اختلاف‌های قرارداد هشدارها را با مشخصات، موتور Stage 7، schema، مصرف‌کنندگان قابل‌شناسایی و یافته‌های گزارش‌های قبلی تطبیق دادم. **هیچ تغییر کدی یا تستی انجام ندادم**؛ انتخاب نام‌های جایگزین یا ارتقای flagها به هشدارهای دارای severity بدون تصمیم مشخص در D8، تغییر قراردادیِ اثبات‌نشده می‌بود.
+**PIT کامل اثبات نشده است.** داده‌های Stage 5 و ارجاع‌های زمانیِ اعلام‌شده تا حدی قابل کنترل‌اند، اما برای قیمت بازار، benchmarkها، همهٔ ورودی‌های EPS و پارامترهای تاریخی شواهد کافی وجود ندارد.
 
-### مقایسهٔ الزام و رفتار فعلی
+### اصلاح انجام‌شده
 
-| نام در بخش 49 مشخصات | رفتار واقعی موتور | ارزیابی |
-|---|---|---|
-| `HIGH_SCENARIO_DISPERSION` | `WARNING:HIGH_SCENARIO_DISPERSION` و flag متناظر | نام منطبق؛ پیاده‌سازی‌شده |
-| `LOW_FORECAST_RELIABILITY` | `WARNING:LOW_FORECAST_RELIABILITY` و flag متناظر | نام منطبق؛ پیاده‌سازی‌شده |
-| `VALUATION_BENCHMARK_DIVERGENCE` | `WATCH:VALUATION_ABOVE_TARGET_PE` یا `WATCH:VALUATION_BELOW_TARGET_PE` | اختلاف نام؛ حفظ جهت بالا/پایین لازم است |
-| `HISTORICAL_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_ABOVE_HISTORICAL` یا `WATCH:FORWARD_PE_BELOW_HISTORICAL` | اختلاف نام؛ رفتار جهت‌دار فعلی روشن است |
-| `INDUSTRY_VALUATION_DIVERGENCE` | `WATCH:FORWARD_PE_ABOVE_INDUSTRY` یا `WATCH:FORWARD_PE_BELOW_INDUSTRY` | اختلاف نام؛ رفتار جهت‌دار فعلی روشن است |
-| `INSUFFICIENT_PEER_DATA` | فقط در `valuation_risk_flags` | flag موجود است؛ مشخصات تعیین نکرده که flag به‌تنهایی کافی است یا باید severity داشته باشد |
-| `NEGATIVE_EPS` | فقط در `valuation_risk_flags` | flag موجود است؛ کفایت آن به‌عنوان Alert تعیین نشده |
-| `SIGN_CHANGE` | فقط در `valuation_risk_flags` | flag موجود است؛ کفایت آن به‌عنوان Alert تعیین نشده |
-| `ASSESSMENT_FLIP_RISK` | صادر نمی‌شود | طبق D1 تا تعریف معیار معتبر، عمداً غیرفعال |
-| `HIGH_MULTIPLE_DEPENDENCE` | صادر نمی‌شود | طبق D2 تا تأیید معیار وابستگی، عمداً غیرفعال |
-| `HIGH_EPS_DEPENDENCE` | صادر نمی‌شود | طبق D3 عمداً غیرفعال؛ EPS مرحلهٔ قبل حفظ می‌شود |
-| `MARGIN_ASSUMPTION_RISK` | صادر نمی‌شود | طبق D4، ورودی معتبر و تاریخ‌دار در دسترس نیست |
-| `HIGH_IMPACT_HIGH_UNCERTAINTY` | صادر نمی‌شود | طبق D5، معیار مستقل و معتبر تعریف نشده |
-| `POOR_DATA_QUALITY` | صادر نمی‌شود | مشخصات trigger مشخصی برای آن ندارد |
-| `POINT_IN_TIME_WARNING` | صادر نمی‌شود | به تعیین تکلیف D7 و معیار معتبر PIT وابسته است |
+در [engine.py](D:/winprojects/analyzer/src/valuation/engine.py:115)، موتور Stage 7 اکنون ارجاع‌های پذیرفته‌شده‌ای را که Stage 5 در `forecast_result.assumptions["input_refs"]` قرار می‌دهد، خودکار بررسی می‌کند. ارجاع‌های بدون `available_at` یا بعد از cutoff رد می‌شوند؛ ارجاع دقیقاً روی cutoff پذیرفته می‌شود. این ارجاع‌ها حتی در صورت ارسال فهرست صریح خالی نیز بررسی می‌شوند.
 
-موتور همچنین `CRITICAL:INSUFFICIENT_BENCHMARK_DATA` و `INFO:TOP_DRIVER:<driver>` صادر می‌کند. اولی با `INSUFFICIENT_PEER_DATA` یکی نیست: وضعیت نبود benchmark قابل‌استفاده را نشان می‌دهد، درحالی‌که دومی کمبود تعداد peerها را نشان می‌دهد. دومی یادداشت driver است، نه یکی از نام‌های بخش 49.
+چهار تست به [test_stage7_valuation.py](D:/winprojects/analyzer/src/tests/test_stage7_valuation.py:1364) اضافه شد:
 
-### Schema و مصرف‌کنندگان
+- `test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted`
+- `test_p53_embedded_forecast_input_ref_after_cutoff_is_rejected`
+- `test_p53_embedded_forecast_input_ref_without_availability_is_rejected`
+- `test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance`
 
-فیلد `ValuationResult.alerts` از نوع `List[str]` است؛ severity به‌شکل پیشوند متنی مثل `WATCH:` یا `WARNING:` در رشته ذخیره می‌شود و فیلد ساختاریافتهٔ جداگانه‌ای برای severity وجود ندارد.
+آزمون‌ها اجرا نشدند.
 
-بررسی مستقیم `DecisionEngine.make_decision` نشان داد Stage 9 از `valuation_status` و چند مقدار مشتق‌شده استفاده می‌کند، اما `alerts`، `valuation_risk_flags` یا `valuation_driver_ranking` را نمی‌خواند. بنابراین **مصرف‌کنندهٔ فعلیِ تأییدشده‌ای برای نام‌های هشدار Stage 7 در Stage 9 پیدا نشد**. این بررسی سازگاری مصرف‌کنندگان آینده، سابقهٔ خروجی‌ها یا مصرف‌کنندگان خارج از مخزن را تعیین نمی‌کند.
+### شواهد زمانی و محدودیت‌ها
 
-### طبقه‌بندی و تصمیم لازم
+| ورودی | تاریخ مشاهده یا گزارش | شواهد دسترس‌پذیری و اعمال cutoff | محدودیت باقی‌مانده |
+|---|---|---|---|
+| قیمت بازار | `MarketDaily.jalali_year/month/day`؛ انتخاب آخرین قیمت در یا پیش از تاریخ جلالی درخواستی | `select_market_price_as_of` تاریخ جلالی را مقایسه می‌کند و قیمت، منبع و شناسهٔ رکورد را در metadata نگه می‌دارد. | مدل قیمت بازار `available_at` ندارد؛ تاریخ معامله ثابت نمی‌کند قیمت در همان زمان برای سیستم یا بازار در دسترس بوده است. تاریخ انتخاب‌شده هم به فیلدهای `valuation_date` و `market_price_date` منتقل نمی‌شود؛ در metadata باقی می‌ماند. |
+| facts صورت‌های مالی | `FinancialPeriod.end_date` از نوع `Date` | `src/forecast/queries.py` نسخه‌هایی را انتخاب می‌کند که `ReportVersion.publication_datetime <= cutoff` باشد و ارجاع publication را برای Stage 5 فراهم می‌کند. | `publication_datetime` هنگام ingestion به‌عنوان ورودی دریافت می‌شود؛ کد بررسی نمی‌کند که آن زمان از منبع مستقل و معتبر تأیید شده باشد. پایان دوره، زمان انتشار نیست. |
+| Forecast EPS | `SingleForecastChain.eps` در `CompanyForecastResult`؛ همراه `forecast_timestamp`، `data_cutoff_datetime` و `model_version` | Stage 5 ارجاع‌های پذیرفته‌شده را در `assumptions["input_refs"]` می‌گذارد. اصلاح P53 این شواهد را به اعتبارسنجی Stage 7 وصل می‌کند. | فهرست ارجاع‌ها فقط آنچه اعلام شده را پوشش می‌دهد. نبود ارجاع، ورودی‌های اعلام‌نشده را اثباتاً تاریخی نمی‌کند؛ provenance کامل EPS تضمین نشده است. |
+| benchmark تاریخی و صنعتی | ورودی‌های عددی `historical_pe_values`، `industry_forward_pe_values` و `industry_ttm_pe_values` | در موتور Stage 7 به median تبدیل می‌شوند. | این ورودی‌ها تاریخ، منبع، تاریخ دسترس‌پذیری یا provenance به‌ازای هر observation ندارند؛ cutoff روی آن‌ها اعمال نمی‌شود. |
+| cutoff و تاریخ ارزش‌گذاری | `data_cutoff_datetime` اختیاری است؛ در نبود آن از cutoff Forecast استفاده می‌شود. `valuation_date` اختیاری است. | cutoff برای ارجاع‌های Forecast مقایسه می‌شود. | ترتیب cutoff، تاریخ ارزش‌گذاری و تاریخ قیمت در موتور کنترل نمی‌شود. انتخاب قیمت به تاریخ جلالی است و آن را بدون تبدیلِ اثبات‌شده نمی‌توان با cutoff از نوع `datetime` مقایسه کرد. |
+| نسخه و پارامترهای مدل | `model_version` و snapshot پارامترها ثبت می‌شوند. | انتخاب تاریخ‌دار با `parameter_as_of` و registry صریح پشتیبانی می‌شود. | registry پیش‌فرض فقط مجموعهٔ genesis بدون `effective_from` دارد. cutoff خودکار مبنای انتخاب پارامتر نیست (`data_cutoff_used_for_parameter_selection=False`)؛ تاریخچهٔ پارامترهای معتبر برای بازآزمایی کامل در دسترس نیست. |
 
-- **اختلاف نام:** سه خانوادهٔ benchmark، تاریخی و صنعتی نام‌های مشخصات را با نام‌های موجود موتور تطبیق نمی‌دهند. انتخاب rename، alias یا پذیرفتن نام‌های موتور در مشخصات هنوز تصمیم مالک است.
-- **ابهام قرارداد:** مشخص نیست flagهای `INSUFFICIENT_PEER_DATA`، `NEGATIVE_EPS` و `SIGN_CHANGE` برای الزام «قابلیت Alert» کافی‌اند یا باید Alert دارای severity باشند؛ severityهای لازم هم تعریف نشده‌اند.
-- **قابلیت‌های تعمداً به‌تعویق‌افتاده:** هشدارهای D1 تا D5 را فعال نکردم. triggerهای `POOR_DATA_QUALITY` و `POINT_IN_TIME_WARNING` نیز معیار کافی ندارند.
-- **اصلاحات ایمن:** موردی پیدا نشد که بدون انتخاب سیاست D8 یا تعریف trigger و severity، بتوان اصلاحش کرد. رفتار فعلی و آزمون‌های موجود دست‌نخورده ماندند.
+### مسیر بررسی‌شده
 
-### تغییرات و اعتبارسنجی
+مسیر قابل‌ترکیب در کد از سرویس Forecast و داده‌های مالیِ فیلترشده بر اساس publication شروع می‌شود؛ `calculate_valuation_as_of_jalali` قیمت را با تاریخ جلالی انتخاب می‌کند و به `ValuationEngine` می‌دهد؛ `calculate_decision_as_of_jalali` نتیجهٔ Stage 7 را به `DecisionEngine` می‌رساند. بااین‌حال، در کد محلی فراخوانِ برنامه‌ای برای orchestrator مرحلهٔ تصمیم پیدا نشد؛ استفادهٔ قابل‌مشاهده از آن در تست‌هاست. بنابراین وجود این توابع به‌تنهایی مسیر production یا PIT تاریخیِ سرتاسری را اثبات نمی‌کند.
 
-فایلی تغییر نکرد و تستی اضافه یا ویرایش نشد. تست یا CI اجرا نکردم؛ بررسی محدود به خواندن مشخصات، کد و تست‌های مرتبط و جست‌وجوی ارجاع‌های مصرف‌کننده بود.
+**نتیجه:** enforcement برای ارجاع‌های Forecast که واقعاً همراه نتیجه اعلام شده‌اند تقویت شد؛ کنترل cutoff قیمت فقط بر اساس تاریخ مشاهده انجام می‌شود. صحت PIT کل ارزش‌گذاری و بازآزمایی تاریخی همچنان **اثبات‌نشده** است.
 
-**گام بعدی در برنامهٔ Stage 7:** تصمیم‌گیری مالک دربارهٔ گزینهٔ نام‌گذاری D8 و اینکه emission در سطح flag برای بخش 49 کفایت می‌کند یا نه. `temp_report2.md` همین تصمیم را به‌عنوان WP-0 و پیش‌نیاز تصمیم‌های بعدی مشخص کرده است. تا روشن‌شدن آن، تغییر قرارداد توجیه ندارد؛ Stage 7 همچنان باز است و frozen اعلام نمی‌شود.
+### فایل‌ها، آزمون‌ها و گام بعدی
 
-# ## P52 انجام شد
+فایل‌های تغییرکرده:
 
-تنها فایل تغییرکرده از طرف من [07_Stage7_Valuation.md](D:/winprojects/analyzer/07_Stage7_Valuation.md) است.
+- `src/valuation/engine.py` — اتصال provenance موجود Forecast به اعتبارسنجی Stage 7.
+- `src/tests/test_stage7_valuation.py` — چهار تست متمرکز برای مرز cutoff، دادهٔ آینده، availability نامعلوم، و جلوگیری از دورزدن بررسی با فهرست صریح خالی.
 
-- **بخش ۴۹:** واژگان واقعی V1 را ثبت کردم. کانال `alerts` را از `valuation_risk_flags` جدا توضیح دادم؛ فهرست alertها شامل نام‌های severityدار و جهت‌دار است. `INSUFFICIENT_PEER_DATA`، `NEGATIVE_EPS` و `SIGN_CHANGE` به‌عنوان flag-only ثبت شدند.
-- **بخش‌های ۵۴ و ۵۵:** نام‌های واقعی `WATCH:FORWARD_PE_ABOVE/BELOW_HISTORICAL` و `WATCH:FORWARD_PE_ABOVE/BELOW_INDUSTRY` را با معنای هر جهت مستند کردم. تمایز `INSUFFICIENT_PEER_DATA` با `INDUSTRY_BENCHMARK_INSUFFICIENT` حفظ شده است.
-- **بخش‌های ۵۰ تا ۵۳:** هشدارهای D1 تا D4 به‌عنوان موارد به‌تعویق‌افتاده مشخص شدند؛ بخش ۴۹ نیز وضعیت D5 را ثبت می‌کند.
-- **بخش ۵۶:** روشن کردم که نبودن `POINT_IN_TIME_WARNING` اثبات‌کنندهٔ صحت یا کامل‌بودن PIT نیست.
-- **یادداشت‌های مرتبط با بخش‌های ۷۲ و ۷۹:** ارجاع منسوخ به بازبودن تصمیم D8 اصلاح شد و `FORECAST_RISK` به‌عنوان نامی خارج از واژگان پذیرفته‌شدهٔ V1 مشخص شد.
+ترتیب پیشنهادی اجرای تست‌ها:
 
-کد تولید، schema، پارامترها و تست‌ها را تغییر ندادم. آزمون‌های مرتبط را فقط به‌صورت ایستا بررسی کردم؛ از جمله `test_alerts_include_severity_and_driver_focus`، `test_p2_alert_divergence_ratios_boundaries` و `test_v1_defers_undefined_flip_dependence_and_assumption_alerts`. هیچ تست یا CI اجرا نکردم؛ `git diff --check` بدون خطا بود.
+```bash
+python -m pytest src/tests/test_stage7_valuation.py -q -k "p53_embedded_forecast_input_ref or p53_explicit_empty_refs"
+python -m pytest src/tests/test_stage7_valuation.py -q
+```
 
-در واژگان فعلی V1، تصمیم مستندسازی‌شدهٔ D8 دیگر ابهامی ندارد. سازگاری مصرف‌کنندگان خارج از مخزن قابل‌تأیید نیست؛ این تغییر مستنداتی نیز صحت runtime، اتصال production یا انطباق کامل PIT را اثبات نمی‌کند. **Stage 7 همچنان OPEN است.**
+این فایل‌ها و بخش‌های مرتبط از کد و تست‌های Forecast، market ingestion، مدل‌های Report/Period/Market، پارامترهای Stage 7 و سرویس تصمیم بررسی شدند. تست یا CI اجرا نکردم و فایل گزارش یا مشخصات قفل‌شده را تغییر ندادم. **گام بعدی برنامه** رفع محدودیت D7 است: منبع معتبر `available_at` برای قیمت بازار، provenance تاریخ‌دار benchmarkها و نسخه‌های مؤثر تاریخی پارامترها لازم است. Stage 7 همچنان **OPEN** است.
