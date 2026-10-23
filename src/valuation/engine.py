@@ -109,9 +109,11 @@ class ValuationEngine:
         if data_cutoff_datetime is None:
             data_cutoff_datetime = forecast_result.data_cutoff_datetime
         data_cutoff_datetime = normalize_datetime(data_cutoff_datetime)
-        # Stage 5 carries accepted input provenance in its result assumptions.
-        # Always validate it, even if a caller also supplied explicit refs, so
-        # the caller cannot accidentally omit provenance already on the result.
+        # Stage 5's public ``input_refs`` assumption contains refs accepted by
+        # its PIT guard. Its underscored ``__input_refs`` audit handle also
+        # contains late refs that Stage 5 rejected and excluded from the
+        # forecast; do not reclassify those dropped refs as inputs to valuation.
+        # Validate accepted refs even if a caller supplied an empty override.
         embedded_refs = forecast_result.assumptions.get("input_refs")
         if embedded_refs is not None:
             normalized_embedded_refs = tuple(

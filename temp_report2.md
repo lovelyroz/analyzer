@@ -4087,3 +4087,31 @@ python -m pytest src/tests/test_stage7_valuation.py -q
 ```
 
 این فایل‌ها و بخش‌های مرتبط از کد و تست‌های Forecast، market ingestion، مدل‌های Report/Period/Market، پارامترهای Stage 7 و سرویس تصمیم بررسی شدند. تست یا CI اجرا نکردم و فایل گزارش یا مشخصات قفل‌شده را تغییر ندادم. **گام بعدی برنامه** رفع محدودیت D7 است: منبع معتبر `available_at` برای قیمت بازار، provenance تاریخ‌دار benchmarkها و نسخه‌های مؤثر تاریخی پارامترها لازم است. Stage 7 همچنان **OPEN** است.
+==========================================================
+# P53.1 انجام شد
+
+فایل‌های تغییرکرده از طرف من:
+
+- [src/valuation/engine.py](D:/winprojects/analyzer/src/valuation/engine.py:113) — توضیح handoff را روشن کردم: Stage 7 اعتبارسنجی را روی `assumptions["input_refs"]` انجام می‌دهد، یعنی ارجاع‌هایی که Stage 5 از PIT guard عبور داده است. `__input_refs` شامل ارجاع‌های خام، از جمله موارد ردشده، است و نباید دوباره به‌عنوان ورودی ارزش‌گذاری اعتبارسنجی شود. **منطق اجرایی تغییری نکرده است.**
+- [src/tests/test_stage7_valuation.py](D:/winprojects/analyzer/src/tests/test_stage7_valuation.py:1318) — تست‌های دستی P53 را با تست‌هایی جایگزین کردم که نتیجه را واقعاً با `ForecastEngine.generate_forecast()` می‌سازند و سپس به Stage 7 می‌دهند.
+
+Stage 5 ارجاع‌های خام را در `__input_refs` نگه می‌دارد؛ ارجاع‌های پذیرفته‌شده را در `assumptions["input_refs"]` می‌گذارد و موارد دیررسِ حذف‌شده را در `pit_dropped_values` ثبت می‌کند. بنابراین دیررس‌بودن یک ارجاع در فهرست audit به‌تنهایی دلیل رد forecast در Stage 7 نیست؛ Stage 5 ممکن است همان ورودی را قبلاً از محاسبه کنار گذاشته باشد. این با توضیح شواهد در خود P53.1 تفاوت دارد، اما با خروجی واقعی کد Stage 5 سازگار است.
+
+تست‌های اضافه یا بازنویسی‌شده:
+
+- `test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted`
+- `test_p53_stage5_dropped_future_input_is_not_reintroduced_to_stage7`
+- `test_p53_embedded_forecast_input_ref_without_availability_is_rejected`
+- `test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance`
+- `test_p53_stage5_forecast_without_provenance_preserves_legacy_path`
+
+تست دوم نشان می‌دهد Stage 5 ورودیِ بعد از cutoff را حذف می‌کند و Stage 7 از ارجاع audit آن به‌عنوان ورودی مصرف‌شده استفاده نمی‌کند. تست آخر مسیر legacy را حفظ می‌کند و هم‌زمان نشان می‌دهد forecast فاقد provenance همچنان ورودی‌های اجباریِ اعلام‌نشده دارد؛ این وضعیت **اثبات PIT نیست**.
+
+دستورهای پیشنهادی برای اجرای شما:
+
+```bash
+python -m pytest src/tests/test_stage7_valuation.py -q -k "p53_"
+python -m pytest src/tests/test_stage7_valuation.py -q
+```
+
+تست یا CI اجرا نکردم؛ بررسی ایستای diff انجام شد و `git diff --check` خطایی گزارش نکرد. محدودیت اصلی همچنان برقرار است: نبود provenance برای برخی ورودی‌ها، و فقدان شواهد تاریخی کافی برای بازار، benchmarkها و نسخهٔ پارامترها، اجازهٔ اثبات PIT کامل را نمی‌دهد. **Stage 7 باز است.**

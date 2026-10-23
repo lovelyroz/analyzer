@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from src.forecast.schema import CompanyForecastResult, ForecastInputRef, ScenarioForecastResult, SingleForecastChain
+from src.forecast.engine import ForecastEngine
 from src.core.database import Base
 from src.models.entity import Company, Industry
 from src.models.market import MarketDaily
@@ -1314,6 +1315,29 @@ def _p32_kwargs(**overrides):
     return params
 
 
+def _p53_stage5_forecast(input_refs=None):
+    """Produce a real Stage 5 result with declared provenance for P53.1."""
+    context = {
+        "seasonality_valid": True,
+        "seasonal_baseline_revenue": 10000.0,
+        "recent_run_rate_revenue": 9000.0,
+        "baseline_revenue_growth": 0.10,
+        "historical_operating_margin": 0.20,
+        "historical_net_margin": 0.10,
+        "share_count": 1000.0,
+        "net_profit_is_attributable": True,
+    }
+    if input_refs is not None:
+        context["input_refs"] = input_refs
+    return ForecastEngine().generate_forecast(
+        company_id=1,
+        forecast_period_id=101,
+        industry_code="PETROCHEMICAL",
+        financial_context=context,
+        data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+
 def test_p32_input_refs_before_cutoff_leave_results_unchanged():
     import dataclasses
 
@@ -1362,13 +1386,13 @@ def test_p32_input_refs_absent_preserves_legacy_path():
 
 
 def test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted():
-    forecast = make_forecast()
-    forecast.assumptions["input_refs"] = [{
-        "fact_key": "EPS",
-        "report_version_id": 7,
-        "available_at": "2026-01-01T00:00:00+00:00",
-        "source": "CODAL",
-    }]
+    forecast = _p53_stage5_forecast([ForecastInputRef(
+        fact_key="seasonal_baseline_revenue",
+        report_version_id=7,
+        available_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        source="CODAL",
+    )])
+    assert forecast.assumptions["input_refs"][0]["fact_key"] == "seasonal_baseline_revenue"
 
     result = ValuationEngine().calculate_valuation(
         **_p32_kwargs(forecast_result=forecast)
@@ -1377,51 +1401,74 @@ def test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted():
         **_p32_kwargs(forecast_result=forecast)
     )
 
-    assert result.expected_fair_value == 1260.0
+    # This test supplies a genuine Stage 5 forecast, whose EPS and resulting
+    # fair value are not the synthetic make_forecast() golden values. The
+    # accepted-at-cutoff provenance is verified by the successful valuation
+    # call above; assert the real forecast EPS is passed through unchanged.
+    assert result.scenarios["base"].eps_forecast == forecast.scenario_forecasts.base.eps
     assert result.valuation_status == repeated.valuation_status
     assert result.expected_fair_value == repeated.expected_fair_value
     assert result.valuation_risk_flags == repeated.valuation_risk_flags
 
 
-def test_p53_embedded_forecast_input_ref_after_cutoff_is_rejected():
-    forecast = make_forecast()
-    forecast.assumptions["input_refs"] = [{
-        "fact_key": "EPS",
-        "report_version_id": 7,
-        "available_at": "2026-01-02T00:00:00+00:00",
-        "source": "CODAL",
-    }]
+def test_p53_stage5_dropped_future_input_is_not_reintroduced_to_stage7():
+    forecast = _p53_stage5_forecast([ForecastInputRef(
+        fact_key="seasonal_baseline_revenue",
+        report_version_id=7,
+        available_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+        source="CODAL",
+    )])
+    assert forecast.assumptions["pit_dropped_values"] == ["seasonal_baseline_revenue"]
+    assert forecast.assumptions["input_refs"] == []
+    assert forecast.assumptions["__input_refs"][0].available_at == datetime(
+        2026, 1, 2, tzinfo=timezone.utc
+    )
 
-    with pytest.raises(ValueError, match="after the"):
-        ValuationEngine().calculate_valuation(**_p32_kwargs(forecast_result=forecast))
+    # Stage 5 already removed the late value before producing EPS. Stage 7 must
+    # value that guarded forecast, not reject its audit-only dropped ref.
+    result = ValuationEngine().calculate_valuation(
+        **_p32_kwargs(forecast_result=forecast)
+    )
+    assert result.scenarios["base"].eps_forecast == forecast.scenario_forecasts.base.eps
 
 
 def test_p53_embedded_forecast_input_ref_without_availability_is_rejected():
-    forecast = make_forecast()
-    forecast.assumptions["input_refs"] = [{
-        "fact_key": "EPS",
-        "report_version_id": 7,
-        "available_at": None,
-        "source": "CODAL",
-    }]
+    forecast = _p53_stage5_forecast([ForecastInputRef(
+        fact_key="seasonal_baseline_revenue",
+        report_version_id=7,
+        available_at=None,
+        source="CODAL",
+    )])
+    assert forecast.assumptions["input_refs"][0]["available_at"] is None
 
     with pytest.raises(ValueError, match="without"):
         ValuationEngine().calculate_valuation(**_p32_kwargs(forecast_result=forecast))
 
 
 def test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance():
-    forecast = make_forecast()
-    forecast.assumptions["input_refs"] = [{
-        "fact_key": "EPS",
-        "report_version_id": 7,
-        "available_at": "2026-01-02T00:00:00+00:00",
-        "source": "CODAL",
-    }]
+    forecast = _p53_stage5_forecast([ForecastInputRef(
+        fact_key="seasonal_baseline_revenue",
+        report_version_id=7,
+        available_at=None,
+        source="CODAL",
+    )])
 
-    with pytest.raises(ValueError, match="after the"):
+    with pytest.raises(ValueError, match="without"):
         ValuationEngine().calculate_valuation(
             **_p32_kwargs(forecast_result=forecast, forecast_input_refs=[])
         )
+
+
+def test_p53_stage5_forecast_without_provenance_preserves_legacy_path():
+    forecast = _p53_stage5_forecast()
+    assert forecast.assumptions["input_refs"] == []
+    assert forecast.assumptions["undeclared_mandatory_inputs"]
+
+    result = ValuationEngine().calculate_valuation(
+        **_p32_kwargs(forecast_result=forecast)
+    )
+
+    assert result.scenarios["base"].eps_forecast == forecast.scenario_forecasts.base.eps
 
 
 def _p33_snapshot():
