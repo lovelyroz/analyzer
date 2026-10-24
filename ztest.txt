@@ -1,7 +1,0 @@
-stepsForStage7.md
-07_Stage7_Valuation.md
-src/valuation/parameters.py
-src/valuation/engine.py
-src/valuation/schema.py
-src/valuation/service.py
-src/tests/test_stage7_valuation.py
