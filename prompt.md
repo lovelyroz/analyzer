@@ -1,123 +1,104 @@
-# P63 — Audit Historical Parameter Versioning (P54) Before Stage 7 Integration
+# P64 — Verify Authoritative Evidence for Stage 7 Parameter Effective Dates
 
-## 1. Role and Project Context
+## Objective
 
-You are conducting a focused engineering audit of the local project folder `analyzer`, a financial-data application.
+Resolve the remaining policy and evidence gap identified by P63 before implementing any change to Stage 7 historical parameter versioning.
 
-Financial correctness, point-in-time correctness, auditability, deterministic behavior, and preservation of existing financial invariants take priority over implementation speed or making tests pass.
+Work only in the project folder `analyzer`. Read `stepsForStage7.md` first, then the current `reply.md` containing P63.
 
-The latest P62 report is in `reply.md`. Read `stepsForStage7.md` first because it is the authoritative Stage 7 execution plan. Then read the current `reply.md` and only the directly relevant sections of `temp_report2.md` and the Stage 7 specification.
+The financial application requires strict historical correctness, auditability, deterministic behavior, and preservation of financial invariants.
 
-## 2. Strict Execution Boundaries
+## Strict Boundaries
 
-This task is **analysis and reporting only**.
+This is an evidence audit only.
 
-- Do not edit application code, tests, configuration, specifications, or planning files.
-- Do not add, modify, or seed parameter records.
-- Do not change parameter defaults, financial formulas, thresholds, or historical-selection behavior.
-- Do not run pytest, application code, migrations, database writes, or CI.
-- Do not use GitHub, GitHub CLI/API, remotes, pushes, pulls, commits, branches, or other remote operations.
-- Do not inspect the entire repository. Follow the focused file scope below.
+- Do not change code, tests, specifications, parameter values, defaults, dates, or registry entries.
+- Do not add a dated parameter version.
+- Do not run tests, application code, database writes, migrations, or CI.
+- Do not use GitHub, GitHub CLI/API, remote operations, commits, pushes, pulls, or branches.
+- Do not explore the repository broadly.
 - Do not modify `reply.md`, `temp_report.md`, `temp_report2.md`, `stepsForStage7.md`, `stage_7_prompts.md`, or `ClaudeReports/`.
-- Do not assume that making a historical lookup succeed proves historical correctness.
+- Do not infer that the current date, project creation date, or a model version ID establishes a parameter's effective date.
+- Do not invent financial approvals, historical facts, or parameter values.
 
-Your only deliverable is a report that I will review and place in `reply.md` myself.
+## Focused Scope
 
-## 3. Required Audit Scope
+Inspect only the evidence needed to answer whether the existing Stage 7 parameter values and their effective dates are authoritatively defined.
 
-First inspect `stepsForStage7.md` and `reply.md`. Then inspect only the files necessary to trace the P54 parameter-selection path, prioritizing:
+Prioritize:
 
-- `src/valuation/parameters.py`
-- `src/valuation/engine.py`
-- `src/valuation/service.py`
-- `src/valuation/schema.py`
-- `src/valuation/models.py`, if it exists and is relevant
-- `src/tests/test_stage7_valuation.py`
-- The exact parameter-related specification sections in `07_Stage7_Valuation.md`
-- Any directly referenced parameter registry, parameter model, migration, or seed file required to establish the actual implementation
+1. The parameter-versioning section referenced by P63 in `07_Stage7_Valuation.md`, including its surrounding requirements and any referenced acceptance rules.
+2. `src/valuation/parameters.py`, specifically `DEFAULT_REGISTRY`, `_genesis_records`, `GENESIS_VERSION`, and the parameter-selection functions.
+3. `stepsForStage7.md` and the P63 report in `reply.md` for prior decisions and constraints.
+4. Only if directly referenced by those files, relevant parameter-related history or specifications already present in the local repository.
 
-If a listed path does not exist, record that fact and do not silently substitute a guessed path. Follow references only as far as necessary to establish the selection behavior and data provenance.
+Do not search unrelated financial modules.
 
-## 4. Questions That Must Be Answered With Code or Specification Evidence
+## Questions to Answer
 
-### A. Current selection behavior
+### A. What is actually authorized?
 
-1. Locate `resolve_parameter_set_as_of` and identify its exact inputs, return type, and error behavior.
-2. Explain when current-date or undated selection is allowed, when historical selection is attempted, and why P54 can raise `LookupError`.
-3. Identify the actual source of the parameter records: code defaults, registry entries, database rows, seed data, or another mechanism.
-4. Establish whether parameter versions have effective-start and effective-end dates, version identifiers, or other temporal metadata.
-5. Determine how the selected parameter set is associated with the valuation result and whether the exact values/version used can be reconstructed later.
+Determine whether the locked specification explicitly defines any of the following:
 
-### B. Point-in-time correctness
+- Effective date for the current Genesis parameter set.
+- Effective date for an initial 2026 parameter version.
+- Approval or provenance requirements for parameter values.
+- Whether historical parameter selection is mandatory for every historical valuation or only when an explicit parameter cutoff is supplied.
+- Required behavior when a historical version is unavailable.
 
-Determine whether the current implementation can prove that a parameter set was valid and available at the historical analysis cutoff.
+For every claimed requirement, provide the exact file path, section, and line number where possible. Separate explicit requirements from your interpretation.
 
-Explicitly distinguish:
+### B. Can the proposed date `2026-01-01T00:00:00Z` be justified?
 
-- **Effective time:** when a parameter set is considered valid for business use.
-- **Knowledge/recorded time:** when the system actually knew or recorded that parameter set.
-- **Analysis cutoff:** the time/date through which information is allowed to influence the calculation.
+Classify the date as one of:
 
-Do not assume these three concepts are interchangeable. If the schema or evidence cannot establish one of them, state that clearly.
+- **AUTHORITATIVELY SPECIFIED** — directly required by an authoritative project specification or approved record.
+- **SUPPORTED BUT NOT FORMALLY APPROVED** — supported by evidence but missing required approval.
+- **UNSUPPORTED** — no adequate evidence establishes it.
 
-Check whether a historical valuation could silently use present-day defaults, a model version ID without historical parameter values, or a valuation date that is not the authoritative data cutoff.
+Apply the same classification to the proposition that the current hardcoded parameter values were valid from that date.
 
-### C. Test evidence
+Do not treat the P63 report's proposed example date as evidence of validity.
 
-Read the existing parameter-related Stage 7 tests. Classify what they actually prove:
+### C. What does the current implementation permit?
 
-- Current/default parameter resolution
-- Historical resolution
-- Missing historical version behavior
-- Boundary dates and version overlaps
-- Deterministic replay/reconstruction
-- Audit metadata and exact parameter-value provenance
+Confirm whether the current implementation:
+- Allows historical selection only from dated registry entries.
+- Fails closed when no valid dated entry exists.
+- Allows a legacy calculation using current constants without proving historical validity.
+- Records enough metadata to identify the values actually consumed.
 
-Do not claim any test exists unless you locate it. Do not run tests.
+Identify any distinction between recording parameter values and proving their historical validity.
 
-### D. Minimal safe remediation decision
+### D. Safest decision
 
-Compare these options using evidence, without implementing any of them:
+Recommend exactly one next action:
 
-1. Add a dated parameter record.
-2. Introduce or complete explicit effective-dated parameter versioning.
-3. Fail closed for historical valuation until a valid historical version can be proven.
-4. Another narrowly scoped option supported by the actual code and specification.
+1. Implement a dated parameter version using an already-authorized effective date and values.
+2. Request an explicit policy/approval decision because the effective date or historical validity is undefined.
+3. Preserve fail-closed historical selection and defer historical versioning until authoritative evidence exists.
+4. Another option, only if directly supported by project evidence.
 
-For each viable option, describe:
-- Preconditions
-- Financial/PIT risks
-- Compatibility implications
-- Required audit metadata
-- Minimum tests needed before acceptance
+If more than one action is necessary, state the required order and identify the single immediate next action.
 
-Choose the safest recommendation. Do not invent parameter values, effective dates, historical facts, or business policy. If the specification does not define the required policy, classify that as a decision gap instead of guessing.
+Do not ask the user to make technical or financial-policy choices that can be resolved from existing project evidence. If the evidence genuinely cannot resolve a policy question, state the precise unresolved decision without guessing.
 
-## 5. Relationship to Stage 7 Integration
+## Required Report
 
-P62 identified unproven end-to-end execution from Stage 3 through Stage 9 and several missing production contracts.
+Produce a Markdown report with:
 
-This P63 task must remain limited to P54. Explain how the parameter-versioning result affects Stage 7 integration readiness, but do not design or implement an orchestrator, Stage 3/8 data loaders, or Stage 9 persistence.
+1. Executive conclusion.
+2. Authoritative specification evidence.
+3. Effective-date and parameter-value provenance assessment.
+4. Classification of `2026-01-01T00:00:00Z` and the current parameter values.
+5. Current implementation behavior and remaining PIT limitations.
+6. One recommended next action with rationale.
+7. Objective acceptance criteria for the eventual P54 resolution.
+8. Files inspected, with actual paths and relevant line numbers.
+9. Explicit confirmation that no files were changed and no code, tests, database operations, migrations, or CI were run.
 
-Do not redesign `src/valuation/engine.py`. If it contains relevant parameter-consumption behavior, document that behavior and leave it unchanged.
+Clearly distinguish verified facts, interpretations, and unresolved policy decisions.
 
-## 6. Required Report Format
+## Completion Rule
 
-Produce a concise but technically rigorous Markdown report with these sections:
-
-1. **Executive Conclusion** — Is historical parameter resolution safe, unsafe, or not provable from available evidence?
-2. **Evidence-Based Current Behavior** — Exact functions, files, relevant line numbers, and observed behavior.
-3. **Temporal Data Model and PIT Assessment** — Effective time, recorded/knowledge time, and analysis cutoff.
-4. **Test Coverage Assessment** — Existing test names and precisely what they establish; identify missing coverage.
-5. **Remediation Options Comparison** — Evidence-based trade-offs.
-6. **Recommended Next Action** — One narrowly scoped next task, with prerequisites and explicit non-goals.
-7. **Acceptance Criteria** — Objective conditions that must hold before P54 can be considered resolved.
-8. **Stage 7 Integration Impact** — What remains blocked and what this audit does not establish.
-9. **Files Inspected** — Actual paths inspected; explicitly identify any missing paths.
-10. **Execution Confirmation** — Explicitly confirm that no files were changed and no tests, application code, database writes, migrations, or CI were run.
-
-Clearly separate **verified facts**, **inferences**, and **unresolved policy decisions**. Cite code locations using actual line numbers. If evidence is missing, say so rather than guessing.
-
-## 7. Completion Rule
-
-Stop after producing the report. Do not implement the recommendation and do not edit any repository or report file. I will review the report before authorizing the next step.
+Stop after producing the report. Do not implement any change. The report will be reviewed before further work is authorized.
