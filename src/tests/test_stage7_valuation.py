@@ -1646,8 +1646,9 @@ def test_p35_as_of_selection_governs_calculation_and_snapshot_matches():
         overrides={"VALUATION_THRESHOLDS.expensive_base_upside": -50.0, "MODEL_VERSION": "TEST_MODEL_V2"},
     )
     registry = _p35_registry(v1, v2)
-    historical = _p35_call(parameter_registry=registry, parameter_as_of=datetime(2025, 6, 1))
-    current = _p35_call(parameter_registry=registry, parameter_as_of=datetime(2026, 6, 1))
+    # D9: the effective data cutoff (not a separate as-of) governs selection.
+    historical = _p35_call(parameter_registry=registry, data_cutoff_datetime=datetime(2025, 6, 1))
+    current = _p35_call(parameter_registry=registry, data_cutoff_datetime=datetime(2026, 6, 1))
     # The selected set changes the classification (parameter genuinely consumed).
     assert historical.valuation_status == "EXPENSIVE"
     assert current.valuation_status == "FAIR"
@@ -1663,9 +1664,9 @@ def test_p35_as_of_selection_governs_calculation_and_snapshot_matches():
     assert selection["mode"] == "AS_OF_EFFECTIVE_DATED"
     assert selection["point_in_time_selection_applied"] is True
     assert selection["as_of_requested"] == "2026-06-01T00:00:00+00:00"
-    assert selection["as_of_source"] == "CALLER_SUPPLIED"
+    assert selection["as_of_source"] == "EFFECTIVE_DATA_CUTOFF"
     assert selection["effective_from"] == "2026-01-01T00:00:00+00:00"
-    assert selection["data_cutoff_used_for_parameter_selection"] is False
+    assert selection["data_cutoff_used_for_parameter_selection"] is True
     assert selection["module_constants_modified_since_import"] is None
 
 
@@ -1690,7 +1691,7 @@ def test_p35_selected_set_governs_peers_alerts_and_scenario_weights():
             "SCENARIO_WEIGHTS.bear": 0.5, "SCENARIO_WEIGHTS.base": 0.3, "SCENARIO_WEIGHTS.bull": 0.2,
         },
     )
-    selected = _p35_call(parameter_registry=_p35_registry(v2), parameter_as_of=dt(2026, 6, 1), **kwargs)
+    selected = _p35_call(parameter_registry=_p35_registry(v2), data_cutoff_datetime=dt(2026, 6, 1), **kwargs)
     assert selected.target_pe_source == "INDUSTRY_FORWARD_PE"
     assert "INSUFFICIENT_PEER_DATA" not in selected.valuation_risk_flags
     assert "LOW_FORECAST_RELIABILITY" in selected.valuation_risk_flags
@@ -1704,19 +1705,24 @@ def test_p35_missing_or_ambiguous_as_of_selection_fails_closed():
     from datetime import datetime as dt
 
     v1 = _p35_version("TEST/V1", dt(2025, 1, 1))
-    # as-of before every dated version
+    # cutoff before every dated version
     with pytest.raises(LookupError):
-        _p35_call(parameter_registry=_p35_registry(v1), parameter_as_of=dt(2024, 1, 1))
-    # registry supplied without an as-of instant: none is inferred (R8/D9 open)
+        _p35_call(parameter_registry=_p35_registry(v1), data_cutoff_datetime=dt(2024, 1, 1))
+    # registry supplied with neither an effective cutoff nor an as-of instant:
+    # none is inferred (valuation_date is never a substitute)
     with pytest.raises(LookupError, match="as-of instant"):
-        _p35_call(parameter_registry=_p35_registry(v1))
+        _p35_call(
+            parameter_registry=_p35_registry(v1),
+            forecast_result=_d9_forecast_without_cutoff(),
+            valuation_date=dt(2025, 6, 1),
+        )
     # as-of requested against the default registry (undated genesis only)
     with pytest.raises(LookupError, match="R8"):
         _p35_call(parameter_as_of=dt(2026, 1, 1))
     # ambiguous effective dates
     dup = _p35_registry(_p35_version("TEST/A", dt(2025, 1, 1)), _p35_version("TEST/B", dt(2025, 1, 1)))
     with pytest.raises(LookupError, match="Ambiguous"):
-        _p35_call(parameter_registry=dup, parameter_as_of=dt(2025, 6, 1))
+        _p35_call(parameter_registry=dup, data_cutoff_datetime=dt(2025, 6, 1))
 
 
 def test_p35_invalid_parameter_set_raises_without_fallback_to_constants():
@@ -1732,9 +1738,9 @@ def test_p35_invalid_parameter_set_raises_without_fallback_to_constants():
     )
     for version in cases:
         with pytest.raises(ParameterSetInvalidError):
-            _p35_call(parameter_registry=_p35_registry(version), parameter_as_of=when)
+            _p35_call(parameter_registry=_p35_registry(version), data_cutoff_datetime=when)
     with pytest.raises(ParameterSetInvalidError, match="MIN_INDUSTRY_PEERS"):
-        _p35_call(parameter_registry=_p35_registry(cases[0]), parameter_as_of=when)
+        _p35_call(parameter_registry=_p35_registry(cases[0]), data_cutoff_datetime=when)
 
 
 def test_p35_isolation_from_global_mutation_and_snapshot_aliasing():
@@ -1744,7 +1750,7 @@ def test_p35_isolation_from_global_mutation_and_snapshot_aliasing():
     from src.valuation.parameters import consume_parameter_set, live_genesis_parameter_set
 
     v2 = _p35_version("TEST/V2", datetime(2026, 1, 1))
-    kwargs = dict(parameter_registry=_p35_registry(v2), parameter_as_of=datetime(2026, 6, 1))
+    kwargs = dict(parameter_registry=_p35_registry(v2), data_cutoff_datetime=datetime(2026, 6, 1))
     before = _p35_call(**kwargs)
     original = params.VALUATION_THRESHOLDS["expensive_base_upside"]
     try:
@@ -1779,8 +1785,218 @@ def test_p35_repeated_as_of_calculations_are_deterministic():
     registry = _p35_registry(_p35_version("TEST/V1", datetime(2025, 1, 1)))
     runs = []
     for _ in range(3):
-        result = _p35_call(parameter_registry=registry, parameter_as_of=datetime(2025, 6, 1))
+        result = _p35_call(parameter_registry=registry, data_cutoff_datetime=datetime(2025, 6, 1))
         payload = dataclasses.asdict(result)
         payload.pop("calculation_timestamp")
         runs.append(payload)
     assert runs[0] == runs[1] == runs[2]
+
+
+# ---------------------------------------------------------------------------
+# D9 — historical parameter selection is governed by the effective data cutoff.
+# Synthetic versions are labelled TEST/* and never registered in
+# DEFAULT_REGISTRY. No real effective dates are invented: the undated Genesis
+# set stays undated and is never eligible for dated selection.
+# ---------------------------------------------------------------------------
+def _d9_forecast_without_cutoff():
+    """Minimal stand-in exposing only what the engine reads, with no cutoff."""
+    from types import SimpleNamespace
+
+    base = make_forecast(70.0, 140.0, 150.0)
+    return SimpleNamespace(
+        scenario_forecasts=base.scenario_forecasts,
+        assumptions={},
+        data_cutoff_datetime=None,
+    )
+
+
+def _d9_registry():
+    v1 = _p35_version("TEST/V1", datetime(2025, 1, 1))
+    v2 = _p35_version(
+        "TEST/V2", datetime(2026, 1, 1),
+        overrides={"VALUATION_THRESHOLDS.expensive_base_upside": -50.0, "MODEL_VERSION": "TEST_MODEL_V2"},
+    )
+    return _p35_registry(v1, v2)
+
+
+def test_d9_effective_cutoff_governs_selection_not_valuation_date():
+    registry = _d9_registry()
+    # Explicit cutoff 2025-06 selects V1 even though valuation_date is later.
+    early = _p35_call(
+        parameter_registry=registry,
+        data_cutoff_datetime=datetime(2025, 6, 1),
+        valuation_date=datetime(2026, 6, 1),
+    )
+    selection = early.metadata["parameter_selection"]
+    assert early.metadata["parameter_set_version"] == "TEST/V1"
+    assert early.valuation_status == "EXPENSIVE"
+    assert selection["as_of_requested"] == "2025-06-01T00:00:00+00:00"
+    assert selection["as_of_source"] == "EFFECTIVE_DATA_CUTOFF"
+    assert selection["data_cutoff_used_for_parameter_selection"] is True
+    # Cutoff inherited from the forecast (2026-01-01) selects V2 even though
+    # valuation_date is earlier: valuation_date is never a substitute.
+    inherited = _p35_call(parameter_registry=registry, valuation_date=datetime(2025, 6, 1))
+    inherited_selection = inherited.metadata["parameter_selection"]
+    assert inherited.metadata["parameter_set_version"] == "TEST/V2"
+    assert inherited.valuation_status == "FAIR"
+    assert inherited_selection["as_of_requested"] == "2026-01-01T00:00:00+00:00"
+    assert inherited_selection["data_cutoff_used_for_parameter_selection"] is True
+    assert inherited.valuation_date == datetime(2025, 6, 1, tzinfo=timezone.utc)
+
+
+def test_d9_exact_effective_from_boundary_is_accepted():
+    registry = _d9_registry()
+    at_boundary = _p35_call(parameter_registry=registry, data_cutoff_datetime=datetime(2026, 1, 1))
+    assert at_boundary.metadata["parameter_set_version"] == "TEST/V2"
+    just_before = _p35_call(
+        parameter_registry=registry, data_cutoff_datetime=datetime(2025, 12, 31, 23, 59, 59)
+    )
+    assert just_before.metadata["parameter_set_version"] == "TEST/V1"
+
+
+def test_d9_future_effective_version_is_rejected():
+    future_only = _p35_registry(_p35_version("TEST/FUTURE", datetime(2026, 1, 1)))
+    with pytest.raises(LookupError):
+        _p35_call(parameter_registry=future_only, data_cutoff_datetime=datetime(2025, 12, 31, 23, 59, 59))
+    # A later-effective version never displaces an eligible earlier one.
+    registry = _p35_registry(
+        _p35_version("TEST/V1", datetime(2025, 1, 1)),
+        _p35_version("TEST/FAR_FUTURE", datetime(2027, 1, 1)),
+    )
+    result = _p35_call(parameter_registry=registry, data_cutoff_datetime=datetime(2026, 6, 1))
+    assert result.metadata["parameter_set_version"] == "TEST/V1"
+
+
+def test_d9_missing_eligible_dated_version_fails_closed_without_genesis_fallback():
+    from src.valuation.parameters import DEFAULT_REGISTRY
+
+    cutoff = datetime(2026, 1, 1)
+    with pytest.raises(LookupError):
+        _p35_call(parameter_registry=_p35_registry(), data_cutoff_datetime=cutoff)
+    with pytest.raises(LookupError):
+        _p35_call(parameter_registry=_p35_registry(_p35_version("TEST/UNDATED", None)), data_cutoff_datetime=cutoff)
+    # The undated Genesis set never stands in for history.
+    with pytest.raises(LookupError, match="R8"):
+        _p35_call(parameter_registry=DEFAULT_REGISTRY, data_cutoff_datetime=cutoff)
+    with pytest.raises(LookupError, match="R8"):
+        _p35_call(parameter_as_of=cutoff)
+
+
+def test_d9_overlapping_eligible_versions_are_deterministic():
+    dup = _p35_registry(
+        _p35_version("TEST/A", datetime(2025, 1, 1)),
+        _p35_version("TEST/B", datetime(2025, 1, 1)),
+    )
+    with pytest.raises(LookupError, match="Ambiguous"):
+        _p35_call(parameter_registry=dup, data_cutoff_datetime=datetime(2025, 6, 1))
+    # Differently dated eligible versions: the newest eligible one wins, in any order.
+    older = _p35_version("TEST/OLD", datetime(2025, 1, 1))
+    newer = _p35_version("TEST/NEW", datetime(2025, 6, 1))
+    for versions in ((older, newer), (newer, older)):
+        result = _p35_call(parameter_registry=_p35_registry(*versions), data_cutoff_datetime=datetime(2025, 9, 1))
+        assert result.metadata["parameter_set_version"] == "TEST/NEW"
+
+
+def test_d9_conflicting_parameter_as_of_is_rejected():
+    registry = _d9_registry()
+    with pytest.raises(ValueError, match="conflicts with the effective data cutoff"):
+        _p35_call(
+            parameter_registry=registry,
+            parameter_as_of=datetime(2025, 6, 1),
+            data_cutoff_datetime=datetime(2026, 1, 1),
+        )
+    # Conflict with a cutoff inherited from the forecast is rejected as well.
+    with pytest.raises(ValueError, match="conflicts with the effective data cutoff"):
+        _p35_call(parameter_registry=registry, parameter_as_of=datetime(2025, 6, 1))
+    # Also when no registry is supplied (default registry path).
+    with pytest.raises(ValueError, match="conflicts with the effective data cutoff"):
+        _p35_call(parameter_as_of=datetime(2025, 6, 1))
+    # An identical instant (naive vs UTC-aware) is not a conflict.
+    result = _p35_call(
+        parameter_registry=registry,
+        parameter_as_of=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        data_cutoff_datetime=datetime(2026, 1, 1),
+    )
+    selection = result.metadata["parameter_selection"]
+    assert result.metadata["parameter_set_version"] == "TEST/V2"
+    assert selection["as_of_source"] == "EFFECTIVE_DATA_CUTOFF"
+    assert selection["parameter_as_of_supplied"] == "2026-01-01T00:00:00+00:00"
+    assert selection["data_cutoff_used_for_parameter_selection"] is True
+
+
+def test_d9_without_any_cutoff_caller_supplied_as_of_is_labelled_truthfully():
+    registry = _d9_registry()
+    result = _p35_call(
+        parameter_registry=registry,
+        forecast_result=_d9_forecast_without_cutoff(),
+        parameter_as_of=datetime(2025, 6, 1),
+        valuation_date=datetime(2026, 6, 1),
+    )
+    selection = result.metadata["parameter_selection"]
+    assert result.metadata["parameter_set_version"] == "TEST/V1"
+    assert selection["mode"] == "AS_OF_EFFECTIVE_DATED"
+    assert selection["as_of_source"] == "CALLER_SUPPLIED"
+    assert selection["data_cutoff_datetime"] is None
+    assert selection["data_cutoff_used_for_parameter_selection"] is False
+
+
+def test_d9_metadata_distinguishes_dated_selection_from_legacy_genesis():
+    legacy = _p35_call()
+    dated = _p35_call(parameter_registry=_d9_registry(), data_cutoff_datetime=datetime(2025, 6, 1))
+    legacy_sel = legacy.metadata["parameter_selection"]
+    dated_sel = dated.metadata["parameter_selection"]
+    assert legacy_sel["mode"] == "FIXED_GENESIS_LEGACY"
+    assert legacy_sel["point_in_time_selection_applied"] is False
+    assert legacy_sel["historical_parameter_verification"] == "UNVERIFIED_LEGACY_GENESIS"
+    assert legacy_sel["as_of_source"] is None
+    assert legacy_sel["effective_from"] is None
+    assert legacy_sel["data_cutoff_used_for_parameter_selection"] is False
+    assert dated_sel["mode"] == "AS_OF_EFFECTIVE_DATED"
+    assert dated_sel["point_in_time_selection_applied"] is True
+    assert dated_sel["historical_parameter_verification"] == "DATED_VERSION_SELECTED"
+    assert dated_sel["effective_from"] == "2025-01-01T00:00:00+00:00"
+    assert dated_sel["data_cutoff_used_for_parameter_selection"] is True
+
+
+def test_d9_legacy_path_stays_backward_compatible_and_never_claims_pit():
+    # Even with an explicit, very old cutoff the legacy path keeps working on the
+    # live Genesis constants and must not claim historical validity.
+    result = _p35_call(data_cutoff_datetime=datetime(2020, 1, 1), valuation_date=datetime(2020, 1, 1))
+    selection = result.metadata["parameter_selection"]
+    assert result.valuation_status == "EXPENSIVE"
+    assert selection["mode"] == "FIXED_GENESIS_LEGACY"
+    assert selection["point_in_time_selection_applied"] is False
+    assert selection["data_cutoff_used_for_parameter_selection"] is False
+    assert selection["data_cutoff_datetime"] == "2020-01-01T00:00:00+00:00"
+    assert "NOT verified" in selection["caveat"]
+    assert result.metadata["parameter_set_version"] == "STAGE7_V1/GENESIS"
+    assert result.metadata["parameter_snapshot"] == _p33_snapshot()
+    assert len(result.metadata["parameter_snapshot"]) == 38
+    consumption = result.metadata["parameter_consumption"]
+    assert len(consumption["consumed_names"]) == 33
+    assert len(consumption["recorded_not_consumed_names"]) == 5
+
+
+def test_d9_cutoff_governed_selection_is_deterministic_on_repeat():
+    import dataclasses
+
+    registry = _d9_registry()
+    payloads = []
+    for _ in range(3):
+        result = _p35_call(
+            parameter_registry=registry,
+            data_cutoff_datetime=datetime(2025, 6, 1),
+            valuation_date=datetime(2026, 6, 1),
+        )
+        payload = dataclasses.asdict(result)
+        payload.pop("calculation_timestamp")
+        payloads.append(payload)
+    assert payloads[0] == payloads[1] == payloads[2]
+    # Failures are deterministic too.
+    for _ in range(2):
+        with pytest.raises(ValueError, match="conflicts with the effective data cutoff"):
+            _p35_call(
+                parameter_registry=registry,
+                parameter_as_of=datetime(2025, 6, 1),
+                data_cutoff_datetime=datetime(2026, 1, 1),
+            )

@@ -72,10 +72,20 @@ class ValuationEngine:
         parameter_registry: Optional[ParameterRegistry] = None,
         parameter_as_of: Optional[datetime] = None,
     ) -> ValuationResult:
+        # D9: the effective data cutoff is determined BEFORE parameter selection
+        # so that, when a dated selection is requested, it is the governing
+        # timestamp. ``valuation_date`` is never used as a substitute.
+        if data_cutoff_datetime is None:
+            data_cutoff_datetime = forecast_result.data_cutoff_datetime
+        data_cutoff_datetime = normalize_datetime(data_cutoff_datetime)
+        governing_as_of, as_of_source = self._resolve_parameter_governing_timestamp(
+            parameter_registry, parameter_as_of, data_cutoff_datetime
+        )
+
         # Parameters are selected and validated first, so an unavailable or
         # ambiguous set fails closed before any financial output is produced.
         selected_version, selection_meta = select_parameter_set_for_valuation(
-            parameter_registry, parameter_as_of
+            parameter_registry, governing_as_of
         )
         params = consume_parameter_set(selected_version)
 
@@ -106,9 +116,6 @@ class ValuationEngine:
             probability_confidence = 50.0
         valuation_date = normalize_datetime(valuation_date)
         market_price_date = normalize_datetime(market_price_date)
-        if data_cutoff_datetime is None:
-            data_cutoff_datetime = forecast_result.data_cutoff_datetime
-        data_cutoff_datetime = normalize_datetime(data_cutoff_datetime)
         # Stage 5's public ``input_refs`` assumption contains refs accepted by
         # its PIT guard. Its underscored ``__input_refs`` audit handle also
         # contains late refs that Stage 5 rejected and excluded from the
@@ -222,13 +229,24 @@ class ValuationEngine:
             if expected_fv is None:
                 status = "NOT_APPLICABLE"
 
+        dated_selection = bool(selection_meta.get("point_in_time_selection_applied"))
+        cutoff_governed = dated_selection and as_of_source == "EFFECTIVE_DATA_CUTOFF"
         parameter_selection = {
             **selection_meta,
+            # Overrides the generic caller-supplied label with what really governed.
+            "as_of_source": as_of_source if dated_selection else None,
+            "parameter_as_of_supplied": (
+                None if parameter_as_of is None
+                else normalize_datetime(parameter_as_of).isoformat()
+            ),
+            "historical_parameter_verification": (
+                "DATED_VERSION_SELECTED" if dated_selection else "UNVERIFIED_LEGACY_GENESIS"
+            ),
             "version_key": params.version_key,
             "set_model_version": params.set_model_version,
             "effective_from": None if params.effective_from is None else normalize_datetime(params.effective_from).isoformat(),
             "data_cutoff_datetime": None if data_cutoff_datetime is None else data_cutoff_datetime.isoformat(),
-            "data_cutoff_used_for_parameter_selection": False,
+            "data_cutoff_used_for_parameter_selection": cutoff_governed,
         }
         parameter_consumption = {
             "source": "SELECTED_PARAMETER_SET_ONLY",
@@ -291,6 +309,42 @@ class ValuationEngine:
                 "pit_inputs_required": True,
             },
         )
+
+    @staticmethod
+    def _resolve_parameter_governing_timestamp(
+        parameter_registry: Optional[ParameterRegistry],
+        parameter_as_of: Optional[datetime],
+        effective_cutoff: Optional[datetime],
+    ) -> tuple[Optional[datetime], Optional[str]]:
+        """Decide which instant governs dated parameter selection (D9).
+
+        * Neither registry nor ``parameter_as_of`` supplied: legacy undated
+          Genesis path; no timestamp is chosen and no historical validity is
+          claimed.
+        * A valid effective cutoff exists: it governs. An explicit
+          ``parameter_as_of`` that differs from it is rejected, never silently
+          honoured or overridden.
+        * No cutoff exists but ``parameter_as_of`` was supplied: the caller's
+          instant is used and labelled ``CALLER_SUPPLIED``.
+        * Otherwise ``None`` is returned and the selector fails closed; no
+          instant (including ``valuation_date``) is invented.
+        """
+        if parameter_registry is None and parameter_as_of is None:
+            return None, None
+        supplied = normalize_datetime(parameter_as_of)
+        if effective_cutoff is not None:
+            if supplied is not None and supplied != effective_cutoff:
+                raise ValueError(
+                    "Stage 7 parameter_as_of conflicts with the effective data "
+                    f"cutoff (parameter_as_of={supplied.isoformat()}, "
+                    f"data_cutoff_datetime={effective_cutoff.isoformat()}); "
+                    "the data cutoff governs historical parameter selection, "
+                    "so omit parameter_as_of or pass the same instant."
+                )
+            return effective_cutoff, "EFFECTIVE_DATA_CUTOFF"
+        if supplied is not None:
+            return supplied, "CALLER_SUPPLIED"
+        return None, None
 
     @staticmethod
     def _valid_positive_count(values: Sequence[Optional[float]]) -> int:

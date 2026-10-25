@@ -4117,3 +4117,48 @@ python -m pytest src/tests/test_stage7_valuation.py -q
 تست یا CI اجرا نکردم؛ بررسی ایستای diff انجام شد و `git diff --check` خطایی گزارش نکرد. محدودیت اصلی همچنان برقرار است: نبود provenance برای برخی ورودی‌ها، و فقدان شواهد تاریخی کافی برای بازار، benchmarkها و نسخهٔ پارامترها، اجازهٔ اثبات PIT کامل را نمی‌دهد. **Stage 7 باز است.**
 ==============================================================
 # P54
+تغییرات D9 آماده است و فقط روی engine.py و فایل تست انجام شد. من هیچ تستی اجرا نکرده‌ام؛ فقط syntax هر دو فایل را با ast.parse چک کردم.
+
+تغییرات واقعی
+
+ریشهٔ مشکل: در engine.py انتخاب پارامتر قبل از تعیین cutoff انجام می‌شد و data_cutoff_used_for_parameter_selection هم به‌صورت ثابت False نوشته می‌شد.
+
+اصلاحات در engine.py:
+
+cutoff مؤثر (آرگومان صریح یا cutoff خود forecast) اکنون قبل از انتخاب پارامتر تعیین می‌شود.
+متد کمکی جدید _resolve_parameter_governing_timestamp تعیین می‌کند چه زمانی حاکم است:
+اگر نه registry و نه parameter_as_of داده شده باشد: مسیر legacy Genesis، بدون انتخاب تاریخ.
+اگر cutoff معتبر وجود داشته باشد: cutoff حاکم است. parameter_as_of متفاوت با آن، ValueError با پیام «conflicts with the effective data cutoff» می‌دهد. اگر با cutoff برابر باشد (حتی با timezone متفاوت) مشکلی نیست.
+اگر cutoff وجود نداشته باشد ولی parameter_as_of داده شده باشد: همان مقدار استفاده می‌شود و با برچسب CALLER_SUPPLIED ثبت می‌شود.
+اگر هیچ‌کدام نباشد: انتخاب با LookupError شکست می‌خورد. valuation_date هرگز جایگزین نمی‌شود.
+متادیتا حالا واقعی است:
+data_cutoff_used_for_parameter_selection فقط وقتی True است که cutoff واقعاً حاکم بوده باشد.
+as_of_source یکی از EFFECTIVE_DATA_CUTOFF، CALLER_SUPPLIED یا None است.
+کلیدهای جدید historical_parameter_verification (با مقدار DATED_VERSION_SELECTED یا UNVERIFIED_LEGACY_GENESIS) و parameter_as_of_supplied اضافه شده‌اند.
+
+parameters.py تغییر نکرد. منطق resolve_parameter_set_as_of از قبل effective_from <= governing، رد نسخهٔ آینده، رد تعارض و خطای صریح برای نبود نسخه را درست پیاده کرده بود.
+
+نکتهٔ مهم دربارهٔ تست‌های قدیمی
+
+شش تست P35 تا حالا parameter_as_of را با مقداری متفاوت از cutoff پیش‌فرض (2026-01-01) می‌دادند. طبق الزام ۴ این حالت اکنون خطاست. در این تست‌ها parameter_as_of= را به data_cutoff_datetime= تبدیل کردم و assertionهای مالی و snapshot را دست نزدم. دو assertion عمداً عوض شد: as_of_source شد EFFECTIVE_DATA_CUTOFF و data_cutoff_used... شد True. تست legacy بدون تغییر ماند و همچنان False را انتظار دارد.
+
+تست‌های جدید (۱۰ تست test_d9_*)
+انتخاب با cutoff و نه با valuation_date (در هر دو جهت)
+مرز دقیق effective_from (برابر پذیرفته می‌شود، یک ثانیه قبل‌تر رد می‌شود)
+رد نسخهٔ آینده
+نبود نسخهٔ واجد شرایط (registry خالی، نسخهٔ بدون تاریخ، Genesis)
+نسخه‌های هم‌پوشان (تساوی تاریخ یعنی Ambiguous، و در غیر تساوی جدیدترین برنده است، مستقل از ترتیب)
+تعارض parameter_as_of با cutoff
+حالت بدون cutoff با CALLER_SUPPLIED
+تفکیک متادیتای dated از legacy
+سازگاری legacy، شامل ۳۸ رکورد، ۳۳ مصرف‌شده و ۵ ثبت‌شده‌ی مصرف‌نشده
+قطعی‌بودن اجراهای تکراری
+فایل‌های تغییر‌یافته
+src/valuation/engine.py
+src/tests/test_stage7_valuation.py
+محدودیت‌های باقی‌مانده
+هیچ نسخهٔ تاریخ‌دار واقعی در DEFAULT_REGISTRY وجود ندارد. پس هر انتخاب تاریخی روی registry پیش‌فرض عمداً با LookupError (با پیام R8) شکست می‌خورد. تست‌ها از نسخه‌های ساختگی TEST/* استفاده می‌کنند، نه تاریخ واقعی.
+مسیر legacy همچنان ادعای PIT ندارد (UNVERIFIED_LEGACY_GENESIS).
+طبق D7، حاکم‌بودن cutoff برای پارامترها به‌معنای اثبات PIT برای داده‌های ورودی نیست.
+توضیح docstring بالای select_parameter_set_for_valuation در parameters.py هنوز می‌گوید «as-of توسط caller داده می‌شود»، چون طبق دستور آن فایل را دست نزدم. این فقط توضیح است و رفتار را تغییر نمی‌دهد.
+فرضم دربارهٔ normalize_datetime(None) این است که None برمی‌گرداند. کد قبلی هم همین فرض را داشت، اما در src.forecast.schema آن را ندیدم.

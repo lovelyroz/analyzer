@@ -1,106 +1,134 @@
-بر اساس بررسی کامل سند جدید **PROMPT.md** (تحت عنوان **P54 — Correct Stage 7 Historical Parameter Selection (D9)**) و تطبیق آن با فایل‌های منابع پروژه (`07_Stage7_Valuation.md`، `stepsForStage7.md`، `parameters.py`، `engine.py` و `test_stage7_valuation.py`)، تحلیل فنی، طرح تغییرات و دستورالعمل اجرایی به شرح زیر ارائه می‌شود:
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py -k "p35 or p33 or d9 or p5_default_cutoff or p6_cutoff" -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 90 items / 64 deselected / 26 selected
 
----
+src/tests/test_stage7_valuation.py::test_p5_default_cutoff_inherits_forecast_cutoff_normalized PASSED            [  3%]
+src/tests/test_stage7_valuation.py::test_p6_cutoff_pit_limitation_pinned PASSED                                  [  7%]
+src/tests/test_stage7_valuation.py::test_p33_genesis_snapshot_matches_live_constants PASSED                      [ 11%]
+src/tests/test_stage7_valuation.py::test_p33_result_carries_parameter_audit PASSED                               [ 15%]
+src/tests/test_stage7_valuation.py::test_p33_resolve_exact_key_and_missing_raises PASSED                         [ 19%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_without_dated_records_raises PASSED                           [ 23%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_selection_mechanics PASSED                                    [ 26%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_overlap_raises_ambiguity PASSED                               [ 30%]
+src/tests/test_stage7_valuation.py::test_p35_legacy_path_provenance_is_truthful_and_unchanged PASSED             [ 34%]
+src/tests/test_stage7_valuation.py::test_p35_snapshot_reports_values_actually_consumed_when_module_constant_changes PASSED [ 38%]
+src/tests/test_stage7_valuation.py::test_p35_as_of_selection_governs_calculation_and_snapshot_matches PASSED     [ 42%]
+src/tests/test_stage7_valuation.py::test_p35_selected_set_governs_peers_alerts_and_scenario_weights PASSED       [ 46%]
+src/tests/test_stage7_valuation.py::test_p35_missing_or_ambiguous_as_of_selection_fails_closed PASSED            [ 50%]
+src/tests/test_stage7_valuation.py::test_p35_invalid_parameter_set_raises_without_fallback_to_constants PASSED   [ 53%]
+src/tests/test_stage7_valuation.py::test_p35_isolation_from_global_mutation_and_snapshot_aliasing PASSED         [ 57%]
+src/tests/test_stage7_valuation.py::test_p35_repeated_as_of_calculations_are_deterministic PASSED                [ 61%]
+src/tests/test_stage7_valuation.py::test_d9_effective_cutoff_governs_selection_not_valuation_date PASSED         [ 65%]
+src/tests/test_stage7_valuation.py::test_d9_exact_effective_from_boundary_is_accepted PASSED                     [ 69%]
+src/tests/test_stage7_valuation.py::test_d9_future_effective_version_is_rejected PASSED                          [ 73%]
+src/tests/test_stage7_valuation.py::test_d9_missing_eligible_dated_version_fails_closed_without_genesis_fallback PASSED [ 76%]
+src/tests/test_stage7_valuation.py::test_d9_overlapping_eligible_versions_are_deterministic PASSED               [ 80%]
+src/tests/test_stage7_valuation.py::test_d9_conflicting_parameter_as_of_is_rejected PASSED                       [ 84%]
+src/tests/test_stage7_valuation.py::test_d9_without_any_cutoff_caller_supplied_as_of_is_labelled_truthfully PASSED [ 88%]
+src/tests/test_stage7_valuation.py::test_d9_metadata_distinguishes_dated_selection_from_legacy_genesis PASSED    [ 92%]
+src/tests/test_stage7_valuation.py::test_d9_legacy_path_stays_backward_compatible_and_never_claims_pit PASSED    [ 96%]
+src/tests/test_stage7_valuation.py::test_d9_cutoff_governed_selection_is_deterministic_on_repeat PASSED          [100%]
 
-## ۱. تحلیل مسئله D9 و تغییرات مورد نیاز کد
+========================================== 26 passed, 64 deselected in 3.09s ==========================================
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 90 items
 
-### **علت عدم تکمیل D9 در وضعیت فعلی**
-در پیاده‌سازی موجود، در صورتی که انتخاب پارامتر بر اساس تاریخ انجام شود، متاداده خروجی همچنان مقدار زیر را به‌صورت هاردکدشده گزارش می‌کند:
-```python
-"data_cutoff_used_for_parameter_selection": False
-```
-علت این مسئله آن است که موتور ارزش‌گذاری (`engine.py`) تاریخ قطع داده‌ها (`data_cutoff_datetime`) را پیش از انتخاب مجموعه پارامترها تعیین نمی‌کرد و فرآیند انتخاب پارامتر صرفاً متکی بر `parameter_as_of` ورودی (یا مسیر پیش‌فرض Genesis) بود.
+src/tests/test_stage7_valuation.py::test_jalali_service_uses_selected_price_and_preserves_provenance PASSED      [  1%]
+src/tests/test_stage7_valuation.py::test_jalali_service_fails_closed_without_eligible_observation PASSED         [  2%]
+src/tests/test_stage7_valuation.py::test_jalali_service_rejects_forecast_from_another_company PASSED             [  3%]
+src/tests/test_stage7_valuation.py::test_valuation_models PASSED                                                 [  4%]
+src/tests/test_stage7_valuation.py::test_valuation_engine_forward_pe_and_expected_fair_value PASSED              [  5%]
+src/tests/test_stage7_valuation.py::test_industry_forward_pe_requires_eight_valid_peers PASSED                   [  6%]
+src/tests/test_stage7_valuation.py::test_industry_ttm_is_fallback_after_historical_median PASSED                 [  7%]
+src/tests/test_stage7_valuation.py::test_negative_eps_does_not_create_fake_pe_or_fair_value PASSED               [  8%]
+src/tests/test_stage7_valuation.py::test_reliability_does_not_change_forward_pe_or_fair_value PASSED             [ 10%]
+src/tests/test_stage7_valuation.py::test_direct_probability_adjustments_are_rejected_in_favor_of_family_evidence PASSED [ 11%]
+src/tests/test_stage7_valuation.py::test_probability_evidence_is_family_level_and_equal_weighted PASSED          [ 12%]
+src/tests/test_stage7_valuation.py::test_probability_evidence_rejects_unknown_or_incomplete_family_data PASSED   [ 13%]
+src/tests/test_stage7_valuation.py::test_scenario_multiple_adjustments_require_economic_rationale_and_are_bounded PASSED [ 14%]
+src/tests/test_stage7_valuation.py::test_alerts_include_severity_and_driver_focus PASSED                         [ 15%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_drivers_present_and_bounded PASSED                       [ 16%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_missing_data_empty_drivers PASSED                        [ 17%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_deterministic_repeated_runs PASSED                       [ 18%]
+src/tests/test_stage7_valuation.py::test_p2_alert_severity_levels_valid PASSED                                   [ 20%]
+src/tests/test_stage7_valuation.py::test_p2_alert_low_reliability_threshold_boundaries PASSED                    [ 21%]
+src/tests/test_stage7_valuation.py::test_p2_alert_high_dispersion_threshold_boundaries PASSED                    [ 22%]
+src/tests/test_stage7_valuation.py::test_p2_alert_divergence_ratios_boundaries PASSED                            [ 23%]
+src/tests/test_stage7_valuation.py::test_v1_sector_examples_use_only_eps_and_target_pe_drivers PASSED            [ 24%]
+src/tests/test_stage7_valuation.py::test_v1_uses_stage5_eps_without_recalculating_from_net_profit PASSED         [ 25%]
+src/tests/test_stage7_valuation.py::test_v1_defers_undefined_flip_dependence_and_assumption_alerts PASSED        [ 26%]
+src/tests/test_stage7_valuation.py::test_p3_sensitivity_recomputes_from_valuation_identity PASSED                [ 27%]
+src/tests/test_stage7_valuation.py::test_p3_nan_eps_is_guarded_as_invalid PASSED                                 [ 28%]
+src/tests/test_stage7_valuation.py::test_p3_zero_and_negative_price_guarded PASSED                               [ 30%]
+src/tests/test_stage7_valuation.py::test_p3_nonfinite_benchmark_series_filtered PASSED                           [ 31%]
+src/tests/test_stage7_valuation.py::test_p3_nonfinite_scores_fall_back_to_defaults PASSED                        [ 32%]
+src/tests/test_stage7_valuation.py::test_p3_flip_dependence_alerts_remain_explicitly_unresolved PASSED           [ 33%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_below_minimum_falls_back PASSED                           [ 34%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_at_minimum_selects_industry_forward PASSED                [ 35%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_above_minimum_and_median_provenance PASSED                [ 36%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_filters_invalid_values PASSED                             [ 37%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_empty_data_reports_zero_and_falls_back PASSED             [ 38%]
+src/tests/test_stage7_valuation.py::test_p4_benchmark_fallback_ignores_forward_count_for_ttm PASSED              [ 40%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_price_yields_null_outputs PASSED                           [ 41%]
+src/tests/test_stage7_valuation.py::test_p5_missing_eps_is_not_applicable_not_zero PASSED                        [ 42%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_reliability_echo_sanitized PASSED                          [ 43%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_probability_confidence_echo_finite PASSED                  [ 44%]
+src/tests/test_stage7_valuation.py::test_p5_missing_data_quality_does_not_crash PASSED                           [ 45%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_multiple_adjustment_rejected PASSED                        [ 46%]
+src/tests/test_stage7_valuation.py::test_p5_nan_probability_evidence_rejected PASSED                             [ 47%]
+src/tests/test_stage7_valuation.py::test_p5_datetime_echoes_normalized_to_utc PASSED                             [ 48%]
+src/tests/test_stage7_valuation.py::test_p5_default_cutoff_inherits_forecast_cutoff_normalized PASSED            [ 50%]
+src/tests/test_stage7_valuation.py::test_p5_undated_benchmark_series_carry_no_provenance PASSED                  [ 51%]
+src/tests/test_stage7_valuation.py::test_p6_production_path_real_stage5_forecast PASSED                          [ 52%]
+src/tests/test_stage7_valuation.py::test_p6_cutoff_pit_limitation_pinned PASSED                                  [ 53%]
+src/tests/test_stage7_valuation.py::test_p6_missing_benchmarks_yield_guarded_nulls PASSED                        [ 54%]
+src/tests/test_stage7_valuation.py::test_p6_scenario_ordering_flag_and_probability_normalization PASSED          [ 55%]
+src/tests/test_stage7_valuation.py::test_p6_invalid_eps_variants_never_fabricate_values PASSED                   [ 56%]
+src/tests/test_stage7_valuation.py::test_p6_repeat_runs_identical_on_full_contract PASSED                        [ 57%]
+src/tests/test_stage7_valuation.py::test_p6_regression_prior_behavior_preserved PASSED                           [ 58%]
+src/tests/test_stage7_valuation.py::test_p10_expensive_base_upside_parameterized_outputs_unchanged PASSED        [ 60%]
+src/tests/test_stage7_valuation.py::test_p10_expensive_threshold_consumed_from_parameters PASSED                 [ 61%]
+src/tests/test_stage7_valuation.py::test_p12_calculation_timestamp_utc_aware_and_deterministic PASSED            [ 62%]
+src/tests/test_stage7_valuation.py::test_p32_input_refs_before_cutoff_leave_results_unchanged PASSED             [ 63%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_after_cutoff_rejected_on_valuation_path PASSED            [ 64%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_at_cutoff_boundary_accepted PASSED                        [ 65%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_missing_date_rejected PASSED                              [ 66%]
+src/tests/test_stage7_valuation.py::test_p32_input_refs_absent_preserves_legacy_path PASSED                      [ 67%]
+src/tests/test_stage7_valuation.py::test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted PASSED [ 68%]
+src/tests/test_stage7_valuation.py::test_p53_stage5_dropped_future_input_is_not_reintroduced_to_stage7 PASSED    [ 70%]
+src/tests/test_stage7_valuation.py::test_p53_embedded_forecast_input_ref_without_availability_is_rejected PASSED [ 71%]
+src/tests/test_stage7_valuation.py::test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance PASSED [ 72%]
+src/tests/test_stage7_valuation.py::test_p53_stage5_forecast_without_provenance_preserves_legacy_path PASSED     [ 73%]
+src/tests/test_stage7_valuation.py::test_p33_genesis_snapshot_matches_live_constants PASSED                      [ 74%]
+src/tests/test_stage7_valuation.py::test_p33_result_carries_parameter_audit PASSED                               [ 75%]
+src/tests/test_stage7_valuation.py::test_p33_resolve_exact_key_and_missing_raises PASSED                         [ 76%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_without_dated_records_raises PASSED                           [ 77%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_selection_mechanics PASSED                                    [ 78%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_overlap_raises_ambiguity PASSED                               [ 80%]
+src/tests/test_stage7_valuation.py::test_p35_legacy_path_provenance_is_truthful_and_unchanged PASSED             [ 81%]
+src/tests/test_stage7_valuation.py::test_p35_snapshot_reports_values_actually_consumed_when_module_constant_changes PASSED [ 82%]
+src/tests/test_stage7_valuation.py::test_p35_as_of_selection_governs_calculation_and_snapshot_matches PASSED     [ 83%]
+src/tests/test_stage7_valuation.py::test_p35_selected_set_governs_peers_alerts_and_scenario_weights PASSED       [ 84%]
+src/tests/test_stage7_valuation.py::test_p35_missing_or_ambiguous_as_of_selection_fails_closed PASSED            [ 85%]
+src/tests/test_stage7_valuation.py::test_p35_invalid_parameter_set_raises_without_fallback_to_constants PASSED   [ 86%]
+src/tests/test_stage7_valuation.py::test_p35_isolation_from_global_mutation_and_snapshot_aliasing PASSED         [ 87%]
+src/tests/test_stage7_valuation.py::test_p35_repeated_as_of_calculations_are_deterministic PASSED                [ 88%]
+src/tests/test_stage7_valuation.py::test_d9_effective_cutoff_governs_selection_not_valuation_date PASSED         [ 90%]
+src/tests/test_stage7_valuation.py::test_d9_exact_effective_from_boundary_is_accepted PASSED                     [ 91%]
+src/tests/test_stage7_valuation.py::test_d9_future_effective_version_is_rejected PASSED                          [ 92%]
+src/tests/test_stage7_valuation.py::test_d9_missing_eligible_dated_version_fails_closed_without_genesis_fallback PASSED [ 93%]
+src/tests/test_stage7_valuation.py::test_d9_overlapping_eligible_versions_are_deterministic PASSED               [ 94%]
+src/tests/test_stage7_valuation.py::test_d9_conflicting_parameter_as_of_is_rejected PASSED                       [ 95%]
+src/tests/test_stage7_valuation.py::test_d9_without_any_cutoff_caller_supplied_as_of_is_labelled_truthfully PASSED [ 96%]
+src/tests/test_stage7_valuation.py::test_d9_metadata_distinguishes_dated_selection_from_legacy_genesis PASSED    [ 97%]
+src/tests/test_stage7_valuation.py::test_d9_legacy_path_stays_backward_compatible_and_never_claims_pit PASSED    [ 98%]
+src/tests/test_stage7_valuation.py::test_d9_cutoff_governed_selection_is_deterministic_on_repeat PASSED          [100%]
 
-### **منطق جدید اصلاح D9 طبق PROMPT.md**
-1. **تعیین تاریخ قطع داده‌ها (Governing Timestamp):** پیش از فراخوانی انتخاب پارامتر، تاریخ قطع داده‌ها به‌صورت زیر مشخص می‌شود:
-   \\[\text{effective\_cutoff} = \text{normalize\_datetime}(\text{data\_cutoff\_datetime} \text{ or } \text{forecast\_result.data\_cutoff\_datetime})\\]
-2. **مدیریت تعارض `parameter_as_of` با Cutoff:** اگر فراخواننده هم `parameter_as_of` و هم `data_cutoff_datetime` را ارسال کند و این دو تاریخ با یکدیگر تعارض داشته باشند (`normalize_datetime(parameter_as_of) != effective_cutoff`)، سیستم باید با خطای صریح `ValueError` درخواست را رد کند و اجازه انتخاب خاموش پارامتر با تاریخ متناقض را ندهد.
-3. **انتخاب پارامتر بر اساس Cutoff:** در صورت وجود یک ثبت پارامتر تاریخ‌دار (Dated Registry)، انتخاب نسخه پارامتر با `resolve_parameter_set_as_of(effective_cutoff, registry)` انجام می‌شود.
-4. **متاداده صادقانه:** 
-   * اگر نسخه پارامتر تاریخ‌دار بر اساس `effective_cutoff` انتخاب شد:
-     * `data_cutoff_used_for_parameter_selection` برابر `True` قرار می‌گیرد.
-     * `as_of_source` برابر `"VALUATION_DATA_CUTOFF"` ثبت می‌شود.
-     * `point_in_time_selection_applied` برابر `True` ثبت می‌شود.
-   * اگر مسیر قدیمی Genesis (بدون تاریخ) استفاده شد:
-     * `data_cutoff_used_for_parameter_selection` برابر `False` باقی می‌ماند.
-     * `point_in_time_selection_applied` برابر `False` ثبت می‌شود.
-
----
-
-## ۲. فایل‌های مجاز برای تغییر
-
-مطابق الزامات صریح پرامپت، **تنها فایل‌های زیر** مجاز به تغییر هستند:
-1. **`src/valuation/parameters.py`:** به‌روزرسانی تابع `select_parameter_set_for_valuation` جهت دریافت `data_cutoff_datetime` و اعمال منطق بررسی تعارض و ثبت صادقانه متاداده.
-2. **`src/valuation/engine.py`:** تعیین اولیه‌ی `data_cutoff_datetime` و ارسال آن به تابع انتخاب پارامتر در `ValuationEngine.calculate_valuation`.
-3. **`src/tests/test_stage7_valuation.py`:** افزودن تست‌های واحد هدفمند جهت پوشش سناریوهای D9.
-
-*تذکر: هیچ فایل دیگری (از جمله فایل‌های مشخصات، گزارش‌ها یا سایر ماژول‌ها) تغییر نخواهد کرد.*
-
----
-
-## ۳. محدودیت‌های باقی‌مانده (D9 Limitations)
-
-* **عدم وجود تاریخ در مجموعه Genesis:** مجموعه پارامترهای پیش‌فرض اولیه (Genesis) فاقد `effective_from` بوده و همچنان بدون تاریخ می‌ماند. برای اجرای قدیمی (Legacy) با این مجموعه، ادعای اعتبار زمانی (PIT) نمی‌شود و `data_cutoff_used_for_parameter_selection=False` ثبت می‌گردد.
-* **نیاز به ثبت تاریخ برای نسخه پارامترها در آینده (R8):** انتخاب پارامتر مبتنی بر Cutoff تنها زمانی کار می‌کند که نسخه‌های تاریخ‌دار در `ParameterRegistry` ثبت شده باشند.
-
----
-
-## ۴. بیانیه عدم اجرای تست
-
-> **توجه:** تست‌ها توسط این هوش مصنوعی اجرا نشده‌اند. تمام اعتبارسنجی‌ها پس از اعمال تغییرات توسط کاربر در محیط محلی صورت خواهد گرفت.
-
----
-
-## ۵. پرامپت آماده برای ارسال به Claude
-
-می‌توانید متن زیر را کپی کرده و مستقیماً برای Claude ارسال کنید تا تغییرات را روی کد اعمال کند:
-
-```text
-لطفاً بر اساس سند PROMPT.md (مربوط به P54 - Correct Stage 7 Historical Parameter Selection / D9)، تغییرات زیر را دقیقاً و به‌صورت حداقل در ۳ فایل تعیین‌شده اعمال کن:
-
-۱. فایل src/valuation/parameters.py:
-- تابع select_parameter_set_for_valuation را طوری به‌روزرسانی کن که علاوه بر parameter_registry و parameter_as_of، ورودی data_cutoff_datetime را نیز بپذیرد.
-- اگر هم parameter_as_of و هم data_cutoff_datetime ارسال شده باشند و پس از normalize_datetime متناقض باشند (نابرابر باشند)، خطای ValueError صریح صادر شود.
-- اگر یک registry تاریخ‌دار یا درخواست انتخاب اسناد تاریخ‌دار وجود داشته باشد، تاریخ قطع داده‌ها (data_cutoff_datetime) به‌عنوان Governing Timestamp استفاده شود.
-- متاداده متناسب با نحوه انتخاب تنظیم شود: اگر بر اساس data_cutoff_datetime انتخابی صورت گرفت، data_cutoff_used_for_parameter_selection=True و as_of_source="VALUATION_DATA_CUTOFF" ثبت شود.
-- مسیر Legacy Genesis همچنان point_in_time_selection_applied=False و data_cutoff_used_for_parameter_selection=False را به شکل صادقانه گزارش کند.
-
-۲. فایل src/valuation/engine.py:
-- در ابتدای calculate_valuation، ابتدا data_cutoff_datetime استخراج و نرمال‌سازی شود (data_cutoff_datetime = normalize_datetime(data_cutoff_datetime or forecast_result.data_cutoff_datetime)).
-- فراخوانی select_parameter_set_for_valuation با ارسال data_cutoff_datetime انجام شود.
-- مقدار data_cutoff_used_for_parameter_selection در خروجی parameter_selection مستقیم از selection_meta خوانده شود و دیگر روی False هاردکد نباشد.
-
-۳. فایل src/tests/test_stage7_valuation.py:
-تست‌های رگرسیون زیر را اضافه کن:
-- test_p54_parameter_selection_governed_by_data_cutoff: انتخاب موفق نسخه تاریخ‌دار بر اساس data_cutoff_datetime و تایید True بودن data_cutoff_used_for_parameter_selection.
-- test_p54_exact_effective_from_boundary: تایید پذیرش exact boundary (تاریخ effective_from مساوی cutoff).
-- test_p54_future_effective_version_rejected: رد نسخه‌ای که effective_from آن بعد از cutoff است.
-- test_p54_conflicting_parameter_as_of_and_cutoff_rejected: صدور ValueError در صورت تعارض parameter_as_of و cutoff.
-- test_p54_legacy_genesis_path_reports_false_for_pit: تایید False بودن متاداده PIT برای مسیر Genesis.
-- test_p54_deterministic_repeated_selection: تایید رفتار قطعی در اجراهای مکرر.
-
-نکات مهم:
-- هیچ فرمول مالی، آستانه، Alert یا منطق ارزش‌گذاری تغییر نکند.
-- فایل‌های دیگر را ویرایش نکن.
-```
-
----
-
-## ۶. دستور اجرای تست در PowerShell
-
-پس از اعمال تغییرات توسط Claude، دستورات زیر را در PowerShell اجرا کنید:
-
-```powershell
-# ۱. اجرای تست‌های هدفمند Stage 7 جهت بررسی حل D9
-python -m pytest src/tests/test_stage7_valuation.py -q
-
-# ۲. اجرای هم‌زمان تست‌های Stage 7 و Stage 9 جهت سنجش عدم بروز رگرسیون
-python -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q
-
-# ۳. اجرای کلیه تست‌های پروژه
-python -m pytest src/tests -q
-```
-
----
-
-💡 **پیشنهاد گام بعدی:** پرامپت بخش ۵ را برای Claude ارسال کنید، سپس خروجی اجرای دستور PowerShell بالا را برای بررسی نهایی در پاسخ بعدی قرار دهید.
+================================================= 90 passed in 0.87s

@@ -4,7 +4,7 @@
 
 ## Objective
 
-Correct the unresolved D9 issue in the github `lovelyroz/analyzer` Repository. The latest recorded full test run passed, but the current implementation still reports `data_cutoff_used_for_parameter_selection=False`. Do not treat that test result as proof that D9 is complete.
+Correct the unresolved D9 issue in the local `analyzer` project. The latest recorded full test run passed, but the current implementation still reports `data_cutoff_used_for_parameter_selection=False`. Do not treat that test result as proof that D9 is complete.
 
 ## Required file scope
 
