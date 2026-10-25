@@ -1,66 +1,55 @@
-# P58 — Verify Scenario Dispersion Test Coverage and Contract
+# P59 — Add Focused Stage 9 Dispersion Regression Tests
 
 ## Task Type
-REPORT ONLY — evidence verification and policy-contract analysis.
+CODE CHANGE — test file only.
 
 ## Repository
 Local working folder: `analyzer`
-GitHub repository identity is `lovelyroz/analyzer`, but do not use GitHub operations or APIs.
 
 ## Exact File Scope
-Read only:
-1. `stepsForStage7.md`
-2. `07_Stage7_Valuation.md`
-3. `src/valuation/engine.py`
-4. `src/valuation/parameters.py`
-5. `src/decision/engine.py`
-6. `src/tests/test_stage7_valuation.py`
-7. `src/tests/test_stage9_decision.py`
+The only file permitted to change is:
+- `src/tests/test_stage9_decision.py`
 
-Do not explore the repository broadly.
+Do not modify or create any other file.
 
-## Hard Restrictions
-- Do not modify or create any file.
-- Do not run tests or CI.
-- Do not modify `reply.md`, `stepsForStage7.md`, `temp_report.md`, `temp_report2.md`, `stage_7_prompts.md`, or anything under `ClaudeReports/`.
-- Do not change financial thresholds or infer an undocumented financial policy.
-- Do not redesign `engine.py`.
+## Objective
+Add focused regression tests for the existing Stage 9 behavior that consumes `valuation_result.metadata["scenario_dispersion"]`.
+
+Inspect `src/decision/engine.py` and the existing test file before editing. Do not assume the existing test helper provides coverage by itself.
+
+## Required Test Coverage
+Add tests that verify:
+
+1. A numeric `scenario_dispersion` greater than `0.50` adds `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` to the conflicts.
+2. A value exactly equal to `0.50` does not trigger that conflict.
+3. A value below `0.50` does not trigger that conflict.
+4. The conflict directly causes the existing 10-point decision-confidence deduction, using a controlled comparison that holds all other inputs constant.
+5. The conflict blocks `STRONG_BUY` under otherwise qualifying conditions.
+6. Where practical, test the distinction between the conflict's own confidence penalty and the independent penalty for `valuation_risk_level` being `HIGH` or `EXTREME`.
+
+Use existing fixtures/helpers and established test conventions where possible. Keep tests deterministic. Do not fabricate financial records or weaken existing assertions.
+
+## Financial Policy Boundary
+These tests document the current Stage 9 implementation behavior only. They do NOT ratify `0.50` as a financially approved threshold and do NOT establish that Stage 9 must dynamically share Stage 7's configurable threshold.
+
+Do not change any threshold, production logic, recommendation rule, or specification. Do not unify the Stage 7 and Stage 9 threshold paths.
+
+If a requested assertion cannot be isolated reliably with the current test helpers, do not force it or alter production code. Explain the limitation in the report.
+
+## Restrictions
+- Do not run tests or CI; the user will run them.
 - Do not use GitHub, GitHub CLI/API, remotes, commits, pushes, pulls, or branch operations.
-- Clearly distinguish code inspected, tests inspected, and tests actually executed. No tests are to be executed for this task.
-
-## Questions to Resolve
-
-1. Inspect all of `src/tests/test_stage9_decision.py` for an actual test asserting that numeric `scenario_dispersion > 0.50` adds `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK`. A helper accepting a `dispersion` argument is not sufficient evidence of coverage. If such a test exists, quote its exact test function name and assertions. If not, explicitly report that the behavior is untested in this file.
-
-2. Inspect Stage 9 recommendation and confidence logic. Establish the actual downstream effects of `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` from code, distinguishing effects directly caused by this conflict from effects caused independently by `valuation_risk_level`.
-
-3. Verify whether the Stage 7 specification explicitly requires Stage 9 to use the same configurable threshold as Stage 7, or whether it only documents the default value. Cite exact section headings and relevant wording. Do not infer a shared-threshold requirement from equal default values alone.
-
-4. Verify the Stage 7 threshold paths separately:
-   - `alert_thresholds["high_scenario_dispersion"]`
-   - `risk_thresholds["high_scenario_dispersion"]`
-   - Stage 9's hard-coded `0.50`
-
-   Explain whether these thresholds are independently consumed and whether a custom Stage 7 parameter set could cause divergent behavior.
-
-5. Classify the finding using one of these outcomes:
-   - **Confirmed implementation defect:** explicit specification or existing contract requires shared behavior and code violates it.
-   - **Test coverage gap:** behavior exists but is not adequately tested.
-   - **Unresolved policy question:** available evidence does not establish whether the thresholds must be unified.
-   Multiple classifications may apply, but justify each independently.
-
-6. Recommend the smallest justified next action. Do not recommend a code change unless the inspected specification or established contract supports it. If policy remains unresolved, state exactly what remains unknown and why changing the code now would be premature.
+- Do not inspect the repository broadly.
+- Do not edit `reply.md`, `stepsForStage7.md`, `temp_report.md`, `temp_report2.md`, `stage_7_prompts.md`, or anything under `ClaudeReports/`.
+- Do not redesign `engine.py`.
 
 ## Required Report
-Provide:
-- Exact source locations and test function names.
-- Specification evidence supporting each conclusion.
-- A concise behavior table for Stage 7 thresholds below, equal to, and above `0.50`.
-- Separate findings for implementation correctness, test coverage, and policy clarity.
-- The smallest justified next action.
-- If a later code change is justified, list the exact files that would need modification and provide focused pytest commands for the user to run later. Do not run those commands.
+Report:
+1. Exact test functions added and the behavior each verifies.
+2. The exact file changed.
+3. Any requested assertion not added and why.
+4. The focused pytest command for the user to run:
+   `pytest src/tests/test_stage9_decision.py -q`
+5. Explicitly state that tests were not run and no production code or thresholds were changed.
 
-End with an explicit statement:
-- Files changed/created: none.
-- Tests run: none.
-- Stage 7 remains OPEN.
+Stage 7 remains OPEN.

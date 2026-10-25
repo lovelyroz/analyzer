@@ -292,3 +292,156 @@ def test_dashboard_contract_carries_required_fields():
     assert result.decision_date is not None
     assert result.model_version == "STAGE9_V1"
     assert result.contract_version == "DECISION_CONTRACT_V1"
+
+
+    def test_scenario_dispersion_threshold_boundaries():
+        """Verify scenario_dispersion threshold boundaries (> 0.50, == 0.50, < 0.50, None)."""
+        engine = DecisionEngine()
+
+        # 1. Above threshold (> 0.50) -> triggers HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK
+        res_above = engine.make_decision(
+            1,
+            10,
+            make_fundamental(85),
+            make_valuation(dispersion=0.55),
+            make_market(),
+            forecast_reliability_score=85,
+            trend_state="STRONG_IMPROVEMENT",
+            forecast_direction="POSITIVE",
+        )
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" in res_above.conflicts
+
+        # 2. Exactly at threshold (== 0.50) -> does NOT trigger conflict
+        res_at = engine.make_decision(
+            1,
+            10,
+            make_fundamental(85),
+            make_valuation(dispersion=0.50),
+            make_market(),
+            forecast_reliability_score=85,
+            trend_state="STRONG_IMPROVEMENT",
+            forecast_direction="POSITIVE",
+        )
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" not in res_at.conflicts
+
+        # 3. Below threshold (< 0.50) -> does NOT trigger conflict
+        res_below = engine.make_decision(
+            1,
+            10,
+            make_fundamental(85),
+            make_valuation(dispersion=0.45),
+            make_market(),
+            forecast_reliability_score=85,
+            trend_state="STRONG_IMPROVEMENT",
+            forecast_direction="POSITIVE",
+        )
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" not in res_below.conflicts
+
+        # 4. None dispersion -> does NOT trigger conflict
+        res_none = engine.make_decision(
+            1,
+            10,
+            make_fundamental(85),
+            make_valuation(dispersion=None),
+            make_market(),
+            forecast_reliability_score=85,
+            trend_state="STRONG_IMPROVEMENT",
+            forecast_direction="POSITIVE",
+        )
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" not in res_none.conflicts
+
+
+    def test_scenario_dispersion_causes_ten_point_confidence_deduction():
+        """Verify that scenario_dispersion > 0.50 directly deducts 10 points from decision confidence."""
+        engine = DecisionEngine()
+        kwargs = dict(
+            company_id=1,
+            period_id=10,
+            fundamental_result=make_fundamental(85),
+            market_result=make_market(),
+            forecast_reliability_score=85,
+            trend_state="STRONG_IMPROVEMENT",
+            forecast_direction="POSITIVE",
+        )
+
+        # Baseline without dispersion conflict
+        base_res = engine.make_decision(
+            valuation_result=make_valuation(dispersion=0.45), **kwargs
+        )
+        assert base_res.decision_confidence == 100.0
+
+        # With dispersion > 0.50 -> 10-point penalty
+        disp_res = engine.make_decision(
+            valuation_result=make_valuation(dispersion=0.55), **kwargs
+        )
+        assert disp_res.decision_confidence == 90.0
+        assert base_res.decision_confidence - disp_res.decision_confidence == 10.0
+
+
+    def test_scenario_dispersion_blocks_strong_buy():
+        """Verify that HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK blocks STRONG_BUY recommendation."""
+        engine = DecisionEngine()
+        kwargs = dict(
+            company_id=1,
+            period_id=10,
+            fundamental_result=make_fundamental(85),
+            market_result=make_market(),
+            forecast_reliability_score=85,
+            trend_state="STRONG_IMPROVEMENT",
+            forecast_direction="POSITIVE",
+        )
+
+        # Without dispersion conflict -> STRONG_BUY
+        qualifying_res = engine.make_decision(
+            valuation_result=make_valuation(dispersion=0.50), **kwargs
+        )
+        assert qualifying_res.recommendation == "STRONG_BUY"
+
+        # With dispersion > 0.50 -> STRONG_BUY blocked, degraded to BUY
+        blocked_res = engine.make_decision(
+            valuation_result=make_valuation(dispersion=0.55), **kwargs
+        )
+        assert blocked_res.recommendation == "BUY"
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" in blocked_res.conflicts
+
+
+    def test_scenario_dispersion_penalty_distinct_from_valuation_risk_level_high():
+        """Verify distinction between dispersion conflict penalty and valuation_risk_level penalty."""
+        engine = DecisionEngine()
+        kwargs = dict(
+            company_id=1,
+            period_id=10,
+            fundamental_result=make_fundamental(85),
+            market_result=make_market(),
+            forecast_reliability_score=85,
+            trend_state="STRONG_IMPROVEMENT",
+            forecast_direction="POSITIVE",
+        )
+
+        # 1. Low risk, low dispersion -> 100.0 confidence, no conflict
+        c1 = engine.make_decision(
+            valuation_result=make_valuation(risk="LOW", dispersion=0.45), **kwargs
+        )
+        assert c1.decision_confidence == 100.0
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" not in c1.conflicts
+
+        # 2. Low risk, high dispersion -> 90.0 confidence, dispersion conflict present
+        c2 = engine.make_decision(
+            valuation_result=make_valuation(risk="LOW", dispersion=0.55), **kwargs
+        )
+        assert c2.decision_confidence == 90.0
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" in c2.conflicts
+
+        # 3. High risk, low dispersion -> 90.0 confidence, NO dispersion conflict
+        c3 = engine.make_decision(
+            valuation_result=make_valuation(risk="HIGH", dispersion=0.45), **kwargs
+        )
+        assert c3.decision_confidence == 90.0
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" not in c3.conflicts
+
+        # 4. High risk, high dispersion -> 80.0 confidence (both penalties apply)
+        c4 = engine.make_decision(
+            valuation_result=make_valuation(risk="HIGH", dispersion=0.55), **kwargs
+        )
+        assert c4.decision_confidence == 80.0
+        assert "HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK" in c4.conflicts

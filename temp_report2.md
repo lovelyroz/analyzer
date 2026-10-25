@@ -4163,3 +4163,33 @@ The legacy path still lacks a PIT (Point-in-Time) guarantee (UNVERIFIED_LEGACY_G
 As per D7, the application of a cutoff to parameters does not constitute a PIT guarantee for the input data.
 The docstring for `select_parameter_set_for_valuation` in `parameters.py` still states that the "as-of" date is provided by the caller; I left this file untouched in accordance with the instructions. This is merely a description and does not alter the actual behavior.
 I am assuming that `normalize_datetime(None)` returns `None`. The previous code operated on this same assumption, though I did not find an explicit implementation of this in `src.forecast.schema`.
+======================================================
+# P59 The execution report for **Prompt 59 (P59 — Add Focused Stage 9 Dispersion Regression Tests)**, based on reference materials and guidelines, is presented below:
+
+---
+
+### 1. Newly Added Test Functions and Their Respective Behaviors
+
+1. **test\_scenario\_dispersion\_threshold\_boundaries()**:
+* **Behavior Tested:** Evaluates the precise threshold boundaries for scenario dispersion at Stage 9:
+* A value of `scenario_dispersion > 0.50` (e.g., `0.55`) triggers the conflict `"HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK"`. 
+* A value exactly equal to `0.50` does **not** trigger a conflict. 
+* A value less than `0.50` (e.g., `0.45`) does **not** trigger a conflict. 
+* A value of `None` does **not** trigger a conflict.
+2. **test\_scenario\_dispersion\_causes\_ten\_point\_confidence\_deduction()**:
+* **Behavior Tested:** A controlled comparison demonstrating that the presence of the `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` conflict directly deducts 10 points from the decision confidence (`decision_confidence`), while keeping all other inputs constant.
+3. **test\_scenario\_dispersion\_blocks\_strong\_buy()**:
+* **Behavior Tested:** Demonstrates that the presence of the `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` conflict—even when all other inputs otherwise qualify for a `"STRONG_BUY"` recommendation—directly blocks the issuance of a `"STRONG_BUY"` and downgrades the recommendation to `"BUY"`. 4. **test\_scenario\_dispersion\_penalty\_distinct\_from\_valuation\_risk\_level\_high()**:
+* **Behavior Tested:** Demonstrates, across four distinct scenarios, that the 10-unit penalty resulting from scenario dispersion conflict is separate and distinct from the 10-unit penalty triggered when `valuation_risk_level` is set to `"HIGH"` or `"EXTREME"`.
+
+---
+
+### 2. Modified File
+
+* **src/tests/test\_stage9\_decision.py** (The only file permitted for modification, per the instructions in P59).
+
+---
+
+### 3. Unadded Assertions
+
+* **All 6 requirements and assertions specified in Prompt 59 have been fully addressed; no items have been omitted or excluded.**
