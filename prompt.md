@@ -1,142 +1,123 @@
-# P62 — Define the Minimal Production Integration Contract for Stage 7
+# P63 — Audit Historical Parameter Versioning (P54) Before Stage 7 Integration
 
+## 1. Role and Project Context
 
+You are conducting a focused engineering audit of the local project folder `analyzer`, a financial-data application.
 
-This is a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants take priority over speed or superficial test success.
+Financial correctness, point-in-time correctness, auditability, deterministic behavior, and preservation of existing financial invariants take priority over implementation speed or making tests pass.
 
-## Task type
+The latest P62 report is in `reply.md`. Read `stepsForStage7.md` first because it is the authoritative Stage 7 execution plan. Then read the current `reply.md` and only the directly relevant sections of `temp_report2.md` and the Stage 7 specification.
 
-**ANALYSIS / DESIGN REPORT ONLY.**
+## 2. Strict Execution Boundaries
 
-Do not modify application code, tests, specifications, or project-planning files. Do not run tests or CI. The user will run tests personally.
+This task is **analysis and reporting only**.
 
-## Mandatory operating constraints
+- Do not edit application code, tests, configuration, specifications, or planning files.
+- Do not add, modify, or seed parameter records.
+- Do not change parameter defaults, financial formulas, thresholds, or historical-selection behavior.
+- Do not run pytest, application code, migrations, database writes, or CI.
+- Do not use GitHub, GitHub CLI/API, remotes, pushes, pulls, commits, branches, or other remote operations.
+- Do not inspect the entire repository. Follow the focused file scope below.
+- Do not modify `reply.md`, `temp_report.md`, `temp_report2.md`, `stepsForStage7.md`, `stage_7_prompts.md`, or `ClaudeReports/`.
+- Do not assume that making a historical lookup succeed proves historical correctness.
 
-- Work only within the local `analyzer` project.
-- No GitHub, GitHub CLI/API, remote operations, commits, pushes, pulls, branch changes, or other repository synchronization.
-- Do not perform a broad repository exploration. Read the specific files identified below and follow only directly relevant references.
-- Do not redesign `src/valuation/engine.py`.
-- Do not invent financial formulas, data sources, industry mappings, date semantics, persistence contracts, or point-in-time guarantees.
-- Do not create an orchestrator, integration test, or synthetic execution path during this task.
-- Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `stepsForStage7.md`, `stage_7_prompts.md`, or anything under `ClaudeReports/`.
-- Return the complete report in your Claude response. The user will decide what to preserve or append.
+Your only deliverable is a report that I will review and place in `reply.md` myself.
 
-## Step 1 — Read the authoritative plan and prior findings
+## 3. Required Audit Scope
 
-Read `stepsForStage7.md` first, especially the P48 audit findings dated 2026-10-25 and the remaining execution plan.
+First inspect `stepsForStage7.md` and `reply.md`. Then inspect only the files necessary to trace the P54 parameter-selection path, prioritizing:
 
-Use only the relevant earlier findings in `temp_report2.md` to clarify existing conclusions about:
-- production-path and integration audits, including P38/P48 if present;
-- parameter-selection and point-in-time constraints, including P54;
-- scenario-dispersion threshold policy, P61/P61-R.
-
-Do not repeat earlier investigations unless needed to resolve a specific contradiction. Treat the latest P48 findings in `stepsForStage7.md` as the current working baseline.
-
-## Step 2 — Inspect only the minimum necessary implementation files
-
-Start with these files:
-
-- `src/scoring/engine.py`
-- `src/forecast/service.py`
-- `src/forecast/schema.py`
-- `src/forecast/repo.py`
+- `src/valuation/parameters.py`
+- `src/valuation/engine.py`
 - `src/valuation/service.py`
 - `src/valuation/schema.py`
-- `src/decision/service.py`
-- `src/decision/schema.py`
-- `src/market/engine.py`
-- `src/market/schema.py`
-- `src/core/database.py`
-- the market-data query/ingestion modules directly used by the services above
-- the corresponding model files only where needed to verify existing persistence contracts
+- `src/valuation/models.py`, if it exists and is relevant
+- `src/tests/test_stage7_valuation.py`
+- The exact parameter-related specification sections in `07_Stage7_Valuation.md`
+- Any directly referenced parameter registry, parameter model, migration, or seed file required to establish the actual implementation
 
-Inspect a caller, configuration, or model outside this list only when a specific symbol reference or direct dependency requires it. Record why that additional file was necessary.
+If a listed path does not exist, record that fact and do not silently substitute a guessed path. Follow references only as far as necessary to establish the selection behavior and data provenance.
 
-Do not read the entire test suite. You may inspect a small, directly relevant test only to understand an existing contract. Do not run it.
+## 4. Questions That Must Be Answered With Code or Specification Evidence
 
-## Step 3 — Define the minimal integration contract
+### A. Current selection behavior
 
-For each boundary below, establish the existing contract and the missing information required to connect it safely:
+1. Locate `resolve_parameter_set_as_of` and identify its exact inputs, return type, and error behavior.
+2. Explain when current-date or undated selection is allowed, when historical selection is attempted, and why P54 can raise `LookupError`.
+3. Identify the actual source of the parameter records: code defaults, registry entries, database rows, seed data, or another mechanism.
+4. Establish whether parameter versions have effective-start and effective-end dates, version identifiers, or other temporal metadata.
+5. Determine how the selected parameter set is associated with the valuation result and whether the exact values/version used can be reconstructed later.
 
-1. **Stage 3 → downstream stages**
-   - What produces `FundamentalScoreResult`?
-   - What exact identity and period fields must match?
-   - Are actual `KPIResult` production and aggregation connected to a caller, or is only the scoring engine present?
+### B. Point-in-time correctness
 
-2. **Stage 5 Forecast production/retrieval**
-   - What function produces `CompanyForecastResult`?
-   - What data and cutoff does it require?
-   - What persistence/retrieval capability already exists?
-   - Is there an authoritative way to select the intended forecast version for a historical analysis date?
-   - Do not treat model version alone as complete historical parameter versioning.
+Determine whether the current implementation can prove that a parameter set was valid and available at the historical analysis cutoff.
 
-3. **Stage 7 Valuation**
-   - What inputs does `calculate_valuation_as_of_jalali` require?
-   - How is the Jalali analysis date supplied?
-   - Which price observation is selected and what provenance is preserved?
-   - What remains unavailable for full point-in-time verification?
+Explicitly distinguish:
 
-4. **Stage 8 Market analysis**
-   - What input shape does `MarketEngine.analyze_market` require?
-   - What existing source or query can supply that input?
-   - Can the market signal be produced using data eligible as of the same analysis date?
-   - Do not assume that the Stage 7 market-price query also supplies all Stage 8 inputs.
+- **Effective time:** when a parameter set is considered valid for business use.
+- **Knowledge/recorded time:** when the system actually knew or recorded that parameter set.
+- **Analysis cutoff:** the time/date through which information is allowed to influence the calculation.
 
-5. **Stage 9 Decision**
-   - What inputs are required by `calculate_decision_as_of_jalali`?
-   - What identity checks already exist?
-   - What does it return?
-   - Is there an existing authoritative persistence or consumption contract for the final decision?
+Do not assume these three concepts are interchangeable. If the schema or evidence cannot establish one of them, state that clearly.
 
-6. **Shared execution context**
-   - Who should own/create/close the SQLAlchemy `Session`, based on existing conventions?
-   - What explicit date values must be passed across boundaries?
-   - Keep the Persian Jalali calendar as the relevant analysis-date convention. Do not introduce Gregorian-date conversion unless an existing contract explicitly requires it.
-   - Distinguish forecast `data_cutoff_datetime`, Jalali market analysis date, calculation timestamp, and parameter-selection cutoff. They are not interchangeable.
-   - Do not silently substitute the current date or `valuation_date` for a missing historical cutoff.
+Check whether a historical valuation could silently use present-day defaults, a model version ID without historical parameter values, or a valuation date that is not the authoritative data cutoff.
 
-## Step 4 — Produce a contract matrix
+### C. Test evidence
 
-Return a concise table with one row per boundary and these columns:
+Read the existing parameter-related Stage 7 tests. Classify what they actually prove:
 
-- Boundary
-- Existing function/interface
-- Required inputs and identity invariants
-- Output
-- Existing persistence or retrieval
-- Evidence of a real caller
-- Missing contract or blocker
-- Classification: `EXISTS AND CONNECTED`, `EXISTS BUT CALLER UNPROVEN`, or `MISSING/UNDEFINED`
+- Current/default parameter resolution
+- Historical resolution
+- Missing historical version behavior
+- Boundary dates and version overlaps
+- Deterministic replay/reconstruction
+- Audit metadata and exact parameter-value provenance
 
-Cite exact file paths and function/class names. Include line numbers when available, but do not invent line numbers.
+Do not claim any test exists unless you locate it. Do not run tests.
 
-A function existing in a module or being called by a unit test does not, by itself, prove a production execution path.
+### D. Minimal safe remediation decision
 
-## Step 5 — Recommend the smallest safe next implementation task
+Compare these options using evidence, without implementing any of them:
 
-Based on the evidence, recommend the smallest next task that would move the real application toward a verifiable execution path.
+1. Add a dated parameter record.
+2. Introduce or complete explicit effective-dated parameter versioning.
+3. Fail closed for historical valuation until a valid historical version can be proven.
+4. Another narrowly scoped option supported by the actual code and specification.
 
-Your recommendation must:
-- name the exact file/interface responsibility that should be addressed first;
-- explain why it is the first dependency;
-- list prerequisites and unresolved decisions;
-- identify which existing contracts must remain unchanged;
-- state what evidence would prove completion;
-- specify the tests the user should run later, but **do not run them**;
-- avoid designing a speculative database schema or adding new public APIs before confirming they are necessary.
+For each viable option, describe:
+- Preconditions
+- Financial/PIT risks
+- Compatibility implications
+- Required audit metadata
+- Minimum tests needed before acceptance
 
-If the available code does not identify a legitimate source or owner for an input, state that explicitly rather than inventing one.
+Choose the safest recommendation. Do not invent parameter values, effective dates, historical facts, or business policy. If the specification does not define the required policy, classify that as a decision gap instead of guessing.
 
-Do not implement anything in P62. Do not declare Stage 7 complete.
+## 5. Relationship to Stage 7 Integration
 
-## Required report structure
+P62 identified unproven end-to-end execution from Stage 3 through Stage 9 and several missing production contracts.
 
-1. Executive conclusion
-2. Evidence and contract matrix
-3. Confirmed gaps versus unknowns
-4. Minimal recommended implementation task
-5. User-run validation plan
-6. Files inspected and any additional files inspected, with reasons
-7. Explicit statement confirming no code changes and no tests/CI executed
+This P63 task must remain limited to P54. Explain how the parameter-versioning result affects Stage 7 integration readiness, but do not design or implement an orchestrator, Stage 3/8 data loaders, or Stage 9 persistence.
 
-Return the report in your Claude response only. The user will review it before authorizing any implementation work.
+Do not redesign `src/valuation/engine.py`. If it contains relevant parameter-consumption behavior, document that behavior and leave it unchanged.
+
+## 6. Required Report Format
+
+Produce a concise but technically rigorous Markdown report with these sections:
+
+1. **Executive Conclusion** — Is historical parameter resolution safe, unsafe, or not provable from available evidence?
+2. **Evidence-Based Current Behavior** — Exact functions, files, relevant line numbers, and observed behavior.
+3. **Temporal Data Model and PIT Assessment** — Effective time, recorded/knowledge time, and analysis cutoff.
+4. **Test Coverage Assessment** — Existing test names and precisely what they establish; identify missing coverage.
+5. **Remediation Options Comparison** — Evidence-based trade-offs.
+6. **Recommended Next Action** — One narrowly scoped next task, with prerequisites and explicit non-goals.
+7. **Acceptance Criteria** — Objective conditions that must hold before P54 can be considered resolved.
+8. **Stage 7 Integration Impact** — What remains blocked and what this audit does not establish.
+9. **Files Inspected** — Actual paths inspected; explicitly identify any missing paths.
+10. **Execution Confirmation** — Explicitly confirm that no files were changed and no tests, application code, database writes, migrations, or CI were run.
+
+Clearly separate **verified facts**, **inferences**, and **unresolved policy decisions**. Cite code locations using actual line numbers. If evidence is missing, say so rather than guessing.
+
+## 7. Completion Rule
+
+Stop after producing the report. Do not implement the recommendation and do not edit any repository or report file. I will review the report before authorizing the next step.

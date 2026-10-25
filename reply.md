@@ -1,104 +1,157 @@
+# Report P63
+### گزارش ممیزی نسخه بوم تاریخی پارامترها (P54) قبل از یکپارچه‌سازی Stage 7
+
+این گزارش تخصصی مهندسی، ارزیابی جامعی از مکانیزم انتخاب و نسخه‌بندی تاریخی پارامترها (موضوع مسئله P54) در ماژول ارزش‌گذاری Stage 7 پروژه `analyzer` ارائه می‌دهد. این گزارش بدون ایجاد تغییر در کد، اجرا یا تغییر اسناد، بر اساس ممیزی دقیق کدهای سورس و مشخصات مالی تنظیم شده است.
+
+---
+
 ### ۱. جمع‌بندی اجرایی (Executive Conclusion)
 
-گزارش حاضر، خروجی تحلیلی اجرای پرامپت **P62 — تعیین کمینه‌ترین قرارداد یکپارچه‌سازی تولید برای Stage 7** است. بر اساس ممیزی P48 و تحلیل کد‌های موجود در پروژه `analyzer`، اتصال داخلی بین **Stage 5 ← Stage 7 ← Stage 9** از طریق مرز سرویس `src/decision/service.py::calculate_decision_as_of_jalali` به‌صورت ساختاری پیاده‌سازی شده و معتبر است. 
+**پاسخ صریح:** بازیابی تاریخی پارامترها (Historical Parameter Resolution) در وضعیت فعلی سیستم **ناایمن (UNSAFE) و غیرقابل اثبات (NOT PROVABLE)** از روی شواهد موجود است.
 
-با این حال، **مسیر سرتاسری اجرایی (End-to-End Execution Path) از Stage 3 تا Stage 9 از یک نقطه ورود واقعی (مانند CLI یا API) اثبات نشده و مفقود است**. مهم‌ترین شکاف‌های شناسایی‌شده عبارتند از:
-1. **Stage 8**: عدم وجود سرویس یا کوئری استخراج سری داده‌های روزانه بازار برای `MarketEngine.analyze_market` جهت تولید `MarketSignalResult`.
-2. **Stage 3**: عدم وجود فراخواننده اجرایی برای استخراج KPIها و فراخوانی `FundamentalScoringEngine.calculate_score` جهت تأمین `FundamentalScoreResult`.
-3. **Stage 9**: نبود مدل پایگاه‌داده و مخزن ذخیره‌سازی برای خروجی نهایی تصمیم (`FinalDecisionResult`).
-4. **Stage 7 (P54)**: خطای عدم امکان انتخاب پارامترهای تاریخ‌دار تاریخی (`LookupError`) به دلیل نبود رکوردهای R8 در `ParameterRegistry`.
+**دلیل اصلی:**
+1. ثبات‌بخش اصلی پارامترها (`DEFAULT_REGISTRY` در `src/valuation/parameters.py:263`) تنها شامل یک رکورد اولیه تحت عنوان `GENESIS_VERSION` (`version_key="STAGE7_V1/GENESIS"`) است.
+2. مقدار تاریخ اعتبار این رکورد صریحاً برابر با `effective_from = None` (فاقد تاریخ اعتبار تاریخی) تنظیم شده است.
+3. تابع انتخاب بر اساس تاریخ (`resolve_parameter_set_as_of`) به‌گونه‌ای طراحی شده که تمام رکوردهای فاقد تاریخ (از جمله نسخه Genesis) را از کاندیداهای انتخاب تاریخی حذف می‌کند. در نتیجه، هرگونه درخواست ارزش‌گذاری با مشخص کردن تاریخ پارامتر (`parameter_as_of`) منجر به صدور خطای صریح `LookupError` می‌شود (`zErrors.md`).
+4. در سمت مقابل، اگر هیچ تاریخی ارسال نشود (`parameter_as_of=None`)، سیستم وارد حالت میراثی `FIXED_GENESIS_LEGACY` شده و ثابت‌های جاری کد را بدون بررسی صحت زمانی (Point-in-Time) اعمال می‌کند و پرچم `point_in_time_selection_applied=False` را ثبت می‌نماید.
 
----
-
-### ۲. ماتریس شواهد و قراردادهای یکپارچه‌سازی (Evidence and Contract Matrix)
-
-| مرز (Boundary) | تابع / رابط موجود (Existing Function/Interface) | ورودی‌ها و ناورداهای شناسه (Required Inputs & Invariants) | خروجی (Output) | ماندگاری / بازیابی موجود (Persistence/Retrieval) | شواهد فراخواننده واقعی (Evidence of Real Caller) | قرارداد مفقود یا مانع (Missing Contract / Blocker) | طبقه‌بندی (Classification) |
-|---|---|---|---|---|---|---|---|
-| **Stage 3 ← downstream** | `FundamentalScoringEngine.calculate_score` در `src/scoring/engine.py:169` | `company_id: int`, `period_id: int`, `industry_code: str`, `kpi_results: List[KPIResult]`, `peer_values`, `historical_values` | `FundamentalScoreResult` | ندارد | تست‌های واحد در `test_stage3_scoring.py` | عدم وجود سرویس/فراخواننده برای گردآوری `KPIResult` از Stage 1 و ارسال به Stage 9 | **EXISTS BUT CALLER UNPROVEN** |
-| **Stage 5 Forecast production/retrieval** | `generate_and_persist_forecast` در `src/forecast/service.py:137`؛ `ForecastRecordRepository.read_at_cutoff` در `src/forecast/repo.py:112` | `session: Session`, `company_id: int`, `forecast_period_id: int`, `data_cutoff_datetime: datetime`, `trend_result: Optional[TrendResult]` | `CompanyForecastResult` | `ForecastVersion` و `ForecastInputRefModel` در SQLite via `ForecastRecordRepository` | تست‌های واحد در `test_stage5_forecast.py` | عدم فراخوانی در یک مسیر برنامه‌ای سرتاسری و عدم وجود تبدیل انباره تاریخچه‌ای به `CompanyForecastResult` برای اجراهای گذشته | **EXISTS BUT CALLER UNPROVEN** |
-| **Stage 7 Valuation** | `calculate_valuation_as_of_jalali` در `src/valuation/service.py:12` | `session: Session`, `company_id: int`, `period_id: int`, `forecast_result: CompanyForecastResult`, `as_of_jalali_date: JalaliDate`. **Invariants:** `forecast_result.company_id == company_id` و `period_id == period_id` | `ValuationResult` | خواندن قیمت بازار از `MarketDaily` via `select_market_price_as_of`. عدم وجود مدل ذخیره‌سازی برای `ValuationResult` | فراخوانی در `src/decision/service.py::calculate_decision_as_of_jalali` | عدم وجود ممیزی کامل Point-in-Time برای بنچمارک‌ها؛ خطای `LookupError` در انتخاب پارامترهای تاریخ‌دار تاریخی (P54) | **EXISTS AND CONNECTED** |
-| **Stage 8 Market Analysis** | `MarketEngine.analyze_market` در `src/market/engine.py:145` | `company_id: int`, `as_of_date: datetime`, `market_data: Sequence[Dict[str, Any]]`, `industry_benchmark`, `market_benchmark`, `point_in_time: bool` | `MarketSignalResult` | ندارد | تست‌های واحد در `test_stage8_market.py` | نبود کوئری/سرویس استخراج داده‌های روزانه OHLCV بازار برای ساخت `market_data` و اجرای Stage 8 | **EXISTS BUT CALLER UNPROVEN** |
-| **Stage 9 Decision** | `DecisionEngine.make_decision` در `src/decision/engine.py`؛ `calculate_decision_as_of_jalali` در `src/decision/service.py:12` | `session: Session`, `forecast_result: CompanyForecastResult`, `as_of_jalali_date: JalaliDate`, `fundamental_result: FundamentalScoreResult`, `market_result: MarketSignalResult`. **Invariants:** تطابق `company_id` و `period_id` در تمام ورودی‌ها | `ValuationDecisionResult` (شامل `ValuationResult` و `FinalDecisionResult`) | ندارد (مدل پایگاه‌داده/مخزن برای `FinalDecisionResult` وجود ندارد) | تست‌های یکپارچه‌سازی در `test_stage9_decision.py` | عدم وجود فراخواننده نهایی برنامه‌ای و نبود مقصدی برای ذخیره خروجی تصمیم | **EXISTS AND CONNECTED** |
-| **Shared Execution Context** | مالکیت Session در `src/core/database.py` (`SessionLocal`) | `data_cutoff_datetime` (UTC datetime), `as_of_jalali_date` (Jalali tuple), `calculation_timestamp` (UTC datetime) | Session instance / Datetimes | SQLite database `tehran_stock.db` | سرویس‌های Stage 5, Stage 7, Stage 9 | نبود مدیریت‌کننده متمرکز جلسه (Session Owner) در یک مسیر تولیدی برای مدیریت تراکنش و زمان‌بندی تاریخ‌ها | **EXISTS BUT CALLER UNPROVEN** |
+بنابراین، سیستم هم‌اکنون بین دو حالت رفتار می‌کند: یا در درخواست‌های تاریخی با خطای `LookupError` متوقف می‌شود (Fail Closed)، یا در حالت میراثی ثوابت فعلی را بدون اثبات صحت تاریخی مصرف می‌کند.
 
 ---
 
-### ۳. شکاف‌های اثبات‌شده در برابر مجهولات (Confirmed Gaps vs Unknowns)
+### ۲. رفتار فعلی بر اساس شواهد کد (Evidence-Based Current Behavior)
 
-#### شکاف‌های اثبات‌شده (Confirmed Gaps):
-1. **نبود نقطه ورود اصلی برنامه (No Main Entry Point / CLI / API)**: هیچ فایل اجرایی در ریشه پروژه یا `src/` برای اجرای کامل زنجیره تحلیل از Stage 3 تا Stage 9 وجود ندارد.
-2. **عدم وجود سرویس استخراج داده‌های بازار برای Stage 8**: هیچ ماژولی داده‌های قیمت روزانه و حجم بازار را از `tehran_stock.db` استخراج نمی‌کند تا به‌عنوان `market_data` به `MarketEngine.analyze_market` تحویل دهد.
-3. **عدم وجود سرویس استخراج و گردآوری KPIها برای Stage 3**: هیچ مسیری `KPIResult`ها را از صورت‌های مالی استخراج نمی‌کند تا به `FundamentalScoringEngine` داده شود.
-4. **عدم ذخیره‌سازی تصمیم نهایی (No Persistence for FinalDecisionResult)**: هیچ جدول یا مدل SQLAlchemy برای ذخیره‌سازی `FinalDecisionResult` تعریف نشده است.
-5. **خطای انتخاب پارامترهای تاریخی ارزش‌گذاری (P54 - Parameter Versioning Gap)**: متد `resolve_parameter_set_as_of` در صورت دریافت تاریخ تاریخی، به دلیل نبود رکوردهای تاریخ‌دار R8 در `ParameterRegistry` خطای `LookupError` صادر می‌کند.
+#### ۱. توابع اصلی و رفتار آن‌ها:
+* **`resolve_parameter_set_as_of`** (`src/valuation/parameters.py:263-294`):
+  * **ورودی‌ها:** `as_of: Optional[datetime]`, `registry: ParameterRegistry = DEFAULT_REGISTRY`
+  * **خروجی:** `ParameterSetVersion`
+  * **رفتار:** ابتدا نرمال‌سازی تاریخ به UTC انجام می‌شود. اگر `as_of` برابر `None` باشد، خطای `LookupError` صادر می‌کند. سپس نسخه‌هایی را که `effective_from is not None` و `effective_from <= moment` هستند فیلتر می‌کند. اگر کاندیدایی یافت نشود، خطای `LookupError("No dated Stage 7 parameter version covers as_of=...")` صادر می‌گردد. در صورت وجود هم‌زمانی دقیق در جدیدترین تاریخ اعتبار، خطای `LookupError("Ambiguous...")` صادر می‌شود.
+* **`resolve_parameter_set`** (`src/valuation/parameters.py:258-262`):
+  * **ورودی‌ها:** `version_key: str`, `registry: ParameterRegistry = DEFAULT_REGISTRY`
+  * **رفتار:** جستجوی دقیق بر اساس کلید نسخه (`version_key`). در صورت عدم وجود کلید، خطای `KeyError` صادر می‌کند (بدون Fallback خاموش).
+* **`select_parameter_set_for_valuation`** (`src/valuation/parameters.py:350-380`):
+  * **حالت ۱ (`FIXED_GENESIS_LEGACY`):** اگر هر دو آرگومان `parameter_registry` و `parameter_as_of` برابر `None` باشند، نسخه `live_genesis_parameter_set()` فراخوانی شده و متادیتای `point_in_time_selection_applied: False` ثبت می‌شود.
+  * **حالت ۲ (`AS_OF_EFFECTIVE_DATED`):** اگر یکی از آرگومان‌ها ارسال شود، تابع `resolve_parameter_set_as_of` فراخوانی می‌شود که در صورت عدم وجود رکوردهای تاریخ‌دار در ثبت‌کننده، به خطای `LookupError` می‌انجامد.
 
-#### مجهولات (Unknowns):
-1. **سیاست کسب‌وکار برای ذخیره‌سازی تصمیم**: آیا خروجی Stage 9 باید در پایگاه‌داده ذخیره شود یا فقط به‌صورت یک گزارش موقت (Ephemeral) در حافظه/API بازگردانده شود؟
-2. **نحوه تعیین `as_of_jalali_date` و `data_cutoff_datetime` در یک اجرای واقعی**: آیا کاربر این دو تاریخ را به‌صورت ورودی دستی CLI/API وارد می‌کند یا سیستم آن‌ها را از آخرین تاریخ گزارش/بازار استخراج می‌کند؟
+#### ۲. منبع واقعی رکوردهای پارامتر:
+رکوردهای پارامتر مستقیماً از ثابت‌های موجود در ماژول `src/valuation/parameters.py` (مانند `SCENARIO_WEIGHTS`, `VALUATION_THRESHOLDS`, `CONFIDENCE_THRESHOLDS`, `RISK_THRESHOLDS`, `ALERT_THRESHOLDS`, `SENSITIVITY_PERTURBATION`, `MIN_INDUSTRY_PEERS`) به‌صورت برنامه‌ای در تابع `_genesis_records()` ساخته می‌شوند. هیچ جدول پایگاه‌داده، فایل Seed یا دایرکتوری جداگانه‌ای برای نگهداری نسخه پارامترها وجود ندارد.
 
----
+#### ۳. متادیتای زمانی (Temporal Metadata):
+* `ParameterRecord` شامل فیلدهای `parameter_name`, `parameter_value`, `effective_from: Optional[datetime]`, `description` است.
+* `ParameterSetVersion` شامل `model_version`, `version_key`, `effective_from: Optional[datetime]`, `records` است.
+* فیلد `effective_end` در ساختار داده وجود ندارد؛ بازه اعتبار به‌صورت باز از `effective_from` تا زمان ثبت نسخه بعدی محاسبه می‌شود.
 
-### ۴. کمینه‌ترین تکلیف اجرایی پیشنهادی (Minimal Recommended Implementation Task)
-
-* **نام مسئولیت و رابط/فایل هدف**: ایجاد یک سرویس استخراج داده‌های بازار برای Stage 8 (مانند `src/market/service.py::analyze_market_as_of_jalali`) و یک سرویس/کلاس هماهنگ‌کننده اجرایی کمینه (Application Boundary/Caller) که ورودی‌های لازم را گردآوری کرده و به `src/decision/service.py::calculate_decision_as_of_jalali` پاس دهد.
-* **علت اولویت نخست بودن**: سرویس `src/decision/service.py::calculate_decision_as_of_jalali` هم‌اکنون اتصال Stage 5، Stage 7 و Stage 9 را به‌طور کامل و سالم مدیریت می‌کند. تنها مانع اجرایی شدن آن، تأمین ورودی‌های `MarketSignalResult` (از Stage 8) و `FundamentalScoreResult` (از Stage 3) است.
-* **پیش‌نیازها و تصمیمات حل‌نشده**:
-  * رفع محدودیت P54 با افزودن حداقل یک رکورد پارامتر تاریخ‌دار معتبر به `ParameterRegistry` جهت جلوگیری از `LookupError` در تحلیل‌های تاریخی.
-  * تصمیم‌گیری درباره نحوه ذخیره‌سازی خروجی Stage 9 (در صورت نیاز به ذخیره‌سازی).
-* **قراردادهای موجود که باید بدون تغییر باقی بمانند**:
-  * `src/valuation/engine.py` (طبق محدودیت‌های P62 و P48 نباید بازطراحی شود).
-  * امضا و ناورداهای شناسه در `src/decision/service.py::calculate_decision_as_of_jalali`.
-  * فرمول‌های مالی، آستانه‌های P/E و منطق ریسک/اعتماد.
-* **شواهد اثبات‌کننده تکمیل**:
-  * اجرای یک اسکریپت آزمایشی غیرتولیدی که برای یک شناسه شرکت و تاریخ جلالی واقعی، تمام ورودی‌ها را فراخوانی کرده و خروجی `ValuationDecisionResult` معتبر و کامل تولید کند.
-* **تست‌هایی که کاربر باید بعداً اجرا کند (بدون اجرای توسط Agent)**:
-  * `python -m pytest src/tests/test_stage7_valuation.py`
-  * `python -m pytest src/tests/test_stage9_decision.py`
-  * `python -m pytest src/tests/test_stage5_forecast.py`
-  * `python -m pytest src/tests/test_stage3_scoring.py`
-  * `python -m pytest src/tests/test_stage8_market.py`
+#### ۴. نحوه ارتباط پارامتر با خروجی ارزش‌گذاری:
+موتور ارزش‌گذاری (`ValuationEngine.calculate_valuation` در `src/valuation/engine.py:215-219`) مقادیر مصرف‌شده را در فیلد `metadata` خروجی `ValuationResult` ثبت می‌کند:
+* `metadata["parameter_set_version"]`: کلید نسخه مانند `"STAGE7_V1/GENESIS"` یا `"TEST/V1"`.
+* `metadata["parameter_snapshot"]`: اسنپ‌شات کامل از ۳۸ پارامتر مصرف‌شده.
+* `metadata["parameter_selection"]`: مشخصات حالت انتخاب (`mode`, `point_in_time_selection_applied`, `as_of_requested`, `effective_from` و ...).
+* `metadata["parameter_consumption"]`: اسامی پارامترهای مصرف‌شده (`consumed_names`) و پارامترهای ثبت‌شده اما مصرف‌نشده (`recorded_not_consumed_names`).
 
 ---
 
-### ۵. طرح اعتبارسنجی قابل اجرا توسط کاربر (User-Run Validation Plan)
+### ۳. مدل داده‌های زمانی و ارزیابی Point-in-Time
 
-کاربر گرامی، جهت اعتبارسنجی پیشرفت‌ها و اطمینان از سلامت قراردادها، دستورات زیر را در محیط PowerShell اجرا فرمایید:
+در سنجش صحت زمانی پارامترها، سه مفهوم به تفکیک بررسی شدند:
 
-```powershell
-# ۱. اجرای تست‌های ارزش‌گذاری Stage 7
-python -m pytest src/tests/test_stage7_valuation.py -v
+1. **زمان اعتبار عملیاتی (Effective Time):** زمانی که پارامتر از نظر مالی و کسب‌وکار معتبر شناخته می‌شود (`effective_from`). در نسخه `GENESIS_VERSION` این فیلد برابر `None` است و بنابراین فاقد زمان اعتبار تاریخی است.
+2. **زمان ثبت / آگاهی سیستم (Recorded/Knowledge Time):** سیستم فاقد قابلیت Bitemporal است و فیلدی برای ثبت زمان دقیق درج یا آگاهی سیستم از پارامتر در دیتابیس/کد وجود ندارد.
+3. **نقطه قطع تحلیل (Analysis Cutoff / `data_cutoff_datetime`):** تاریخ پایانی که داده‌های شرکت و گزارش‌ها تا آن زمان مجاز به ورود هستند.
 
-# ۲. اجرای تست‌های تصمیم‌گیری Stage 9
-python -m pytest src/tests/test_stage9_decision.py -v
-
-# ۳. اجرای یکپارچه پنج مجموعه تست اصلی پروژه
-python -m pytest src/tests/test_stage3_scoring.py src/tests/test_stage5_forecast.py src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -q
-```
+**شکاف‌های شناسایی‌شده در صحت زمانی (PIT):**
+* تابع `select_parameter_set_for_valuation` تاریخ `parameter_as_of` را به‌صورت مجزا از ورودی دریافت می‌کند و آن را به طور خودکار از روی `data_cutoff_datetime` نگاشت نمی‌کند.
+* در حالت میراثی (`FIXED_GENESIS_LEGACY`)، حتی اگر `data_cutoff_datetime` متعلق به چند سال قبل (مثلاً ۲۰۲۰) باشد، سیستم ثابت‌های فعلی کد (سال ۲۰۲۶) را اعمال می‌کند که این امر نقض صریح اصل Point-in-Time است.
+* در حالت انتخابی (`AS_OF_EFFECTIVE_DATED`)، به دلیل عدم وجود تاریخ اعتبار برای Genesis، امکان ارزش‌گذاری تاریخی وجود ندارد و سیستم با `LookupError` متوقف می‌شود.
 
 ---
 
-### ۶. فایل‌های بررسی‌شده و دلایل دسترسی (Files Inspected)
+### ۴. ارزیابی پوشش تست‌ها (Test Coverage Assessment)
 
-بر اساس دستورالعمل P62، دقیقاً فایل‌های مجاز و حداقل بررسی شدند:
-1. `PROMPT.md` / `prompt.md`: بررسی دستورالعمل P62 و الزامات P54.
-2. `stepsForStage7.md`: بررسی برنامه اجرایی، یافته‌های ممیزی P48 و سیاست‌های D1–D9.
-3. `reply.md` / `temp_report2.md`: بررسی نتایج ممیزی P61 در خصوص آستانه‌های پراکندگی سناریوها.
-4. `zErrors.md`: بررسی جزئیات خطای pytest و لئک‌آپ پارامترها (`LookupError` در P54).
-5. `07_Stage7_Valuation.md`: بررسی مشخصات قفل‌شده Stage 7.
-6. `src/scoring/engine.py`: بررسی متد `calculate_score` و ورودی‌های Stage 3.
-7. `src/forecast/service.py`, `src/forecast/schema.py`, `src/forecast/repo.py`: بررسی مسیر تولید و بازیابی پیش‌بینی Stage 5.
-8. `src/valuation/service.py`, `src/valuation/schema.py`: بررسی مرز سرویس ارزش‌گذاری جلالی Stage 7.
-9. `src/market/engine.py`, `src/market/schema.py`: بررسی متد `analyze_market` و قرارداد Stage 8.
-10. `src/decision/service.py`, `src/decision/schema.py`: بررسی متد `calculate_decision_as_of_jalali` و ساختار Stage 9.
-11. `src/core/database.py`: بررسی الگوی مدیریت جلسه SQLAlchemy (`SessionLocal`).
+تست‌های مربوط به نسخه پارامترها در فایل `src/tests/test_stage7_valuation.py` بررسی شدند:
+
+* **تست‌های اثبات‌شده در کد:**
+  1. `test_p33_genesis_snapshot_matches_live_constants` (خط ۱۷۳۰ به بعد): اثبات می‌کند که اسنپ‌شات Genesis دقیقاً شامل ۳۸ پارامتر و مطابق با ثابت‌های جاری کد بوده و `effective_from is None` است.
+  2. `test_p33_resolve_exact_key_and_missing_raises`: اثبات می‌کند جستجوی کلید دقیق کار می‌کند و کلید ناموجود خطای `KeyError` می‌دهد.
+  3. `test_p33_as_of_without_dated_records_raises`: اثبات می‌کند که فراخوانی `resolve_parameter_set_as_of` روی `DEFAULT_REGISTRY` خطای `LookupError` صادر می‌کند.
+  4. `test_p33_as_of_selection_mechanics`: مکانیسم انتخاب بر اساس تاریخ را با استفاده از یک ثبت‌کننده ساختگی (`_p33_synthetic_registry`) شامل نسخه‌های `TEST/V1` و `TEST/V2` تست می‌کند.
+  5. `test_p33_as_of_overlap_raises_ambiguity`: اثبات می‌کند تاریخ‌های اعتبار هم‌زمان منجر به خطای عدم قطعیت (`Ambiguous`) می‌شوند.
+  6. `test_p35_legacy_path_provenance_is_truthful_and_unchanged`: صحت متادیتای حالت میراثی و شفافیت عدم تایید PIT را اثبات می‌کند.
+  7. `test_p35_as_of_selection_governs_calculation_and_snapshot_matches`: اثبات می‌کند که در صورت تعریف ثبت‌کننده دارای تاریخ، تغییر پارامترها بر روی محاسبات و خروجی وضعیت ارزش‌گذاری اثر مستقیم می‌گذارد.
+  8. `test_p35_missing_or_ambiguous_as_of_selection_fails_closed`: رفتار Fail-Closed را در حالت عدم وجود نسخه معتبر تأیید می‌کند.
+
+* **تست‌های مفقود (Missing Coverage):**
+  * هیچ تستی برای بازیابی پارامترهای تاریخی از پایگاه‌داده وجود ندارد (زیرا لایه ماندگاری برای پارامترها پیاده‌سازی نشده است).
+  * هیچ تستی برای پیوند خودکار بین `data_cutoff_datetime` و `parameter_as_of` در لایه سرویس وجود ندارد.
 
 ---
 
-### ۷. تأییدیه صریح عدم تغییر کد و عدم اجرای تست‌ها/CI (Explicit Statement)
+### ۵. مقایسه گزینه‌های اصلاحی (Remediation Options Comparison)
 
-**بدین‌وسیله صریحاً تأیید می‌شود که در طول انجام این گزارش تحلیلی (P62):**
-1. هیچ‌گونه تغییری در کدهای سورس برنامه، فایل‌های تست، مشخصات معمارانه یا فایل‌های برنامه‌ریزی پروژه ایجاد نشده است.
-2. هیچ دستور تستی (pytest)، ابزار CI یا دستور اجرایی کد توسط سیستم/Agent اجرا نگردیده است.
-3. گزارش فوق تماماً تحلیلی و مستند بر شواهد موجود در منابع پروژه می‌باشد.
+| گزینه | پیش‌نیازها | ریسک‌های مالی و PIT | پیامدهای سازگاری | متادیتای ممیزی موردنیاز | حکم ممیزی |
+|---|---|---|---|---|---|
+| **۱. افزودن تاریخ به رکورد موجود Genesis** | اختصاص یک تاریخ فرضی (مثلاً ۲۰۲۰-۰۱-۰۱) به Genesis | **بسیار بالا:** انتساب فرضی تاریخ اعتبار به ثابت‌های جاری بدون مصوبه رسمی، ادعای کاذب PIT ایجاد می‌کند. | باعث سبز شدن ظاهر تست‌های تاریخ‌دار می‌شود. | ثبت تاریخ فرضی در `effective_from` | **رد می‌شود** (با سیاست عدم حدس حقایق تاریخی منافات دارد). |
+| **۲. تکمیل نسخه‌بندی تاریخ‌دار صریح با رکورد R8** | تصویب رسمی پارامترهای پایه سال ۲۰۲۶ توسط مالک سیستم با تاریخ `2026-01-01` | **پایین:** صحت مالی حفظ شده و تاریخ اعتبار مشخصات رسماً ثبت می‌شود. | کاملاً با مکانیسم موجود `ParameterRegistry` سازگار است. | `effective_from: "2026-01-01T00:00:00Z"` | **توصیه می‌شود** (مسیر استاندارد مهندسی). |
+| **۳. توقف صریح (Fail Closed) برای تحلیل تاریخی** | حفظ رفتار فعلی در عدم انتخاب پارامتر تاریخی تا زمان ارائه ثبت‌کننده معتبر | **صفر:** از محاسبات گمراه‌کننده تاریخی با پارامترهای نامعتبر جلوگیری می‌کند. | در صورت ارسال `parameter_as_of` بدون دیتابیس/ثبت‌کننده تاریخ‌دار، خطای `LookupError` می‌دهد. | ثبت علل توقف در متادیتای خطا | **توصیه می‌شود** (حالت امن فعلی). |
+| **۴. الزامی کردن پاس دادن ثبت‌کننده یا پذیرش صریح حالت میراثی** | فراخواننده باید یا ثبت‌کننده تاریخ‌دار بدهد یا حالت `FIXED_GENESIS_LEGACY` را بپذیرد | **پایین:** شفافیت کامل برای فراخواننده ایجاد می‌کند. | نیاز به تنظیم شفاف ورودی‌های سرویس دارد. | `point_in_time_selection_applied: False` | **پایین‌ترین ریسک عملیاتی**. |
 
-💡 *آیا تمایل دارید پس از بررسی این گزارش تحلیلی، درباره پیاده‌سازی سرویس استخراج داده‌های بازار برای Stage 8 یا تعریف رکوردهای تاریخ‌دار پارامترها (P54) تصمیم‌گیری کنیم؟*
+---
+
+### ۶. اقدام بعدی پیشنهادی (Recommended Next Action)
+
+**کوچک‌ترین اقدام امن:**
+ثبت حداقل یک نسخه پارامتر تاریخ‌دار معتبر و رسمی برای سال ۲۰۲۶ (مثلاً `version_key = "STAGE7_V1/INITIAL_2026"` با `effective_from = datetime(2026, 1, 1, tzinfo=timezone.utc)`) در `DEFAULT_REGISTRY` پس از تایید مالک سیستم/مشخصات.
+
+* **پیش‌نیازها:** تایید رسمی که مقادیر ثابت فعلی کد، از تاریخ اول ژانویه ۲۰۲۶ معتبر و قابل اتکا هستند.
+* **غیر‌اهداف (Non-goals):**
+  * عدم حدس زدن تاریخ‌های اعتبار برای قبل از سال ۲۰۲۶.
+  * عدم بازطراحی فایل `src/valuation/engine.py`.
+  * عدم ایجاد اسکیما یا جداول غیرضروری پایگاه‌داده برای پارامترها در این مرحله.
+
+---
+
+### ۷. معیارهای پذیرش (Acceptance Criteria)
+
+تکلیف P54 تنها زمانی حل‌شده تلقی می‌شود که شرایط عینی زیر برقرار باشد:
+1. ثبت‌کننده پیش‌فرض (`DEFAULT_REGISTRY`) حداقل شامل یک نسخه پارامتر با `effective_from` معتبر و غیر `None` باشد.
+2. فراخوانی `resolve_parameter_set_as_of(datetime(2026, 1, 1, tzinfo=timezone.utc))` بدون صدور `LookupError` نسخه معتبر را بازگرداند.
+3. در صورت فراخوانی سرویس ارزش‌گذاری با `parameter_as_of` معتبر، متادیتای خروجی شامل `mode: "AS_OF_EFFECTIVE_DATED"` و `point_in_time_selection_applied: True` باشد.
+4. تمام ۷۵ تست موجود در `src/tests/test_stage7_valuation.py` بدون خطا پاس شوند.
+
+---
+
+### ۸. اثر بر یکپارچه‌سازی Stage 7 (Stage 7 Integration Impact)
+
+* **موارد مسدودشده:**
+  * سرویس `calculate_valuation_as_of_jalali` در `src/valuation/service.py` به `ValuationEngine` متصل است. اگر فراخواننده قصد داشته باشد نسخه پارامترها را بر اساس تاریخ جلالی/تاریخ قطع انتخاب کند و `parameter_as_of` را ارسال نماید، به دلیل نبود رکورد تاریخ‌دار R8 با `LookupError` متوقف می‌شود.
+  * در صورتی که `parameter_as_of` ارسال نشود، ارزش‌گذاری انجام می‌شود اما متادیتای خروجی صریحاً اعلام می‌کند که انتخاب Point-in-Time بر روی پارامترها اعمال نشده است (`FIXED_GENESIS_LEGACY`).
+
+* **آنچه این ممیزی اثبات نمی‌کند:**
+  * این ممیزی هیچ‌گونه کدی برای استخراج داده‌های Stage 3 یا Stage 8 پیاده‌سازی نمی‌کند.
+  * هیچ مدلی برای ذخیره‌سازی خروجی نهایی تصمیم در Stage 9 ایجاد نمی‌کند.
+
+---
+
+### ۹. فایل‌های بررسی‌شده (Files Inspected)
+
+۱. `stepsForStage7.md` (برنامه اجرایی و یافته‌های P48)  
+۲. `reply.md` / `temp_report.md` (گزارش‌های ممیزی P62 و خطوط لوله)  
+۳. `src/valuation/parameters.py` (تعریف پارامترها، ثبت‌کننده و توابع انتخاب)  
+۴. `src/valuation/engine.py` (نحوه فراخوانی و مصرف پارامترها در `calculate_valuation`)  
+۵. `src/valuation/service.py` (مرز سرویس ارزش‌گذاری جلالی)  
+۶. `src/valuation/schema.py` (ساختار داده‌ای `ValuationResult`)  
+۷. `src/valuation/models.py` (مدل‌های محاسباتی ارزش‌گذاری)  
+۸. `src/tests/test_stage7_valuation.py` (تست‌های مربوط به P33 و P35 در خصوص نسخه‌بندی پارامترها)  
+۹. `07_Stage7_Valuation.md` (بخش ۶۵ — مشخصات قفل‌شده نسخه‌بندی پارامترها)  
+۱۰. `zErrors.md` (جزئیات تریس‌بک خطای `LookupError`)  
+
+---
+
+### ۱۰. تأییدیه صریح عدم تغییر کد و عدم اجرای تست‌ها (Execution Confirmation)
+
+**بدین‌وسیله صریحاً تأیید می‌شود که:**
+1. هیچ‌یک از فایل‌های سورس برنامه، تست‌ها، تنظیمات، مشخصات یا اسناد برنامه‌ریزی پروژه ویرایش یا تغییر داده نشده‌اند.
+2. هیچ دستور تستی (pytest)، کد برنامه‌نویسی، تغییر دیتابیس، مایگریشن یا فرایند CI توسط سیستم/Agent اجرا نگردیده است.
+3. این گزارش تماماً خروجی تحلیل و ممیزی کدهای موجود پروژه بر اساس قوانین P63 می‌باشد.
+
+---
+💡 *آیا پس از بررسی این گزارش ممیزی، تمایل دارید درباره ثبت اولین نسخه تاریخ‌دار پارامتر برای سال ۲۰۲۶ (جهت رفع محدودیت P54) یا پرداختن به سایر پیش‌نیازهای یکپارچه‌سازی تصمیم‌گیری کنیم؟*
