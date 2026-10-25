@@ -1,55 +1,46 @@
-# P59 — Add Focused Stage 9 Dispersion Regression Tests
+# P60 — Fix Stage 9 Dispersion Test Discovery
 
-## Task Type
-CODE CHANGE — test file only.
-
-## Repository
-Local working folder: `analyzer`
-
-## Exact File Scope
-The only file permitted to change is:
-- `src/tests/test_stage9_decision.py`
-
-Do not modify or create any other file.
+**Task type: CODE CHANGE — tests only**
 
 ## Objective
-Add focused regression tests for the existing Stage 9 behavior that consumes `valuation_result.metadata["scenario_dispersion"]`.
 
-Inspect `src/decision/engine.py` and the existing test file before editing. Do not assume the existing test helper provides coverage by itself.
+Correct the four P59 regression tests so that pytest discovers them as independent test functions. The current definitions are indented inside `test_dashboard_contract_carries_required_fields`, so they are not independently collected.
 
-## Required Test Coverage
-Add tests that verify:
+## Allowed file
 
-1. A numeric `scenario_dispersion` greater than `0.50` adds `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` to the conflicts.
-2. A value exactly equal to `0.50` does not trigger that conflict.
-3. A value below `0.50` does not trigger that conflict.
-4. The conflict directly causes the existing 10-point decision-confidence deduction, using a controlled comparison that holds all other inputs constant.
-5. The conflict blocks `STRONG_BUY` under otherwise qualifying conditions.
-6. Where practical, test the distinction between the conflict's own confidence penalty and the independent penalty for `valuation_risk_level` being `HIGH` or `EXTREME`.
+- `src/tests/test_stage9_decision.py` — the only file permitted to change.
+- Create no files.
 
-Use existing fixtures/helpers and established test conventions where possible. Keep tests deterministic. Do not fabricate financial records or weaken existing assertions.
+## Required changes
 
-## Financial Policy Boundary
-These tests document the current Stage 9 implementation behavior only. They do NOT ratify `0.50` as a financially approved threshold and do NOT establish that Stage 9 must dynamically share Stage 7's configurable threshold.
+1. Move these four test functions to the module's top level, using the same indentation as the other top-level test functions:
+   - `test_scenario_dispersion_threshold_boundaries`
+   - `test_scenario_dispersion_causes_ten_point_confidence_deduction`
+   - `test_scenario_dispersion_blocks_strong_buy`
+   - `test_scenario_dispersion_penalty_distinct_from_valuation_risk_level_high`
 
-Do not change any threshold, production logic, recommendation rule, or specification. Do not unify the Stage 7 and Stage 9 threshold paths.
+2. Preserve the existing assertions and test intent. Do not weaken or remove assertions to make the tests pass.
 
-If a requested assertion cannot be isolated reliably with the current test helpers, do not force it or alter production code. Explain the limitation in the report.
+3. Confirm by static inspection that all four functions are defined at module scope and are not nested inside another function.
+
+4. Do not modify production code, threshold values, recommendation rules, financial formulas, specifications, or unrelated tests.
 
 ## Restrictions
-- Do not run tests or CI; the user will run them.
-- Do not use GitHub, GitHub CLI/API, remotes, commits, pushes, pulls, or branch operations.
-- Do not inspect the repository broadly.
-- Do not edit `reply.md`, `stepsForStage7.md`, `temp_report.md`, `temp_report2.md`, `stage_7_prompts.md`, or anything under `ClaudeReports/`.
-- Do not redesign `engine.py`.
 
-## Required Report
+- Do not run tests or CI. The user will run the tests locally.
+- Do not use GitHub, GitHub CLI/API, remotes, commits, pushes, pulls, or branch changes.
+- Do not perform repository-wide exploration.
+- Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `stepsForStage7.md`, `stage_7_prompts.md`, or anything in `ClaudeReports/`.
+- Do not claim the tests pass or have been executed.
+
+## Required response
+
 Report:
-1. Exact test functions added and the behavior each verifies.
-2. The exact file changed.
-3. Any requested assertion not added and why.
-4. The focused pytest command for the user to run:
-   `pytest src/tests/test_stage9_decision.py -q`
-5. Explicitly state that tests were not run and no production code or thresholds were changed.
+- The exact file changed.
+- Confirmation that all four functions are now at module scope.
+- Confirmation that no production code or threshold values changed.
+- The exact command the user should run:
 
-Stage 7 remains OPEN.
+`.venv\Scripts\python.exe -m pytest src/tests/test_stage9_decision.py -q`
+
+Do not report a test result. Stop after the correction and static inspection.
