@@ -1,253 +1,104 @@
-# Report P61 :
-گزارش تحلیل و ممیزی یکپارچگی آستانهٔ پراکندگی سناریوها (**P61 — Stage 7 / Stage 9 Scenario-Dispersion Threshold Consistency Audit**) بر اساس منابع، مشخصات معماری و کد موجود به شرح زیر ارائه می‌شود:
+### ۱. جمع‌بندی اجرایی (Executive Conclusion)
+
+گزارش حاضر، خروجی تحلیلی اجرای پرامپت **P62 — تعیین کمینه‌ترین قرارداد یکپارچه‌سازی تولید برای Stage 7** است. بر اساس ممیزی P48 و تحلیل کد‌های موجود در پروژه `analyzer`، اتصال داخلی بین **Stage 5 ← Stage 7 ← Stage 9** از طریق مرز سرویس `src/decision/service.py::calculate_decision_as_of_jalali` به‌صورت ساختاری پیاده‌سازی شده و معتبر است. 
+
+با این حال، **مسیر سرتاسری اجرایی (End-to-End Execution Path) از Stage 3 تا Stage 9 از یک نقطه ورود واقعی (مانند CLI یا API) اثبات نشده و مفقود است**. مهم‌ترین شکاف‌های شناسایی‌شده عبارتند از:
+1. **Stage 8**: عدم وجود سرویس یا کوئری استخراج سری داده‌های روزانه بازار برای `MarketEngine.analyze_market` جهت تولید `MarketSignalResult`.
+2. **Stage 3**: عدم وجود فراخواننده اجرایی برای استخراج KPIها و فراخوانی `FundamentalScoringEngine.calculate_score` جهت تأمین `FundamentalScoreResult`.
+3. **Stage 9**: نبود مدل پایگاه‌داده و مخزن ذخیره‌سازی برای خروجی نهایی تصمیم (`FinalDecisionResult`).
+4. **Stage 7 (P54)**: خطای عدم امکان انتخاب پارامترهای تاریخ‌دار تاریخی (`LookupError`) به دلیل نبود رکوردهای R8 در `ParameterRegistry`.
 
 ---
 
-### ۱. طبقه‌بندی وظیفه و تأیید محدوده (Task Classification & Scope Confirmation)
+### ۲. ماتریس شواهد و قراردادهای یکپارچه‌سازی (Evidence and Contract Matrix)
 
-* **نوع وظیفه:** گزارش و تحلیل صرف (**REPORT-ONLY / ANALYSIS**) — بدون اعمال هرگونه تغییر در کد، مشخصات یا پارامترها.
-* **محدودهٔ فایل‌های بررسی‌شده:** 
-  1. `stepsForStage7.md`
-  2. `07_Stage7_Valuation.md`
-  3. `src/valuation/parameters.py`
-  4. `src/valuation/engine.py`
-  5. `src/decision/engine.py`
-  6. `src/tests/test_stage7_valuation.py`
-  7. `src/tests/test_stage9_decision.py`
-* **سوابق تاریخی:** یافته‌های ممیزی P56 تا P59 در `temp_report2.md`.
+| مرز (Boundary) | تابع / رابط موجود (Existing Function/Interface) | ورودی‌ها و ناورداهای شناسه (Required Inputs & Invariants) | خروجی (Output) | ماندگاری / بازیابی موجود (Persistence/Retrieval) | شواهد فراخواننده واقعی (Evidence of Real Caller) | قرارداد مفقود یا مانع (Missing Contract / Blocker) | طبقه‌بندی (Classification) |
+|---|---|---|---|---|---|---|---|
+| **Stage 3 ← downstream** | `FundamentalScoringEngine.calculate_score` در `src/scoring/engine.py:169` | `company_id: int`, `period_id: int`, `industry_code: str`, `kpi_results: List[KPIResult]`, `peer_values`, `historical_values` | `FundamentalScoreResult` | ندارد | تست‌های واحد در `test_stage3_scoring.py` | عدم وجود سرویس/فراخواننده برای گردآوری `KPIResult` از Stage 1 و ارسال به Stage 9 | **EXISTS BUT CALLER UNPROVEN** |
+| **Stage 5 Forecast production/retrieval** | `generate_and_persist_forecast` در `src/forecast/service.py:137`؛ `ForecastRecordRepository.read_at_cutoff` در `src/forecast/repo.py:112` | `session: Session`, `company_id: int`, `forecast_period_id: int`, `data_cutoff_datetime: datetime`, `trend_result: Optional[TrendResult]` | `CompanyForecastResult` | `ForecastVersion` و `ForecastInputRefModel` در SQLite via `ForecastRecordRepository` | تست‌های واحد در `test_stage5_forecast.py` | عدم فراخوانی در یک مسیر برنامه‌ای سرتاسری و عدم وجود تبدیل انباره تاریخچه‌ای به `CompanyForecastResult` برای اجراهای گذشته | **EXISTS BUT CALLER UNPROVEN** |
+| **Stage 7 Valuation** | `calculate_valuation_as_of_jalali` در `src/valuation/service.py:12` | `session: Session`, `company_id: int`, `period_id: int`, `forecast_result: CompanyForecastResult`, `as_of_jalali_date: JalaliDate`. **Invariants:** `forecast_result.company_id == company_id` و `period_id == period_id` | `ValuationResult` | خواندن قیمت بازار از `MarketDaily` via `select_market_price_as_of`. عدم وجود مدل ذخیره‌سازی برای `ValuationResult` | فراخوانی در `src/decision/service.py::calculate_decision_as_of_jalali` | عدم وجود ممیزی کامل Point-in-Time برای بنچمارک‌ها؛ خطای `LookupError` در انتخاب پارامترهای تاریخ‌دار تاریخی (P54) | **EXISTS AND CONNECTED** |
+| **Stage 8 Market Analysis** | `MarketEngine.analyze_market` در `src/market/engine.py:145` | `company_id: int`, `as_of_date: datetime`, `market_data: Sequence[Dict[str, Any]]`, `industry_benchmark`, `market_benchmark`, `point_in_time: bool` | `MarketSignalResult` | ندارد | تست‌های واحد در `test_stage8_market.py` | نبود کوئری/سرویس استخراج داده‌های روزانه OHLCV بازار برای ساخت `market_data` و اجرای Stage 8 | **EXISTS BUT CALLER UNPROVEN** |
+| **Stage 9 Decision** | `DecisionEngine.make_decision` در `src/decision/engine.py`؛ `calculate_decision_as_of_jalali` در `src/decision/service.py:12` | `session: Session`, `forecast_result: CompanyForecastResult`, `as_of_jalali_date: JalaliDate`, `fundamental_result: FundamentalScoreResult`, `market_result: MarketSignalResult`. **Invariants:** تطابق `company_id` و `period_id` در تمام ورودی‌ها | `ValuationDecisionResult` (شامل `ValuationResult` و `FinalDecisionResult`) | ندارد (مدل پایگاه‌داده/مخزن برای `FinalDecisionResult` وجود ندارد) | تست‌های یکپارچه‌سازی در `test_stage9_decision.py` | عدم وجود فراخواننده نهایی برنامه‌ای و نبود مقصدی برای ذخیره خروجی تصمیم | **EXISTS AND CONNECTED** |
+| **Shared Execution Context** | مالکیت Session در `src/core/database.py` (`SessionLocal`) | `data_cutoff_datetime` (UTC datetime), `as_of_jalali_date` (Jalali tuple), `calculation_timestamp` (UTC datetime) | Session instance / Datetimes | SQLite database `tehran_stock.db` | سرویس‌های Stage 5, Stage 7, Stage 9 | نبود مدیریت‌کننده متمرکز جلسه (Session Owner) در یک مسیر تولیدی برای مدیریت تراکنش و زمان‌بندی تاریخ‌ها | **EXISTS BUT CALLER UNPROVEN** |
 
 ---
 
-### ۲. بررسی پیاده‌سازی واقعی در کد (Actual Implementation Tracing)
+### ۳. شکاف‌های اثبات‌شده در برابر مجهولات (Confirmed Gaps vs Unknowns)
 
-#### **الف) آستانهٔ هشدار Stage 7 (Alert Threshold)**
-* **پارامتر کنترل‌کننده:** `ALERT_THRESHOLDS["high_scenario_dispersion"]` با مقدار پیش‌فرض `0.50` در فایل `src/valuation/parameters.py`.
-* **نحوهٔ مصرف:** در `src/valuation/engine.py` (متد `_alerts`، خط ۳۸۷):
-  ```python
-  if dispersion is not None and dispersion > alert_thresholds["high_scenario_dispersion"]:
-      alerts.append("WARNING:HIGH_SCENARIO_DISPERSION")
-  ```
-* **عملگر مقایسه:** نابرابری اکید (`>`).
+#### شکاف‌های اثبات‌شده (Confirmed Gaps):
+1. **نبود نقطه ورود اصلی برنامه (No Main Entry Point / CLI / API)**: هیچ فایل اجرایی در ریشه پروژه یا `src/` برای اجرای کامل زنجیره تحلیل از Stage 3 تا Stage 9 وجود ندارد.
+2. **عدم وجود سرویس استخراج داده‌های بازار برای Stage 8**: هیچ ماژولی داده‌های قیمت روزانه و حجم بازار را از `tehran_stock.db` استخراج نمی‌کند تا به‌عنوان `market_data` به `MarketEngine.analyze_market` تحویل دهد.
+3. **عدم وجود سرویس استخراج و گردآوری KPIها برای Stage 3**: هیچ مسیری `KPIResult`ها را از صورت‌های مالی استخراج نمی‌کند تا به `FundamentalScoringEngine` داده شود.
+4. **عدم ذخیره‌سازی تصمیم نهایی (No Persistence for FinalDecisionResult)**: هیچ جدول یا مدل SQLAlchemy برای ذخیره‌سازی `FinalDecisionResult` تعریف نشده است.
+5. **خطای انتخاب پارامترهای تاریخی ارزش‌گذاری (P54 - Parameter Versioning Gap)**: متد `resolve_parameter_set_as_of` در صورت دریافت تاریخ تاریخی، به دلیل نبود رکوردهای تاریخ‌دار R8 در `ParameterRegistry` خطای `LookupError` صادر می‌کند.
 
-#### **ب) آستانهٔ ریسک Stage 7 (Risk Threshold)**
-* **پارامتر کنترل‌کننده:** `RISK_THRESHOLDS["high_scenario_dispersion"]` با مقدار پیش‌فرض `0.50` در فایل `src/valuation/parameters.py`.
-* **نحوهٔ مصرف:** در `src/valuation/engine.py` (خط ۳۶۵ و متد `_valuation_risk` خط ۳۸۳):
-  ```python
-  if scenario_dispersion is not None and scenario_dispersion > params.risk_thresholds["high_scenario_dispersion"]:
-      flags.append("HIGH_SCENARIO_DISPERSION")
-  ```
-  و در صورت عبور، سطح ریسک ارزش‌گذاری (`valuation_risk_level`) به `"HIGH"` ارتقاء می‌یابد.
-* **عملگر مقایسه:** نابرابری اکید (`>`).
-
-#### **ج) آستانهٔ تصمیم‌گیری Stage 9**
-* **پارامتر کنترل‌کننده:** مقدار هاردکدشدهٔ `0.50` در فایل `src/decision/engine.py` (خط ۲۱۲):
-  ```python
-  if isinstance(scenario_dispersion, (int, float)) and scenario_dispersion > 0.50:
-      conflicts.append("HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK")
-  ```
-* **نوع آستانه:** هاردکدشده (بدون خواندن پارامترهای Stage 7).
-* **عملگر مقایسه:** نابرابری اکید (`>`).
-
-#### **د) رفتار در نقاط مرزی (Boundaries Behavior)**
-* **کمتر از 0.50 (مثلاً 0.45):** هیچ هشدار، پرچم ریسک یا تعارضی صادر نمی‌شود.
-* **دقیقاً برابر 0.50:** به دلیل استفاده از عملگر اکید (`>`) در هر سه موقعیت، شرط `0.50 > 0.50` برقرار نبوده و هیچ هشدار، پرچم ریسک یا تعارضی صادر نمی‌شود.
-* **بزرگتر از 0.50 (مثلاً 0.55):** هشدار `WARNING:HIGH_SCENARIO_DISPERSION` صادرشده، پرچم `HIGH_SCENARIO_DISPERSION` ثبت شده، سطح ریسک به `"HIGH"` تغییر کرده و تعارض `"HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK"` در Stage 9 شکل می‌گیرد.
-
-#### **هـ) تأثیر تعارض Stage 9 بر خروجی نهایی**
-* **اطمینان تصمیم (`decision_confidence`):** کسر مستقیم ۱۰ واحد از امتیاز اطمینان (`confidence -= 10.0`).
-* **پیشنهاد نهایی (`recommendation`):** صریحاً صدور پیشنهاد `"STRONG_BUY"` را مسدود می‌کند (حتی اگر تمامی شواهد بنیادی و بازار عالی باشند).
+#### مجهولات (Unknowns):
+1. **سیاست کسب‌وکار برای ذخیره‌سازی تصمیم**: آیا خروجی Stage 9 باید در پایگاه‌داده ذخیره شود یا فقط به‌صورت یک گزارش موقت (Ephemeral) در حافظه/API بازگردانده شود؟
+2. **نحوه تعیین `as_of_jalali_date` و `data_cutoff_datetime` در یک اجرای واقعی**: آیا کاربر این دو تاریخ را به‌صورت ورودی دستی CLI/API وارد می‌کند یا سیستم آن‌ها را از آخرین تاریخ گزارش/بازار استخراج می‌کند؟
 
 ---
 
-### ۳. یافته‌های قرارداد مشخصات (Specification Contract Findings)
+### ۴. کمینه‌ترین تکلیف اجرایی پیشنهادی (Minimal Recommended Implementation Task)
 
-1. **الزام به آستانهٔ مشترک پویا:** در سند مشخصات (`07_Stage7_Valuation.md` §1، §40، §48)، **هیچ حکمی وجود ندارد** که Stage 9 را موظف کند حتماً آستانهٔ خود را به‌صورت پویا از رجیستری/تنظیمات Stage 7 دریافت کند. Stage 7 یک موتور ارزش‌گذاری است و Stage 9 یک موتور تصمیم‌گیری مستقل.
-2. **استقلال آستانه‌های Stage 7:** در فایل `parameters.py` آستانهٔ هشدار (`ALERT_THRESHOLDS`) و آستانهٔ ریسک (`RISK_THRESHOLDS`) دو ساختار کاملاً مجزا هستند. اگرچه مقادیر پیش‌فرض اولیه هر دو `0.50` تنظیم شده است، اما کد آن‌ها را به‌عنوان دو پارامتر مستقل ارزیابی می‌کند.
-3. **ماهیت پارامترها:** طبق سند `07_Stage7_Valuation.md` (§22، §39)، مقادیر `0.50` «پارامترهای نسخهٔ مدل» (Model Version Parameters) هستند و نه «ثوابت غیرقابل تغییر معماری» (Architecture Constants).
-
----
-
-### ۴. جدول سناریوهای آستانه‌های مستقل (Independent-Threshold Scenario Table)
-
-جدول زیر رفتار عملیاتی سیستم را در صورت تغییر مستقل هر یک از آستانه‌ها (با فرض پراکندگی واقعی داده‌ها) نشان می‌دهد:
-
-| سناریو | آستانه هشدار Stage 7 | آستانه ریسک Stage 7 | آستانه Stage 9 | مقدار پراکندگی واقعی | هشدار Stage 7 | پرچم و سطح ریسک Stage 7 | تعارض Stage 9 (`HIGH_BEAR_RISK`) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **۱. تغییر آستانه هشدار** | **`0.60`** | `0.50` | `0.50` | **`0.55`** | صادر **نمی‌شود** (`0.55 <= 0.60`) | پرچم دارد؛ ریسک **`HIGH`** | صادر **می‌شود** (`0.55 > 0.50`) |
-| **۲. تغییر آستانه ریسک** | `0.50` | **`0.60`** | `0.50` | **`0.55`** | **`WARNING:HIGH_SCENARIO_DISPERSION`** | پرچم ندارد؛ ریسک عادی | صادر **می‌شود** (`0.55 > 0.50`) |
-| **۳. تغییر هر دو آستانه S7** | **`0.40`** | **`0.40`** | `0.50` | **`0.45`** | **`WARNING:HIGH_SCENARIO_DISPERSION`** | پرچم دارد؛ ریسک **`HIGH`** | صادر **نمی‌شود** (`0.45 <= 0.50`) |
-| **۴. پراکندگی روی مرز** | `0.50` | `0.50` | `0.50` | **`0.50`** | صادر **نمی‌شود** (`0.50 > 0.50` False) | پرچم ندارد؛ ریسک عادی | صادر **نمی‌شود** |
-
----
-
-### ۵. یافته‌های پوشش تست P59 (P59 Test Coverage Findings)
-
-* **شواهد ارائه‌شده توسط کاربر:** اجرای دستور `pytest src/tests/test_stage9_decision.py -q` منجر به **`19 passed in 0.74s`** شده است.
-* **تحلیل تست‌های P59:** چهار تست اضافه شده در P59 شامل:
-  1. `test_scenario_dispersion_threshold_boundaries`
-  2. `test_scenario_dispersion_causes_ten_point_confidence_deduction`
-  3. `test_scenario_dispersion_blocks_strong_buy`
-  4. `test_scenario_dispersion_penalty_distinct_from_valuation_risk_level_high`
-* **دامنه اثبات تست‌ها:** این تست‌ها رفتار فعلی Stage 9 (تولید تعارض در صورت `scenario_dispersion > 0.50` در متاداده) را صریحاً تثبیت (Pin) می‌کنند.
-* **عدم اثبات یکسان‌سازی بین‌مرحله‌ای:** این تست‌ها ثبات رفتار فعلی Stage 9 را اثبات می‌کنند، اما **هیچ مدرکی مبنی بر لزوم اتصال پویای آستانه Stage 9 به پارامترهای قابل‌پیکربندی Stage 7 ارائه نمی‌دهند**.
+* **نام مسئولیت و رابط/فایل هدف**: ایجاد یک سرویس استخراج داده‌های بازار برای Stage 8 (مانند `src/market/service.py::analyze_market_as_of_jalali`) و یک سرویس/کلاس هماهنگ‌کننده اجرایی کمینه (Application Boundary/Caller) که ورودی‌های لازم را گردآوری کرده و به `src/decision/service.py::calculate_decision_as_of_jalali` پاس دهد.
+* **علت اولویت نخست بودن**: سرویس `src/decision/service.py::calculate_decision_as_of_jalali` هم‌اکنون اتصال Stage 5، Stage 7 و Stage 9 را به‌طور کامل و سالم مدیریت می‌کند. تنها مانع اجرایی شدن آن، تأمین ورودی‌های `MarketSignalResult` (از Stage 8) و `FundamentalScoreResult` (از Stage 3) است.
+* **پیش‌نیازها و تصمیمات حل‌نشده**:
+  * رفع محدودیت P54 با افزودن حداقل یک رکورد پارامتر تاریخ‌دار معتبر به `ParameterRegistry` جهت جلوگیری از `LookupError` در تحلیل‌های تاریخی.
+  * تصمیم‌گیری درباره نحوه ذخیره‌سازی خروجی Stage 9 (در صورت نیاز به ذخیره‌سازی).
+* **قراردادهای موجود که باید بدون تغییر باقی بمانند**:
+  * `src/valuation/engine.py` (طبق محدودیت‌های P62 و P48 نباید بازطراحی شود).
+  * امضا و ناورداهای شناسه در `src/decision/service.py::calculate_decision_as_of_jalali`.
+  * فرمول‌های مالی، آستانه‌های P/E و منطق ریسک/اعتماد.
+* **شواهد اثبات‌کننده تکمیل**:
+  * اجرای یک اسکریپت آزمایشی غیرتولیدی که برای یک شناسه شرکت و تاریخ جلالی واقعی، تمام ورودی‌ها را فراخوانی کرده و خروجی `ValuationDecisionResult` معتبر و کامل تولید کند.
+* **تست‌هایی که کاربر باید بعداً اجرا کند (بدون اجرای توسط Agent)**:
+  * `python -m pytest src/tests/test_stage7_valuation.py`
+  * `python -m pytest src/tests/test_stage9_decision.py`
+  * `python -m pytest src/tests/test_stage5_forecast.py`
+  * `python -m pytest src/tests/test_stage3_scoring.py`
+  * `python -m pytest src/tests/test_stage8_market.py`
 
 ---
 
-### ۶. توصیه‌مندی محدود (Bounded Recommendation)
+### ۵. طرح اعتبارسنجی قابل اجرا توسط کاربر (User-Run Validation Plan)
 
-بر اساس شواهد کدی و مستندات، **گزینهٔ C** انتخاب می‌شود:
+کاربر گرامی، جهت اعتبارسنجی پیشرفت‌ها و اطمینان از سلامت قراردادها، دستورات زیر را در محیط PowerShell اجرا فرمایید:
 
-> **C. قرارداد فعلی برای تصمیم‌گیری کافی نیست؛ رفتار فعلی بدون تغییر حفظ شده و نیازمندی‌های دقیق تصمیم سیاست‌گذاری مالی یا مشخصات معماری برای یکسان‌سازی مشخص گردد.**
+```powershell
+# ۱. اجرای تست‌های ارزش‌گذاری Stage 7
+python -m pytest src/tests/test_stage7_valuation.py -v
 
-**توجیه:**
-1. در هیچ‌یک از اسناد رسمی لزوم اتصال پویای آستانهٔ Stage 9 به پارامترهای Stage 7 تصریح نشده است.
-2. مقادیر پیش‌فرض موجود در هر سه موقعیت کد برابر `0.50` هستند و در حال حاضر هیچ واگرایی رفتاری در تولید ایجاد نمی‌کنند.
-3. تغییر کد Stage 9 یا Stage 7 بدون وجود سند تصمیم‌گیری مالی/محصولی (R-level decision)، ایجاد یک فرض ساختگی جدید تلقی می‌شود که طبق قواعد مهندسی پروژه ممنوع است.
+# ۲. اجرای تست‌های تصمیم‌گیری Stage 9
+python -m pytest src/tests/test_stage9_decision.py -v
 
----
-
-### ۷. اقدام بعدی دقیق (Exact Next Action)
-
-* **هیچ تغییر کدی در تولید یا تست‌ها نباید انجام شود.**
-* در صورت نیاز به یکسان‌سازی در آینده، مالک محصول/تیم مالی باید طی یک تصمیم رسمی مشخص کند:
-  1. آیا Stage 9 باید آستانه پراکندگی را از متاداده یا پارامتر Stage 7 به صورت پویا بخواند؟
-  2. آیا آستانه هشدار و آستانه ریسک در Stage 7 باید همیشه مقدار یکسانی داشته باشند یا مستقل بمانند؟
+# ۳. اجرای یکپارچه پنج مجموعه تست اصلی پروژه
+python -m pytest src/tests/test_stage3_scoring.py src/tests/test_stage5_forecast.py src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -q
+```
 
 ---
 
-### ۸. بیانیه صریح ممیزی (Audit Declaration)
+### ۶. فایل‌های بررسی‌شده و دلایل دسترسی (Files Inspected)
 
-* **هیچ فایلی تغییر داده نشد یا ایجاد نگردید (No files were changed).**
-* **هیچ تستی توسط دستیار اجرا نشد (No tests were run).**
-* **وضعیت Stage 7 همچنان باز (OPEN) باقی مانده است.**
-
----
-
-💡 *در صورت تمایل، می‌توانید درخواست کنید که ممیزی سایر بخش‌های Stage 7 یا بررسی مستندات نهایی انجام شود.*
-
-# Report P61-R 
-گزارش تحلیل و ممیزی یکپارچگی آستانهٔ پراکندگی سناریوها (**P61 — Stage 7 / Stage 9 Scenario-Dispersion Threshold Consistency Audit**) بر اساس منابع، مشخصات معماری و کد موجود به شرح زیر ارائه می‌شود:
-
----
-
-### ۱. طبقه‌بندی وظیفه و تأیید محدوده (Task Classification & Scope Confirmation)
-
-* **نوع وظیفه:** گزارش و تحلیل صرف (**REPORT-ONLY / ANALYSIS**) — بدون اعمال هرگونه تغییر در کد، مشخصات یا پارامترها.
-* **محدودهٔ فایل‌های بررسی‌شده:** 
-  1. `stepsForStage7.md`
-  2. `07_Stage7_Valuation.md`
-  3. `src/valuation/parameters.py`
-  4. `src/valuation/engine.py`
-  5. `src/decision/engine.py`
-  6. `src/tests/test_stage7_valuation.py`
-  7. `src/tests/test_stage9_decision.py`
-* **سوابق تاریخی:** یافته‌های ممیزی P56 تا P59 در `temp_report2.md`.
+بر اساس دستورالعمل P62، دقیقاً فایل‌های مجاز و حداقل بررسی شدند:
+1. `PROMPT.md` / `prompt.md`: بررسی دستورالعمل P62 و الزامات P54.
+2. `stepsForStage7.md`: بررسی برنامه اجرایی، یافته‌های ممیزی P48 و سیاست‌های D1–D9.
+3. `reply.md` / `temp_report2.md`: بررسی نتایج ممیزی P61 در خصوص آستانه‌های پراکندگی سناریوها.
+4. `zErrors.md`: بررسی جزئیات خطای pytest و لئک‌آپ پارامترها (`LookupError` در P54).
+5. `07_Stage7_Valuation.md`: بررسی مشخصات قفل‌شده Stage 7.
+6. `src/scoring/engine.py`: بررسی متد `calculate_score` و ورودی‌های Stage 3.
+7. `src/forecast/service.py`, `src/forecast/schema.py`, `src/forecast/repo.py`: بررسی مسیر تولید و بازیابی پیش‌بینی Stage 5.
+8. `src/valuation/service.py`, `src/valuation/schema.py`: بررسی مرز سرویس ارزش‌گذاری جلالی Stage 7.
+9. `src/market/engine.py`, `src/market/schema.py`: بررسی متد `analyze_market` و قرارداد Stage 8.
+10. `src/decision/service.py`, `src/decision/schema.py`: بررسی متد `calculate_decision_as_of_jalali` و ساختار Stage 9.
+11. `src/core/database.py`: بررسی الگوی مدیریت جلسه SQLAlchemy (`SessionLocal`).
 
 ---
 
-### ۲. بررسی پیاده‌سازی واقعی در کد (Actual Implementation Tracing)
+### ۷. تأییدیه صریح عدم تغییر کد و عدم اجرای تست‌ها/CI (Explicit Statement)
 
-#### **الف) آستانهٔ هشدار Stage 7 (Alert Threshold)**
-* **پارامتر کنترل‌کننده:** `ALERT_THRESHOLDS["high_scenario_dispersion"]` با مقدار پیش‌فرض `0.50` در فایل `src/valuation/parameters.py`.
-* **نحوهٔ مصرف:** در `src/valuation/engine.py` (متد `_alerts`، خط ۳۸۷):
-  ```python
-  if dispersion is not None and dispersion > alert_thresholds["high_scenario_dispersion"]:
-      alerts.append("WARNING:HIGH_SCENARIO_DISPERSION")
-  ```
-* **عملگر مقایسه:** نابرابری اکید (`>`).
+**بدین‌وسیله صریحاً تأیید می‌شود که در طول انجام این گزارش تحلیلی (P62):**
+1. هیچ‌گونه تغییری در کدهای سورس برنامه، فایل‌های تست، مشخصات معمارانه یا فایل‌های برنامه‌ریزی پروژه ایجاد نشده است.
+2. هیچ دستور تستی (pytest)، ابزار CI یا دستور اجرایی کد توسط سیستم/Agent اجرا نگردیده است.
+3. گزارش فوق تماماً تحلیلی و مستند بر شواهد موجود در منابع پروژه می‌باشد.
 
-#### **ب) آستانهٔ ریسک Stage 7 (Risk Threshold)**
-* **پارامتر کنترل‌کننده:** `RISK_THRESHOLDS["high_scenario_dispersion"]` با مقدار پیش‌فرض `0.50` در فایل `src/valuation/parameters.py`.
-* **نحوهٔ مصرف:** در `src/valuation/engine.py` (خط ۳۶۵ و متد `_valuation_risk` خط ۳۸۳):
-  ```python
-  if scenario_dispersion is not None and scenario_dispersion > params.risk_thresholds["high_scenario_dispersion"]:
-      flags.append("HIGH_SCENARIO_DISPERSION")
-  ```
-  و در صورت عبور، سطح ریسک ارزش‌گذاری (`valuation_risk_level`) به `"HIGH"` ارتقاء می‌یابد.
-* **عملگر مقایسه:** نابرابری اکید (`>`).
-
-#### **ج) آستانهٔ تصمیم‌گیری Stage 9**
-* **پارامتر کنترل‌کننده:** مقدار هاردکدشدهٔ `0.50` در فایل `src/decision/engine.py` (خط ۲۱۲):
-  ```python
-  if isinstance(scenario_dispersion, (int, float)) and scenario_dispersion > 0.50:
-      conflicts.append("HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK")
-  ```
-* **نوع آستانه:** هاردکدشده (بدون خواندن پارامترهای Stage 7).
-* **عملگر مقایسه:** نابرابری اکید (`>`).
-
-#### **د) رفتار در نقاط مرزی (Boundaries Behavior)**
-* **کمتر از 0.50 (مثلاً 0.45):** هیچ هشدار، پرچم ریسک یا تعارضی صادر نمی‌شود.
-* **دقیقاً برابر 0.50:** به دلیل استفاده از عملگر اکید (`>`) در هر سه موقعیت، شرط `0.50 > 0.50` برقرار نبوده و هیچ هشدار، پرچم ریسک یا تعارضی صادر نمی‌شود.
-* **بزرگتر از 0.50 (مثلاً 0.55):** هشدار `WARNING:HIGH_SCENARIO_DISPERSION` صادرشده، پرچم `HIGH_SCENARIO_DISPERSION` ثبت شده، سطح ریسک به `"HIGH"` تغییر کرده و تعارض `"HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK"` در Stage 9 شکل می‌گیرد.
-
-#### **هـ) تأثیر تعارض Stage 9 بر خروجی نهایی**
-* **اطمینان تصمیم (`decision_confidence`):** کسر مستقیم ۱۰ واحد از امتیاز اطمینان (`confidence -= 10.0`).
-* **پیشنهاد نهایی (`recommendation`):** صریحاً صدور پیشنهاد `"STRONG_BUY"` را مسدود می‌کند (حتی اگر تمامی شواهد بنیادی و بازار عالی باشند).
-
----
-
-### ۳. یافته‌های قرارداد مشخصات (Specification Contract Findings)
-
-1. **الزام به آستانهٔ مشترک پویا:** در سند مشخصات (`07_Stage7_Valuation.md` §1، §40، §48)، **هیچ حکمی وجود ندارد** که Stage 9 را موظف کند حتماً آستانهٔ خود را به‌صورت پویا از رجیستری/تنظیمات Stage 7 دریافت کند. Stage 7 یک موتور ارزش‌گذاری است و Stage 9 یک موتور تصمیم‌گیری مستقل.
-2. **استقلال آستانه‌های Stage 7:** در فایل `parameters.py` آستانهٔ هشدار (`ALERT_THRESHOLDS`) و آستانهٔ ریسک (`RISK_THRESHOLDS`) دو ساختار کاملاً مجزا هستند. اگرچه مقادیر پیش‌فرض اولیه هر دو `0.50` تنظیم شده است، اما کد آن‌ها را به‌عنوان دو پارامتر مستقل ارزیابی می‌کند.
-3. **ماهیت پارامترها:** طبق سند `07_Stage7_Valuation.md` (§22، §39)، مقادیر `0.50` «پارامترهای نسخهٔ مدل» (Model Version Parameters) هستند و نه «ثوابت غیرقابل تغییر معماری» (Architecture Constants).
-
----
-
-### ۴. جدول سناریوهای آستانه‌های مستقل (Independent-Threshold Scenario Table)
-
-جدول زیر رفتار عملیاتی سیستم را در صورت تغییر مستقل هر یک از آستانه‌ها (با فرض پراکندگی واقعی داده‌ها) نشان می‌دهد:
-
-| سناریو | آستانه هشدار Stage 7 | آستانه ریسک Stage 7 | آستانه Stage 9 | مقدار پراکندگی واقعی | هشدار Stage 7 | پرچم و سطح ریسک Stage 7 | تعارض Stage 9 (`HIGH_BEAR_RISK`) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **۱. تغییر آستانه هشدار** | **`0.60`** | `0.50` | `0.50` | **`0.55`** | صادر **نمی‌شود** (`0.55 <= 0.60`) | پرچم دارد؛ ریسک **`HIGH`** | صادر **می‌شود** (`0.55 > 0.50`) |
-| **۲. تغییر آستانه ریسک** | `0.50` | **`0.60`** | `0.50` | **`0.55`** | **`WARNING:HIGH_SCENARIO_DISPERSION`** | پرچم ندارد؛ ریسک عادی | صادر **می‌شود** (`0.55 > 0.50`) |
-| **۳. تغییر هر دو آستانه S7** | **`0.40`** | **`0.40`** | `0.50` | **`0.45`** | **`WARNING:HIGH_SCENARIO_DISPERSION`** | پرچم دارد؛ ریسک **`HIGH`** | صادر **نمی‌شود** (`0.45 <= 0.50`) |
-| **۴. پراکندگی روی مرز** | `0.50` | `0.50` | `0.50` | **`0.50`** | صادر **نمی‌شود** (`0.50 > 0.50` False) | پرچم ندارد؛ ریسک عادی | صادر **نمی‌شود** |
-
----
-
-### ۵. یافته‌های پوشش تست P59 (P59 Test Coverage Findings)
-
-* **شواهد ارائه‌شده توسط کاربر:** اجرای دستور `pytest src/tests/test_stage9_decision.py -q` منجر به **`19 passed in 0.74s`** شده است.
-* **تحلیل تست‌های P59:** چهار تست اضافه شده در P59 شامل:
-  1. `test_scenario_dispersion_threshold_boundaries`
-  2. `test_scenario_dispersion_causes_ten_point_confidence_deduction`
-  3. `test_scenario_dispersion_blocks_strong_buy`
-  4. `test_scenario_dispersion_penalty_distinct_from_valuation_risk_level_high`
-* **دامنه اثبات تست‌ها:** این تست‌ها رفتار فعلی Stage 9 (تولید تعارض در صورت `scenario_dispersion > 0.50` در متاداده) را صریحاً تثبیت (Pin) می‌کنند.
-* **عدم اثبات یکسان‌سازی بین‌مرحله‌ای:** این تست‌ها ثبات رفتار فعلی Stage 9 را اثبات می‌کنند، اما **هیچ مدرکی مبنی بر لزوم اتصال پویای آستانه Stage 9 به پارامترهای قابل‌پیکربندی Stage 7 ارائه نمی‌دهند**.
-
----
-
-### ۶. توصیه‌مندی محدود (Bounded Recommendation)
-
-بر اساس شواهد کدی و مستندات، **گزینهٔ C** انتخاب می‌شود:
-
-> **C. قرارداد فعلی برای تصمیم‌گیری کافی نیست؛ رفتار فعلی بدون تغییر حفظ شده و نیازمندی‌های دقیق تصمیم سیاست‌گذاری مالی یا مشخصات معماری برای یکسان‌سازی مشخص گردد.**
-
-**توجیه:**
-1. در هیچ‌یک از اسناد رسمی لزوم اتصال پویای آستانهٔ Stage 9 به پارامترهای Stage 7 تصریح نشده است.
-2. مقادیر پیش‌فرض موجود در هر سه موقعیت کد برابر `0.50` هستند و در حال حاضر هیچ واگرایی رفتاری در تولید ایجاد نمی‌کنند.
-3. تغییر کد Stage 9 یا Stage 7 بدون وجود سند تصمیم‌گیری مالی/محصولی (R-level decision)، ایجاد یک فرض ساختگی جدید تلقی می‌شود که طبق قواعد مهندسی پروژه ممنوع است.
-
----
-
-### ۷. اقدام بعدی دقیق (Exact Next Action)
-
-* **هیچ تغییر کدی در تولید یا تست‌ها نباید انجام شود.**
-* در صورت نیاز به یکسان‌سازی در آینده، مالک محصول/تیم مالی باید طی یک تصمیم رسمی مشخص کند:
-  1. آیا Stage 9 باید آستانه پراکندگی را از متاداده یا پارامتر Stage 7 به صورت پویا بخواند؟
-  2. آیا آستانه هشدار و آستانه ریسک در Stage 7 باید همیشه مقدار یکسانی داشته باشند یا مستقل بمانند؟
-
----
-
-### ۸. بیانیه صریح ممیزی (Audit Declaration)
-
-* **هیچ فایلی تغییر داده نشد یا ایجاد نگردید (No files were changed).**
-* **هیچ تستی توسط دستیار اجرا نشد (No tests were run).**
-* **وضعیت Stage 7 همچنان باز (OPEN) باقی مانده است.**
-
----
-
-💡 *در صورت تمایل، می‌توانید درخواست کنید که ممیزی سایر بخش‌های Stage 7 یا بررسی مستندات نهایی انجام شود.*
+💡 *آیا تمایل دارید پس از بررسی این گزارش تحلیلی، درباره پیاده‌سازی سرویس استخراج داده‌های بازار برای Stage 8 یا تعریف رکوردهای تاریخ‌دار پارامترها (P54) تصمیم‌گیری کنیم؟*

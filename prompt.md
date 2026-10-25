@@ -1,148 +1,142 @@
-# P61 — Stage 7 / Stage 9 Scenario-Dispersion Threshold Consistency Audit
+# P62 — Define the Minimal Production Integration Contract for Stage 7
 
-**Task type: REPORT-ONLY / ANALYSIS — no code or documentation changes**
 
-## Objective
 
-Determine whether the current scenario-dispersion threshold behavior in Stage 7 and Stage 9 is internally consistent with the existing specifications and contracts, and identify what evidence would be required before changing any threshold or production behavior.
+This is a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants take priority over speed or superficial test success.
 
-This is a financial-data application. Correctness, auditability, deterministic behavior, and preservation of financial invariants take precedence over convenience.
+## Task type
 
-## Required reading and exact scope
+**ANALYSIS / DESIGN REPORT ONLY.**
 
-Work only in the local project folder `analyzer`.
+Do not modify application code, tests, specifications, or project-planning files. Do not run tests or CI. The user will run tests personally.
 
-Read these files:
+## Mandatory operating constraints
 
-1. `stepsForStage7.md` — authoritative Stage 7 plan and current task order.
-2. `07_Stage7_Valuation.md` — inspect the relevant sections defining scenario dispersion, alert thresholds, risk thresholds, and the status of unresolved policy decisions.
-3. `src/valuation/parameters.py` — identify the configured Stage 7 alert and risk thresholds.
-4. `src/valuation/engine.py` — trace how the alert threshold and risk threshold are consumed.
-5. `src/decision/engine.py` — trace the Stage 9 scenario-dispersion condition, confidence penalty, and recommendation restriction.
-6. `src/tests/test_stage7_valuation.py` — inspect only tests relevant to scenario-dispersion alert and risk-threshold behavior.
-7. `src/tests/test_stage9_decision.py` — inspect the four P59 tests and related existing tests.
+- Work only within the local `analyzer` project.
+- No GitHub, GitHub CLI/API, remote operations, commits, pushes, pulls, branch changes, or other repository synchronization.
+- Do not perform a broad repository exploration. Read the specific files identified below and follow only directly relevant references.
+- Do not redesign `src/valuation/engine.py`.
+- Do not invent financial formulas, data sources, industry mappings, date semantics, persistence contracts, or point-in-time guarantees.
+- Do not create an orchestrator, integration test, or synthetic execution path during this task.
+- Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `stepsForStage7.md`, `stage_7_prompts.md`, or anything under `ClaudeReports/`.
+- Return the complete report in your Claude response. The user will decide what to preserve or append.
 
-Use the relevant P56–P59 findings already recorded in `temp_report2.md` as historical context. Do not reread or reproduce the entire report archive; inspect only the relevant passages if necessary.
+## Step 1 — Read the authoritative plan and prior findings
 
-Do not explore unrelated modules or the repository as a whole.
+Read `stepsForStage7.md` first, especially the P48 audit findings dated 2026-10-25 and the remaining execution plan.
 
-## Questions that must be answered
+Use only the relevant earlier findings in `temp_report2.md` to clarify existing conclusions about:
+- production-path and integration audits, including P38/P48 if present;
+- parameter-selection and point-in-time constraints, including P54;
+- scenario-dispersion threshold policy, P61/P61-R.
 
-### 1. Establish the actual implementation
+Do not repeat earlier investigations unless needed to resolve a specific contradiction. Treat the latest P48 findings in `stepsForStage7.md` as the current working baseline.
 
-Trace and report separately:
+## Step 2 — Inspect only the minimum necessary implementation files
 
-- Which Stage 7 parameter controls the scenario-dispersion alert.
-- Which Stage 7 parameter controls the valuation risk level.
-- Whether Stage 9 uses a configurable parameter or a hardcoded numeric threshold.
-- The exact comparison operators and behavior at, below, and above the threshold.
-- How the Stage 9 conflict affects decision confidence and the `STRONG_BUY` recommendation.
+Start with these files:
 
-Do not conflate Stage 7's alert threshold with its risk threshold. They are separate parameters unless the implementation explicitly proves otherwise.
+- `src/scoring/engine.py`
+- `src/forecast/service.py`
+- `src/forecast/schema.py`
+- `src/forecast/repo.py`
+- `src/valuation/service.py`
+- `src/valuation/schema.py`
+- `src/decision/service.py`
+- `src/decision/schema.py`
+- `src/market/engine.py`
+- `src/market/schema.py`
+- `src/core/database.py`
+- the market-data query/ingestion modules directly used by the services above
+- the corresponding model files only where needed to verify existing persistence contracts
 
-### 2. Establish the specification contract
+Inspect a caller, configuration, or model outside this list only when a specific symbol reference or direct dependency requires it. Record why that additional file was necessary.
 
-Determine whether the specification explicitly requires:
+Do not read the entire test suite. You may inspect a small, directly relevant test only to understand an existing contract. Do not run it.
 
-- A single shared threshold across Stage 7 and Stage 9.
-- Stage 9 to consume the threshold selected by Stage 7.
-- Independent thresholds for alerts, valuation risk, and decision conflicts.
-- Any exact numerical threshold for these behaviors.
+## Step 3 — Define the minimal integration contract
 
-For every conclusion, cite the relevant file and section or function. Distinguish explicit requirements from implementation behavior and historical assumptions.
+For each boundary below, establish the existing contract and the missing information required to connect it safely:
 
-### 3. Evaluate the consequences of independent thresholds
+1. **Stage 3 → downstream stages**
+   - What produces `FundamentalScoreResult`?
+   - What exact identity and period fields must match?
+   - Are actual `KPIResult` production and aggregation connected to a caller, or is only the scoring engine present?
 
-Use a compact scenario table to illustrate the consequences of changing each threshold independently.
+2. **Stage 5 Forecast production/retrieval**
+   - What function produces `CompanyForecastResult`?
+   - What data and cutoff does it require?
+   - What persistence/retrieval capability already exists?
+   - Is there an authoritative way to select the intended forecast version for a historical analysis date?
+   - Do not treat model version alone as complete historical parameter versioning.
 
-At minimum, cover:
+3. **Stage 7 Valuation**
+   - What inputs does `calculate_valuation_as_of_jalali` require?
+   - How is the Jalali analysis date supplied?
+   - Which price observation is selected and what provenance is preserved?
+   - What remains unavailable for full point-in-time verification?
 
-- Alert threshold changed while risk threshold remains unchanged.
-- Risk threshold changed while alert threshold remains unchanged.
-- Both Stage 7 thresholds differ from Stage 9's current threshold.
-- Dispersion exactly at the relevant threshold.
+4. **Stage 8 Market analysis**
+   - What input shape does `MarketEngine.analyze_market` require?
+   - What existing source or query can supply that input?
+   - Can the market signal be produced using data eligible as of the same analysis date?
+   - Do not assume that the Stage 7 market-price query also supplies all Stage 8 inputs.
 
-For each scenario, identify which alert, risk classification, and Stage 9 conflict would be expected. Use existing code behavior only; do not invent new rules.
+5. **Stage 9 Decision**
+   - What inputs are required by `calculate_decision_as_of_jalali`?
+   - What identity checks already exist?
+   - What does it return?
+   - Is there an existing authoritative persistence or consumption contract for the final decision?
 
-### 4. Evaluate test coverage
+6. **Shared execution context**
+   - Who should own/create/close the SQLAlchemy `Session`, based on existing conventions?
+   - What explicit date values must be passed across boundaries?
+   - Keep the Persian Jalali calendar as the relevant analysis-date convention. Do not introduce Gregorian-date conversion unless an existing contract explicitly requires it.
+   - Distinguish forecast `data_cutoff_datetime`, Jalali market analysis date, calculation timestamp, and parameter-selection cutoff. They are not interchangeable.
+   - Do not silently substitute the current date or `valuation_date` for a missing historical cutoff.
 
-Confirm whether the P59 tests are now at module scope and identify what they actually establish.
+## Step 4 — Produce a contract matrix
 
-The user has run:
+Return a concise table with one row per boundary and these columns:
 
-`pytest src/tests/test_stage9_decision.py -q`
+- Boundary
+- Existing function/interface
+- Required inputs and identity invariants
+- Output
+- Existing persistence or retrieval
+- Evidence of a real caller
+- Missing contract or blocker
+- Classification: `EXISTS AND CONNECTED`, `EXISTS BUT CALLER UNPROVEN`, or `MISSING/UNDEFINED`
 
-Observed result: **19 passed in 0.74s**.
+Cite exact file paths and function/class names. Include line numbers when available, but do not invent line numbers.
 
-Treat this as user-provided evidence that the current Stage 9 test suite passes. Do not claim that you independently executed tests.
+A function existing in a module or being called by a unit test does not, by itself, prove a production execution path.
 
-Determine whether existing tests establish cross-stage threshold consistency or only pin current Stage 9 behavior. Identify any missing coverage without adding tests.
+## Step 5 — Recommend the smallest safe next implementation task
 
-### 5. Make a bounded recommendation
+Based on the evidence, recommend the smallest next task that would move the real application toward a verifiable execution path.
 
-Choose one of these outcomes based on the evidence:
+Your recommendation must:
+- name the exact file/interface responsibility that should be addressed first;
+- explain why it is the first dependency;
+- list prerequisites and unresolved decisions;
+- identify which existing contracts must remain unchanged;
+- state what evidence would prove completion;
+- specify the tests the user should run later, but **do not run them**;
+- avoid designing a speculative database schema or adding new public APIs before confirming they are necessary.
 
-- **A.** Existing contracts require shared threshold behavior; define the minimum safe next step and the exact missing evidence.
-- **B.** Existing contracts support independent thresholds; recommend documenting their distinct purposes and avoid unnecessary unification.
-- **C.** The contract is insufficient to decide; keep current behavior unchanged and identify the exact policy decision or specification definition needed.
+If the available code does not identify a legitimate source or owner for an input, state that explicitly rather than inventing one.
 
-Do not force a choice if the evidence supports outcome C.
+Do not implement anything in P62. Do not declare Stage 7 complete.
 
-## Financial and engineering guardrails
+## Required report structure
 
-- Do not modify production code, tests, specifications, parameters, or configuration.
-- Do not ratify `0.50` as approved financial policy merely because existing tests pin it.
-- Do not change recommendation rules, confidence deductions, risk classifications, or alert behavior.
-- Do not invent a new threshold, formula, or cross-stage dependency.
-- Do not weaken or delete tests.
-- Do not redesign `src/valuation/engine.py`; its redesign remains the final Stage 7 task.
-- Do not run tests or CI. The user runs tests locally.
-- Do not use GitHub, GitHub CLI/API, remotes, commits, pushes, pulls, or branch changes.
-- Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `stepsForStage7.md`, `stage_7_prompts.md`, or files in `ClaudeReports/`.
-- Do not create or modify any file.
+1. Executive conclusion
+2. Evidence and contract matrix
+3. Confirmed gaps versus unknowns
+4. Minimal recommended implementation task
+5. User-run validation plan
+6. Files inspected and any additional files inspected, with reasons
+7. Explicit statement confirming no code changes and no tests/CI executed
 
-## Required report
-
-Return a concise but evidence-based report containing:
-
-1. Task classification and scope confirmation.
-2. Actual Stage 7 alert threshold, Stage 7 risk threshold, and Stage 9 threshold behavior, with exact source references.
-3. Specification findings, separating explicit requirements from unresolved policy.
-4. The independent-threshold scenario table.
-5. P59 test-coverage findings, distinguishing user-run results from static inspection.
-6. Recommendation A, B, or C, with justification.
-7. The exact next action, if any, without implementing it.
-
-Explicitly state that no files were changed and no tests were run by you.
-
-Stop after the report. Do not begin implementation or the `engine.py` redesign.
-
-# **P61-R — Complete the Incomplete Scenario-Dispersion Audit**
-
-**Task type:** REPORT-ONLY / ANALYSIS. Continue the existing P61 audit; do not restart broad repository exploration.
-
-The current `reply.md` ends midway through row 4 of the scenario table. Complete the missing analysis and report sections.
-
-Review only the relevant portions of:
-- `src/decision/engine.py`
-- `src/valuation/engine.py`
-- `src/valuation/parameters.py`
-- `src/tests/test_stage9_decision.py`
-- `07_Stage7_Valuation.md`
-- `stepsForStage7.md`
-
-Complete these sections:
-
-1. Finish the scenario table, clearly distinguishing Stage 7 alert, dispersion-specific risk flag, overall valuation risk level, and Stage 9 conflict.
-2. Verify that all four P59 tests are at module scope and describe precisely what each test proves. State that the user reported `19 passed in 0.74s`; do not claim that you ran tests.
-3. Explain whether those tests establish cross-stage threshold consistency. Do not confuse testing current Stage 9 behavior with approving its financial policy.
-4. Give the bounded recommendation:
-   - **A:** Shared-threshold policy is explicitly required by evidence.
-   - **B:** Independent thresholds are explicitly supported by evidence.
-   - **C:** The contract does not settle the policy; preserve current behavior and identify the exact decision that remains unresolved.
-
-Choose only the option supported by evidence. If the specification does not resolve the policy, choose C. Do not infer financial policy from matching default values or code structure alone.
-
-**Restrictions:** No code, test, configuration, or specification changes. Do not run tests or CI. Do not redesign `engine.py`. Do not use GitHub write operations, commits, pushes, pulls, or branch changes. Do not modify any repository files, including `reply.md` or report archives.
-
-Return the completed missing sections as a report in your response. Stop when the report is complete.
+Return the report in your Claude response only. The user will review it before authorizing any implementation work.
