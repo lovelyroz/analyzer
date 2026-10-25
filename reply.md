@@ -1,44 +1,70 @@
-The Stage 7 Valuation Alerts Contract Audit Report (pursuant to the **P56 — Stage 7 D8 Alert Contract Audit** guideline) is presented below, based on an audit of source files, specifications, tests, and the Stage 9 consumer:
+The audit report and examination of the consistency of the Scenario Dispersion Threshold (**Scenario Dispersion Threshold**) between Stage 7 and Stage 9 (following the instruction **P57 — Audit Stage 7 / Stage 9 Scenario Dispersion Threshold Consistency**) is presented as follows:
 
 ---
 
-### 1. Table of Actual Alerts Emitted in Stage 7
+### 1. Detailed code paths and threshold sources (Code Paths & Threshold Sources)
 
-| Alert Name | Triggering Condition | Output Location | Test Evidence | Stage 9 Consumption |
-| :--- | :--- | :--- | :--- | :--- |
-| `WARNING:HIGH_SCENARIO_DISPERSION` | `scenario_dispersion > 0.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_high_dispersion_threshold_boundaries` | Stage 9 uses `metadata["scenario_dispersion"]` (>0.50) to generate the `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` conflict. |
-| `WARNING:LOW_FORECAST_RELIABILITY` | `forecast_reliability < 40.0` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_low_reliability_threshold_boundaries` | Stage 9 uses the numerical value of `forecast_reliability_score` to assess the confidence factor and the `POSITIVE_FORECAST_LOW_RELIABILITY` conflict. |
-| `CRITICAL:INSUFFICIENT_BENCHMARK_DATA` | `target_source == "INSUFFICIENT_DATA"` | `alerts` (and `valuation_risk_flags` as `INDUSTRY_BENCHMARK_INSUFFICIENT`) | `test_p6_missing_benchmarks_yield_guarded_nulls` | Stage 9 sets the recommendation to `WATCH` based on `valuation_status == "INSUFFICIENT_DATA"`. |
-| `WATCH:VALUATION_ABOVE_TARGET_PE` | `base.forward_pe / base.target_pe >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Evaluated at a high level via `valuation_status` (not directly parsed from text). |
-| `WATCH:VALUATION_BELOW_TARGET_PE` | `base.target_pe / base.forward_pe >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Evaluated via `valuation_status`. |
-| `WATCH:FORWARD_PE_ABOVE_HISTORICAL` | `base.forward_pe / historical_median >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Not directly parsed from text. |
-| `WATCH:FORWARD_PE_BELOW_HISTORICAL` | `historical_median / base.forward_pe >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Not directly parsed from text. |
-| `WATCH:FORWARD_PE_ABOVE_INDUSTRY` | `base.forward_pe / industry_forward_median >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Not directly parsed as text. |
-| `WATCH:FORWARD_PE_BELOW_INDUSTRY` | `industry_forward_median / base.forward_pe >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Not directly parsed as text. |
-| `INFO:TOP_DRIVER:<driver>` | Presence of the primary driver in `driver_ranking` | `alerts` (and `valuation_risk_flags`) | `test_alerts_include_severity_and_driver_focus` | Used for displaying metadata and the user dashboard. |
+#### **In Stage 7 (Valuation Engine - `src/valuation/engine.py`)**
+1. **How to calculate:** The `_scenario_dispersion(scenarios)' method calculates the amount of dispersion as follows: 
+\\[\text{scenario\_dispersion} = \frac{\max(\text{fair\_values}) - \min(\text{fair\_values})}{\text{base.fair\_value}}\\]
+2. **Threshold source:** Configurable parameter `ALERT_THRESHOLDS["high_scenario_dispersion"]` (with default value `0.50`) and `RISK_THRESHOLDS["high_scenario_dispersion"]` (with default value `0.50`) are in file `src/valuation/parameters.py`.
+3. ** Application and representation in the output: ** 
+* **Channel `alerts`:** If `scenario_dispersion > 0.50`, ``WARNING:HIGH_SCENARIO_DISPERSION'' warning is issued. 
+* **Channel `valuation_risk_flags`:** The token `"HIGH_SCENARIO_DISPERSION"` is registered. 
+* **Valuation risk level (`valuation_risk_level`):** is upgraded to ``HIGH'' status. 
+* **Valuation confidence (`valuation_confidence'):** A numerical penalty equal to `min(40.0, scenario_dispersion * 50.0)' is deducted. 
+* **Metadata (`metadata`):** Numeric value stored in `metadata["scenario_dispersion"]`.
 
-* **Explanation regarding channel separation:**
-* The `alerts` channel contains strings prefixed with a severity level (`INFO:`, `WATCH:`, `WARNING:`, `CRITICAL:`). 
-* The `valuation_risk_flags` channel contains flags without severity prefixes (such as `INSUFFICIENT_PEER_DATA`, `NEGATIVE_EPS`, `ZERO_EPS`, `SIGN_CHANGE`, `SCENARIO_ORDER_WARNING`, `INDUSTRY_BENCHMARK_INSUFFICIENT`), along with copies of the issued alerts.
-
----
-
-### 2. List of Documented but Unissued Alerts (Deferred Alerts)
-
-In accordance with the V1 deferral policies (policies D1 through D5), the following alerts are not issued:
-1. **`ASSESSMENT_FLIP_RISK` (D1):** Due to the absence of a valid financial metric to measure shocks and status changes ("flips"). 2. **`HIGH_MULTIPLE_DEPENDENCE` (D2):** The parameter `high_dependence_share = 0.60` exists in the code but is not utilized; a valid dependency mechanism has not been implemented.
-3. **`HIGH_EPS_DEPENDENCE` (D3):** No quantitative threshold for EPS dependency has been defined; the EPS earnings from Stage 5 are retained without adjustment.
-4. **`MARGIN_ASSUMPTION_RISK` (D4):** Time-stamped inputs for profit margins are absent from the V1 valuation layer.
-5. **`HIGH_IMPACT_HIGH_UNCERTAINTY` (D5):** This is represented as a numerical dictionary entry (`review_priority`) rather than being converted into a distinct textual alert.
-6. **`POOR_DATA_QUALITY`:** No explicit financial trigger has been registered for this condition.
-7. **`POINT_IN_TIME_WARNING`:** The temporal assessment trigger at the valuation boundary has not been activated.
+#### **In Stage 9 (Decision Engine - `src/decision/engine.py`)**
+1. **Extract Value:** Directly retrieves a numeric value from the metadata: 
+```python 
+scenario_dispersion = valuation_result.metadata.get("scenario_dispersion") 
+```
+2. **Evaluation and threshold source:** The number `0.50` is hard-coded in the Stage 9 code: 
+```python 
+if isinstance(scenario_dispersion, (int, float)) and scenario_dispersion > 0.50: 
+conflicts.append("HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK") 
+```
+3. **Effect on confidence and offer:** 
+* **decision_confidence (`decision_confidence`):** 10.0 units will be deducted. 
+* **Final recommendation (`recommendation`):** Explicitly prevents issuing a ``STRONG_BUY'' recommendation.
 
 ---
 
-### 3. Discrepancy Table
+### 2. Evidence in specifications and tests (Specification & Test Evidence)
 
-| File / Function / Test Reference | Description of Discrepancy | Severity Level |
-| :--- | :--- | :--- |
-| `src/valuation/parameters.py`<br>`ALERT_THRESHOLDS["high_dependence_share"]` | The parameter `high_dependence_share` is defined in the constants but is not read by `engine.py` (Unconsumed Dead Parameter). | **Low (Informational / Dead Parameter)** |
-| `src/valuation/engine.py`<br>`calculate_valuation` | All `alerts` strings are copied into `valuation_risk_flags` (`flags.extend(alerts)`). | **Compliant with V1 Specification** (Explicitly stated in section 49 of the document `07_Stage7_Valuation.md`) |
-| `src/decision/engine.py`<br>`make_decision` | Stage 9 uses structured fields (`valuation_status`, `valuation_risk_level`, `forecast_reliability_score`, `scenario_dispersion`) instead of parsing text-based `alerts` strings. | **Design-compliant**
+* **Specification document (`07_Stage7_Valuation.md` & `src/decision/engine.py`):** 
+* In the Stage 7 document (sections 40, 48 and 49), the threshold `0.50' is recorded as a model version parameter. 
+* In Stage 9, the decision engine is designed based on independent evidence evaluation rules and directly evaluates the numerical metadata of the valuation.
+* **Available tests:** 
+* In `test_stage7_valuation.py` (the `test_p2_alert_high_dispersion_threshold_boundaries` test) the exact boundary of `0.50` for issuing/not issuing alerts in Stage 7 has been measured. 
+* In `test_stage9_decision.py`, the presence of `scenario_dispersion > 0.50` is tested to generate `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` conflict. 
+* There are no tests in the current test suite that expect changing a Stage 7 parameter to automatically change the hardcoded logic of Stage 9.
+
+---
+
+### 3. Table of system behavior in case of Stage 7 threshold difference with 0.50 (Consequences Table)
+
+| Scenario Stage 7 behavior Stage 9 behavior Divergence and executive impact (Divergence/Impact).
+| :--- | :--- | :--- | :--- |
+| **Stage 7 threshold should be greater than 0.50**<br>*(eg \\(T_{S7} = 0.60\\) and dispersion value = 0.55)* | The dispersion is \\(0.55 \le 0.60\\); A warning/risk flag is **not issued**. | The value is \\(0.55 > 0.50\\); The `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK' conflict is **issued**. | **Divergence:** Stage 9 makes the decision conservative and blocks `STRONG_BUY', while Stage 7 did not consider this dispersion as high risk. |
+| **Stage 7 threshold should be smaller than 0.50**<br>*(eg \\(T_{S7} = 0.40\\) and dispersion value = 0.45)* | The dispersion is \\(0.45 > 0.40\\); The warning/risk flag `HIGH_SCENARIO_DISPERSION' is **issued** and the risk becomes `HIGH'. | The value is \\(0.45 \le 0.50\\); The conflict `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK' **is not issued**. | **Minor divergence:** Stage 9 deducts 10% from confidence due to ``HIGH'' valuation risk, but does not record the direct conflict of ``HIGH_BEAR_RISK''. |
+| **Stage 7 threshold should be equal to 0.50**<br>*(Genesis default mode)* | Dispersion \\(> 0.50\\) issues a warning. | Dispersion \\(> 0.50\\) issues a conflict. | **Full compatibility:** The borders of the two layers are perfectly synchronized. |
+
+---
+
+### 4. Conclusion (Defect vs. Unresolved Policy)
+
+* **Absence of technical defects (Confirmed Defect):** Currently, the code does not have any execution bugs; In the default constants (Genesis Parameters), the threshold of both stages is set to `0.50' and they work perfectly in harmony.
+* **Unresolved Policy Question:** It is an architectural/financial decision whether Stage 9 should retain its independent threshold (`0.50') or whether Stage 9 conflict should be a direct function of warning issued by Stage 7.
+
+---
+
+### 5. Smallest Justified Next Action
+
+**No code changes in the repository are justified.**
+It is recommended to keep the current independent constants (value of `0.50' in both layers) and keep their synchronization documented so that if needed, the product owner can make a decision about contract unification.
+
+---
+
+### 6. pytes commands

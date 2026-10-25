@@ -1,65 +1,57 @@
-# P56 — Stage 7 D8 Alert Contract Audit (Report Only)
+# P57 — Audit Stage 7 / Stage 9 Scenario Dispersion Threshold Consistency
 
-## Objective
-
-Audit the actual Stage 7 valuation alert contract against the Stage 7 V1 specification, implementation, tests, and Stage 9 consumers.
-
-**This is a report-only task. Do not modify, create, delete, or rewrite any repository file.**
+## Task type
+REPORT ONLY. Do not change or create any repository files. Do not run tests.
 
 ## Exact files to inspect
-
-Read these files from the local project folder `analyzer`:
 
 1. `stepsForStage7.md`
 2. `07_Stage7_Valuation.md`
 3. `src/valuation/engine.py`
-4. `src/valuation/schema.py`
-5. `src/valuation/parameters.py`
+4. `src/valuation/parameters.py`
+5. `src/decision/engine.py`
 6. `src/tests/test_stage7_valuation.py`
-7. `src/decision/engine.py`
-8. `src/tests/test_stage9_decision.py`
+7. `src/tests/test_stage9_decision.py`
 
-Do not perform a repository-wide search or inspect unrelated files. If a specific claim cannot be verified from these files, identify the missing evidence instead of expanding the scope automatically.
+Use only these files. Do not perform repository-wide exploration.
 
-## Required investigation
+## Questions to answer
 
-1. Identify every alert name that Stage 7 can actually emit. Trace each alert to its implementation and the relevant tests.
-2. Distinguish alerts from valuation risk flags, confidence labels, driver rankings, `review_priority`, and metadata. Do not treat these as interchangeable output categories.
-3. Compare actual behavior with the documented V1 alert contract, especially the D1–D5 deferred alerts:
-   - `ASSESSMENT_FLIP_RISK`
-   - `HIGH_MULTIPLE_DEPENDENCE`
-   - `HIGH_EPS_DEPENDENCE`
-   - `MARGIN_ASSUMPTION_RISK`
-   - `HIGH_IMPACT_HIGH_UNCERTAINTY`
-4. Check whether the specification documents alerts that the implementation does not emit, or whether the implementation emits alerts whose behavior or names are inadequately documented.
-5. Trace how Stage 9 consumes Stage 7 alert fields, risk flags, and related metadata. Determine whether any proposed change to alert names, fields, or semantics could break a consumer.
-6. Separate:
-   - confirmed implementation/specification mismatch;
-   - behavior that is consistent with an explicit V1 deferral;
-   - ambiguous or outdated documentation;
-   - unresolved policy decisions requiring product or financial approval.
-7. Do not invent alert thresholds, financial formulas, severity rules, aliases, or new output fields. Do not change the behavior of deferred alerts simply to make the specification appear complete.
+1. In Stage 7, identify exactly how `high_scenario_dispersion` is obtained, applied, and represented in alerts, risk flags, and metadata.
+2. In Stage 9, identify exactly how `scenario_dispersion` is evaluated and how `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` affects decision confidence and recommendation.
+3. Determine whether the two stages intentionally have independent thresholds under the documented V1 contract, or whether the current hard-coded Stage 9 value `0.50` conflicts with a configurable Stage 7 parameter.
+4. Inspect the existing tests to determine whether a changed Stage 7 threshold is expected to govern Stage 9 behavior. Do not infer that it is expected merely because Stage 7 has a configurable parameter.
+5. Assess the consequences of these cases:
+   - Stage 7 threshold is greater than `0.50`.
+   - Stage 7 threshold is less than `0.50`.
+   - Stage 7 threshold remains `0.50`.
+   Explain whether alerts, risk flags, conflicts, or recommendations could diverge.
+6. Determine the smallest justified resolution:
+   - retain independent thresholds and document their separate semantics;
+   - change the contract so one threshold governs both stages; or
+   - leave the matter unresolved pending an explicit policy decision.
+   
+   Choose only an option supported by evidence. Do not invent financial thresholds or silently change policy.
 
 ## Constraints
 
-- Do not edit any files.
-- Do not run tests or CI.
-- Do not perform Git/GitHub operations.
-- Do not redesign `engine.py`.
-- Do not describe a deferred capability as implemented.
-- Do not claim full production integration has been proven.
+- No file modifications, creations, or deletions.
+- No tests or CI.
+- No Git/GitHub operations.
+- Do not redesign either engine.
+- Do not weaken tests.
+- Do not claim production integration is fully proven.
 - Keep Stage 7 OPEN.
 
-## Required report
+## Required response
 
-Return a concise but evidence-based report containing:
-
-1. A table of every actual Stage 7 alert, its triggering condition, output location, relevant test evidence, and Stage 9 consumption (if any).
-2. A separate list of documented-but-not-emitted deferred alerts.
-3. A discrepancy table with file/function/test references and severity of each confirmed discrepancy.
-4. A clear distinction between actual defects and intentional V1 deferrals.
-5. The smallest justified next action, if any. If no code change is justified, explicitly say so.
-6. Exact focused pytest commands for the user to run later **only if a subsequent implementation change makes them necessary**.
+Return:
+1. The exact Stage 7 and Stage 9 code paths and threshold sources.
+2. Evidence from the specification and existing tests.
+3. A concise table showing expected behavior when the Stage 7 threshold differs from `0.50`.
+4. A clear conclusion distinguishing a confirmed defect from an unresolved policy question.
+5. The smallest justified next action, including whether code changes are warranted.
+6. Focused pytest commands only if a later code change is justified.
 7. An explicit statement that no files were changed and no tests were run.
 
-Do not modify or append to reports, handoff instructions, or planning files. Return the report in the response only.
+Return the report in the response only. Do not modify `reply.md`, `stepsForStage7.md`, `temp_report2.md`, or any other file.
