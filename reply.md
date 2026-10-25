@@ -1,59 +1,44 @@
-گزارش بررسی تطبیق سیاست‌های **D1 تا D6** در **Stage 7 (Valuation Engine)** بر اساس دستورالعمل `PROMPT.md` و اسناد مرجع پروژه به شرح زیر ارائه می‌شود:
+The Stage 7 Valuation Alerts Contract Audit Report (pursuant to the **P56 — Stage 7 D8 Alert Contract Audit** guideline) is presented below, based on an audit of source files, specifications, tests, and the Stage 9 consumer:
 
 ---
 
-### ۱. جدول انطباق سیاست‌های D1 تا D6 (Compliance Table)
+### 1. Table of Actual Alerts Emitted in Stage 7
 
-| شناسه | عنوان سیاست | رفتار واقعی در کد موجود (Actual Behavior) | شواهد از فایل‌ها (Evidence) | وضعیت (Disposition) |
+| Alert Name | Triggering Condition | Output Location | Test Evidence | Stage 9 Consumption |
 | :--- | :--- | :--- | :--- | :--- |
-| **D1** | **ASSESSMENT_FLIP_RISK** | هشدار صادر نمی‌شود. محرک و آستانهٔ تغییر وضعیت ارزش‌گذاری غیرفعال نگه داشته شده است. | `07_Stage7_Valuation.md` §50, `engine.py`, `test_stage7_valuation.py` | **منطبق با V1** (رفتار فعلی مجاز و طبق تعویق صریح V1 است) |
-| **D2** | **HIGH_MULTIPLE_DEPENDENCE** | هشدار صادر نمی‌شود. پارامتر `high_dependence_share` به‌صورت ثابت مرده (Unconsumed) ثبت و در متادادهٔ عدم مصرف گزارش می‌شود. | `07_Stage7_Valuation.md` §51, `parameters.py`, `engine.py`, `test_stage7_valuation.py` | **منطبق با V1** (از شاخص غیرمعتبر استفاده نمی‌شود) |
-| **D3** | **HIGH_EPS_DEPENDENCE** | هشدار صادر نمی‌شود. سود هر سهم (EPS) مرحلهٔ ۵ مستقیماً و بدون محاسبهٔ مجدد به‌عنوان پیش‌بینی معتبر حفظ می‌شود. | `07_Stage7_Valuation.md` §52, `engine.py`, `test_stage7_valuation.py`, `decision/engine.py` | **منطبق با V1** (اصالت EPS مرحله ۵ حفظ شده است) |
-| **D4** | **MARGIN_ASSUMPTION_RISK** | هشدار صادر نمی‌شود. به دلیل عدم وجود ورودی‌های معتبر و تاریخ‌دار حاشیه سود در این مرحله، غیرفعال مانده است. | `07_Stage7_Valuation.md` §53, `engine.py`, `test_stage7_valuation.py` | **منطبق با V1** (خارج از V1 حفظ شده است) |
-| **D5** | **HIGH_IMPACT_HIGH_UNCERTAINTY** | ساختار `review_priority` برای درایورهای `EPS` و `TARGET_PE` محاسبه و در قرارداد خروجی حفظ می‌شود؛ هشدار جدید تولید نمی‌شود. | `07_Stage7_Valuation.md` §47, `engine.py`, `schema.py`, `test_stage7_valuation.py` | **منطبق با V1** (قرارداد `review_priority` بدون هشدار ساختگی حفظ شده) |
-| **D6** | **Industry Model** | تحلیل درایورها بر اساس دو عامل قرارداد V1 یعنی `EPS` و `TARGET_PE` اجرا می‌شود. کد صنعت بدون فرمول‌های ساختگی نگاشت می‌شود. | `07_Stage7_Valuation.md` §44, `engine.py`, `test_stage7_valuation.py` | **منطبق با V1** (از ساخت فرمول‌های گمانه‌زنی و نگاشت‌های حدسی اجتناب شده) |
+| `WARNING:HIGH_SCENARIO_DISPERSION` | `scenario_dispersion > 0.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_high_dispersion_threshold_boundaries` | Stage 9 uses `metadata["scenario_dispersion"]` (>0.50) to generate the `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` conflict. |
+| `WARNING:LOW_FORECAST_RELIABILITY` | `forecast_reliability < 40.0` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_low_reliability_threshold_boundaries` | Stage 9 uses the numerical value of `forecast_reliability_score` to assess the confidence factor and the `POSITIVE_FORECAST_LOW_RELIABILITY` conflict. |
+| `CRITICAL:INSUFFICIENT_BENCHMARK_DATA` | `target_source == "INSUFFICIENT_DATA"` | `alerts` (and `valuation_risk_flags` as `INDUSTRY_BENCHMARK_INSUFFICIENT`) | `test_p6_missing_benchmarks_yield_guarded_nulls` | Stage 9 sets the recommendation to `WATCH` based on `valuation_status == "INSUFFICIENT_DATA"`. |
+| `WATCH:VALUATION_ABOVE_TARGET_PE` | `base.forward_pe / base.target_pe >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Evaluated at a high level via `valuation_status` (not directly parsed from text). |
+| `WATCH:VALUATION_BELOW_TARGET_PE` | `base.target_pe / base.forward_pe >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Evaluated via `valuation_status`. |
+| `WATCH:FORWARD_PE_ABOVE_HISTORICAL` | `base.forward_pe / historical_median >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Not directly parsed from text. |
+| `WATCH:FORWARD_PE_BELOW_HISTORICAL` | `historical_median / base.forward_pe >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Not directly parsed from text. |
+| `WATCH:FORWARD_PE_ABOVE_INDUSTRY` | `base.forward_pe / industry_forward_median >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Not directly parsed as text. |
+| `WATCH:FORWARD_PE_BELOW_INDUSTRY` | `industry_forward_median / base.forward_pe >= 1.50` | `alerts` (and `valuation_risk_flags`) | `test_p2_alert_divergence_ratios_boundaries` | Not directly parsed as text. |
+| `INFO:TOP_DRIVER:<driver>` | Presence of the primary driver in `driver_ranking` | `alerts` (and `valuation_risk_flags`) | `test_alerts_include_severity_and_driver_focus` | Used for displaying metadata and the user dashboard. |
+
+* **Explanation regarding channel separation:**
+* The `alerts` channel contains strings prefixed with a severity level (`INFO:`, `WATCH:`, `WARNING:`, `CRITICAL:`). 
+* The `valuation_risk_flags` channel contains flags without severity prefixes (such as `INSUFFICIENT_PEER_DATA`, `NEGATIVE_EPS`, `ZERO_EPS`, `SIGN_CHANGE`, `SCENARIO_ORDER_WARNING`, `INDUSTRY_BENCHMARK_INSUFFICIENT`), along with copies of the issued alerts.
 
 ---
 
-### ۲. فایل‌های تغییر یافته (Changed Files)
+### 2. List of Documented but Unissued Alerts (Deferred Alerts)
 
-* **هیچ فایلی تغییر داده نشد (None).**
-
----
-
-### ۳. دلایل عدم نیاز به تغییر کد و پشتیبانی توسط V1
-
-پس از بررسی دقیق فایل‌های سورس (`engine.py`, `parameters.py`, `schema.py`, `service.py`) و تست‌های مربوطه (`test_stage7_valuation.py` و `test_stage9_decision.py` برای مصرف‌کنندهٔ Stage 9)، مشخص شد که:
-1. **تمامی الزامات V1 در کد فعلی به‌طور کامل رعایت شده‌اند**.
-2. هشدارهای speculative (D1 تا D5) به‌صورت عمدی صادر نمی‌شوند تا از ورود معیارهای مالی غیرمعتبر جلوگیری شود.
-3. قرارداد خروجی و ساختار مصرف در Stage 9 (`decision/engine.py`) با عدم صدور این هشدارهای غیرمعتبر، رفتاری پایدار و طبق مشخصات locked نشان می‌دهد.
+In accordance with the V1 deferral policies (policies D1 through D5), the following alerts are not issued:
+1. **`ASSESSMENT_FLIP_RISK` (D1):** Due to the absence of a valid financial metric to measure shocks and status changes ("flips"). 2. **`HIGH_MULTIPLE_DEPENDENCE` (D2):** The parameter `high_dependence_share = 0.60` exists in the code but is not utilized; a valid dependency mechanism has not been implemented.
+3. **`HIGH_EPS_DEPENDENCE` (D3):** No quantitative threshold for EPS dependency has been defined; the EPS earnings from Stage 5 are retained without adjustment.
+4. **`MARGIN_ASSUMPTION_RISK` (D4):** Time-stamped inputs for profit margins are absent from the V1 valuation layer.
+5. **`HIGH_IMPACT_HIGH_UNCERTAINTY` (D5):** This is represented as a numerical dictionary entry (`review_priority`) rather than being converted into a distinct textual alert.
+6. **`POOR_DATA_QUALITY`:** No explicit financial trigger has been registered for this condition.
+7. **`POINT_IN_TIME_WARNING`:** The temporal assessment trigger at the valuation boundary has not been activated.
 
 ---
 
-### ۴. دستور pytest برای اجرا توسط کاربر
+### 3. Discrepancy Table
 
-جهت اطمینان از پاس شدن تست‌های مربوط به Stage 7 و Stage 9، دستور زیر را اجرا کنید:
-
-```bash
-python -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -v
-```
-
----
-
-### ۵. تصمیمات سیاست‌گذاری حل‌نشده (Unresolved Policy Decisions)
-
-موارد زیر به‌دلیل عدم وجود تعریف مالی مشخص یا تصمیم مالک محصول، همچنان غیرفعال و حل‌نشده باقی مانده‌اند:
-* **D1:** تعاریف دقیق شوک، میزان حساسیت و آستانهٔ تغییر وضعیت ارزش‌گذاری (Status Flip).
-* **D2:** فرمول ریاضی و روش اندازه‌گیری سهم وابستگی به Target P/E (Multiple Dependence).
-* **D3:** معیار کمی وابستگی به EPS، قواعد تشدید شدت (Severity) بر اساس Reliability و اولویت پیش‌فرض.
-* **D4:** نحوهٔ دریافت ورودی‌های تاریخ‌دار حاشیه سود و آستانهٔ ریسک حاشیه سود.
-* **D5:** معیار مستقل مالی برای ارتقاء `review_priority` به یک هشدار مجزای ریسک.
-* **D6:** فرمول‌های اختصاصی صنایع (نظیر NII برای بانک‌ها یا NAV برای هلدینگ‌ها) و نگاشت‌های قطعی کد صنعت در لایهٔ ارزش‌گذاری.
-
----
-
-### ۶. بیانیهٔ عدم اجرای تست‌ها
-
-**تست‌ها توسط دستیار اجرا نشده‌اند** (مطابق با الزامات صریح سند PROMPT.md).
-
----
+| File / Function / Test Reference | Description of Discrepancy | Severity Level |
+| :--- | :--- | :--- |
+| `src/valuation/parameters.py`<br>`ALERT_THRESHOLDS["high_dependence_share"]` | The parameter `high_dependence_share` is defined in the constants but is not read by `engine.py` (Unconsumed Dead Parameter). | **Low (Informational / Dead Parameter)** |
+| `src/valuation/engine.py`<br>`calculate_valuation` | All `alerts` strings are copied into `valuation_risk_flags` (`flags.extend(alerts)`). | **Compliant with V1 Specification** (Explicitly stated in section 49 of the document `07_Stage7_Valuation.md`) |
+| `src/decision/engine.py`<br>`make_decision` | Stage 9 uses structured fields (`valuation_status`, `valuation_risk_level`, `forecast_reliability_score`, `scenario_dispersion`) instead of parsing text-based `alerts` strings. | **Design-compliant**
