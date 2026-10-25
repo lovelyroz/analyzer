@@ -1,10 +1,14 @@
-# P57 — Audit Stage 7 / Stage 9 Scenario Dispersion Threshold Consistency
+# P58 — Verify Scenario Dispersion Test Coverage and Contract
 
-## Task type
-REPORT ONLY. Do not change or create any repository files. Do not run tests.
+## Task Type
+REPORT ONLY — evidence verification and policy-contract analysis.
 
-## Exact files to inspect
+## Repository
+Local working folder: `analyzer`
+GitHub repository identity is `lovelyroz/analyzer`, but do not use GitHub operations or APIs.
 
+## Exact File Scope
+Read only:
 1. `stepsForStage7.md`
 2. `07_Stage7_Valuation.md`
 3. `src/valuation/engine.py`
@@ -13,45 +17,50 @@ REPORT ONLY. Do not change or create any repository files. Do not run tests.
 6. `src/tests/test_stage7_valuation.py`
 7. `src/tests/test_stage9_decision.py`
 
-Use only these files. Do not perform repository-wide exploration.
+Do not explore the repository broadly.
 
-## Questions to answer
+## Hard Restrictions
+- Do not modify or create any file.
+- Do not run tests or CI.
+- Do not modify `reply.md`, `stepsForStage7.md`, `temp_report.md`, `temp_report2.md`, `stage_7_prompts.md`, or anything under `ClaudeReports/`.
+- Do not change financial thresholds or infer an undocumented financial policy.
+- Do not redesign `engine.py`.
+- Do not use GitHub, GitHub CLI/API, remotes, commits, pushes, pulls, or branch operations.
+- Clearly distinguish code inspected, tests inspected, and tests actually executed. No tests are to be executed for this task.
 
-1. In Stage 7, identify exactly how `high_scenario_dispersion` is obtained, applied, and represented in alerts, risk flags, and metadata.
-2. In Stage 9, identify exactly how `scenario_dispersion` is evaluated and how `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` affects decision confidence and recommendation.
-3. Determine whether the two stages intentionally have independent thresholds under the documented V1 contract, or whether the current hard-coded Stage 9 value `0.50` conflicts with a configurable Stage 7 parameter.
-4. Inspect the existing tests to determine whether a changed Stage 7 threshold is expected to govern Stage 9 behavior. Do not infer that it is expected merely because Stage 7 has a configurable parameter.
-5. Assess the consequences of these cases:
-   - Stage 7 threshold is greater than `0.50`.
-   - Stage 7 threshold is less than `0.50`.
-   - Stage 7 threshold remains `0.50`.
-   Explain whether alerts, risk flags, conflicts, or recommendations could diverge.
-6. Determine the smallest justified resolution:
-   - retain independent thresholds and document their separate semantics;
-   - change the contract so one threshold governs both stages; or
-   - leave the matter unresolved pending an explicit policy decision.
-   
-   Choose only an option supported by evidence. Do not invent financial thresholds or silently change policy.
+## Questions to Resolve
 
-## Constraints
+1. Inspect all of `src/tests/test_stage9_decision.py` for an actual test asserting that numeric `scenario_dispersion > 0.50` adds `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK`. A helper accepting a `dispersion` argument is not sufficient evidence of coverage. If such a test exists, quote its exact test function name and assertions. If not, explicitly report that the behavior is untested in this file.
 
-- No file modifications, creations, or deletions.
-- No tests or CI.
-- No Git/GitHub operations.
-- Do not redesign either engine.
-- Do not weaken tests.
-- Do not claim production integration is fully proven.
-- Keep Stage 7 OPEN.
+2. Inspect Stage 9 recommendation and confidence logic. Establish the actual downstream effects of `HIGH_EXPECTED_UPSIDE_HIGH_BEAR_RISK` from code, distinguishing effects directly caused by this conflict from effects caused independently by `valuation_risk_level`.
 
-## Required response
+3. Verify whether the Stage 7 specification explicitly requires Stage 9 to use the same configurable threshold as Stage 7, or whether it only documents the default value. Cite exact section headings and relevant wording. Do not infer a shared-threshold requirement from equal default values alone.
 
-Return:
-1. The exact Stage 7 and Stage 9 code paths and threshold sources.
-2. Evidence from the specification and existing tests.
-3. A concise table showing expected behavior when the Stage 7 threshold differs from `0.50`.
-4. A clear conclusion distinguishing a confirmed defect from an unresolved policy question.
-5. The smallest justified next action, including whether code changes are warranted.
-6. Focused pytest commands only if a later code change is justified.
-7. An explicit statement that no files were changed and no tests were run.
+4. Verify the Stage 7 threshold paths separately:
+   - `alert_thresholds["high_scenario_dispersion"]`
+   - `risk_thresholds["high_scenario_dispersion"]`
+   - Stage 9's hard-coded `0.50`
 
-Return the report in the response only. Do not modify `reply.md`, `stepsForStage7.md`, `temp_report2.md`, or any other file.
+   Explain whether these thresholds are independently consumed and whether a custom Stage 7 parameter set could cause divergent behavior.
+
+5. Classify the finding using one of these outcomes:
+   - **Confirmed implementation defect:** explicit specification or existing contract requires shared behavior and code violates it.
+   - **Test coverage gap:** behavior exists but is not adequately tested.
+   - **Unresolved policy question:** available evidence does not establish whether the thresholds must be unified.
+   Multiple classifications may apply, but justify each independently.
+
+6. Recommend the smallest justified next action. Do not recommend a code change unless the inspected specification or established contract supports it. If policy remains unresolved, state exactly what remains unknown and why changing the code now would be premature.
+
+## Required Report
+Provide:
+- Exact source locations and test function names.
+- Specification evidence supporting each conclusion.
+- A concise behavior table for Stage 7 thresholds below, equal to, and above `0.50`.
+- Separate findings for implementation correctness, test coverage, and policy clarity.
+- The smallest justified next action.
+- If a later code change is justified, list the exact files that would need modification and provide focused pytest commands for the user to run later. Do not run those commands.
+
+End with an explicit statement:
+- Files changed/created: none.
+- Tests run: none.
+- Stage 7 remains OPEN.
