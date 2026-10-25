@@ -1,154 +1,195 @@
-# P65 — Stage 7 D9 Parameter Governance: Decision-Preparation Audit
+# P66 — Stage 7 Consolidated Engineering Batch: Architecture Contracts, Specification Reconciliation, and D1–D6
 
-## Role and Project Context
+## 1. Role and Project Context
 
-You are auditing the Stage 7 valuation parameter-governance gap in the local project folder:
+Work in the local project folder:
 
 `analyzer`
 
-This is a financial-data application. Financial correctness, auditability, point-in-time (PIT) correctness, deterministic behavior, and preservation of financial invariants take priority over implementation speed.
+This is a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants are mandatory.
 
-This task is an evidence-based audit and decision-preparation exercise only. You must not make financial policy decisions on behalf of the project owner.
+Use `stepsForStage7.md` as the authoritative Stage 7 roadmap and `07_Stage7_Valuation.md` as the valuation specification. Review the available findings in `reply.md`, including P63, P64, and P65 where present.
 
-## Authoritative Context
+Also preserve these established constraints from prior Stage 7 planning:
+- The production path across Stages 3, 5, 7, 8, and 9 has not yet been fully proven.
+- Do not change the existing scenario-dispersion thresholds or comparison semantics without explicit specification approval.
+- Do not invent industry mappings, sector-specific formulas, financial assumptions, parameter values, or historical effective dates.
+- Keep D9 fail-closed where historical parameter selection cannot be established, and report the limitation truthfully.
 
-Treat the following files as the primary sources:
+Do not assume that any report ID exists in `reply.md` unless you verify it. If a referenced finding is unavailable, inspect the authoritative roadmap and relevant source files instead of inventing its contents.
 
-1. `stepsForStage7.md` — authoritative Stage 7 plan and unresolved D9 status.
-2. `07_Stage7_Valuation.md` — Stage 7 specification, especially the previously identified relevant sections 47, 48, 65, 85, and 87.
-3. `src/valuation/parameters.py` — current parameter registry, version-selection logic, legacy behavior, and related provenance metadata.
+## 2. Objectives for This Batch
 
-Use other files only if necessary to verify a specific claim. Do not perform a repository-wide exploration.
+Advance the following roadmap areas together:
 
-## Established Findings — Verify, Do Not Assume
+- Stage 7 roadmap Phase 2: architecture gaps and interface contracts.
+- Stage 7 roadmap Phase 3: specification, warning, implementation, and test discrepancies.
+- Stage 7 roadmap Phase 6: policies D1–D6.
 
-Previous audits reported the following findings. Verify them against the specified files and correct any discrepancy with exact file and section/line references.
+Do not begin the final `engine.py` redesign. Do not attempt to force a complete production integration when real sources, contracts, or consumers have not been established.
 
-- `DEFAULT_REGISTRY` contains a Genesis version whose `effective_from` is `None`.
-- Historical as-of selection considers dated parameter versions and fails closed when no eligible dated version exists.
-- The legacy path can use current hardcoded constants, but its metadata explicitly states that historical PIT validity has not been verified.
-- The valuation metadata snapshot records consumed parameter values but does not prove that those values were financially approved or historically valid.
-- No authoritative project specification currently approves `2026-01-01T00:00:00Z` as the Genesis effective date.
-- Existing hardcoded parameter values must not automatically be treated as financially approved merely because they are implemented in code.
-- The available model does not appear to record a separate knowledge/recorded timestamp for when a parameter value became known to the system. Verify this before concluding.
-- `parameter_as_of` and `data_cutoff_datetime` are separate concepts. Do not merge them or assume one supplies the other’s policy meaning without explicit contractual evidence.
+## 3. Objective A — Resolve the Architecture Contract Questions
 
-## Required Investigation
+Start from the evidence already recorded in P48. Verify only the specific interfaces and callers needed to establish the current contract. Avoid repository-wide exploration.
 
-### 1. Establish the exact D9 obligation
+Trace and document the relevant existing interfaces for:
 
-Read D9 in `stepsForStage7.md` and the relevant Stage 7 specification sections.
+1. Stage 3 scoring outputs and their real producers/callers.
+2. Stage 5 forecast generation, persistence, and returned results.
+3. Stage 7 valuation inputs, market-price selection, date handling, and parameter selection.
+4. Stage 8 market analysis inputs and `MarketSignalResult` production.
+5. Stage 9 decision inputs, orchestration, and returned results.
+6. Database `Session` ownership and the propagation of analysis dates/cutoffs.
+7. The destination or consumer of the final decision result.
 
-Explain precisely:
+For each interface, establish:
 
-- What D9 requires the system to guarantee.
-- Which parts are technical implementation requirements and which require an explicit financial/business decision.
-- Which acceptance criteria can be verified now and which cannot be satisfied without approved parameter policy or authoritative evidence.
-- Whether D9 requires only effective-dated parameter selection or also requires historical knowledge-time/recorded-time tracking. If the specification is silent or ambiguous, state that explicitly; do not invent a requirement.
+- Actual function/class and file path.
+- Required inputs and their proven sources.
+- Output type and its actual consumer, if one exists.
+- Date and session responsibilities.
+- Whether the connection is proven, partial, or missing.
 
-### 2. Separate the decisions that must not be conflated
+Distinguish an implemented service from a real application execution path. A unit test using mocks does not establish production integration.
 
-Analyze these questions independently:
+### Required outcome
 
-A. **Approval of parameter values:** Are the currently implemented parameter values financially approved, or are they only provisional code defaults?
+Produce a concrete interface/gap matrix that identifies the smallest viable next integration step using existing architecture.
 
-B. **Effective date:** If a parameter set is approved, from what date and time is it valid? Is there authoritative evidence supporting that date?
+Where a missing source, entry point, date contract, or result consumer prevents a valid connection, document that exact gap. Do not invent data, use synthetic financial inputs to disguise missing production functionality, or create a redundant orchestrator merely to make the architecture appear connected.
 
-C. **Historical coverage:** Is the approved set valid only prospectively, or is there evidence supporting its validity for earlier dates? Do not infer historical validity from a current approval.
+If the existing interfaces already support a safe, clearly bounded connection that does not depend on unresolved policy, implement it only if it belongs within this batch and can be validated without fabricating missing inputs. Otherwise, provide a precise implementation-ready contract.
 
-D. **Knowledge/recorded time:** Does the project require reconstructing what parameter values were known or recorded at a historical point in time, separately from when they were economically effective? Identify the specification evidence, or lack of it, for this distinction.
+## 4. Objective B — Reconcile Specification, Implementation, and Tests
 
-E. **Parameter-level changes:** Must all parameters in a set share one effective date, or can individual parameters change independently? Report what the existing specification actually establishes. If unresolved, flag it as a policy/schema question.
+Use the discrepancies and warnings already identified in `reply.md` as leads. Verify them against the actual code and authoritative specifications before deciding whether anything is wrong.
 
-F. **Missing historical evidence:** What must the system do when a requested valuation date precedes all approved effective-dated parameter versions or when no approved historical version exists?
+Prioritize:
 
-For each question, classify the status as one of:
-- Explicitly specified and supported by evidence
-- Partially specified
-- Unresolved; project-owner decision required
+1. Warning and alert names, semantics, and output contracts under D8.
+2. Differences between documented warning behavior and warnings actually emitted.
+3. The reported missing or incomplete sector-driver decomposition and industry-specific behavior.
+4. Reported risk-warning discrepancies and the separation of risk, confidence, valuation status, and review priority.
+5. Tests that may encode behavior inconsistent with the locked specification.
+6. Contradictions between status summaries in `07_Stage7_Valuation.md` and factual implementation annotations elsewhere in that file.
 
-Do not convert an unresolved question into an assumed requirement.
+For every discrepancy, classify it as one of:
 
-### 3. Assess evidence and approval requirements
+- Confirmed implementation defect against an explicit requirement.
+- Test/specification inconsistency.
+- Unresolved or ambiguous specification.
+- Documented limitation or deferred capability.
+- Previously reported issue that cannot be reproduced from the available evidence.
 
-Identify what evidence would be sufficient to approve a parameter version and its effective date. Distinguish:
+### Implementation requirement
 
-- Project specification or signed-off financial policy
-- Authoritative financial source or documented calculation
-- Implementation constants and tests
-- Historical source data or records
-- An approval statement from the project owner
+Fix confirmed, specification-backed defects that can safely be corrected within the existing architecture.
 
-Explain what each type of evidence can and cannot establish. Tests proving that a constant is consumed correctly do not prove that the constant is financially correct.
+Update or add focused tests for the changed behavior, but do not execute them.
 
-Do not search the internet or introduce external market assumptions. Use only the repository evidence and clearly identified missing evidence.
+Do not change a test merely to make it pass if doing so would conceal a real defect. If a test conflicts with an explicit specification, correct the test only when the specification clearly determines the intended behavior.
 
-### 4. Prepare a minimal owner decision record
+If the financial meaning is ambiguous, do not guess. Record the exact decision needed and continue with independent work.
 
-Provide a compact, fillable decision-record template for the project owner. It must capture only information genuinely needed to resolve D9, including, as applicable:
+## 5. Objective C — Verify and Advance Policies D1–D6
 
-- Parameter-set identifier and the exact parameter names and values being approved
-- Whether approval covers current values only or also a specified historical period
-- Approved effective-from date/time and its evidentiary basis
-- Whether historical validity before that date is established, unknown, or unsupported
-- Whether recorded/knowledge-time tracking is required
-- Whether parameter validity is versioned as a whole set or per parameter
-- Approval status, approving authority, and approval reference/date
-- Explicit handling of valuation requests for dates without a supported parameter version
+For each policy, compare the authoritative specification with implementation and test coverage.
 
-For each field, state whether it is mandatory to resolve D9 now, optional, or dependent on a confirmed specification requirement. Do not require the owner to make unrelated technical implementation decisions.
+- **D1:** Do not produce a status-change alert without a valid criterion.
+- **D2:** Do not use an invalid P/E-dependency indicator.
+- **D3:** Preserve Stage 5 EPS; do not recalculate it or emit unapproved warnings.
+- **D4:** Do not produce a margin-risk alert without valid inputs.
+- **D5:** Keep `review_priority` separate from risk alerts.
+- **D6:** Preserve the current valuation contract and do not invent industry mappings or sector formulas.
 
-Do not fill in unknown financial values or dates. Do not prepopulate an assumed date such as `2026-01-01T00:00:00Z`.
+For each policy:
 
-### 5. Recommend safe behavior while decisions remain unresolved
+1. Identify the actual relevant implementation and tests.
+2. Verify whether the policy is correctly enforced, partially enforced, violated, or not implementable with current inputs.
+3. Check relevant edge cases and invalid/missing-input behavior.
+4. Add or revise focused tests where necessary.
+5. Fix clear violations where the required behavior is explicit.
+6. Record any remaining limitation or policy decision precisely.
 
-Based on the existing specification and implementation, describe the safest behavior that preserves auditability and avoids falsely claiming PIT correctness.
+Do not treat the existence of a test as proof that a policy is fully enforced. Inspect what the test actually asserts.
 
-Distinguish the current as-of path from the legacy path. Do not recommend weakening fail-closed behavior or silently assigning an effective date to Genesis.
+Do not invent industry classifications, sector formulas, financial thresholds, or new data sources.
 
-If the specification does not fully define a behavior, label it as a recommendation requiring approval rather than presenting it as an existing requirement.
+## 6. Consolidated Implementation Rules
 
-### 6. Define the next implementation gate
+This batch should make real progress across all three objectives without expanding into an uncontrolled refactor.
 
-Provide explicit, testable conditions that must be met before D9 can be considered resolved and implementation or integration work can rely on the parameter registry.
+- Inspect only the files needed to verify the reported findings and implement the relevant fixes.
+- Prefer small, cohesive changes over a broad redesign.
+- Preserve public interfaces unless a change is explicitly required and all known consumers can be updated safely.
+- Maintain deterministic behavior and existing financial invariants.
+- Add focused tests for implemented changes.
+- Keep unrelated work moving even when one issue is blocked by missing evidence or an owner decision.
+- Do not modify `src/valuation/engine.py` as part of a redesign or large refactor. Its redesign remains the final Stage 7 task.
+- Do not introduce a new application entry point, orchestration layer, persistence model, or schema without first establishing the actual gap and a compatible contract.
+- Do not change P61 scenario-dispersion thresholds or their semantics without explicit specification support.
+- Do not invent or approve parameter values, effective dates, or historical validity to resolve D9. Preserve the current fail-closed historical parameter selection and truthful legacy metadata.
+- Do not claim that point-in-time correctness or end-to-end production integration is achieved unless the relevant evidence actually proves it.
 
+## 7. Tests and Validation
+
+You may inspect and write tests, but **do not run any tests or application execution commands**. The project owner will run tests locally.
+
+For every code change:
+
+- Identify the behavior being protected.
+- Identify the relevant test file and test cases.
+- State the exact command the owner should run.
+- Explain what a failure would mean, if it is not self-evident.
+
+At minimum, provide targeted commands for affected tests. If changes span multiple test areas, provide a combined command and, where useful, a separate targeted command.
+
+Do not report tests as passed, verified at runtime, or executed. Clearly label all unexecuted tests.
+
+## 8. Guardrails
+
+- Work only in the local `analyzer` folder.
+- Do not use GitHub, GitHub CLI/API, or remote operations.
+- Do not commit, push, pull, switch branches, or alter remote configuration.
+- Do not run tests.
+- Do not make unrelated changes.
+- Do not modify `stepsForStage7.md`, `07_Stage7_Valuation.md`, `reply.md`, or other planning/report files just to record progress. Report findings in your final response for the owner to review.
+- Do not perform the final `engine.py` redesign.
+- Do not claim that the entire Stage 7 roadmap is complete after this batch.
+
+## 9. Required Final Report
+
+Return one consolidated report with the following sections:
+
+### A. Work Completed
+List actual code and test-file changes, grouped by objective. Include exact file paths and concise explanations.
+
+### B. Architecture Contract and Remaining Gaps
+Summarize proven interfaces, partial connections, missing sources/consumers, date/session ownership, and the smallest valid next integration step.
+
+### C. Specification and Implementation Reconciliation
+For each investigated discrepancy, state the evidence, classification, action taken, and remaining status.
+
+### D. D1–D6 Status
+Provide a compact matrix with policy, implementation status, evidence, changes made, and remaining limitations.
+
+### E. Owner-Run Test Plan
+Give exact PowerShell-compatible commands for the affected tests. Clearly state that none were executed during this task.
+
+### F. Remaining Blockers and Next Roadmap Step
 Separate:
-- Owner/policy approval prerequisites
-- Specification/documentation prerequisites
-- Code changes, if any
-- Tests that the user should run later
+- Items that can be implemented now.
+- Items blocked by missing interfaces or data.
+- Items requiring explicit financial/business approval.
+- Work intentionally deferred to the final `engine.py` review.
 
-Do not perform those future actions in this task.
+### G. Execution Confirmation
+State explicitly:
+- Whether source code was changed.
+- Whether tests were added or changed.
+- Whether any tests or application commands were executed.
+- Whether any Git or remote operations occurred.
 
-## Strict Guardrails
+The report must describe actual results, not intended work. If a task could not be completed, explain the exact reason and what evidence is missing.
 
-- Do not modify any files.
-- Do not write or change application code, tests, schemas, migrations, CI, or documentation.
-- Do not execute tests or other project commands that change repository state.
-- Do not create commits, branches, or perform GitHub, remote, push, pull, or Git operations.
-- Do not invent parameter values, approval decisions, effective dates, historical coverage, or financial policy.
-- Do not treat implementation behavior as proof of financial approval.
-- Do not redesign `engine.py`. Its redesign remains the last Stage 7 task.
-- Do not begin Stage 7 production integration as part of P65.
-- Keep the investigation within the named files unless a narrowly targeted verification is essential.
-
-## Required Report
-
-Return a concise but complete decision brief with these headings:
-
-1. **D9 Requirement and Evidence**
-2. **Decision Matrix** — questions A–F, status, evidence, and required resolution
-3. **Evidence Needed for Approval**
-4. **Project-Owner Decision Record Template**
-5. **Safe Behavior Until Approval**
-6. **D9 Exit Criteria and Next Gate**
-7. **Files Inspected and Verification Limits**
-
-Cite exact file paths and section headings or line ranges for material findings. Clearly separate facts, interpretations, and recommendations. Identify any conflict between the specification and implementation instead of silently resolving it.
-
-At the end, state explicitly:
-- Whether D9 is resolved or remains open.
-- Which specific owner decisions are still required.
-- Whether any files were changed or tests were run. The expected answer for this task is **no changes and no tests**.
-
-The report is for review in the conversation. Do not append it to repository files or create a report file.
+**Acceptance criterion:** This batch must deliver verified progress on multiple roadmap objectives, not merely another audit. Implement all clear, safe, specification-backed fixes within scope, add appropriate tests without running them, and leave a precise, evidence-based path for the next batch.

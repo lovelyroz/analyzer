@@ -427,3 +427,102 @@ D9 تضمین می‌کند که هر ارزشیابی انجام‌شده، پ�
 1. **وضعیت D9:** **همچنان باز (OPEN)** است.
 2. **تصمیمات خاص موردنیاز از مالک پروژه:** تصویب رسمی ۳۸ مقدار عددی پارامترها، تعیین تاریخ اعتبار صریح (`effective_from`)، تعیین سیاست پوشش تاریخی و تعیین تکالیف درخواست‌های قبل از تاریخ اعتبار.
 3. **تاییدیه اجرای عملیات:** **هیچ فایلی تغییر داده نشده و هیچ تستی اجرا نگردیده است (No files changed and no tests run).**
+
+# P66 
+### گزارش جامع مهندسی P66 — عقود معماری، تطبیق مشخصات و سیاست‌های D1 تا D6
+
+این گزارش، خروجی جامع تحلیلی و ممیزی کدهای پروژه `analyzer` بر اساس الزامات **P66** (مرحله ۲، مرحله ۳ و مرحله ۶ نقشه راه Stage 7) است. تمام یافته‌ها بر پایه کدهای موجود در مخزن، مشخصات قفل‌شده `07_Stage7_Valuation.md` و سند برنامه اجرایی `stepsForStage7.md` تنظیم شده و هیچ‌گونه تغییر در کد، اجرا یا تغییر اسناد بدون تصویب انجام نگردیده است.
+
+---
+
+### ۱. کار انجام‌شده (Work Completed)
+
+در این دسته اجرایی (P66)، اقدامات زیر انجام و اعتبارسنجی شد:
+1. **مرحله ۲ نقشه راه (عقود معماری):** ردگیری کامل تمام مرزهای سرویس از Stage 3 تا Stage 9، تعیین دقیق ورودی/خروجی، نحوه مدیریت Session و تاریخ‌ها، و استخراج کمینه‌ترین گام یکپارچه‌سازی بدون ایجاد کدهای مصنوعی.
+2. **مرحله ۳ نقشه راه (تطبیق مشخصات و کد):** تطبیق واژگان هشدارهای خروجی (D8)، واکاوای دلایل عدم پیاده‌سازی Driverهای اختصاصی صنعت (D6) و بررسی عدم انطباق ادعاهای PASS در سند مشخصات با واقعیت‌های کد.
+3. **مرحله ۶ نقشه راه (سیاست‌های D1 تا D6):** ارزیابی دقیق نحوه اعمال سیاست‌های عدم تولید هشدارهای غیرمعتبر، حفظ ناورداهای Stage 5 EPS و تفکیک اولویت بررسی (`review_priority`) از هشدارهای ریسک.
+
+---
+
+### ۲. قرارداد معماری و شکاف‌های باقیمانده (Architecture Contract and Remaining Gaps)
+
+#### ماتریس رابط‌ها و شکاف‌های معماری:
+
+| مرز (Boundary) | تابع / کلاس و مسیر فایل | ورودی‌های لازم و منبع اثبات‌شده | نوع خروجی و مصرف‌کننده | مدیریت جلسه و تاریخ | وضعیت اتصال (Connection Status) | شکاف یا مانع اصلی (Main Gap / Blocker) |
+|---|---|---|---|---|---|---|
+| **Stage 3 Scoring** | `FundamentalScoringEngine.calculate_score` در `src/scoring/engine.py:169` | `kpi_results: List[KPIResult]`, `company_id`, `period_id` | `FundamentalScoreResult` (مصرف‌کننده: فقط تست‌ها) | فاقد وابستگی مستقیم به Session | **EXISTS BUT CALLER UNPROVEN** | عدم وجود سرویس/فراخواننده برای استخراج KPIها از صورت‌های مالی Stage 1. |
+| **Stage 5 Forecast** | `generate_and_persist_forecast` در `src/forecast/service.py:137` | `session: Session`, `company_id`, `period_id`, `data_cutoff_datetime` | `CompanyForecastResult` (ذخیره‌سازی در SQLite via `ForecastRecordRepository`) | مصرف Session از فراخواننده؛ دریافت صریح UTC datetime | **EXISTS BUT CALLER UNPROVEN** | عدم وجود فراخواننده تولیدی که خروجی را مستقیم به Stage 7 پاس دهد. |
+| **Stage 7 Valuation** | `calculate_valuation_as_of_jalali` در `src/valuation/service.py:12` | `session: Session`, `company_id`, `period_id`, `forecast_result: CompanyForecastResult`, `as_of_jalali_date` | `ValuationResult` (مصرف‌کننده: `src/decision/service.py`) | استخراج قیمت بازار از `MarketDaily`؛ حفظ تاریخ جلالی در متادیتا | **EXISTS AND CONNECTED** (به Stage 9) | نبود رکوردهای تاریخ‌دار R8 در پارامترها (P54/D9) که در صورت ارسال `parameter_as_of` خطای `LookupError` می‌دهد. |
+| **Stage 8 Market** | `MarketEngine.analyze_market` در `src/market/engine.py:145` | `market_data: Sequence[Dict]`, `as_of_date: datetime` | `MarketSignalResult` (مصرف‌کننده: Stage 9 via service input) | دریافت تاریخ از فراخواننده | **EXISTS BUT CALLER UNPROVEN** | عدم وجود کوئری/سرویس استخراج سری روزانه OHLCV بازار از دیتابیس برای Stage 8. |
+| **Stage 9 Decision** | `calculate_decision_as_of_jalali` در `src/decision/service.py:12` | `session: Session`, `forecast_result`, `as_of_jalali_date`, `fundamental_result`, `market_result` | `ValuationDecisionResult` (ترکیب Stage 7 + Stage 9) | مدیریت یکپارچه جلسه و تاریخ جلالی | **EXISTS AND CONNECTED** (داخلی) | نبود نقطه ورود اصلی برنامه (CLI/API) و نبود مدل دیتابیس برای ذخیره `FinalDecisionResult`. |
+| **Session & Date Ownership** | `SessionLocal` در `src/core/database.py` | مالکیت Session توسط فراخواننده؛ انتقال صریح `data_cutoff_datetime` و `as_of_jalali_date` | مدیریت تراکنش پایگاه داده | تفکیک UTC datetime و تاریخ جلالی | **EXISTS AND CONNECTED** | نبود مدیریت‌کننده متمرکز جلسه در یک نقطه ورود تولیدی. |
+
+**کمینه‌ترین گام یکپارچه‌سازی بعدی (Smallest Viable Next Step):**  
+ایجاد یک سرویس استخراج سری داده‌های روزانه بازار برای Stage 8 (`src/market/service.py`) جهت تأمین ورودی `MarketSignalResult` به `src/decision/service.py::calculate_decision_as_of_jalali` بدون ساخت برنامه‌های اجرایی پیچیده یا دایرکتوری‌های مصنوعی.
+
+---
+
+### ۳. تطبیق مشخصات، پیاده‌سازی و تست‌ها (Specification and Implementation Reconciliation)
+
+| موضوع مورد بررسی | شواهد کد و مشخصات (Evidence) | طبقه‌بندی (Classification) | اقدام انجام‌شده / وضعیت باقیمانده |
+|---|---|---|---|
+| **۱. واژگان و کانال‌های هشدارها (D8)** | بخش ۴۹ سند `07_Stage7_Valuation.md` و کد `src/valuation/engine.py:254-256`. توکن‌ها دارای پیشوند شدت هستند (`WARNING:HIGH_SCENARIO_DISPERSION`, `CRITICAL:INSUFFICIENT_BENCHMARK_DATA`). | **Documented Limitation / Resolved Standard** | کانال `alerts` و `valuation_risk_flags` از هم تفکیک شده‌اند. هشدارهای جهت‌دار (`WATCH:FORWARD_PE_ABOVE_HISTORICAL` و ...) به‌طور کامل انطباق دارند. |
+| **۲. Driverهای اختصاصی صنعت (بخش‌های ۴۲ تا ۴۴)** | در `07_Stage7_Valuation.md` بخش ۴۷ حاشیه‌نویسی شده که زنجیره‌های Driver برای بانک (`NII`) و هولدینگ (`NAV`) در V1 پیاده‌سازی نشده‌اند. کد `engine.py:250-253` فقط `EPS` و `TARGET_PE` را تولید می‌کند. | **Deferred Capability (D6 Open)** | عدم ایجاد فرمول‌های ساختگی بدون مشخصات. الگوی فعلی دو‌عاملی حفظ شد. |
+| **۳. تفکیک وضعیت، ریسک و اطمینان** | `valuation_status` (VERY_ATTRACTIVE تا VERY_EXPENSIVE)، `valuation_risk_level` (LOW تا EXTREME) و `valuation_confidence` (0-100) در `schema.py` و `engine.py:247-250` کاملاً از هم جدا هستند. | **Confirmed Compliant Implementation** | سیستم می‌تواند وضعیت `ATTRACTIVE` را همراه با ریسک `HIGH` یا اطمینان `LOW` صادر کند (تست‌شده در `test_stage7_valuation.py:118`). |
+| **۴. تناقض ادعاهای PASS در مشخصات** | ادعاهای PASS در بخش‌های ۷۷، ۷۸، ۷۹، ۸۳ و ۸۵ مشخصات با حاشیه‌نویسی‌های واقعی P24/P35 نقض شده‌اند (عدم تولید `ASSESSMENT_FLIP_RISK` و عدم اجرای کامل PIT در لایه ورودی). | **Specification / Implementation Inconsistency** | ثبت صریح وضعیت تعویق (Deferred) در متادیتا و حاشیه‌نویسی‌ها؛ عدم تغییر تست‌ها برای پنهان کردن خطاهای واقعی. |
+| **۵. آستانه‌های پراکندگی سناریو (P61)** | بر اساس تصمیم P61 (گزینه C)، آستانه `high_scenario_dispersion` روی `0.50` با مقایسه صریح `>` باقی ماند. | **Confirmed Policy Decision (P61-C)** | هیچ تغییری در آستانه‌ها یا سمانتیک مقایسه داده نشد. |
+
+---
+
+### ۴. وضعیت سیاست‌های D1 تا D6 (D1–D6 Status)
+
+| سیاست | وضعیت پیاده‌سازی | شواهد کد و تست‌ها (Evidence) | تغییرات ایجادشده | محدودیتهای باقیمانده |
+|---|---|---|---|---|
+| **D1 — ASSESSMENT_FLIP_RISK** | **DEFERRED (تعویق‌شده)** | ۰ ارجاع در `src/valuation/`. تست `test_p3_flip_dependence_alerts_remain_explicitly_unresolved` عدم صدور آن را پین می‌کند. | هیچ هشدار ساختگی بدون معیار مصوب اضافه نشد. | نیازمند تصویب فرمول و آستانه شوک توسط مالک پروژه. |
+| **D2 — HIGH_MULTIPLE_DEPENDENCE** | **DEFERRED (تعویق‌شده)** | `ALERT_THRESHOLDS.high_dependence_share = 0.60` یک تعریف مرده (Unwired) در `parameters.py:51` است و در کد خوانده نمی‌شود. | عدم اتصال تعریف مرده به سیستم تا زمان طراحی معتبر. | نیازمند فرمول سهم وابستگی به Multiple. |
+| **D3 — HIGH_EPS_DEPENDENCE** | **DEFERRED (تعویق‌شده)** | ۰ ارجاع در کد ارزش‌گذاری. EPS Stage 5 بدون تغییر و بدون محاسبه مجدد حفظ می‌شود (`engine.py:226`). | عدم دستکاری EPS یا ضرب مستقیم در Reliability. | نیازمند تعریف صریح معیار وابستگی به EPS. |
+| **D4 — MARGIN_ASSUMPTION_RISK** | **DEFERRED (تعویق‌شده)** | نبود ورودی‌های حاشیه سود تاریخ‌دار در مرز ارزش‌گذاری. | خارج از V1 باقی ماند. | نیازمند ورودی‌های سری زمانی حاشیه سود. |
+| **D5 — HIGH_IMPACT_HIGH_UNCERTAINTY** | **ENFORCED (در لایه Review Priority)** | `review_priority` در `engine.py:253` محاسبه می‌شود (`impact_pct * uncertainty / 100`) اما هشدار ریسک جدید تولید نمیکند. | حفظ تفکیک اولویت بررسی از هشدارهای ریسک. | عدم تولید هشدار ریسک مستقل بدون آستانه مصوب. |
+| **D6 — مدل‌های اختصاصی صنایع** | **ENFORCED (قرارداد دو‌عاملی)** | امضای `calculate_valuation` در `engine.py:57` دو عامل `EPS` و `TARGET_PE` را اعمال کرده و فرمول اختصاصی صنعت اضافه نکرده است. | عدم ساخت فرمول‌های حدسی برای بانک و هولدینگ. | تحلیل تفکیکی Driverها به V2 موکول شد. |
+
+---
+
+### ۵. طرح تست قابل اجرا توسط کاربر (Owner-Run Test Plan)
+
+کاربر گرامی، جهت اعتبارسنجی کدهای این بخش، دستورات زیر را در محیط PowerShell اجرا فرمایید (Agent هیچ تستی را اجرا نکرده است):
+
+```powershell
+# ۱. اجرای تست‌های ارزش‌گذاری Stage 7
+python -m pytest src/tests/test_stage7_valuation.py -v
+
+# ۲. اجرای تست‌های تصمیم‌گیری Stage 9
+python -m pytest src/tests/test_stage9_decision.py -v
+
+# ۳. اجرای یکپارچه و فشرده پنج مجموعه اصلی پروژه
+python -m pytest src/tests/test_stage3_scoring.py src/tests/test_stage5_forecast.py src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -q
+```
+
+---
+
+### ۶. موانع باقیمانده و گام بعدی نقشه راه (Remaining Blockers and Next Roadmap Step)
+
+1. **موارد قابل پیاده‌سازی در حال حاضر:**  
+   پیاده‌سازی سرویس استخراج داده‌های روزانه بازار برای Stage 8 (`src/market/service.py`) جهت تکمیل ورودی‌های `src/decision/service.py`.
+2. **موارد مسدودشده به دلیل نبود رابط‌ها یا داده‌ها:**  
+   نبود نقطه ورود اصلی برنامه (CLI/API) برای اجرای سرتاسری و نبود مدل پایگاه داده برای ذخیره‌سازی خروجی نهایی تصمیم (`FinalDecisionResult`).
+3. **موارد نیازمند تصویب صریح مالی/مدیریتی (D9):**  
+   تصویب رسمی مقادیر ۳۸ پارامتر و تعیین تاریخ اعتبار (`effective_from`) جهت حل مشکل `LookupError` در ممیزی P54.
+4. **کارهای موکول‌شده به بازنگری نهایی `engine.py`:**  
+   بازطراحی داخلی و ساده‌سازی مسئولیت‌ها در `src/valuation/engine.py` که طبق قانون نقشه راه، آخرین گام فنی Stage 7 خواهد بود.
+
+---
+
+### ۷. تأییدیه صریح اجرای عملیات (Execution Confirmation)
+
+**بدین‌وسیله صریحاً تأیید می‌شود که:**
+* **تغییر سورس کد:** هیچ تغییری در کدهای سورس برنامه ایجاد نشد.
+* **افزودن یا تغییر تست‌ها:** هیچ تستی ویرایش یا اضافه نگردید.
+* **اجرای تست‌ها یا دستورات برنامه:** هیچ دستور تستی (pytest) یا دستور اجرایی توسط Agent اجرا نشده است.
+* **عملیات گیت یا ریموت:** هیچ‌گونه عملیات Commit، Push، Branch یا دستورات Git انجام نگرفته است.
+
+---
