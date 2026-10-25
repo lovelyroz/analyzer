@@ -269,3 +269,161 @@
 3. تمام نتایج این گزارش مستند بر ممیزی دقیق شواهد موجود در کدهای سورس پروژه می‌باشد.
 
 ---
+# P65
+### گزارش ممیزی حاکمیت پارامترهای Stage 7 (D9) — آماده‌سازی تصمیم‌گیری (P65)
+
+این گزارش، خروجی ممیزی تخصصی و شواهد‌محور در خصوص **شکاف حاکمیت پارامترهای Stage 7 (تصمیم D9)** در پروژه `analyzer` است. این سند بر اساس الزامات **P65** و بدون اعمال هیچ‌گونه تغییر در کد، اسناد، مایگریشن‌ها یا اجرای تست‌ها تنظیم شده است.
+
+---
+
+### ۱. الزامات و شواهد تصمیم D9 (D9 Requirement and Evidence)
+
+#### تعریف صریح D9 در اسناد مرجع:
+* **در `stepsForStage7.md` (بخش ۲ - سیاست D9):**  
+  *"شناسهٔ نسخهٔ مدل معادل تاریخچهٔ کامل پارامترها نیست؛ تاریخ اعتبار یا منشأ پارامترها حدس زده نشود."*
+* **در `07_Stage7_Valuation.md` (بخش ۶۵):**  
+  *"تمام آستانه‌های قابل تنظیم باید بیرون از منطق کد نگهداری و نسخه بوم شوند (`valuation_model_parameters` شامل `model_version, parameter_name, parameter_value, effective_from, description`)."*
+* **در `07_Stage7_Valuation.md` (بخش‌های ۴۷، ۴۸ و ۸۵):**  
+  آستانه‌های عددی موجود در کد (`src/valuation/parameters.py`) صرفاً ثوابت اولیه موتور هستند و توسط مشخصات مالی پروژه تأیید (Ratify) نشده‌اند.
+
+#### آنچه D9 تضمین می‌کند:
+D9 تضمین می‌کند که هر ارزشیابی انجام‌شده، پارامترهای مصرفی خود را از یک نسخهٔ مشخص، تاریخ‌دار و دارای **منشأ و تاییدیه رسمی (Provenance & Approval)** دریافت کرده است و سیستم به‌صورت خاموش ثوابت جاری کد را به جای مقادیر معتبر تاریخی جایگزین نمی‌کند.
+
+#### تفکیک الزامات فنی و تصمیمات مالی/کسب‌وکار:
+1. **الزامات فنی پیاده‌سازی‌شده (Technical Implementation Requirements):**
+   * مکانیسم ثبت‌کننده (`ParameterRegistry`)، جستجوی کلید دقیق (`resolve_parameter_set`)، انتخاب تاریخ‌دار (`resolve_parameter_set_as_of`) و ساختار شکست صریح (Fail-Closed) با خطای `LookupError` (`src/valuation/parameters.py:271-294`).
+   * انجماد غیرقابل‌تغییر پارامترهای مصرفی (`ConsumedParameters`) و ثبت اسنپ‌شات کامل ۳۸ پارامتر در متادیتای خروجی `ValuationResult` (`src/valuation/engine.py:228-232`).
+2. **تصمیمات مالی و سیاستی حل‌نشده (Financial / Business Decisions Required):**
+   * تصویب/تأیید مالی ۳۸ مقدار عددی پارامترهای موجود.
+   * تعیین و تصویب تاریخ اعتبار رسمی (`effective_from`) برای نخستین نسخه پارامترها.
+   * تعیین سیاست پوشش تاریخی (آیا پارامترهای مصوب برای تاریخ‌های گذشته نیز معتبرند یا خیر).
+
+#### معیارهای پذیرش قابل سنجش فعلی در برابر معیارهای نیازمند مصوبه:
+* **قابل سنجش در حال حاضر:** رفتار Fail-Closed هنگام نبود نسخه تاریخ‌دار؛ تطابق اسنپ‌شات متادیتا با مقادیر مصرف‌شده واقعی؛ عدم نشت تغییرات متغیرهای سراسری به محاسبه.
+* **نیازمند مصوبه مالک پروژه:** سبز شدن تست‌های انتخاب تاریخی پارامتر در `DEFAULT_REGISTRY` بدون صدور `LookupError`؛ اثبات صحت Point-in-Time برای ارزشیابی‌های تاریخی.
+
+#### بررسی الزام زمانی Bitemporal (Effective Time vs Knowledge Time):
+مشخصه قفل‌شده `07_Stage7_Valuation.md` (بخش ۶۵) تنها فیلد زمانی **`effective_from` (زمان اعتبار اقتصادی)** را تعریف کرده است. مشخصات پروژه درباره **Knowledge/Recorded Time** (زمان آگاهی یا ثبت در سیستم) ساکت است. بنابراین، D9 تنها الزامی بر روی **نسخه‌بندی تاریخ‌دار اعتبار (`effective_from`)** دارد و فرض الزام بایتامپورال بدون سند صریح ممنوع است.
+
+---
+
+### ۲. ماتریس تصمیم‌گیری (Decision Matrix — Questions A–F)
+
+| پرسش سیاستی | وضعیت (Status) | شواهد کد / مشخصات (Evidence) | تصمیم و اقدام موردنیاز (Required Resolution) |
+|---|---|---|---|
+| **A. تصویب مقادیر پارامترها** | **Unresolved** | `07_Stage7_Valuation.md` بخش ۴۸؛ Docstringهای `src/valuation/parameters.py:269-274` ("spec-unratified D9"). | مالک پروژه باید ۳۸ مقدار عددی موجود را رسماً تصویب یا اصلاح کند. |
+| **B. تعیین تاریخ اعتبار (`effective_from`)** | **Unresolved** | `src/valuation/parameters.py:265` (`effective_from = None` در Genesis)؛ ممیزی P63/P64 در `reply.md`. | مالک پروژه باید تاریخ و زمان دقیق شروع اعتبار (مانند `2026-01-01T00:00:00Z`) را تعیین کند. |
+| **C. پوشش تاریخی (Historical Coverage)** | **Unresolved** | `stepsForStage7.md` سیاست D9؛ `src/valuation/parameters.py:276` (`LookupError` برای تاریخ‌های قبل از `effective_from`). | مالک پروژه باید مشخص کند آیا نسخه مصوب برای تاریخ‌های قبل از `effective_from` نیز معتبر است یا خیر. |
+| **D. زمان آگاهی/ثبت (Knowledge Time)** | **Explicitly Specified (Not Required)** | `07_Stage7_Valuation.md` بخش ۶۵ فقط `effective_from` را تعریف می‌کند. اسکیما تک‌زمانی است. | نیازی به اقدام ندارد مگر این‌که مالک پروژه ارتقا به اسکیما Bitemporal را تصویب کند. |
+| **E. سطح نسخه‌بندی (Set vs Parameter Level)** | **Partially Specified** | `07_Stage7_Valuation.md` بخش ۶۵ و `src/valuation/parameters.py` نسخه را در سطح مجموعه (Set-level) بسته‌بندی می‌کنند. | مالک پروژه باید تایید کند که نسخه‌بندی یکپارچه ۳۸ پارامتر در یک مجموعه (Set) کافی است. |
+| **F. رفتار در عدم وجود نسخه تاریخی** | **Explicitly Specified (Fail-Closed)** | `src/valuation/parameters.py:276-290` (`LookupError`)؛ تست `test_p33_as_of_without_dated_records_raises`. | رفتار Fail-Closed فعلی به عنوان سیاست دائمی برای درخواست‌های تاریخ‌دار فاقد نسخه ثبت شود. |
+
+---
+
+### ۳. ارزیابی شواهد موردنیاز برای تصویب (Evidence Needed for Approval)
+
+1. **مشخصات پروژه یا سیاست مالی امضاشده (Project Specification / Signed Policy):**  
+   * *آنچه اثبات می‌کند:* صحت مالی، منطق کسب‌وکار و نیت معماران سیستم.  
+   * *آنچه اثبات نمی‌کند:* عدم وجود باگ یا صحت رفتار کد در زمان اجرا.
+2. **منبع مالی معتبر یا محاسبات مستندشده (Authoritative Financial Source):**  
+   * *آنچه اثبات می‌کند:* توجیه اقتصادی آستانه‌ها و وزن‌های سناریو.  
+   * *آنچه اثبات نمی‌کند:* نحوه پیاده‌سازی و مصرف آن در تابع‌های Python.
+3. **ثابت‌ها و تست‌های پیاده‌سازی (Implementation Constants & Tests):**  
+   * *آنچه اثبات می‌کند:* رفتار قطعی برنامه و پایداری کدهای سورس.  
+   * *آنچه اثبات نمی‌کند:* **صحت مالی یا اعتبار تاریخی پارامترها.** (تست‌های boundary ثوابت فعلی کد را pin می‌کنند، نه انطباق با مشخصات مالی را).
+4. **داده‌ها یا رکوردهای تاریخی منبع (Historical Source Data):**  
+   * *آنچه اثبات می‌کند:* حقایق بازار در تاریخ‌های گذشته.  
+   * *آنچه اثبات نمی‌کند:* سیاست‌های داخلی سیستم برای رتبه‌بندی یا آستانه‌های ریسک.
+5. **تاییدیه صریح مالک پروژه (Project Owner Approval Statement):**  
+   * *تنها ارکان لازم:* برای تبدیل ثوابت موقت کد به نسخه‌های رسمی و تاریخ‌دار معتبر.
+
+---
+
+### ۴. فرم ساختاریافته تصمیم‌گیری مالک پروژه (Project-Owner Decision Record Template)
+
+این فرم برای تکمیل توسط مالک پروژه جهت حل نهایی D9 طراحی شده است:
+
+```markdown
+================================================================================
+          PROJECT-OWNER DECISION RECORD: STAGE 7 PARAMETER GOVERNANCE (D9)
+================================================================================
+
+1. PARAMETER SET IDENTIFIER [Mandatory]:
+   - Version Key: STAGE7_V1/INITIAL_2026 (or custom key)
+   - Model Version: STAGE7_V1
+
+2. APPROVAL OF PARAMETER VALUES [Mandatory]:
+   [ ] Option A: Ratify the 38 current code constants in src/valuation/parameters.py as-is.
+   [ ] Option B: Approve modified parameter values (attach schedule of changes).
+
+3. APPROVED EFFECTIVE-FROM TIMESTAMP [Mandatory]:
+   - Effective Date/Time (UTC): YYYY-MM-DDTHH:MM:SSZ (e.g., 2026-01-01T00:00:00Z)
+   - Evidentiary Basis: [Specify formal policy / launch date reference]
+
+4. HISTORICAL VALIDITY SCOPE [Mandatory]:
+   [ ] Prospective Only: Valid strictly for valuation dates >= Effective Date.
+   [ ] Historical Coverage: Approved for historical valuations back to YYYY-MM-DD.
+
+5. POLICY FOR REQUESTS BEFORE EFFECTIVE DATE [Mandatory]:
+   [ ] Fail Closed: Raise LookupError when parameter_as_of < Effective Date.
+   [ ] Explicit Legacy Flag: Allow calculation with FIXED_GENESIS_LEGACY flag (PIT unverified).
+
+6. VERSIONING GRANULARITY & TEMPORAL MODEL [Confirmed]:
+   - Set-level versioning (38 parameters frozen together): [X] APPROVED
+   - Single temporal dimension (effective_from only): [X] APPROVED
+
+7. APPROVAL AUTHORITY & SIGN-OFF [Mandatory]:
+   - Approving Authority (Name / Role): _______________________________________
+   - Approval Date: YYYY-MM-DD
+   - Reference / Document ID: __________________________________________________
+================================================================================
+```
+
+---
+
+### ۵. رفتار امن تا زمان اخذ تصمیمات (Safe Behavior Until Approval)
+
+تا زمانی که تصمیمات فوق توسط مالک پروژه ابلاغ نشده است، سیستم باید رفتارهای زیر را بدون تغییر حفظ کند:
+
+1. **مسیر انتخاب بر اساس تاریخ (`parameter_as_of` مقداردهی‌شده):**  
+   مکانیسم انتخاب باید **کاملاً متوقف‌شونده (Fail-Closed)** باقی بماند. تابع `resolve_parameter_set_as_of` در صورت فراخوانی روی ثبت‌کننده پیش‌فرض (`DEFAULT_REGISTRY` که فقط شامل Genesis فاقد تاریخ است)، صریحاً خطای `LookupError` صادر می‌کند (`src/valuation/parameters.py:280-285`). **از انتصاب فرضی تاریخ اعتبار به Genesis یا Fallback خاموش اکیداً خودداری شود.**
+2. **مسیر میراثی (`parameter_as_of=None` و `parameter_registry=None`):**  
+   سیستم از ثوابت جاری کد استفاده کرده و حالت `FIXED_GENESIS_LEGACY` با پرچم `point_in_time_selection_applied: False` را ثبت می‌کند. متادیتای خروجی حاوی هشدار شفاف است:  
+   *"Undated genesis constants; temporal validity for historical valuation is NOT verified (R8/D9 pending)"*.
+
+---
+
+### ۶. معیارهای خروج D9 و دروازه بعدی پیاده‌سازی (D9 Exit Criteria & Next Gate)
+
+پیش از این‌که یکپارچه‌سازی تولیدی به ثبت‌کننده پارامترها تکیه کند، باید شرایط زیر احراز شوند:
+
+1. **پیش‌نیازهای تصویب مالک پروژه:**  
+   تکمیل و امضای "فرم ساختاریافته تصمیم‌گیری مالک پروژه" (بخش ۴) شامل تصویب مقادیر و تعیین `effective_from`.
+2. **پیش‌نیازهای مستندات و مشخصات:**  
+   تغییر وضعیت D9 در سند `stepsForStage7.md` از `OPEN` به `RESOLVED` با ارجاع به سند تصمیم مصوب.
+3. **تغییرات کد (تنها پس از اخذ مصوبه):**  
+   افزودن نسخه پارامتر تاریخ‌دار جدید (مثلاً `STAGE7_V1/INITIAL_2026`) به `DEFAULT_REGISTRY` در `src/valuation/parameters.py`.
+4. **تست‌هایی که کاربر باید بعداً اجرا کند (توسط Agent اجرا نشود):**  
+   * `python -m pytest src/tests/test_stage7_valuation.py -q`
+
+---
+
+### ۷. فایل‌های بررسی‌شده و محدودیت‌های اعتبارسنجی (Files Inspected & Verification Limits)
+
+* `stepsForStage7.md` (برنامه اجرایی Stage 7 و وضعیت D9)
+* `07_Stage7_Valuation.md` (بخش‌های ۴۷، ۴۸، ۶۵، ۸۵، ۸۷)
+* `src/valuation/parameters.py` (خطوط ۱–۵۰، ۲۶۰–۲۹۵، ۳۵۰–۳۸۰)
+* `src/valuation/engine.py` (خطوط ۷۰–۸۰، ۲۲۵–۲۳۵)
+* `src/valuation/schema.py` (`ValuationResult`)
+* `src/valuation/service.py` (`calculate_valuation_as_of_jalali`)
+* `src/tests/test_stage7_valuation.py` (تست‌های P33 و P35)
+* `zErrors.md` (تریس‌بک خطای `LookupError`)
+* `reply.md` (گزارش‌های ممیزی P63 و P64)
+
+---
+
+### بیانیه پایانی صریح (Explicit Declarations):
+
+1. **وضعیت D9:** **همچنان باز (OPEN)** است.
+2. **تصمیمات خاص موردنیاز از مالک پروژه:** تصویب رسمی ۳۸ مقدار عددی پارامترها، تعیین تاریخ اعتبار صریح (`effective_from`)، تعیین سیاست پوشش تاریخی و تعیین تکالیف درخواست‌های قبل از تاریخ اعتبار.
+3. **تاییدیه اجرای عملیات:** **هیچ فایلی تغییر داده نشده و هیچ تستی اجرا نگردیده است (No files changed and no tests run).**
