@@ -1,69 +1,73 @@
-
-
-# P54 — Correct Stage 7 Historical Parameter Selection (D9)
+# P55 — Stage 7 D1–D6 V1 Policy Conformance and Safe Remediation
 
 ## Objective
 
-Correct the unresolved D9 issue in the local `analyzer` project. The latest recorded full test run passed, but the current implementation still reports `data_cutoff_used_for_parameter_selection=False`. Do not treat that test result as proof that D9 is complete.
+Continue Stage 7 remediation in the local working folder `analyzer`.
 
-## Required file scope
+The authoritative plan is `stepsForStage7.md`. Stage 7 remains OPEN and must not be frozen.
 
-Read all of these files before proposing changes:
+P53/P53.1 addressed part of D7, and P54 implemented cutoff-governed historical parameter selection for D9. Do not redo those tasks. The next planned task is to verify D1–D6 against the actual current implementation and make every independently justified, contract-supported correction.
 
-- `stepsForStage7.md`
-- `07_Stage7_Valuation.md`
-- `src/valuation/parameters.py`
-- `src/valuation/engine.py`
-- `src/valuation/schema.py`
-- `src/valuation/service.py`
-- `src/tests/test_stage7_valuation.py`
+## Required files — inspect these exact files
 
-Modify only `src/valuation/engine.py`, `src/valuation/parameters.py` if strictly necessary, and `src/tests/test_stage7_valuation.py`. Do not edit reports, specifications, handoff files, or other modules.
+1. `stepsForStage7.md`
+2. `07_Stage7_Valuation.md`
+3. `src/valuation/engine.py`
+4. `src/valuation/parameters.py`
+5. `src/valuation/schema.py`
+6. `src/tests/test_stage7_valuation.py`
+7. `src/decision/engine.py`
+8. `src/tests/test_stage9_decision.py`
 
-## Required behavior
+Use only these files unless a specific dependency or consumer cannot be verified without one additional file. If another file is essential, identify its exact path and explain why before expanding scope. Do not scan the whole repository.
 
-1. Determine the effective valuation data cutoff before selecting the parameter set.
-2. When a valid cutoff exists, use it as the governing timestamp for historical parameter selection.
-3. Do not use `valuation_date` as a substitute when the effective data cutoff differs.
-4. If a caller explicitly supplies `parameter_as_of` and it conflicts with the effective cutoff, reject the conflict clearly unless an already documented contract requires a different behavior. Do not silently select parameters using the conflicting timestamp.
-5. A dated parameter version may be selected only when its `effective_from` is not later than the governing timestamp. Preserve deterministic handling of overlapping versions and missing historical versions.
-6. Do not invent effective dates or retrofit dates onto the undated Genesis parameter set.
-7. Preserve the legacy Genesis path where backward compatibility requires it, but mark it explicitly as historically unverified. Do not claim point-in-time parameter selection for that path.
-8. If no eligible dated version exists, do not silently fall back to an undated or future-effective set and claim historical validity. Return an explicit error or limitation consistent with the existing API contract.
-9. Ensure output metadata truthfully distinguishes dated, cutoff-governed selection from legacy Genesis selection. `data_cutoff_used_for_parameter_selection` must reflect what actually happened, not a hard-coded claim.
-10. Preserve financial formulas, existing output contracts, parameter values, the 38-record Genesis registry, and the 33-consumed/5-recorded-not-consumed distinction.
+## Mandatory V1 policies
 
-## Required focused tests
+Treat the following as binding constraints:
 
-Add or update tests for:
+- **D1 — `ASSESSMENT_FLIP_RISK`:** Do not emit a new alert until a valid, documented trigger for changes in valuation assumptions and assessment has been established.
+- **D2 — `HIGH_MULTIPLE_DEPENDENCE`:** Do not treat the current undefined or invalid dependence metric as a validated risk measure. Do not emit this alert without a defensible, specified method.
+- **D3 — `HIGH_EPS_DEPENDENCE`:** Preserve Stage 5 EPS as the authoritative forecast. Do not recalculate EPS or emit a new dependence alert without a valid criterion.
+- **D4 — `MARGIN_ASSUMPTION_RISK`:** Do not emit a new alert without valid, dated inputs and a documented criterion.
+- **D5 — `HIGH_IMPACT_HIGH_UNCERTAINTY`:** Preserve the existing `review_priority` contract. Do not turn it into a new alert without independently valid criteria.
+- **D6 — Industry model:** Preserve the current V1 valuation-driver contract based on EPS and target P/E. Do not invent sector mappings, industry-specific formulas, or unavailable source fields.
 
-- Effective parameter selection using the valuation data cutoff.
-- Exact `effective_from` boundary acceptance.
-- Rejection of a future-effective version.
-- Missing eligible dated versions.
-- Overlapping eligible versions.
-- Conflicting explicit `parameter_as_of` and effective cutoff.
-- Metadata accurately distinguishing dated selection from legacy Genesis fallback.
-- Deterministic repeated results.
-- Backward compatibility of the legacy path without falsely claiming PIT verification.
+## Work to perform
 
-Do not weaken or delete existing tests merely to obtain a passing result. Do not add speculative dates or parameter values.
+1. Inspect the current implementation of alert generation, driver ranking, risk metrics, `review_priority`, and relevant metadata.
+2. Compare actual emitted alerts and driver outputs with the V1 policies above and the locked specification.
+3. Review existing tests, including tests documenting intentionally deferred behaviors. Do not assume an old test requirement overrides the current V1 policy.
+4. Check the Stage 9 consumer before changing any alert names, output shapes, or metadata contracts.
+5. Identify each discrepancy and classify it as:
+   - a concrete implementation defect with an existing authoritative rule;
+   - behavior already compliant with V1;
+   - an unresolved policy requiring a valid financial definition or owner decision.
+6. Implement every independent correction that is justified by the existing specification and code contracts. Add or adjust focused tests only when needed to prove that behavior.
+7. Preserve existing financial formulas, thresholds, EPS sourcing, output contracts, deterministic behavior, and missing-data semantics unless an explicit existing contract requires a correction.
+8. Do not weaken or delete tests merely to make the suite pass. Do not add a test that asserts an unsupported financial rule.
+9. Do not redesign or broadly refactor `engine.py`; that review remains the final Stage 7 task.
 
-## Execution and reporting restrictions
+## Explicit exclusions
 
-- Do not run pytest, CI, or any test command. The user will run tests locally.
-- Do not perform repository-wide exploration.
-- Do not use GitHub, GitHub CLI/API, remotes, push/pull, commits, or branch operations.
-- Do not redesign `engine.py`; make only the minimal changes necessary for D9.
-- Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `stepsForStage7.md`, or `stage_7_prompts.md`.
+- Do not implement speculative alerts, financial thresholds, shock sizes, sector mappings, or formulas.
+- Do not modify Stage 5, Stage 8, or Stage 9 production code unless a specific, demonstrable contract dependency makes a minimal change unavoidable. Explain such a dependency before changing another stage.
+- Do not work on P54/D9 again unless you discover a concrete regression directly caused by P54; report it instead of expanding this task.
+- Do not edit `reply.md`, `temp_report.md`, `temp_report2.md`, `stepsForStage7.md`, `stage_7_prompts.md`, or any report archive.
+- Do not perform GitHub operations, use GitHub CLI/API, change remotes or branches, push, pull, or commit.
+- Do not run pytest, CI, or other tests. The user will run the tests and provide the actual output.
+- Do not claim tests passed.
 
-## Deliverables
+## Required deliverable
 
 Provide:
-1. A concise explanation of the actual code changes and why they resolve D9.
-2. The exact files changed.
-3. The exact focused pytest command for the user to run.
-4. Any remaining limitation, especially where no historical parameter version exists.
-5. A clear statement that tests were not executed by you.
 
-Do not claim D9 complete until the user supplies actual test results and the resulting code behavior has been reviewed.
+1. A concise D1–D6 compliance table showing the actual behavior, evidence from the named files, and disposition.
+2. The exact source and test files changed, if any.
+3. The specific changes made and why each is supported by V1.
+4. The exact focused pytest command(s) for the user to run.
+5. Any unresolved policy decisions and why the current evidence cannot safely resolve them.
+6. A clear statement that tests were not run.
+
+If the environment supports direct editing, apply the justified changes to the working files. If it does not, state that limitation clearly and provide the complete proposed content for each changed file; do not claim implementation occurred when it did not.
+
+Do not write or append any report file. Stage 7 remains OPEN.

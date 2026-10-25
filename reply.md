@@ -1,134 +1,59 @@
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py -k "p35 or p33 or d9 or p5_default_cutoff or p6_cutoff" -v
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
-cachedir: .pytest_cache
-rootdir: D:\winprojects\analyzer
-collected 90 items / 64 deselected / 26 selected
+گزارش بررسی تطبیق سیاست‌های **D1 تا D6** در **Stage 7 (Valuation Engine)** بر اساس دستورالعمل `PROMPT.md` و اسناد مرجع پروژه به شرح زیر ارائه می‌شود:
 
-src/tests/test_stage7_valuation.py::test_p5_default_cutoff_inherits_forecast_cutoff_normalized PASSED            [  3%]
-src/tests/test_stage7_valuation.py::test_p6_cutoff_pit_limitation_pinned PASSED                                  [  7%]
-src/tests/test_stage7_valuation.py::test_p33_genesis_snapshot_matches_live_constants PASSED                      [ 11%]
-src/tests/test_stage7_valuation.py::test_p33_result_carries_parameter_audit PASSED                               [ 15%]
-src/tests/test_stage7_valuation.py::test_p33_resolve_exact_key_and_missing_raises PASSED                         [ 19%]
-src/tests/test_stage7_valuation.py::test_p33_as_of_without_dated_records_raises PASSED                           [ 23%]
-src/tests/test_stage7_valuation.py::test_p33_as_of_selection_mechanics PASSED                                    [ 26%]
-src/tests/test_stage7_valuation.py::test_p33_as_of_overlap_raises_ambiguity PASSED                               [ 30%]
-src/tests/test_stage7_valuation.py::test_p35_legacy_path_provenance_is_truthful_and_unchanged PASSED             [ 34%]
-src/tests/test_stage7_valuation.py::test_p35_snapshot_reports_values_actually_consumed_when_module_constant_changes PASSED [ 38%]
-src/tests/test_stage7_valuation.py::test_p35_as_of_selection_governs_calculation_and_snapshot_matches PASSED     [ 42%]
-src/tests/test_stage7_valuation.py::test_p35_selected_set_governs_peers_alerts_and_scenario_weights PASSED       [ 46%]
-src/tests/test_stage7_valuation.py::test_p35_missing_or_ambiguous_as_of_selection_fails_closed PASSED            [ 50%]
-src/tests/test_stage7_valuation.py::test_p35_invalid_parameter_set_raises_without_fallback_to_constants PASSED   [ 53%]
-src/tests/test_stage7_valuation.py::test_p35_isolation_from_global_mutation_and_snapshot_aliasing PASSED         [ 57%]
-src/tests/test_stage7_valuation.py::test_p35_repeated_as_of_calculations_are_deterministic PASSED                [ 61%]
-src/tests/test_stage7_valuation.py::test_d9_effective_cutoff_governs_selection_not_valuation_date PASSED         [ 65%]
-src/tests/test_stage7_valuation.py::test_d9_exact_effective_from_boundary_is_accepted PASSED                     [ 69%]
-src/tests/test_stage7_valuation.py::test_d9_future_effective_version_is_rejected PASSED                          [ 73%]
-src/tests/test_stage7_valuation.py::test_d9_missing_eligible_dated_version_fails_closed_without_genesis_fallback PASSED [ 76%]
-src/tests/test_stage7_valuation.py::test_d9_overlapping_eligible_versions_are_deterministic PASSED               [ 80%]
-src/tests/test_stage7_valuation.py::test_d9_conflicting_parameter_as_of_is_rejected PASSED                       [ 84%]
-src/tests/test_stage7_valuation.py::test_d9_without_any_cutoff_caller_supplied_as_of_is_labelled_truthfully PASSED [ 88%]
-src/tests/test_stage7_valuation.py::test_d9_metadata_distinguishes_dated_selection_from_legacy_genesis PASSED    [ 92%]
-src/tests/test_stage7_valuation.py::test_d9_legacy_path_stays_backward_compatible_and_never_claims_pit PASSED    [ 96%]
-src/tests/test_stage7_valuation.py::test_d9_cutoff_governed_selection_is_deterministic_on_repeat PASSED          [100%]
+---
 
-========================================== 26 passed, 64 deselected in 3.09s ==========================================
-(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py -v
-================================================= test session starts =================================================
-platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
-cachedir: .pytest_cache
-rootdir: D:\winprojects\analyzer
-collected 90 items
+### ۱. جدول انطباق سیاست‌های D1 تا D6 (Compliance Table)
 
-src/tests/test_stage7_valuation.py::test_jalali_service_uses_selected_price_and_preserves_provenance PASSED      [  1%]
-src/tests/test_stage7_valuation.py::test_jalali_service_fails_closed_without_eligible_observation PASSED         [  2%]
-src/tests/test_stage7_valuation.py::test_jalali_service_rejects_forecast_from_another_company PASSED             [  3%]
-src/tests/test_stage7_valuation.py::test_valuation_models PASSED                                                 [  4%]
-src/tests/test_stage7_valuation.py::test_valuation_engine_forward_pe_and_expected_fair_value PASSED              [  5%]
-src/tests/test_stage7_valuation.py::test_industry_forward_pe_requires_eight_valid_peers PASSED                   [  6%]
-src/tests/test_stage7_valuation.py::test_industry_ttm_is_fallback_after_historical_median PASSED                 [  7%]
-src/tests/test_stage7_valuation.py::test_negative_eps_does_not_create_fake_pe_or_fair_value PASSED               [  8%]
-src/tests/test_stage7_valuation.py::test_reliability_does_not_change_forward_pe_or_fair_value PASSED             [ 10%]
-src/tests/test_stage7_valuation.py::test_direct_probability_adjustments_are_rejected_in_favor_of_family_evidence PASSED [ 11%]
-src/tests/test_stage7_valuation.py::test_probability_evidence_is_family_level_and_equal_weighted PASSED          [ 12%]
-src/tests/test_stage7_valuation.py::test_probability_evidence_rejects_unknown_or_incomplete_family_data PASSED   [ 13%]
-src/tests/test_stage7_valuation.py::test_scenario_multiple_adjustments_require_economic_rationale_and_are_bounded PASSED [ 14%]
-src/tests/test_stage7_valuation.py::test_alerts_include_severity_and_driver_focus PASSED                         [ 15%]
-src/tests/test_stage7_valuation.py::test_p2_sensitivity_drivers_present_and_bounded PASSED                       [ 16%]
-src/tests/test_stage7_valuation.py::test_p2_sensitivity_missing_data_empty_drivers PASSED                        [ 17%]
-src/tests/test_stage7_valuation.py::test_p2_sensitivity_deterministic_repeated_runs PASSED                       [ 18%]
-src/tests/test_stage7_valuation.py::test_p2_alert_severity_levels_valid PASSED                                   [ 20%]
-src/tests/test_stage7_valuation.py::test_p2_alert_low_reliability_threshold_boundaries PASSED                    [ 21%]
-src/tests/test_stage7_valuation.py::test_p2_alert_high_dispersion_threshold_boundaries PASSED                    [ 22%]
-src/tests/test_stage7_valuation.py::test_p2_alert_divergence_ratios_boundaries PASSED                            [ 23%]
-src/tests/test_stage7_valuation.py::test_v1_sector_examples_use_only_eps_and_target_pe_drivers PASSED            [ 24%]
-src/tests/test_stage7_valuation.py::test_v1_uses_stage5_eps_without_recalculating_from_net_profit PASSED         [ 25%]
-src/tests/test_stage7_valuation.py::test_v1_defers_undefined_flip_dependence_and_assumption_alerts PASSED        [ 26%]
-src/tests/test_stage7_valuation.py::test_p3_sensitivity_recomputes_from_valuation_identity PASSED                [ 27%]
-src/tests/test_stage7_valuation.py::test_p3_nan_eps_is_guarded_as_invalid PASSED                                 [ 28%]
-src/tests/test_stage7_valuation.py::test_p3_zero_and_negative_price_guarded PASSED                               [ 30%]
-src/tests/test_stage7_valuation.py::test_p3_nonfinite_benchmark_series_filtered PASSED                           [ 31%]
-src/tests/test_stage7_valuation.py::test_p3_nonfinite_scores_fall_back_to_defaults PASSED                        [ 32%]
-src/tests/test_stage7_valuation.py::test_p3_flip_dependence_alerts_remain_explicitly_unresolved PASSED           [ 33%]
-src/tests/test_stage7_valuation.py::test_p4_peer_count_below_minimum_falls_back PASSED                           [ 34%]
-src/tests/test_stage7_valuation.py::test_p4_peer_count_at_minimum_selects_industry_forward PASSED                [ 35%]
-src/tests/test_stage7_valuation.py::test_p4_peer_count_above_minimum_and_median_provenance PASSED                [ 36%]
-src/tests/test_stage7_valuation.py::test_p4_peer_count_filters_invalid_values PASSED                             [ 37%]
-src/tests/test_stage7_valuation.py::test_p4_peer_count_empty_data_reports_zero_and_falls_back PASSED             [ 38%]
-src/tests/test_stage7_valuation.py::test_p4_benchmark_fallback_ignores_forward_count_for_ttm PASSED              [ 40%]
-src/tests/test_stage7_valuation.py::test_p5_nonfinite_price_yields_null_outputs PASSED                           [ 41%]
-src/tests/test_stage7_valuation.py::test_p5_missing_eps_is_not_applicable_not_zero PASSED                        [ 42%]
-src/tests/test_stage7_valuation.py::test_p5_nonfinite_reliability_echo_sanitized PASSED                          [ 43%]
-src/tests/test_stage7_valuation.py::test_p5_nonfinite_probability_confidence_echo_finite PASSED                  [ 44%]
-src/tests/test_stage7_valuation.py::test_p5_missing_data_quality_does_not_crash PASSED                           [ 45%]
-src/tests/test_stage7_valuation.py::test_p5_nonfinite_multiple_adjustment_rejected PASSED                        [ 46%]
-src/tests/test_stage7_valuation.py::test_p5_nan_probability_evidence_rejected PASSED                             [ 47%]
-src/tests/test_stage7_valuation.py::test_p5_datetime_echoes_normalized_to_utc PASSED                             [ 48%]
-src/tests/test_stage7_valuation.py::test_p5_default_cutoff_inherits_forecast_cutoff_normalized PASSED            [ 50%]
-src/tests/test_stage7_valuation.py::test_p5_undated_benchmark_series_carry_no_provenance PASSED                  [ 51%]
-src/tests/test_stage7_valuation.py::test_p6_production_path_real_stage5_forecast PASSED                          [ 52%]
-src/tests/test_stage7_valuation.py::test_p6_cutoff_pit_limitation_pinned PASSED                                  [ 53%]
-src/tests/test_stage7_valuation.py::test_p6_missing_benchmarks_yield_guarded_nulls PASSED                        [ 54%]
-src/tests/test_stage7_valuation.py::test_p6_scenario_ordering_flag_and_probability_normalization PASSED          [ 55%]
-src/tests/test_stage7_valuation.py::test_p6_invalid_eps_variants_never_fabricate_values PASSED                   [ 56%]
-src/tests/test_stage7_valuation.py::test_p6_repeat_runs_identical_on_full_contract PASSED                        [ 57%]
-src/tests/test_stage7_valuation.py::test_p6_regression_prior_behavior_preserved PASSED                           [ 58%]
-src/tests/test_stage7_valuation.py::test_p10_expensive_base_upside_parameterized_outputs_unchanged PASSED        [ 60%]
-src/tests/test_stage7_valuation.py::test_p10_expensive_threshold_consumed_from_parameters PASSED                 [ 61%]
-src/tests/test_stage7_valuation.py::test_p12_calculation_timestamp_utc_aware_and_deterministic PASSED            [ 62%]
-src/tests/test_stage7_valuation.py::test_p32_input_refs_before_cutoff_leave_results_unchanged PASSED             [ 63%]
-src/tests/test_stage7_valuation.py::test_p32_input_ref_after_cutoff_rejected_on_valuation_path PASSED            [ 64%]
-src/tests/test_stage7_valuation.py::test_p32_input_ref_at_cutoff_boundary_accepted PASSED                        [ 65%]
-src/tests/test_stage7_valuation.py::test_p32_input_ref_missing_date_rejected PASSED                              [ 66%]
-src/tests/test_stage7_valuation.py::test_p32_input_refs_absent_preserves_legacy_path PASSED                      [ 67%]
-src/tests/test_stage7_valuation.py::test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted PASSED [ 68%]
-src/tests/test_stage7_valuation.py::test_p53_stage5_dropped_future_input_is_not_reintroduced_to_stage7 PASSED    [ 70%]
-src/tests/test_stage7_valuation.py::test_p53_embedded_forecast_input_ref_without_availability_is_rejected PASSED [ 71%]
-src/tests/test_stage7_valuation.py::test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance PASSED [ 72%]
-src/tests/test_stage7_valuation.py::test_p53_stage5_forecast_without_provenance_preserves_legacy_path PASSED     [ 73%]
-src/tests/test_stage7_valuation.py::test_p33_genesis_snapshot_matches_live_constants PASSED                      [ 74%]
-src/tests/test_stage7_valuation.py::test_p33_result_carries_parameter_audit PASSED                               [ 75%]
-src/tests/test_stage7_valuation.py::test_p33_resolve_exact_key_and_missing_raises PASSED                         [ 76%]
-src/tests/test_stage7_valuation.py::test_p33_as_of_without_dated_records_raises PASSED                           [ 77%]
-src/tests/test_stage7_valuation.py::test_p33_as_of_selection_mechanics PASSED                                    [ 78%]
-src/tests/test_stage7_valuation.py::test_p33_as_of_overlap_raises_ambiguity PASSED                               [ 80%]
-src/tests/test_stage7_valuation.py::test_p35_legacy_path_provenance_is_truthful_and_unchanged PASSED             [ 81%]
-src/tests/test_stage7_valuation.py::test_p35_snapshot_reports_values_actually_consumed_when_module_constant_changes PASSED [ 82%]
-src/tests/test_stage7_valuation.py::test_p35_as_of_selection_governs_calculation_and_snapshot_matches PASSED     [ 83%]
-src/tests/test_stage7_valuation.py::test_p35_selected_set_governs_peers_alerts_and_scenario_weights PASSED       [ 84%]
-src/tests/test_stage7_valuation.py::test_p35_missing_or_ambiguous_as_of_selection_fails_closed PASSED            [ 85%]
-src/tests/test_stage7_valuation.py::test_p35_invalid_parameter_set_raises_without_fallback_to_constants PASSED   [ 86%]
-src/tests/test_stage7_valuation.py::test_p35_isolation_from_global_mutation_and_snapshot_aliasing PASSED         [ 87%]
-src/tests/test_stage7_valuation.py::test_p35_repeated_as_of_calculations_are_deterministic PASSED                [ 88%]
-src/tests/test_stage7_valuation.py::test_d9_effective_cutoff_governs_selection_not_valuation_date PASSED         [ 90%]
-src/tests/test_stage7_valuation.py::test_d9_exact_effective_from_boundary_is_accepted PASSED                     [ 91%]
-src/tests/test_stage7_valuation.py::test_d9_future_effective_version_is_rejected PASSED                          [ 92%]
-src/tests/test_stage7_valuation.py::test_d9_missing_eligible_dated_version_fails_closed_without_genesis_fallback PASSED [ 93%]
-src/tests/test_stage7_valuation.py::test_d9_overlapping_eligible_versions_are_deterministic PASSED               [ 94%]
-src/tests/test_stage7_valuation.py::test_d9_conflicting_parameter_as_of_is_rejected PASSED                       [ 95%]
-src/tests/test_stage7_valuation.py::test_d9_without_any_cutoff_caller_supplied_as_of_is_labelled_truthfully PASSED [ 96%]
-src/tests/test_stage7_valuation.py::test_d9_metadata_distinguishes_dated_selection_from_legacy_genesis PASSED    [ 97%]
-src/tests/test_stage7_valuation.py::test_d9_legacy_path_stays_backward_compatible_and_never_claims_pit PASSED    [ 98%]
-src/tests/test_stage7_valuation.py::test_d9_cutoff_governed_selection_is_deterministic_on_repeat PASSED          [100%]
+| شناسه | عنوان سیاست | رفتار واقعی در کد موجود (Actual Behavior) | شواهد از فایل‌ها (Evidence) | وضعیت (Disposition) |
+| :--- | :--- | :--- | :--- | :--- |
+| **D1** | **ASSESSMENT_FLIP_RISK** | هشدار صادر نمی‌شود. محرک و آستانهٔ تغییر وضعیت ارزش‌گذاری غیرفعال نگه داشته شده است. | `07_Stage7_Valuation.md` §50, `engine.py`, `test_stage7_valuation.py` | **منطبق با V1** (رفتار فعلی مجاز و طبق تعویق صریح V1 است) |
+| **D2** | **HIGH_MULTIPLE_DEPENDENCE** | هشدار صادر نمی‌شود. پارامتر `high_dependence_share` به‌صورت ثابت مرده (Unconsumed) ثبت و در متادادهٔ عدم مصرف گزارش می‌شود. | `07_Stage7_Valuation.md` §51, `parameters.py`, `engine.py`, `test_stage7_valuation.py` | **منطبق با V1** (از شاخص غیرمعتبر استفاده نمی‌شود) |
+| **D3** | **HIGH_EPS_DEPENDENCE** | هشدار صادر نمی‌شود. سود هر سهم (EPS) مرحلهٔ ۵ مستقیماً و بدون محاسبهٔ مجدد به‌عنوان پیش‌بینی معتبر حفظ می‌شود. | `07_Stage7_Valuation.md` §52, `engine.py`, `test_stage7_valuation.py`, `decision/engine.py` | **منطبق با V1** (اصالت EPS مرحله ۵ حفظ شده است) |
+| **D4** | **MARGIN_ASSUMPTION_RISK** | هشدار صادر نمی‌شود. به دلیل عدم وجود ورودی‌های معتبر و تاریخ‌دار حاشیه سود در این مرحله، غیرفعال مانده است. | `07_Stage7_Valuation.md` §53, `engine.py`, `test_stage7_valuation.py` | **منطبق با V1** (خارج از V1 حفظ شده است) |
+| **D5** | **HIGH_IMPACT_HIGH_UNCERTAINTY** | ساختار `review_priority` برای درایورهای `EPS` و `TARGET_PE` محاسبه و در قرارداد خروجی حفظ می‌شود؛ هشدار جدید تولید نمی‌شود. | `07_Stage7_Valuation.md` §47, `engine.py`, `schema.py`, `test_stage7_valuation.py` | **منطبق با V1** (قرارداد `review_priority` بدون هشدار ساختگی حفظ شده) |
+| **D6** | **Industry Model** | تحلیل درایورها بر اساس دو عامل قرارداد V1 یعنی `EPS` و `TARGET_PE` اجرا می‌شود. کد صنعت بدون فرمول‌های ساختگی نگاشت می‌شود. | `07_Stage7_Valuation.md` §44, `engine.py`, `test_stage7_valuation.py` | **منطبق با V1** (از ساخت فرمول‌های گمانه‌زنی و نگاشت‌های حدسی اجتناب شده) |
 
-================================================= 90 passed in 0.87s
+---
+
+### ۲. فایل‌های تغییر یافته (Changed Files)
+
+* **هیچ فایلی تغییر داده نشد (None).**
+
+---
+
+### ۳. دلایل عدم نیاز به تغییر کد و پشتیبانی توسط V1
+
+پس از بررسی دقیق فایل‌های سورس (`engine.py`, `parameters.py`, `schema.py`, `service.py`) و تست‌های مربوطه (`test_stage7_valuation.py` و `test_stage9_decision.py` برای مصرف‌کنندهٔ Stage 9)، مشخص شد که:
+1. **تمامی الزامات V1 در کد فعلی به‌طور کامل رعایت شده‌اند**.
+2. هشدارهای speculative (D1 تا D5) به‌صورت عمدی صادر نمی‌شوند تا از ورود معیارهای مالی غیرمعتبر جلوگیری شود.
+3. قرارداد خروجی و ساختار مصرف در Stage 9 (`decision/engine.py`) با عدم صدور این هشدارهای غیرمعتبر، رفتاری پایدار و طبق مشخصات locked نشان می‌دهد.
+
+---
+
+### ۴. دستور pytest برای اجرا توسط کاربر
+
+جهت اطمینان از پاس شدن تست‌های مربوط به Stage 7 و Stage 9، دستور زیر را اجرا کنید:
+
+```bash
+python -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -v
+```
+
+---
+
+### ۵. تصمیمات سیاست‌گذاری حل‌نشده (Unresolved Policy Decisions)
+
+موارد زیر به‌دلیل عدم وجود تعریف مالی مشخص یا تصمیم مالک محصول، همچنان غیرفعال و حل‌نشده باقی مانده‌اند:
+* **D1:** تعاریف دقیق شوک، میزان حساسیت و آستانهٔ تغییر وضعیت ارزش‌گذاری (Status Flip).
+* **D2:** فرمول ریاضی و روش اندازه‌گیری سهم وابستگی به Target P/E (Multiple Dependence).
+* **D3:** معیار کمی وابستگی به EPS، قواعد تشدید شدت (Severity) بر اساس Reliability و اولویت پیش‌فرض.
+* **D4:** نحوهٔ دریافت ورودی‌های تاریخ‌دار حاشیه سود و آستانهٔ ریسک حاشیه سود.
+* **D5:** معیار مستقل مالی برای ارتقاء `review_priority` به یک هشدار مجزای ریسک.
+* **D6:** فرمول‌های اختصاصی صنایع (نظیر NII برای بانک‌ها یا NAV برای هلدینگ‌ها) و نگاشت‌های قطعی کد صنعت در لایهٔ ارزش‌گذاری.
+
+---
+
+### ۶. بیانیهٔ عدم اجرای تست‌ها
+
+**تست‌ها توسط دستیار اجرا نشده‌اند** (مطابق با الزامات صریح سند PROMPT.md).
+
+---

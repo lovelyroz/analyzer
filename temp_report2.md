@@ -4003,19 +4003,19 @@ pytest src/tests/test_stage8_market.py
 - **Historical versioning:** The full chain does not yet demonstrate historically versioned parameters and model inputs.
 - **Alert contract:** Deferred Stage 7 alert policies remain unresolved, including the documented D1–D6 items.
 - **Stage 7 freeze:** Stage 7 should remain unfrozen until its documented requirements and blockers are resolved or explicitly accepted.
-گزارش قبلی فایل‌هایی را که در اصلاح هشدارهای تست‌ها تغییر دادم ذکر نکرد. این فایل‌ها بودند:
+The previous report did not mention the files I modified to address test warnings. These files were:
 
 src/models/report.py
- و 
+and
 src/models/normalized.py
- — اصلاح defaultهای زمانی SQLAlchemy که هشدارهای تست Stage 5 ایجاد می‌کردند.
+— Adjusting SQLAlchemy temporal defaults that were triggering Stage 5 test warnings.
 src/scoring/engine.py
- و 
+and
 src/tests/test_stage3_scoring.py
- — اصلاح timestamp موتور و fixtureهای Stage 3.
+— Adjusting engine timestamps and Stage 3 fixtures.
 src/market/engine.py
- — اصلاح timestampهای Stage 8.
-این تغییرها مربوط به رفع warningها بودند، نه اتصال مسیر واقعی Stage 7→9 در پرامپت ۴۷. برای خود اتصال، در پرامپت ۴۷ هیچ فایلی تغییر نکرد؛ چون entry point و تولیدکننده‌های لازم برای Stage 3 و Stage 8 پیدا نشدند.
+— Adjusting Stage 8 timestamps.
+These changes were made to resolve warnings, not to establish the actual Stage 7→9 pipeline mentioned in Prompt 47. Regarding the pipeline itself, no files were modified in Prompt 47, as the necessary entry points and generators for Stage 3 and Stage 8 could not be located.
 ================================================================
 # Prompt 50 and Follow-up Code Fix
 
@@ -4038,66 +4038,62 @@ I did not edit `reply.md` and did not run tests.
 ===================================================
 # P53 — Point-in-Time (D7) Evidence Audit and Safe Remediation
 
-## جمع‌بندی P53
+##P53 Summary
 
-**PIT کامل اثبات نشده است.** داده‌های Stage 5 و ارجاع‌های زمانیِ اعلام‌شده تا حدی قابل کنترل‌اند، اما برای قیمت بازار، benchmarkها، همهٔ ورودی‌های EPS و پارامترهای تاریخی شواهد کافی وجود ندارد.
+**Full PIT (Point-in-Time) is not yet verified.** While Stage 5 data and the associated temporal references are reasonably controllable, there is insufficient evidence regarding market prices, benchmarks, all EPS inputs, and historical parameters.
 
-### اصلاح انجام‌شده
+### Implemented Fix
 
-در [engine.py](D:/winprojects/analyzer/src/valuation/engine.py:115)، موتور Stage 7 اکنون ارجاع‌های پذیرفته‌شده‌ای را که Stage 5 در `forecast_result.assumptions["input_refs"]` قرار می‌دهد، خودکار بررسی می‌کند. ارجاع‌های بدون `available_at` یا بعد از cutoff رد می‌شوند؛ ارجاع دقیقاً روی cutoff پذیرفته می‌شود. این ارجاع‌ها حتی در صورت ارسال فهرست صریح خالی نیز بررسی می‌شوند.
+In [engine.py](D:/winprojects/analyzer/src/valuation/engine.py:115), the Stage 7 engine now automatically validates the references provided by Stage 5 within `forecast_result.assumptions["input_refs"]`. References lacking an `available_at` timestamp or those dated after the cutoff are rejected; references dated exactly on the cutoff are accepted. This validation applies even if an explicitly empty list of references is provided.
 
-چهار تست به [test_stage7_valuation.py](D:/winprojects/analyzer/src/tests/test_stage7_valuation.py:1364) اضافه شد:
+Four tests have been added to [test_stage7_valuation.py](D:/winprojects/analyzer/src/tests/test_stage7_valuation.py:1364):
 
 - `test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted`
 - `test_p53_embedded_forecast_input_ref_after_cutoff_is_rejected`
 - `test_p53_embedded_forecast_input_ref_without_availability_is_rejected`
 - `test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance`
 
-آزمون‌ها اجرا نشدند.
+The tests have not been executed.
 
-### شواهد زمانی و محدودیت‌ها
+### Temporal Evidence and Constraints
 
-| ورودی | تاریخ مشاهده یا گزارش | شواهد دسترس‌پذیری و اعمال cutoff | محدودیت باقی‌مانده |
+| Input | Observation or Reporting Date | Availability Evidence and Cutoff Application | Remaining Constraint |
 |---|---|---|---|
-| قیمت بازار | `MarketDaily.jalali_year/month/day`؛ انتخاب آخرین قیمت در یا پیش از تاریخ جلالی درخواستی | `select_market_price_as_of` تاریخ جلالی را مقایسه می‌کند و قیمت، منبع و شناسهٔ رکورد را در metadata نگه می‌دارد. | مدل قیمت بازار `available_at` ندارد؛ تاریخ معامله ثابت نمی‌کند قیمت در همان زمان برای سیستم یا بازار در دسترس بوده است. تاریخ انتخاب‌شده هم به فیلدهای `valuation_date` و `market_price_date` منتقل نمی‌شود؛ در metadata باقی می‌ماند. |
-| facts صورت‌های مالی | `FinancialPeriod.end_date` از نوع `Date` | `src/forecast/queries.py` نسخه‌هایی را انتخاب می‌کند که `ReportVersion.publication_datetime <= cutoff` باشد و ارجاع publication را برای Stage 5 فراهم می‌کند. | `publication_datetime` هنگام ingestion به‌عنوان ورودی دریافت می‌شود؛ کد بررسی نمی‌کند که آن زمان از منبع مستقل و معتبر تأیید شده باشد. پایان دوره، زمان انتشار نیست. |
-| Forecast EPS | `SingleForecastChain.eps` در `CompanyForecastResult`؛ همراه `forecast_timestamp`، `data_cutoff_datetime` و `model_version` | Stage 5 ارجاع‌های پذیرفته‌شده را در `assumptions["input_refs"]` می‌گذارد. اصلاح P53 این شواهد را به اعتبارسنجی Stage 7 وصل می‌کند. | فهرست ارجاع‌ها فقط آنچه اعلام شده را پوشش می‌دهد. نبود ارجاع، ورودی‌های اعلام‌نشده را اثباتاً تاریخی نمی‌کند؛ provenance کامل EPS تضمین نشده است. |
-| benchmark تاریخی و صنعتی | ورودی‌های عددی `historical_pe_values`، `industry_forward_pe_values` و `industry_ttm_pe_values` | در موتور Stage 7 به median تبدیل می‌شوند. | این ورودی‌ها تاریخ، منبع، تاریخ دسترس‌پذیری یا provenance به‌ازای هر observation ندارند؛ cutoff روی آن‌ها اعمال نمی‌شود. |
-| cutoff و تاریخ ارزش‌گذاری | `data_cutoff_datetime` اختیاری است؛ در نبود آن از cutoff Forecast استفاده می‌شود. `valuation_date` اختیاری است. | cutoff برای ارجاع‌های Forecast مقایسه می‌شود. | ترتیب cutoff، تاریخ ارزش‌گذاری و تاریخ قیمت در موتور کنترل نمی‌شود. انتخاب قیمت به تاریخ جلالی است و آن را بدون تبدیلِ اثبات‌شده نمی‌توان با cutoff از نوع `datetime` مقایسه کرد. |
-| نسخه و پارامترهای مدل | `model_version` و snapshot پارامترها ثبت می‌شوند. | انتخاب تاریخ‌دار با `parameter_as_of` و registry صریح پشتیبانی می‌شود. | registry پیش‌فرض فقط مجموعهٔ genesis بدون `effective_from` دارد. cutoff خودکار مبنای انتخاب پارامتر نیست (`data_cutoff_used_for_parameter_selection=False`)؛ تاریخچهٔ پارامترهای معتبر برای بازآزمایی کامل در دسترس نیست. |
+| Market Price | `MarketDaily.jalali_year/month/day`; selects the latest price on or before the requested Jalali date | `select_market_price_as_of` compares Jalali dates and retains the price, source, and record ID within the metadata. | The market price model lacks an `available_at` field; the transaction date does not confirm that the price was available to the system or the market at that specific time. Furthermore, the selected date is not propagated to the `valuation_date` or `market_price_date` fields; it remains solely in the metadata. |
+| Financial Statement Facts | `FinancialPeriod.end_date` (of type `Date`) | `src/forecast/queries.py` selects versions where `ReportVersion.publication_datetime <= cutoff` and provides the publication reference for Stage 5. | `publication_datetime` is accepted as an input during ingestion; the code does not verify whether this timestamp has been confirmed by an independent, authoritative source. The period end date is not equivalent to the publication date. |
+| Forecast EPS | `SingleForecastChain.eps` within `CompanyForecastResult`; accompanied by `forecast_timestamp`, `data_cutoff_datetime`, and `model_version`. | Stage 5 places accepted references into `assumptions["input_refs"]`. The P53 modification links this evidence to the validation process in Stage 7. | The list of references covers only what has been explicitly declared. The absence of a reference does not definitively establish the historical nature of undeclared inputs; therefore, the complete provenance of the EPS is not guaranteed. |
+| Historical and Industry Benchmarks | Numerical inputs: `historical_pe_values`, `industry_forward_pe_values`, and `industry_ttm_pe_values`. | These are converted into medians within the Stage 7 engine. | ​​These inputs lack associated dates, sources, availability timestamps, or provenance for individual observations; the cutoff is not applied to them. |
+| Cutoff and Valuation Date | `data_cutoff_datetime` is optional; if absent, the Forecast cutoff is used. `valuation_date` is also optional. | The cutoff is compared against Forecast references. | The engine does not enforce a specific order between the cutoff, the valuation date, and the price date. Price selection is based on the Jalali date; without a verified conversion mechanism, this cannot be directly compared against a `datetime`-type cutoff. |
+| Model Version and Parameters | `model_version` and a snapshot of the parameters are recorded. | Point-in-time selection is supported via `parameter_as_of` and an explicit registry. | The default registry contains only the "genesis" set (lacking an `effective_from` attribute). The automatic cutoff is not used as the basis for parameter selection (`data_cutoff_used_for_parameter_selection=False`); the full history of valid parameters is not available for a complete backtest. |
 
-### مسیر بررسی‌شده
+### Examined Workflow
 
-مسیر قابل‌ترکیب در کد از سرویس Forecast و داده‌های مالیِ فیلترشده بر اساس publication شروع می‌شود؛ `calculate_valuation_as_of_jalali` قیمت را با تاریخ جلالی انتخاب می‌کند و به `ValuationEngine` می‌دهد؛ `calculate_decision_as_of_jalali` نتیجهٔ Stage 7 را به `DecisionEngine` می‌رساند. بااین‌حال، در کد محلی فراخوانِ برنامه‌ای برای orchestrator مرحلهٔ تصمیم پیدا نشد؛ استفادهٔ قابل‌مشاهده از آن در تست‌هاست. بنابراین وجود این توابع به‌تنهایی مسیر production یا PIT تاریخیِ سرتاسری را اثبات نمی‌کند.
+The workflow within the codebase begins with the Forecast service and financial data filtered by publication. `calculate_valuation_as_of_jalali` selects the price based on the Jalali date and passes it to the `ValuationEngine`, while `calculate_decision_as_of_jalali` forwards the Stage 7 output to the `DecisionEngine`. However, no programmatic invocation of an orchestrator for the decision stage was found in the local codebase; its usage is only observed within tests. Consequently, the mere existence of these functions does not confirm an end-to-end production workflow or a valid historical Point-in-Time (PIT) process.
 
-**نتیجه:** enforcement برای ارجاع‌های Forecast که واقعاً همراه نتیجه اعلام شده‌اند تقویت شد؛ کنترل cutoff قیمت فقط بر اساس تاریخ مشاهده انجام می‌شود. صحت PIT کل ارزش‌گذاری و بازآزمایی تاریخی همچنان **اثبات‌نشده** است.
+**Conclusion:** Enforcement has been strengthened for Forecast references explicitly associated with the results; however, price cutoff validation is based solely on the observation date. The overall Point-in-Time (PIT) integrity of the valuation process and historical backtesting remains **unverified**. ### Files, Tests, and Next Steps
 
-### فایل‌ها، آزمون‌ها و گام بعدی
+Modified files:
 
-فایل‌های تغییرکرده:
+- `src/valuation/engine.py` — Connecting the existing Forecast provenance to the Stage 7 validation.
+- `src/tests/test_stage7_valuation.py` — Four targeted tests covering the cutoff boundary, future data, unknown availability, and preventing the bypass of checks via an explicitly empty list.
 
-- `src/valuation/engine.py` — اتصال provenance موجود Forecast به اعتبارسنجی Stage 7.
-- `src/tests/test_stage7_valuation.py` — چهار تست متمرکز برای مرز cutoff، دادهٔ آینده، availability نامعلوم، و جلوگیری از دورزدن بررسی با فهرست صریح خالی.
-
-ترتیب پیشنهادی اجرای تست‌ها:
+Recommended test execution order:
 
 ```bash
 python -m pytest src/tests/test_stage7_valuation.py -q -k "p53_embedded_forecast_input_ref or p53_explicit_empty_refs"
 python -m pytest src/tests/test_stage7_valuation.py -q
 ```
 
-این فایل‌ها و بخش‌های مرتبط از کد و تست‌های Forecast، market ingestion، مدل‌های Report/Period/Market، پارامترهای Stage 7 و سرویس تصمیم بررسی شدند. تست یا CI اجرا نکردم و فایل گزارش یا مشخصات قفل‌شده را تغییر ندادم. **گام بعدی برنامه** رفع محدودیت D7 است: منبع معتبر `available_at` برای قیمت بازار، provenance تاریخ‌دار benchmarkها و نسخه‌های مؤثر تاریخی پارامترها لازم است. Stage 7 همچنان **OPEN** است.
+These files, along with relevant sections of the Forecast code and tests, market ingestion, Report/Period/Market models, Stage 7 parameters, and the decision service, have been reviewed. I have not executed the tests or the CI pipeline, nor have I modified any report files or lock specifications. The **next step** is to address the D7 limitation: the authoritative source `a`
 ==========================================================
-# P53.1 انجام شد
+# P53.1 completed.
 
-فایل‌های تغییرکرده از طرف من:
+Files modified by me:
 
-- [src/valuation/engine.py](D:/winprojects/analyzer/src/valuation/engine.py:113) — توضیح handoff را روشن کردم: Stage 7 اعتبارسنجی را روی `assumptions["input_refs"]` انجام می‌دهد، یعنی ارجاع‌هایی که Stage 5 از PIT guard عبور داده است. `__input_refs` شامل ارجاع‌های خام، از جمله موارد ردشده، است و نباید دوباره به‌عنوان ورودی ارزش‌گذاری اعتبارسنجی شود. **منطق اجرایی تغییری نکرده است.**
-- [src/tests/test_stage7_valuation.py](D:/winprojects/analyzer/src/tests/test_stage7_valuation.py:1318) — تست‌های دستی P53 را با تست‌هایی جایگزین کردم که نتیجه را واقعاً با `ForecastEngine.generate_forecast()` می‌سازند و سپس به Stage 7 می‌دهند.
+- [src/valuation/engine.py](D:/winprojects/analyzer/src/valuation/engine.py:113) — Clarified the handoff: Stage 7 performs validation on `assumptions["input_refs"]`—specifically, the references that passed through the PIT guard in Stage 5. `__input_refs` contains the raw references (including those that were dropped) and should not be re-validated as valuation inputs. **The execution logic remains unchanged.**
+- [src/tests/test_stage7_valuation.py](D:/winprojects/analyzer/src/tests/test_stage7_valuation.py:1318) — Replaced the manual P53 tests with tests that generate the actual results using `ForecastEngine.generate_forecast()` and then pass them to Stage 7.
 
-Stage 5 ارجاع‌های خام را در `__input_refs` نگه می‌دارد؛ ارجاع‌های پذیرفته‌شده را در `assumptions["input_refs"]` می‌گذارد و موارد دیررسِ حذف‌شده را در `pit_dropped_values` ثبت می‌کند. بنابراین دیررس‌بودن یک ارجاع در فهرست audit به‌تنهایی دلیل رد forecast در Stage 7 نیست؛ Stage 5 ممکن است همان ورودی را قبلاً از محاسبه کنار گذاشته باشد. این با توضیح شواهد در خود P53.1 تفاوت دارد، اما با خروجی واقعی کد Stage 5 سازگار است.
-
-تست‌های اضافه یا بازنویسی‌شده:
+Stage 5 stores raw references in `__input_refs`, places accepted references in `assumptions["input_refs"]`, and records items dropped due to "lateness" (being too recent/not yet available) in `pit_dropped_values`. Therefore, the mere fact that a reference is flagged as "late" in the audit log is not, by itself, grounds for rejecting a forecast in Stage 7; Stage 5 may have already excluded that specific input from the calculation. This differs from the explanation of the evidence provided within P53.1 itself, but it is consistent with the actual output produced by the Stage 5 code. Added or rewritten tests:
 
 - `test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted`
 - `test_p53_stage5_dropped_future_input_is_not_reintroduced_to_stage7`
@@ -4105,60 +4101,65 @@ Stage 5 ارجاع‌های خام را در `__input_refs` نگه می‌دار
 - `test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance`
 - `test_p53_stage5_forecast_without_provenance_preserves_legacy_path`
 
-تست دوم نشان می‌دهد Stage 5 ورودیِ بعد از cutoff را حذف می‌کند و Stage 7 از ارجاع audit آن به‌عنوان ورودی مصرف‌شده استفاده نمی‌کند. تست آخر مسیر legacy را حفظ می‌کند و هم‌زمان نشان می‌دهد forecast فاقد provenance همچنان ورودی‌های اجباریِ اعلام‌نشده دارد؛ این وضعیت **اثبات PIT نیست**.
+The second test demonstrates that Stage 5 removes inputs occurring after the cutoff, and Stage 7 does not utilize their audit references as consumed inputs. The final test preserves the legacy path while simultaneously showing that a forecast lacking provenance still contains undeclared mandatory inputs; this scenario **does not constitute a PIT (Point-in-Time) proof**.
 
-دستورهای پیشنهادی برای اجرای شما:
+Suggested commands for your execution:
 
 ```bash
 python -m pytest src/tests/test_stage7_valuation.py -q -k "p53_"
 python -m pytest src/tests/test_stage7_valuation.py -q
 ```
 
-تست یا CI اجرا نکردم؛ بررسی ایستای diff انجام شد و `git diff --check` خطایی گزارش نکرد. محدودیت اصلی همچنان برقرار است: نبود provenance برای برخی ورودی‌ها، و فقدان شواهد تاریخی کافی برای بازار، benchmarkها و نسخهٔ پارامترها، اجازهٔ اثبات PIT کامل را نمی‌دهد. **Stage 7 باز است.**
+I have not executed the tests or the CI pipeline; a static review of the diff was performed, and `git diff --check` reported no errors. The primary limitation remains: the absence of provenance for certain inputs—along with a lack of sufficient historical evidence regarding the market, benchmarks, and parameter versions—precludes a complete PIT proof. **Stage 7 remains open.**
 ==============================================================
 # P54
-تغییرات D9 آماده است و فقط روی engine.py و فایل تست انجام شد. من هیچ تستی اجرا نکرده‌ام؛ فقط syntax هر دو فایل را با ast.parse چک کردم.
+The D9 changes are ready; they were applied only to `engine.py` and the test file. I have not executed any tests; I merely verified the syntax of both files using `ast.parse`.
 
-تغییرات واقعی
+Actual Changes
 
-ریشهٔ مشکل: در engine.py انتخاب پارامتر قبل از تعیین cutoff انجام می‌شد و data_cutoff_used_for_parameter_selection هم به‌صورت ثابت False نوشته می‌شد.
+Root cause: In `engine.py`, parameter selection was performed before the cutoff was determined, and `data_cutoff_used_for_parameter_selection` was hardcoded to `False`.
 
-اصلاحات در engine.py:
+Adjustments in `engine.py`:
 
-cutoff مؤثر (آرگومان صریح یا cutoff خود forecast) اکنون قبل از انتخاب پارامتر تعیین می‌شود.
-متد کمکی جدید _resolve_parameter_governing_timestamp تعیین می‌کند چه زمانی حاکم است:
-اگر نه registry و نه parameter_as_of داده شده باشد: مسیر legacy Genesis، بدون انتخاب تاریخ.
-اگر cutoff معتبر وجود داشته باشد: cutoff حاکم است. parameter_as_of متفاوت با آن، ValueError با پیام «conflicts with the effective data cutoff» می‌دهد. اگر با cutoff برابر باشد (حتی با timezone متفاوت) مشکلی نیست.
-اگر cutoff وجود نداشته باشد ولی parameter_as_of داده شده باشد: همان مقدار استفاده می‌شود و با برچسب CALLER_SUPPLIED ثبت می‌شود.
-اگر هیچ‌کدام نباشد: انتخاب با LookupError شکست می‌خورد. valuation_date هرگز جایگزین نمی‌شود.
-متادیتا حالا واقعی است:
-data_cutoff_used_for_parameter_selection فقط وقتی True است که cutoff واقعاً حاکم بوده باشد.
-as_of_source یکی از EFFECTIVE_DATA_CUTOFF، CALLER_SUPPLIED یا None است.
-کلیدهای جدید historical_parameter_verification (با مقدار DATED_VERSION_SELECTED یا UNVERIFIED_LEGACY_GENESIS) و parameter_as_of_supplied اضافه شده‌اند.
+The effective cutoff (either an explicit argument or the forecast's own cutoff) is now determined prior to parameter selection.
+A new helper method, `_resolve_parameter_governing_timestamp`, determines which timestamp governs the selection:
+If neither `registry` nor `parameter_as_of` is provided: The legacy "Genesis" path is followed, with no date selection.
+If a valid cutoff exists: The cutoff governs. If `parameter_as_of` differs from it, a `ValueError` is raised with the message "conflicts with the effective data cutoff." If it matches the cutoff (even with a different timezone), it is accepted.
+If no cutoff exists but `parameter_as_of` is provided: That value is used and recorded with the label `CALLER_SUPPLIED`.
+If neither is present: Selection fails with a `LookupError`. `valuation_date` is never used as a fallback.
+Metadata is now accurate:
+`data_cutoff_used_for_parameter_selection` is `True` only when the cutoff was the actual governing factor.
+`as_of_source` is set to one of the following: `EFFECTIVE_DATA_CUTOFF`, `CALLER_SUPPLIED`, or `None`.
+New keys have been added: `historical_parameter_verification` (with values ​​`DATED_VERSION_SELECTED` or `UNVERIFIED_LEGACY_GENESIS`) and `parameter_as_of_supplied`.
 
-parameters.py تغییر نکرد. منطق resolve_parameter_set_as_of از قبل effective_from <= governing، رد نسخهٔ آینده، رد تعارض و خطای صریح برای نبود نسخه را درست پیاده کرده بود.
+`parameters.py` remains unchanged. The logic in `resolve_parameter_set_as_of` already correctly implemented the following: ensuring `effective_from <= governing`, rejecting future versions, handling conflicts, and explicitly raising an error if no version is found.
 
-نکتهٔ مهم دربارهٔ تست‌های قدیمی
+**Note on Legacy Tests**
 
-شش تست P35 تا حالا parameter_as_of را با مقداری متفاوت از cutoff پیش‌فرض (2026-01-01) می‌دادند. طبق الزام ۴ این حالت اکنون خطاست. در این تست‌ها parameter_as_of= را به data_cutoff_datetime= تبدیل کردم و assertionهای مالی و snapshot را دست نزدم. دو assertion عمداً عوض شد: as_of_source شد EFFECTIVE_DATA_CUTOFF و data_cutoff_used... شد True. تست legacy بدون تغییر ماند و همچنان False را انتظار دارد.
+Six tests (P35 series) previously invoked `parameter_as_of` with a value differing from the default cutoff (`2026-01-01`). Per Requirement 4, this is now considered an error. In these tests, I replaced `parameter_as_of=` with `data_cutoff_datetime=`, while leaving the financial and snapshot assertions unchanged. Two assertions were intentionally modified: `as_of_source` is now set to `EFFECTIVE_DATA_CUTOFF`, and `data_cutoff_used...` is set to `True`. The legacy test remains unchanged and continues to expect `False`.
 
-تست‌های جدید (۱۰ تست test_d9_*)
-انتخاب با cutoff و نه با valuation_date (در هر دو جهت)
-مرز دقیق effective_from (برابر پذیرفته می‌شود، یک ثانیه قبل‌تر رد می‌شود)
-رد نسخهٔ آینده
-نبود نسخهٔ واجد شرایط (registry خالی، نسخهٔ بدون تاریخ، Genesis)
-نسخه‌های هم‌پوشان (تساوی تاریخ یعنی Ambiguous، و در غیر تساوی جدیدترین برنده است، مستقل از ترتیب)
-تعارض parameter_as_of با cutoff
-حالت بدون cutoff با CALLER_SUPPLIED
-تفکیک متادیتای dated از legacy
-سازگاری legacy، شامل ۳۸ رکورد، ۳۳ مصرف‌شده و ۵ ثبت‌شده‌ی مصرف‌نشده
-قطعی‌بودن اجراهای تکراری
-فایل‌های تغییر‌یافته
-src/valuation/engine.py
-src/tests/test_stage7_valuation.py
-محدودیت‌های باقی‌مانده
-هیچ نسخهٔ تاریخ‌دار واقعی در DEFAULT_REGISTRY وجود ندارد. پس هر انتخاب تاریخی روی registry پیش‌فرض عمداً با LookupError (با پیام R8) شکست می‌خورد. تست‌ها از نسخه‌های ساختگی TEST/* استفاده می‌کنند، نه تاریخ واقعی.
-مسیر legacy همچنان ادعای PIT ندارد (UNVERIFIED_LEGACY_GENESIS).
-طبق D7، حاکم‌بودن cutoff برای پارامترها به‌معنای اثبات PIT برای داده‌های ورودی نیست.
-توضیح docstring بالای select_parameter_set_for_valuation در parameters.py هنوز می‌گوید «as-of توسط caller داده می‌شود»، چون طبق دستور آن فایل را دست نزدم. این فقط توضیح است و رفتار را تغییر نمی‌دهد.
-فرضم دربارهٔ normalize_datetime(None) این است که None برمی‌گرداند. کد قبلی هم همین فرض را داشت، اما در src.forecast.schema آن را ندیدم.
+**New Tests (10 `test_d9_*` tests)**
+
+*   Selection based on `cutoff` rather than `valuation_date` (in both directions).
+*   Precise boundary handling for `effective_from` (inclusive of the exact timestamp; exclusive of one second prior).
+*   Rejection of future versions.
+*   Scenarios where no eligible version exists (empty registry, version without a date, or the "Genesis" version).
+*   Handling of overlapping versions (identical dates result in an "Ambiguous" state; otherwise, the most recent version takes precedence, regardless of input order).
+*   Conflicts between `parameter_as_of` and `cutoff`.
+*   Operation without a `cutoff` using `CALLER_SUPPLIED`.
+*   Distinction between "dated" metadata and legacy data.
+*   Legacy compatibility (covering 38 records: 33 consumed, 5 registered but unconsumed).
+*   Determinism of repeated executions.
+
+**Modified Files**
+
+*   `src/valuation/engine.py`
+*   `src/tests/test_stage7_valuation.py`
+
+**Remaining Limitations**
+
+There are currently no actual "dated" versions within the `DEFAULT_REGISTRY`. Consequently, any attempt to perform a date-based selection against the default registry will intentionally fail with a `LookupError` (accompanied by the `R8` error message). The tests use synthetic versions (TEST/*) rather than actual historical data.
+The legacy path still lacks a PIT (Point-in-Time) guarantee (UNVERIFIED_LEGACY_GENESIS).
+As per D7, the application of a cutoff to parameters does not constitute a PIT guarantee for the input data.
+The docstring for `select_parameter_set_for_valuation` in `parameters.py` still states that the "as-of" date is provided by the caller; I left this file untouched in accordance with the instructions. This is merely a description and does not alter the actual behavior.
+I am assuming that `normalize_datetime(None)` returns `None`. The previous code operated on this same assumption, though I did not find an explicit implementation of this in `src.forecast.schema`.
