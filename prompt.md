@@ -1,195 +1,116 @@
-# P66 — Stage 7 Consolidated Engineering Batch: Architecture Contracts, Specification Reconciliation, and D1–D6
+# P67 — Stage 7 Implementation Batch: Market Data Contract, Stage 8–9 Integration Readiness, and Safe Contract Fixes
 
-## 1. Role and Project Context
+You are working in the local project folder `analyzer`.
 
-Work in the local project folder:
+This is an implementation task, not a report-only audit. Use the current repository state and the latest findings recorded in `reply.md`, especially P66, together with `stepsForStage7.md` and `07_Stage7_Valuation.md`.
 
-`analyzer`
+## 1. Mandatory operating constraints
 
-This is a financial-data application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants are mandatory.
 
-Use `stepsForStage7.md` as the authoritative Stage 7 roadmap and `07_Stage7_Valuation.md` as the valuation specification. Review the available findings in `reply.md`, including P63, P64, and P65 where present.
+- Do not run tests, the application, migrations, database initialization, or other execution commands. I will run tests myself.
+- You may inspect source code and existing tests, modify implementation code, and add or update tests.
+- Do not modify `stepsForStage7.md`, `07_Stage7_Valuation.md`, `reply.md`, or other planning/report files.
+- Do not redesign or consolidate `src/valuation/engine.py`. Its redesign remains the final technical step of Stage 7.
+- Do not invent financial data, schemas, model fields, database tables, industry mappings, thresholds, date policies, or parameter effective dates.
+- Preserve Jalali market-date contracts and existing public interfaces unless a specific incompatibility is demonstrated.
+- Never weaken or remove tests merely to obtain a passing result.
+- Continue with independent, safe tasks if another task is blocked. Clearly distinguish implemented changes from findings and blockers.
 
-Also preserve these established constraints from prior Stage 7 planning:
-- The production path across Stages 3, 5, 7, 8, and 9 has not yet been fully proven.
-- Do not change the existing scenario-dispersion thresholds or comparison semantics without explicit specification approval.
-- Do not invent industry mappings, sector-specific formulas, financial assumptions, parameter values, or historical effective dates.
-- Keep D9 fail-closed where historical parameter selection cannot be established, and report the limitation truthfully.
+## 2. Work package A — Establish the actual Stage 8 market-data contract
 
-Do not assume that any report ID exists in `reply.md` unless you verify it. If a referenced finding is unavailable, inspect the authoritative roadmap and relevant source files instead of inventing its contents.
+Inspect only the files necessary to trace the existing market-data path, including:
 
-## 2. Objectives for This Batch
+- `src/market/engine.py`
+- `src/decision/service.py`
+- `src/decision/engine.py`
+- the existing market ORM models, repositories, and query functions
+- `src/valuation/service.py` and the existing `MarketDaily` query path, where relevant
+- relevant market and decision tests
 
-Advance the following roadmap areas together:
+Determine, using actual source definitions:
 
-- Stage 7 roadmap Phase 2: architecture gaps and interface contracts.
-- Stage 7 roadmap Phase 3: specification, warning, implementation, and test discrepancies.
-- Stage 7 roadmap Phase 6: policies D1–D6.
+1. What market data is stored, in which tables/models, and with what date, symbol/company, and OHLCV fields?
+2. Is there an existing repository or query that can provide the historical sequence required by `MarketEngine.analyze_market`?
+3. Can the data be filtered to the requested company/instrument and as-of date without using future observations?
+4. What date type and calendar does the market engine expect, and how does that compare with the persisted market-data contract?
+5. What minimum input is required by `calculate_decision_as_of_jalali`, and which parts of its input must be prepared by its caller?
 
-Do not begin the final `engine.py` redesign. Do not attempt to force a complete production integration when real sources, contracts, or consumers have not been established.
+Do not treat the existence of `MarketDaily` as proof that it contains all the fields or history required by Stage 8. Verify the schema and actual query semantics.
 
-## 3. Objective A — Resolve the Architecture Contract Questions
+## 3. Work package B — Implement only the real, bounded Stage 8 connection
 
-Start from the evidence already recorded in P48. Verify only the specific interfaces and callers needed to establish the current contract. Avoid repository-wide exploration.
+If the existing schema and query paths provide sufficient evidence, implement the smallest compatible market-data service or repository integration needed to load the existing historical data and produce the `MarketSignalResult` expected by Stage 9.
 
-Trace and document the relevant existing interfaces for:
+Requirements:
 
-1. Stage 3 scoring outputs and their real producers/callers.
-2. Stage 5 forecast generation, persistence, and returned results.
-3. Stage 7 valuation inputs, market-price selection, date handling, and parameter selection.
-4. Stage 8 market analysis inputs and `MarketSignalResult` production.
-5. Stage 9 decision inputs, orchestration, and returned results.
-6. Database `Session` ownership and the propagation of analysis dates/cutoffs.
-7. The destination or consumer of the final decision result.
+- Reuse established models, repositories, session ownership, and date conventions.
+- Filter records according to the actual as-of-date contract. Do not include observations after the requested date.
+- Handle missing or insufficient market history using existing documented behavior. Do not invent financial fallback values or signals.
+- Preserve existing service and result contracts unless a demonstrated defect makes a narrow correction necessary.
+- Add focused tests for the real query/filtering contract, date boundary, missing data, and transfer of the resulting market signal to the existing decision service, as applicable.
+- Use the existing test fixtures and models rather than synthetic production infrastructure.
 
-For each interface, establish:
+If the source schema or date semantics are insufficient to implement this safely, do not create a speculative service. Instead, identify the exact missing field, source, or contract and explain the smallest prerequisite needed. Continue with work packages C and D.
 
-- Actual function/class and file path.
-- Required inputs and their proven sources.
-- Output type and its actual consumer, if one exists.
-- Date and session responsibilities.
-- Whether the connection is proven, partial, or missing.
+## 4. Work package C — Verify and correct clear Stage 7/8/9 contract defects
 
-Distinguish an implemented service from a real application execution path. A unit test using mocks does not establish production integration.
+Use P66 findings and the actual code to review the relevant service boundaries and tests.
 
-### Required outcome
+- Verify the actual inputs and outputs for Stage 5 → Stage 7 and Stage 8 → Stage 9.
+- Check that missing market data, invalid date ranges, or unavailable signals are handled consistently with existing contracts.
+- Check that errors are not silently converted into fabricated market signals or financial outputs.
+- Review whether the current decision-service orchestration passes through the actual Stage 7 result and supplied Stage 8 result without unintended replacement or recalculation.
+- Review warning names and output channels only where an actual code-level inconsistency and its consumer impact can be demonstrated.
+- Correct clear, specification-backed defects and add regression tests.
+- Do not rename public warning tokens or alter output structures without checking known consumers and proving the required migration.
 
-Produce a concrete interface/gap matrix that identifies the smallest viable next integration step using existing architecture.
+Do not build a new application entry point, general orchestrator, persistence model for final decisions, or new database schema as part of this batch. Those require a separately proven contract and must not be invented to make integration tests look complete.
 
-Where a missing source, entry point, date contract, or result consumer prevents a valid connection, document that exact gap. Do not invent data, use synthetic financial inputs to disguise missing production functionality, or create a redundant orchestrator merely to make the architecture appear connected.
+## 5. Work package D — Preserve and test the approved V1 policies
 
-If the existing interfaces already support a safe, clearly bounded connection that does not depend on unresolved policy, implement it only if it belongs within this batch and can be validated without fabricating missing inputs. Otherwise, provide a precise implementation-ready contract.
+Inspect existing tests and implementation for D1–D6. Add or correct focused regression tests where coverage is genuinely missing and the expected behavior is explicit.
 
-## 4. Objective B — Reconcile Specification, Implementation, and Tests
+- D1: Do not emit `ASSESSMENT_FLIP_RISK` without an approved, valid criterion.
+- D2: Do not activate the unwired multiple-dependence threshold or invent a dependency formula.
+- D3: Preserve Stage 5 EPS; do not recalculate EPS or introduce an unapproved EPS-dependence warning.
+- D4: Do not emit margin-assumption risk without valid required inputs.
+- D5: Keep `review_priority` separate from risk alerts.
+- D6: Preserve the current EPS/target-P/E valuation contract; do not invent sector-specific formulas or mappings.
 
-Use the discrepancies and warnings already identified in `reply.md` as leads. Verify them against the actual code and authoritative specifications before deciding whether anything is wrong.
+Keep the P61 scenario-dispersion behavior unchanged: preserve the existing `0.50` thresholds and strict `>` comparison semantics. Do not attempt to unify independent thresholds without an approved policy.
 
-Prioritize:
+Do not force changes where existing implementation and tests already correctly enforce the policy. State which cases are already covered and which received new coverage.
 
-1. Warning and alert names, semantics, and output contracts under D8.
-2. Differences between documented warning behavior and warnings actually emitted.
-3. The reported missing or incomplete sector-driver decomposition and industry-specific behavior.
-4. Reported risk-warning discrepancies and the separation of risk, confidence, valuation status, and review priority.
-5. Tests that may encode behavior inconsistent with the locked specification.
-6. Contradictions between status summaries in `07_Stage7_Valuation.md` and factual implementation annotations elsewhere in that file.
+## 6. Work package E — Verify and report test readiness
 
-For every discrepancy, classify it as one of:
+Without running any tests or application commands:
 
-- Confirmed implementation defect against an explicit requirement.
-- Test/specification inconsistency.
-- Unresolved or ambiguous specification.
-- Documented limitation or deferred capability.
-- Previously reported issue that cannot be reproduced from the available evidence.
+- Inspect the changed code and tests for consistency.
+- Check imports, signatures, fixture usage, date types, and compatibility with existing callers by source inspection.
+- List every changed file and explain its purpose.
+- Provide exact PowerShell-compatible test commands for me to run.
+- Separate focused tests from broader regression tests.
+- Do not report any test as passed, and do not claim runtime behavior was verified.
 
-### Implementation requirement
+Use the project virtual environment when giving commands if necessary. Do not assume the system Python has the project dependencies installed.
 
-Fix confirmed, specification-backed defects that can safely be corrected within the existing architecture.
+## 7. Required final report
 
-Update or add focused tests for the changed behavior, but do not execute them.
+Return a concise but evidence-based report with these headings:
 
-Do not change a test merely to make it pass if doing so would conceal a real defect. If a test conflicts with an explicit specification, correct the test only when the specification clearly determines the intended behavior.
+1. **Implementation Summary**
+2. **Market Data Contract — Verified Facts**
+3. **Changes Made and Files Changed**
+4. **Stage 8–9 Connection Status**
+5. **D1–D6 Regression Coverage**
+6. **Remaining Blockers and Exact Missing Contracts**
+7. **PowerShell Test Commands for Owner Execution**
+8. **Execution Confirmation**
 
-If the financial meaning is ambiguous, do not guess. Record the exact decision needed and continue with independent work.
+For each claimed fix, identify the relevant file/function and the corresponding test added or updated. Explicitly state if the Stage 8 connection remains unimplemented because the necessary source contract is missing.
 
-## 5. Objective C — Verify and Advance Policies D1–D6
+Confirm that no tests or application commands were executed and no Git or remote operations were performed.
 
-For each policy, compare the authoritative specification with implementation and test coverage.
+## Acceptance criteria
 
-- **D1:** Do not produce a status-change alert without a valid criterion.
-- **D2:** Do not use an invalid P/E-dependency indicator.
-- **D3:** Preserve Stage 5 EPS; do not recalculate it or emit unapproved warnings.
-- **D4:** Do not produce a margin-risk alert without valid inputs.
-- **D5:** Keep `review_priority` separate from risk alerts.
-- **D6:** Preserve the current valuation contract and do not invent industry mappings or sector formulas.
-
-For each policy:
-
-1. Identify the actual relevant implementation and tests.
-2. Verify whether the policy is correctly enforced, partially enforced, violated, or not implementable with current inputs.
-3. Check relevant edge cases and invalid/missing-input behavior.
-4. Add or revise focused tests where necessary.
-5. Fix clear violations where the required behavior is explicit.
-6. Record any remaining limitation or policy decision precisely.
-
-Do not treat the existence of a test as proof that a policy is fully enforced. Inspect what the test actually asserts.
-
-Do not invent industry classifications, sector formulas, financial thresholds, or new data sources.
-
-## 6. Consolidated Implementation Rules
-
-This batch should make real progress across all three objectives without expanding into an uncontrolled refactor.
-
-- Inspect only the files needed to verify the reported findings and implement the relevant fixes.
-- Prefer small, cohesive changes over a broad redesign.
-- Preserve public interfaces unless a change is explicitly required and all known consumers can be updated safely.
-- Maintain deterministic behavior and existing financial invariants.
-- Add focused tests for implemented changes.
-- Keep unrelated work moving even when one issue is blocked by missing evidence or an owner decision.
-- Do not modify `src/valuation/engine.py` as part of a redesign or large refactor. Its redesign remains the final Stage 7 task.
-- Do not introduce a new application entry point, orchestration layer, persistence model, or schema without first establishing the actual gap and a compatible contract.
-- Do not change P61 scenario-dispersion thresholds or their semantics without explicit specification support.
-- Do not invent or approve parameter values, effective dates, or historical validity to resolve D9. Preserve the current fail-closed historical parameter selection and truthful legacy metadata.
-- Do not claim that point-in-time correctness or end-to-end production integration is achieved unless the relevant evidence actually proves it.
-
-## 7. Tests and Validation
-
-You may inspect and write tests, but **do not run any tests or application execution commands**. The project owner will run tests locally.
-
-For every code change:
-
-- Identify the behavior being protected.
-- Identify the relevant test file and test cases.
-- State the exact command the owner should run.
-- Explain what a failure would mean, if it is not self-evident.
-
-At minimum, provide targeted commands for affected tests. If changes span multiple test areas, provide a combined command and, where useful, a separate targeted command.
-
-Do not report tests as passed, verified at runtime, or executed. Clearly label all unexecuted tests.
-
-## 8. Guardrails
-
-- Work only in the local `analyzer` folder.
-- Do not use GitHub, GitHub CLI/API, or remote operations.
-- Do not commit, push, pull, switch branches, or alter remote configuration.
-- Do not run tests.
-- Do not make unrelated changes.
-- Do not modify `stepsForStage7.md`, `07_Stage7_Valuation.md`, `reply.md`, or other planning/report files just to record progress. Report findings in your final response for the owner to review.
-- Do not perform the final `engine.py` redesign.
-- Do not claim that the entire Stage 7 roadmap is complete after this batch.
-
-## 9. Required Final Report
-
-Return one consolidated report with the following sections:
-
-### A. Work Completed
-List actual code and test-file changes, grouped by objective. Include exact file paths and concise explanations.
-
-### B. Architecture Contract and Remaining Gaps
-Summarize proven interfaces, partial connections, missing sources/consumers, date/session ownership, and the smallest valid next integration step.
-
-### C. Specification and Implementation Reconciliation
-For each investigated discrepancy, state the evidence, classification, action taken, and remaining status.
-
-### D. D1–D6 Status
-Provide a compact matrix with policy, implementation status, evidence, changes made, and remaining limitations.
-
-### E. Owner-Run Test Plan
-Give exact PowerShell-compatible commands for the affected tests. Clearly state that none were executed during this task.
-
-### F. Remaining Blockers and Next Roadmap Step
-Separate:
-- Items that can be implemented now.
-- Items blocked by missing interfaces or data.
-- Items requiring explicit financial/business approval.
-- Work intentionally deferred to the final `engine.py` review.
-
-### G. Execution Confirmation
-State explicitly:
-- Whether source code was changed.
-- Whether tests were added or changed.
-- Whether any tests or application commands were executed.
-- Whether any Git or remote operations occurred.
-
-The report must describe actual results, not intended work. If a task could not be completed, explain the exact reason and what evidence is missing.
-
-**Acceptance criterion:** This batch must deliver verified progress on multiple roadmap objectives, not merely another audit. Implement all clear, safe, specification-backed fixes within scope, add appropriate tests without running them, and leave a precise, evidence-based path for the next batch.
+This batch must produce real implementation/test progress wherever existing contracts support it, without fabricating data or architecture. If a safe connection cannot yet be built, the result must narrow the unresolved issue to concrete missing evidence or contract details. Stage 7 remains OPEN until the roadmap’s full exit criteria are met.

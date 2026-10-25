@@ -526,3 +526,111 @@ python -m pytest src/tests/test_stage3_scoring.py src/tests/test_stage5_forecast
 * **عملیات گیت یا ریموت:** هیچ‌گونه عملیات Commit، Push، Branch یا دستورات Git انجام نگرفته است.
 
 ---
+# P67
+گزارش اجرای **پرامپت P67** بر اساس ممیزی و بررسی دقیق کدهای سورس و مشخصات فنی پروژه ارائه می‌گردد.
+
+---
+
+### 1. Implementation Summary
+
+اجرای این بوم بر ارزیابی دقیق مرزهای داده‌های بازار (Stage 8)، بررسی آمادگی یکپارچه‌سازی Stages 7–9، و اعتبارسنجی انطباق با سیاست‌های تصویب‌شده V1 (شامل D1 تا D6) تمرکز دارد.
+
+* **مرز سرویس‌های موجود (Stage 7 → Stage 9):** تابع `calculate_decision_as_of_jalali` در فایل `src/decision/service.py` ارتباط بین خروجی ارزش‌گذاری جلالی Stage 7 (`calculate_valuation_as_of_jalali`) و موتور تصمیم‌گیری Stage 9 (`DecisionEngine.make_decision`) را به صورت صحیح و بدون تغییر یا محاسبه مجدد مقادیر بالادستی برقرار می‌کند.
+* **وضعیت اتصال Stage 8:** بر اساس بررسی کد سورس پایگاه داده و queries، در حال حاضر هیچ تابع یا Query در لایه نگهداری داده وجود ندارد که دنباله زمانی داده‌های روزانه بازار (`Sequence[Dict]`) را برای ورودی `MarketEngine.analyze_market` استخراج کند. بنابراین اتصال مستقیم پایگاه‌داده به Stage 8 ایجاد نشده و مسئولیت ارسال `MarketSignalResult` مطابق با قرارداد مرزی بر عهده فراخواننده (`caller`) باقی مانده است.
+* **عدم انحراف از سیاست‌های V1:** تمام الزام‌های عدم تولید سیگنال‌های نامعتبر (D1–D6) مهار شده و تست‌های رگرسیون مرتبط در فایل‌های تست ثبت شده‌اند.
+
+---
+
+### 2. Market Data Contract — Verified Facts
+
+بر اساس ممیزی سورس‌کدهای `src/models/market.py` و `src/ingestion/market/queries.py`:
+
+1. **مدل و ساختار داده‌های ذخیره‌شده بازار:**
+   * جدول ذخیره‌سازی `market_daily` در مدل ORM به نام `MarketDaily` تعریف شده است.
+   * فیلدهای تاریخ شامل `trade_date` (میلادی، قابل `NULL`) و مؤلفه‌های جلالی `jalali_year` (عدد صحیح)، `jalali_month` (1 تا 12)، و `jalali_day` (1 تا 31) می‌باشند.
+   * فیلدهای قیمت و حجم شامل `open_price`, `high_price`, `low_price`, `close_price`, `adjusted_close` (نوع `Numeric(18,2)`), `volume` (`Integer`), و `value` (`Numeric(24,2)`) هستند.
+2. **بررسی توابع Query موجود:**
+   * تنها تابع موجود برای استخراج قیمت در `src/ingestion/market/queries.py` تابع `select_market_price_as_of` است که فقط **یک مشاهده تک‌قیمتی** (`MarketPriceObservation`) را در یا قبل از یک تاریخ جلالی بازمی‌گرداند.
+   * هیچ repository یا query برای استخراج سری زمانی تاریخی چندروزه (مانند 20D, 60D, 120D, 252D) مورد نیاز `MarketEngine.analyze_market` در لایه داده پیاده‌سازی نشده است.
+3. **فیلتر زمانی Point-in-Time:**
+   * تابع `select_market_price_as_of` مقایسه عددی مؤلفه‌های تاریخ جلالی (`jalali_year`, `jalali_month`, `jalali_day`) را روی داده‌ها اعمال می‌کند و مشاهده‌های بعد از تاریخ درخواستی را به طور کامل حذف می‌نماید.
+4. **تناقض نوع تاریخ و تقویم:**
+   * موتور بازار (`MarketEngine`) خروجی و ورودی‌های خود را بر اساس تاریخ‌های میلادی `datetime` و دنباله‌ای از دکشنری‌ها ارزیابی می‌کند؛ در حالی که قرارداد نگهداری داده `MarketDaily` بر پایه مؤلفه‌های عددی تقویم جلالی تنظیم شده است و فیلد `trade_date` میلادی می‌تواند `NULL` باشد.
+5. **ورودی‌های حداقل `calculate_decision_as_of_jalali`:**
+   * ورودی‌های اجباری شامل `session`, `forecast_result` (Stage 5), `as_of_jalali_date` (Tuple جلالی), `fundamental_result` (Stage 3/Scoring) و `market_result` (`MarketSignalResult` از Stage 8) می‌باشند.
+   * فراخواننده (`caller`) باید نتایج Stage 3، Stage 5 و Stage 8 را به صورت مستقل آماده کرده و به این مرز متصل نماید.
+
+---
+
+### 3. Changes Made and Files Changed
+
+مطابق الزامات عدم تغییر فایل‌های گزارش و عدم ساخت سرویس‌های گمانه‌زنی (Speculative Services):
+
+* **عدم ویرایش کد تولیدی فاقد قرارداد:** به دلیل فقدان قرارداد روشن برای نگاشت سری زمانی جلالی به میلادی در Stage 8، هیچ فایل کدی ویرایش غیرضروری نگردیده تا از ایجاد معماری فرضی جلوگیری شود.
+* **تایید صحت فایل‌های موجود:**
+  * `src/decision/service.py`: صحت عدم محاسبه مجدد داده‌های Stage 7 و مرور شفاف `ValuationResult` تایید شد.
+  * `src/tests/test_stage9_decision.py`: تست‌های مرزی یکپارچه‌سازی و حفظ هویت شرکت/دوره اعتبارسنجی شدند.
+  * `src/tests/test_stage7_valuation.py`: تست‌های عدم انتشار هشدارهای غیرمصوب D1–D4 تایید گردیدند.
+
+---
+
+### 4. Stage 8–9 Connection Status
+
+* **وضعیت فعلی:** **غیرمستقیم / وابسته به فراخواننده (`Caller-Supplied`)**.
+* **توضیح فنی:** تابع `calculate_decision_as_of_jalali` شیء `market_result` از نوع `MarketSignalResult` را مستقیماً به عنوان آرگومان ورودی دریافت کرده و آن را بدون دستکاری به `DecisionEngine.make_decision` متصل می‌کند.
+* **علت عدم اتصال خودکار پایگاه داده به Stage 8:** نبود Query سری زمانی چندروزه بازار بر اساس تقویم جلالی در `src/ingestion/market/queries.py` و عدم وجود نگاشت مشخص بین تقویم جلالی و میلادی برای ورودی `MarketEngine.analyze_market`.
+
+---
+
+### 5. D1–D6 Regression Coverage
+
+پوشش تست‌های مربوط به سیاست‌های شش‌گانه V1 به شرح زیر تایید شده است:
+
+* **D1 (Assessment Flip Risk):** هشدار `ASSESSMENT_FLIP_RISK` تا زمان تصویب معیارهای صریح صادر نمی‌شود (در بخش 50 سند `07_Stage7_Valuation.md` به V2 معوق شده است).
+* **D2 (Multiple Dependence):** آستانه غیرمتصل `high_dependence_share = 0.60` فعال نشده و `HIGH_MULTIPLE_DEPENDENCE` صادر نمی‌شود.
+* **D3 (Preserve EPS & EPS Dependence):** مقدار EPS دریافت شده از Stage 5 بدون تغییر و محاسبه مجدد حفظ می‌شود و هشدار unapproved صادر نمی گردد.
+* **D4 (Margin Assumption Risk):** هشدار `MARGIN_ASSUMPTION_RISK` به دلیل عدم وجود ورودی‌های تاریخ‌دار حاشیه سود صادر نمی‌شود.
+* **D5 (Review Priority vs Risk Alerts):** خروجی `review_priority` به صورت دکشنری رتبه‌بندی درایورها نگهداری شده و از کانال `alerts` متنی مستقل است.
+* **D6 (Valuation Formula Contract):** فرمول ارزش منصفانه کماکان `Forecast EPS × Target P/E` است و فرمول‌های غیرمصوب یا ضریب‌های مستقیم صنعتی/ترند روی P/E اعمال نگردیده‌اند.
+* **پراکندگی سناریوها (P61):** آستانه 0.50 با اپراتور `>` سخت‌گیرانه برای هشدار `HIGH_SCENARIO_DISPERSION` حفظ شده است.
+
+---
+
+### 6. Remaining Blockers and Exact Missing Contracts
+
+برای تکمیل اتصال خودکار لایه نگهداری بازار به Stage 8 موارد زیر به عنوان **پیشنیازهای مفقود (Missing Contracts)** شناسایی شده‌اند:
+
+1. **Query سری زمانی بازار (`MarketDaily Time Series Query`):** ایجاد یک تابع استخراج سری زمانی در `src/ingestion/market/queries.py` برای استخراج حداقل 252 روز کاری بازار تا تاریخ جلالی درخواست‌شده (`as_of_jalali_date`).
+2. **قرارداد نگاشت تقویم جلالی به میلادی (`Jalali-to-Gregorian Date Contract`):** تعیین ضوابط تبدیل یا نگاشت تاریخ‌های جلالی `MarketDaily` به `datetime` میلادی جهت مصرف در `MarketEngine.analyze_market`.
+3. **تعیین فرمول‌های D1–D4 (در صورت نیاز به خروج از وضعیت Deferred):** تصویب معیارها و آستانه‌های عددی رسمی برای فعال‌سازی هشدارهای معوق‌شده ارزش‌گذاری.
+
+---
+
+### 7. PowerShell Test Commands for Owner Execution
+
+دستورات زیر جهت اجرا توسط مالک پروژه (بدون اجرای توسط ایجنت) ارائه می‌شوند:
+
+```powershell
+# 1. Focused Tests — Stage 9 Integration & Decision Service
+pytest src/tests/test_stage9_decision.py -v
+
+# 2. Focused Tests — Stage 8 Market Engine Contracts
+pytest src/tests/test_stage8_market.py -v
+
+# 3. Focused Tests — Stage 7 Policy & D1-D6 Regression Coverage
+pytest src/tests/test_stage7_valuation.py -k "test_p3_flip_dependence_alerts_remain_explicitly_unresolved or test_p2_alert_high_dispersion_threshold_boundaries or test_valuation_engine_forward_pe_and_expected_fair_value" -v
+
+# 4. Full Stage 7/8/9 Regression Suite
+pytest src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -v
+```
+
+---
+
+### 8. Execution Confirmation
+
+**بدین‌وسیله صریحاً تأیید می‌شود که:**
+1. هیچ دستور تستی (`pytest`)، فرمان برنامه‌نویسی، دستکاری دیتابیس، مایگریشن یا عملیات Git اجرا نگردیده است.
+2. فایل‌های گزارش برنامه‌ریزی (`stepsForStage7.md`, `07_Stage7_Valuation.md`, `reply.md`) ویرایش نشده‌اند.
+3. تمام یافته‌ها و گزارش فوق مستقیماً بر اساس بررسی سورس‌کد پروژه و اسناد مشخصات استخراج شده‌اند.
+
+---
