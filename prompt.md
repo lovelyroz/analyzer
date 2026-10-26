@@ -1,62 +1,62 @@
-# P73 — Correct Missing-Data Handling in Stage 8
+# P74 — Reject or Fail Closed on Non-Finite Stage 8 Market Inputs
 
+You are working in the local project folder `analyzer`, a financial-data application where correctness, auditability, deterministic behavior, and preservation of financial invariants take priority over convenience.
 
+## Required reading
 
-Read `stepsForStage7.md`, the P72 report in `temp_report2.md`, and the current implementations of:
-
+Read:
+- `stepsForStage7.md`
+- The P72 and P73 sections of `temp_report2.md`
 - `src/market/engine.py`
-- `src/market/indicators.py`
 - `src/market/schema.py`
 - `src/tests/test_stage8_market.py`
 - `src/tests/test_stage8_market_service.py`
 
+## Objective
 
+Inspect and correct the handling of non-finite numeric values in Stage 8 market inputs, specifically `NaN`, positive infinity, and negative infinity.
 
-## Objective A — Stop zero-filling missing volume/value
+P73 addressed `None` values but explicitly left `NaN` unresolved. Do not assume that converting a value with `float()` makes it valid financial data.
 
-In `src/market/engine.py`, the current conversion of missing volume and trading-value observations to `0.0` is inconsistent with the P72 data-integrity requirement.
+### A. Establish explicit behavior
 
-Correct this without changing existing financial formulas, thresholds, or the meaning of indicator windows.
+Inspect how `_number`, `_price`, market benchmark processing, and dependent calculations handle non-finite values.
 
-Requirements:
+Define and implement a consistent, fail-safe policy:
 
-1. Preserve missing volume and value observations as missing internally.
-2. Do not pass synthetic zeroes into volume or trading-value indicators.
-3. For a metric whose required observation window contains missing values, return its established missing-data result (`None` for a numeric metric or `INSUFFICIENT_DATA` for its corresponding state), rather than computing a misleading result from zero-filled or silently incomplete data.
-4. Respect the existing observation-count windows. Do not introduce a new lookback window, minimum-sample threshold, or financial threshold.
-5. Keep price calculations unchanged.
-6. Review volume ratio, average volume, average trading value, trading-value stability, liquidity state, and any related alerts so missing data cannot be misclassified as zero activity.
-7. Add focused tests for missing volume and missing value in relevant windows. Assert that missing values are not treated as zero and that dependent metrics/states fail closed as specified.
+- Non-finite prices must never enter price-derived calculations as valid observations.
+- Non-finite optional volume and trading-value observations must never be treated as genuine numeric observations or silently converted to zero.
+- Non-finite benchmark prices must never distort relative-strength or market-regime results.
+- Missing or invalid optional observations must not produce misleading volume, liquidity, or alert outputs.
+- Preserve the distinction between a genuine numeric zero and missing or invalid data.
 
-Do not modify `src/market/indicators.py` unless necessary. If a change there is unavoidable, explain why and keep it narrowly scoped.
+Follow existing contracts and error-handling conventions. Do not introduce silent row dropping if it would conceal invalid source data. Where the current contract does not clearly determine whether to raise an error or fail closed, report the ambiguity rather than inventing a broader policy.
 
-## Objective B — Make market-regime price fallback consistent
+### B. Regression tests
 
-In `_market_regime`, use `adjusted_close` when it is not `None`; otherwise fall back to `close`, matching the established `_price` behavior.
+Add focused tests covering `NaN`, positive infinity, and negative infinity for:
+- Primary price observations
+- Optional volume and trading-value observations
+- Benchmark price observations
+- Dependent indicators and alerts
 
-Do not fall back when the adjusted close is an actual numeric value. Do not invent prices or change regime thresholds.
+Include boundary cases and verify that ordinary finite values and genuine zeros retain their existing behavior.
 
-Add a regression test where benchmark rows have `adjusted_close=None` and valid `close` values. Verify that the regime calculation uses those close values and matches the expected existing formula. Also preserve behavior when both prices are missing.
+### C. Strict exclusions
 
-## Strict exclusions
+- Do not change financial formulas, thresholds, observation windows, or alert names.
+- Do not change the Jalali date contract or add Gregorian conversion.
+- Do not modify `src/valuation/engine.py`, Stage 5 EPS, Stage 7 valuation parameters, or `src/market/indicators.py` unless a specific, unavoidable dependency is demonstrated and reported before expanding scope.
+- Do not change unrelated modules, dependencies, database schemas, or migrations.
+- Do not run tests, the application, database commands, or Git commands. The project owner runs tests locally.
 
-- Do not change the Jalali date contract or introduce Gregorian conversion.
-- Do not change valuation formulas, Stage 5 EPS, Stage 7 parameters, alert thresholds, or unrelated stages.
-- Do not edit `src/valuation/engine.py`.
-- Do not add dependencies, persistence, or orchestration.
-- Do not edit `stepsForStage7.md` or `temp_report2.md`.
-- Do not run tests, launch the application, run database commands, or execute migrations.
-- Do not run Git commands or perform Git/GitHub operations.
+## Final report
 
-## Final review and report
+Report:
+1. The exact files changed and why.
+2. The selected behavior for each non-finite input category.
+3. Tests added and the exact commands the owner should run.
+4. Any ambiguity or remaining limitation.
+5. Explicitly state that tests were not run.
 
-Inspect the changed files and diff without Git commands. Report:
-
-1. Exact files changed.
-2. How missing volume/value now affect each dependent metric and state.
-3. The `_market_regime` fallback correction.
-4. Tests added and exact commands for the owner to run.
-5. Any remaining uncertainty or unresolved behavior.
-6. Explicit confirmation that tests were not run and no Git commands were used.
-
-Do not claim the fixes are verified until the owner runs the tests. Keep the changes limited to these two defects.
+Keep the changes narrowly scoped and preserve all valid P73 behavior.
