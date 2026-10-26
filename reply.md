@@ -1930,3 +1930,156 @@ Benchmark / lookback / حداقل نمونه / قیمت جایگزین: خارج
 ---
 
 **وضعیت گزارش:** طرح حداقلی مبتنی بر شواهد سورس و `stepsForStage7.md`؛ ادعاهای P68-B در موارد entry points، نبود 3→5، mismatch تاریخ Stage 8، و نبود consumer Stage 9 در همین اسنپ‌شات تأیید شدند.
+# P70
+**گزارش P70 — امکان‌سنجی قرارداد تاریخ جلالی Stage 8 (فقط خواندن)**
+
+### 1. اسنپ‌شات و فایل‌های بررسی‌شده
+
+اسنپ‌شات: `analyzer.zip` → `/home/workdir/artifacts/analyzer/`
+
+فایل‌های مستقیم:
+- `src/models/market.py`
+- `src/ingestion/market/queries.py`
+- `src/ingestion/market/ingestion.py`
+- `src/ingestion/market/adapter.py`
+- `src/market/engine.py`
+- `src/market/indicators.py`
+- `src/market/schema.py`
+- `src/tests/test_market_history_query.py`
+- `src/tests/test_stage8_market.py`
+
+زمینه: `stepsForStage7.md` (ممنوعیت تبدیل جلالی بدون ضرورت اثبات‌شده) و یافته‌های P68-B / P69 دربارهٔ D-A.
+
+---
+
+### 2. قراردادهای فعلی تاریخ و استفادهٔ واقعی از تاریخ
+
+#### فیلدها و انواع (تأییدشده در سورس)
+
+| عنصر | نوع / رفتار | محل |
+|------|-------------|-----|
+| `jalali_year/month/day` | `Integer, nullable` | `models/market.py:12-14` |
+| `trade_date` | `Date, nullable=True`؛ کامنت: «may be null for Jalali-sourced rows» | `models/market.py:10` |
+| نوشتن ingestion | **همیشه** `trade_date=None` برای مسیر CSV/جلالی | `ingestion/market/ingestion.py:104-108` |
+| منبع CSV | ستون `jdate`/`date` → فقط اجزای جلالی؛ بدون Gregorian | `ingestion/market/adapter.py:56-57, 85-109` |
+| `MarketHistoryObservation.jalali_date` | `Tuple[int,int,int]`؛ «no Gregorian conversion» | `queries.py:28-40, 150-173` |
+| `select_market_history_as_of` | فیلتر/مرتب‌سازی عددی جلالی؛ inclusive؛ duplicate → `ValueError`؛ OHLCV گم‌شده = `None` | `queries.py:150-221` |
+| `MarketEngine.analyze_market` | `as_of_date: datetime`؛ ردیف‌ها `Dict` با `"date"` | `engine.py:49-59` |
+| `MarketSignalResult.as_of_date` | `datetime` | `schema.py:28` |
+
+**نتیجه دربارهٔ `trade_date`:** در مسیر production فعلی ingestion جلالی، `trade_date` پر نمی‌شود. وجود ستون به‌تنهایی منبع معتبر Gregorian نیست.
+
+#### ردیابی استفاده از تاریخ داخل Stage 8
+
+| محل | نقش تاریخ |
+|-----|-----------|
+| `_prepare_rows` (`engine.py:195-211`) | پارس `date` (datetime یا ISO string)؛ حذف `None`؛ فیلتر PIT `date > as_of_date`؛ مرتب‌سازی بر اساس `date` |
+| `_relative_strength` / `_market_regime` | همان الگوی فیلتر/مرتب‌سازی روی benchmark |
+| `analyze_market_signals` | ردیف‌های مصنوعی با `"date": as_of_date` |
+| خروجی / metadata | ذخیره و `isoformat` کردن `as_of_date` |
+| **شاخص‌ها** (`indicators.py`) | فقط روی `List[float]` قیمت/حجم؛ پنجره‌ها **شاخص مشاهده** (`prices[-window:]`, `horizon` به‌عنوان تعداد گام در سری مرتب)، نه اختلاف تقویمی بین تاریخ ردیف‌ها |
+| تنها ثابت شبه‌تقویمی | `sqrt(252)` در `realized_volatility` برای annualize — قرارداد تعداد روز معاملاتی، نه محاسبات روی فیلد `date` ردیف |
+
+**جمع‌بندی استفاده:** تاریخ در engine برای **فیلتر as-of، مرتب‌سازی، و provenance** است. بازده، SMA، drawdown، volume ratio و نظایر آن به ترتیب مشاهدات وابسته‌اند، نه به day-count میلادی بین دو `datetime`. timezone در مقایسهٔ ردیف‌ها نقش محاسباتی ندارد (naive datetime).
+
+توابعی که در صورت پذیرش مستقیم جلالی باید بازبینی شوند:
+- `MarketEngine.analyze_market`, `analyze_market_signals`
+- `_prepare_rows`, `_relative_strength`, `_market_regime`
+- فیلد `MarketSignalResult.as_of_date` و metadata
+- تست‌های `test_stage8_market.py` که `datetime` مصنوعی می‌سازند
+
+---
+
+### 3. مقایسهٔ گزینه‌ها
+
+#### گزینه A — نگاشت تاریخچهٔ جلالی به engine فعلی مبتنی بر `datetime` با منبع معتبر موجود
+
+| معیار | ارزیابی |
+|------|---------|
+| منبع معتبر موجود؟ | **خیر.** `trade_date` در مسیر جلالی همیشه `None` است (`ingestion.py:104`). query هم تبدیل انجام نمی‌دهد. |
+| فایل‌های درگیر | در عمل نیاز به منبع تاریخ جدید یا سیاست تبدیل دارد → خارج از «منبع موجود» |
+| مرز as-of | بدون منبع معتبر قابل حفظ نیست |
+| Benchmark | همان مشکل تاریخ روی سری benchmark |
+| `trade_date` / OHLCV خالی | `trade_date` null غالب است؛ OHLCV خالی از قبل `None` است |
+| ریسک | اختراع تبدیل جلالی→میلادی خلاف `stepsForStage7.md` و خلاف رفتار query |
+| شواهد لازم باقی | منبع رسمی و تأییدشدهٔ Gregorian برای هر ردیف — در سورس فعلی نیست |
+
+**حکم A:** با قرارداد فعلی persistence **امکان‌پذیر نیست** مگر مالک منبع تاریخ جداگانه‌ای تصویب کند (امروز در کد نیست).
+
+#### گزینه B — تغییر قرارداد ورودی Stage 8 برای کار مستقیم با اجزای جلالی
+
+| معیار | ارزیابی |
+|------|---------|
+| توجیه فنی | محاسبات شاخص به day-diff میلادی وابسته نیستند؛ فقط ترتیب + فیلتر as-of لازم است. مقایسهٔ عددی جلالی در query از قبل وجود دارد. |
+| فایل‌ها / توابع | `market/engine.py` (`analyze_market`, `_prepare_rows`, benchmark helpers, شاید `analyze_market_signals`)؛ `market/schema.py` (`as_of_date`)؛ احتمالاً adapter جدید؛ به‌روزرسانی `test_stage8_market.py` و هر caller مصنوعی |
+| مرز as-of | قابل حفظ با همان معنای inclusive عددی query (`(y,m,d) <= as_of`) |
+| Benchmark | benchmark هم باید همان قرارداد جلالی (یا قرارداد صریح dual) داشته باشد؛ امروز caller سری را می‌دهد |
+| Missing `trade_date` | بی‌ربط می‌شود (دیگر به آن وابسته نیست) |
+| Missing OHLCV | بدون تغییر: `None`؛ سری ناقص قیمت → `INSUFFICIENT_DATA` |
+| ریسک قطعیت / صحت تاریخی | پایین‌تر از تبدیل تقویم، به‌شرط تعریف مقایسه و مرتب‌سازی جلالی یکسان با query |
+| ریسک caller موجود | تست‌ها و هر کد خارجی که `datetime` می‌دهد می‌شکنند مگر سازگاری موقت نگه داشته شود |
+| تصمیم باقی | شکل دقیق public type برای `as_of` و `"date"` ردیف (مثلاً `JalaliDate` در برابر نگه‌داشتن dual-mode) |
+
+#### گزینه C — رویکرد حداقلی دیگر با قرارداد موجود پروژه
+
+Alternatives بررسی‌شده:
+- استفاده از `trade_date` وقتی non-null و جلالی وقتی null → دو تقویم موازی بدون مشخصات؛ مرز as-of مبهم؛ رد می‌شود.
+- ساخت `datetime` ساختگی فقط برای مرتب‌سازی (مثلاً encode جلالی در فیلد datetime) → تقویم جعلی؛ خطر مقایسه با as-of واقعی؛ رد می‌شود.
+- فقط adapter بیرون از engine بدون تغییر engine → دوباره به گزینه A یا تبدیل می‌رسد که منبع ندارد.
+
+**حکم C:** با قراردادهای فعلی پروژه گزینهٔ سومی که هم بدون تبدیل باشد و هم engine را دست نزند، پشتیبانی نمی‌شود.
+
+---
+
+### 4. توصیه
+
+**گزینه B** از نظر شواهد سورس تنها مسیری است که:
+1. به `trade_date` (عملاً خالی) وابسته نیست،
+2. تبدیل جلالی→میلادی اختراع نمی‌کند،
+3. با مدل استفادهٔ واقعی تاریخ در engine (فیلتر + مرتب‌سازی + پنجره‌های مبتنی بر مشاهده) سازگار است.
+
+این یک **پیشنهاد طراحی مبتنی بر شواهد** است، نه رفتار فعلی. تا وقتی مالک شکل دقیق type جلالی در API عمومی Stage 8 و رفتار benchmark را تصویب نکند، پیاده‌سازی کامل نباید شروع شود.
+
+---
+
+### 5. تصمیم‌های باز دقیق
+
+1. **شکل قرارداد ورودی Stage 8:** آیا `as_of_date` و کلید تاریخ ردیف به `JalaliDate` (یا معادل صریح) تغییر می‌کنند، یا حالت سازگار موقت با `datetime` هم حفظ می‌شود؟
+2. **Benchmark:** آیا سری industry/market benchmark هم الزاماً جلالی است و از همان مرز as-of تبعیت می‌کند؟
+3. **معنای برچسب‌های «20D» / «252D»:** امروز = تعداد مشاهده در سری مرتب‌شده؛ آیا مالک همان را برای دادهٔ جلالی تأیید می‌کند؟ (رفتار فعلی کد همین است؛ تغییر معنا نیاز به مشخصات جدا دارد.)
+4. **`MarketSignalResult.as_of_date`:** نوع خروجی برای مصرف‌کنندگان Stage 9 / metadata چه باشد تا قرارداد provenance نشکند؟
+
+بدون (۱) پیاده‌سازی adapter+engine ناامن است. بدون (۲) relative strength / regime در صورت استفاده از benchmark ناقص می‌ماند (امروز هم بدون benchmark → `INSUFFICIENT_DATA`).
+
+---
+
+### 6. فایل‌های محتمل تغییر بعدی و تست‌های قرارداد
+
+**فایل‌های محتمل (پس از تصویب):**
+- `src/market/engine.py` — ورودی as-of و `_prepare_rows` / benchmark helpers
+- `src/market/schema.py` — نوع `as_of_date` (و در صورت نیاز metadata)
+- جدید: `src/market/service.py` یا `adapter.py` — `select_market_history_as_of` → ردیف‌های engine
+- `src/tests/test_stage8_market.py` — داده/as-of جلالی
+- جدید: تست قرارداد adapter (مرز inclusive، duplicate، سری خالی، OHLCV خالی، isolation شرکت)
+- در صورت لمس API عمومی: بازبینی callerهای Stage 9 که فقط `MarketSignalResult` می‌گیرند (فیلدهای state رشته‌ای؛ نوع `as_of_date` اگر عوض شود)
+
+**تست‌های لازم بعداً (مالک اجرا می‌کند):**
+- as-of روی مرز آخرین روز موجود / روز قبل از همهٔ ردیف‌ها
+- ردیف بعد از as-of وارد محاسبه نشود
+- duplicate جلالی → fail
+- بدون تبدیل: هیچ فیلد Gregorian از جلالی ساخته نشود مگر منبع مصوب جدا
+- رگرسیون: رفتار شاخص روی سری یکنواخت قیمت نسبت به نسخهٔ فعلی (همان تعداد مشاهده)
+- benchmark خالی → `INSUFFICIENT_DATA` برای RS/regime
+
+---
+
+### 7. آیا پیاده‌سازی الان امن است؟
+
+**خیر — نه برای adapter کامل و نه برای تغییر engine.**
+
+- گزینه A با سورس فعلی پشتیبانی نمی‌شود (`trade_date` در مسیر جلالی null است).
+- گزینه B از نظر فنی با نحوهٔ استفادهٔ تاریخ در engine سازگار است، اما **تصمیم مالک روی شکل type عمومی و benchmark** هنوز باز است.
+- تا آن تصمیم‌ها ثبت نشوند، کدنویسی Stage 8 integration نباید شروع شود.
+- کارهای صرفاً مستندسازی قرارداد یا طراحی امضای پیشنهادی بدون merge رفتار جدید، بلامانع است.
+
+**وضعیت:** امکان‌سنجی انجام شد؛ توصیهٔ فنی B با شرط تصویب قرارداد type/as-of/benchmark؛ پیاده‌سازی هنوز مجاز نیست.
