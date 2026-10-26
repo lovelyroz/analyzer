@@ -2240,3 +2240,21 @@ Adapter از `MarketHistoryObservation` فقط فیلدهای موجود را ک
 این‌ها می‌توانند بعد از (یا موازی با) پیاده‌سازی قرارداد تاریخ Stage 8 بسته شوند و نباید شروع کار روی `schema` / `engine` / adapter جلالی را متوقف کنند.
 
 **حکم نهایی:** قرارداد تاریخ Stage 8 از نظر فنی برای شروع پیاده‌سازی مشخص است. در این تسک کدی نوشته نشد؛ مرحلهٔ بعد می‌تواند تغییر type و `_prepare_rows` و adapter باشد، بدون بازطراحی `valuation/engine.py` و بدون تبدیل تقویم.
+
+# P72 - Tests results:
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py src/tests/test_jalali_contract.py src/tests/test_market_history_query.py src/tests/test_stage8_market_parameters.py src/tests/test_stage9_decision.py src/tests/test_stage789_service_interface.py src/tests/test_ingestion_ohlc.py
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
+rootdir: D:\winprojects\analyzer
+collected 168 items
+
+src\tests\test_stage8_market.py .........................................................................        [ 43%]
+src\tests\test_stage8_market_service.py ...................                                                      [ 54%]
+src\tests\test_jalali_contract.py ....................                                                           [ 66%]
+src\tests\test_market_history_query.py .................                                                         [ 76%]
+src\tests\test_stage8_market_parameters.py ..                                                                    [ 77%]
+src\tests\test_stage9_decision.py ...................                                                            [ 89%]
+src\tests\test_stage789_service_interface.py ....                                                                [ 91%]
+src\tests\test_ingestion_ohlc.py ..............                                                                  [100%]
+
+================================================= 168 passed in 4.95s
