@@ -1588,3 +1588,199 @@ src/tests/test_stage4_trend.py: 53 warnings
 
 
 * **وضعیت سایر یافته‌های معماری:** سایر یافته‌های ساختاری (مانند عدم وجود نقطه ورود سراسری `main.py` برای ارکستراسیون کل پایپ‌لاین، لزوم حفظ اعتبار EPS مرحله ۵، و رعایت مرزهای نقطه‌زمانی) همچنان با شواهد مستقیم کد منبع پشتیبانی شده و پابرجا هستند.
+# P68-A - Fix ( RERUN )
+**گزارش اصلاحیه کوتاه P68-A**
+
+### فضای کاری / اسنپ‌شات بررسی‌شده
+فایل `analyzer.zip` ضمیمه‌شده (استخراج‌شده در `/home/workdir/artifacts/analyzer/`).  
+فایل دقیق بررسی‌شده:  
+`src/ingestion/market/queries.py` (تاریخ داخل ZIP: 2026-10-26 07:02)
+
+### وجود query تأییدشده
+**بله، هر دو وجود دارند.**
+
+- کلاس:
+```python
+@dataclass(frozen=True)
+class MarketHistoryObservation:
+    ...
+```
+
+- تابع:
+```python
+def select_market_history_as_of(
+    session: Session,
+    company_id: int,
+    as_of_jalali_date: JalaliDate,
+) -> Tuple[MarketHistoryObservation, ...]:
+```
+
+شواهد مستقیم در خطوط ۲۸–۵۰ (کلاس) و ۱۵۰–۲۲۱ (تابع) فایل `queries.py` موجود است. همچنین تست اختصاصی `src/tests/test_market_history_query.py` این تابع را پوشش می‌دهد.
+
+### توضیح ناسازگاری
+گزارش قبلی P68-A مدعی عدم وجود `select_market_history_as_of(...)` بوده است.  
+این ادعا با اسنپ‌شات فعلی ZIP سازگار نیست. محتمل‌ترین علت: گزارش قبلی بر اساس نسخهٔ قدیمی‌تر، ناقص یا متفاوت از همین workspace/ZIP تهیه شده بوده است. در اسنپ‌شات فعلی هر دو `MarketHistoryObservation` و `select_market_history_as_of` به‌طور کامل حاضرند.
+
+### وضعیت اصلاح‌شدهٔ یکپارچه‌سازی Stage 8
+- Query تاریخی **وجود دارد** و قرارداد persistence آن (مرز Jalali، ترتیب قطعی، عدم ساخت مقادیر گم‌شده، رد duplicate) با تست‌های اختصاصی پوشش داده شده است.
+- **هنوز به `MarketEngine` متصل نیست.**  
+  `src/market/engine.py` هیچ import یا فراخوانی از `src.ingestion.market.queries` ندارد و ورودی خود را به‌صورت `Sequence[Dict[str, Any]]` دریافت می‌کند. خود فایل تست `test_market_history_query.py` صراحتاً اعلام می‌کند که این تست‌ها `MarketEngine` را اجرا نمی‌کنند و «شواهدی از مسیر production end-to-end Stage 8 نیستند».
+
+بنابراین: وجود query تأیید می‌شود، اما یکپارچه‌سازی end-to-end هنوز برقرار نیست.
+
+### وضعیت یافته‌های معماری باقی‌مانده
+یافته‌هایی که صرفاً بر «نبود query تاریخی» تکیه داشتند، **باید اصلاح شوند**.  
+سایر یافته‌هایی که به نبود اتصال واقعی بین لایهٔ query و `MarketEngine` (یا نبود قرارداد Jalali-to-engine-date) اشاره دارند، همچنان با شواهد مستقیم سورس پشتیبانی می‌شوند و معتبر باقی می‌مانند.
+# P68-B
+**گزارش P68-B — تأیید مسیر فراخوانی production و ممیزی شکاف orchestration**
+
+فضای کاری بررسی‌شده: اسنپ‌شات `analyzer.zip` استخراج‌شده در `/home/workdir/artifacts/analyzer/` (فقط خواندن سورس؛ بدون اجرا، تست، یا تغییر فایل).
+
+---
+
+### 1. موجودی Entry Pointها
+
+| مسیر | نقطه ورود | آنچه واقعاً فراخوانی می‌کند |
+|------|-----------|------------------------------|
+| `src/scripts/init_db.py` | `if __name__ == "__main__"` → `init_db()` | `Base.metadata.create_all` |
+| `src/scripts/migrate_db.py` | `if __name__ == "__main__"` → `main()` | `MigrationRunner(engine).upgrade()` |
+| `src/scripts/seed_data.py` | `if __name__ == "__main__"` → `seed_initial_data()` | seed صنایع و متریک‌های پایه |
+
+بررسی‌شده و یافت‌نشده:
+- هیچ `main.py` / `app.py` / `__main__.py` / FastAPI / Flask / CLI (click/argparse) / scheduler / worker
+- `requirements.txt` فقط: SQLAlchemy, pytest, openpyxl, pypdf, jdatetime
+- سرویس‌های لایهٔ Stage (`forecast/service.py`, `valuation/service.py`, `decision/service.py`, `ingestion/service.py`, `ingestion/codal/pipeline.py`) توابع قابل فراخوانی library-style هستند، نه entry point اجرایی production
+
+**نتیجه:** هیچ مسیر orchestration end-to-end در سطح application وجود ندارد. فراخوانی‌ها فقط به‌صورت library از caller خارجی (یا تست) انجام می‌شوند.
+
+---
+
+### 2. ماتریس پنج مرز call-path
+
+#### مرز 1: Stage 3 (fundamental/scoring) → Stage 5 (forecast)
+
+| مورد | وضعیت |
+|------|--------|
+| Caller → Callee | **وجود ندارد** در production code |
+| مسیر واقعی Stage 5 | `generate_and_persist_forecast` (`forecast/service.py:294`) → `load_financial_facts` / `load_financial_fact_periods` / `load_share_history` (`forecast/queries.py`) → `ForecastEngine.generate_forecast` |
+| داده عبوری | NormalizedFinancialFactهای Stage 1 با فیلتر PIT روی `ReportVersion.publication_datetime <= cutoff`؛ نه خروجی Stage 3 |
+| هویت / period / as-of | `company_id`, `forecast_period_id`, `data_cutoff_datetime` توسط caller سرویس Stage 5 تأمین می‌شود |
+| PIT | صریح در `forecast/queries.py` (انتشار ≤ cutoff) |
+| وضعیت | Stage 5 به Stage 1 وصل است. Stage 3 (`FundamentalScoringEngine.calculate_score`, `KPIEngine.calculate_all_kpis_for_company`) هیچ caller تولیدی به سمت Stage 5 ندارد — فقط تعریف engine و تست |
+
+#### مرز 2: Stage 5 (forecast/EPS) → Stage 7 (valuation)
+
+| مورد | وضعیت |
+|------|--------|
+| Caller → Callee | `calculate_valuation_as_of_jalali` (`valuation/service.py:18`) → `ValuationEngine.calculate_valuation` (`valuation/engine.py:49`) |
+| نیز از | `calculate_decision_as_of_jalali` (`decision/service.py:56`) همین سرویس را صدا می‌زند |
+| داده عبوری | `CompanyForecastResult` کامل + `current_price` از `select_market_price_as_of` (نه history) |
+| هویت | تطبیق اجباری `forecast_result.company_id` و `forecast_period_id` با آرگومان‌های سرویس |
+| as-of | Jalali از caller؛ فقط به‌عنوان provenance در metadata ذخیره می‌شود (بدون تبدیل به Gregorian برای فیلدهای engine) |
+| وضعیت | **متصل در production service code** (نه فقط تست). فراخوانی end-to-end application-level وجود ندارد |
+
+#### مرز 3: market history → `select_market_history_as_of` → adapter/service → `MarketEngine.analyze_market`
+
+| مورد | وضعیت |
+|------|--------|
+| Query | موجود: `select_market_history_as_of` (`ingestion/market/queries.py:150`) → `Tuple[MarketHistoryObservation, ...]` |
+| `MarketEngine.analyze_market` | موجود: (`market/engine.py:49`) ورودی `as_of_date: datetime` + `market_data: Sequence[Dict[str, Any]]` با کلید `"date"` |
+| زنجیرهٔ production | **هیچ‌جا وجود ندارد** |
+| جستجوی سورس غیرتست | صفر فراخوانی `select_market_history_as_of` خارج از تعریف خودش؛ صفر import از `MarketEngine` در سرویس‌ها |
+| تست‌ها | `test_market_history_query.py` فقط query را می‌زند و صراحتاً می‌گوید `MarketEngine` را exercise نمی‌کند؛ `test_stage8_market.py` با dictهای مصنوعی `analyze_market` را صدا می‌زند |
+| وضعیت | Query و Engine هر دو هستند؛ **اتصال production و mapping قرارداد داده غایب است** |
+
+#### مرز 4: Stage 7 valuation + Stage 8 market → Stage 9 decision
+
+| مورد | وضعیت |
+|------|--------|
+| Caller → Callee | `calculate_decision_as_of_jalali` (`decision/service.py:26`) → داخلی `calculate_valuation_as_of_jalali` سپس `DecisionEngine.make_decision` (`decision/engine.py:31`) |
+| داده عبوری | `forecast_result`, `fundamental_result` (caller-supplied), `market_result: MarketSignalResult` (caller-supplied), سپس valuation تولیدشده |
+| هویت | تطبیق `company_id` / `period_id` بین forecast و fundamental؛ `market_result.company_id` با forecast |
+| Stage 8 | **تولید نمی‌شود** داخل این سرویس؛ caller باید `MarketSignalResult` را از قبل بدهد (تأیید در docstring و در `test_stage789_service_interface.py` خطوط ۸–۱۲) |
+| وضعیت | دست‌به‌دست Stage 7→9 در service code پیاده شده؛ تولید Stage 8 خارج از این مرز باقی مانده |
+
+#### مرز 5: خروجی Stage 9 → مصرف‌کننده downstream
+
+| مورد | وضعیت |
+|------|--------|
+| خروجی | `ValuationDecisionResult(valuation, decision)` برگردانده می‌شود |
+| Persistence | هیچ مدل Decision در `src/models/`؛ هیچ تابع persist برای `FinalDecisionResult` |
+| API / CLI / scheduler / consumer | یافت نشد |
+| وضعیت | خروجی فقط به caller کتابخانه‌ای برمی‌گردد؛ مسیر production downstream وجود ندارد |
+
+---
+
+### 3. نتیجه‌گیری قرارداد داده Stage 8
+
+`MarketHistoryObservation` (Jalali tuple + فیلدهای OHLCV اختیاری) با ورودی `MarketEngine.analyze_market` سازگار نیست:
+
+| جنبه | Query / Observation | MarketEngine |
+|------|---------------------|--------------|
+| تاریخ as-of | `JalaliDate = Tuple[int,int,int]` | `datetime` (Gregorian) |
+| ردیف‌ها | dataclass با `jalali_date` | `Dict` با کلید `"date"` از نوع datetime/ISO |
+| تبدیل | صراحتاً انجام نمی‌شود (docstring query: no Gregorian conversion) | `_prepare_rows` فقط datetime را می‌فهمد |
+
+هیچ adapter/service تولیدی این mapping را انجام نمی‌دهد.  
+قرارداد تاریخ (آیا engine باید Jalali بپذیرد، یا caller باید تاریخ Gregorian بسازد، و از کدام منبع) **تعریف‌نشده** است. تا این تصمیم معماری گرفته نشود، اتصال امن ممکن نیست. ساخت query تاریخی دوم لازم نیست مگر ثابت شود query موجود قرارداد خاصی را برآورده نمی‌کند.
+
+---
+
+### 4. فهرست شکاف‌های مبتنی بر شواهد سورس
+
+**G1 — نبود application entry / orchestration top-level**  
+شواهد: فقط سه اسکریپت DB؛ نبود web/CLI/scheduler.  
+اهمیت: هیچ مسیر اجرایی production برای زنجیره Stageها وجود ندارد.  
+تصمیم لازم: تعریف entry point رسمی (CLI/API/job) و مالک session/as-of.  
+مسدودکننده گام امن بعدی: بله برای هر ادعای «مسیر production end-to-end».
+
+**G2 — نبود اتصال Stage 3 → Stage 5**  
+شواهد: `FundamentalScoringEngine` / `KPIEngine` هیچ caller غیرتست به `generate_and_persist_forecast` ندارند؛ Stage 5 مستقیماً Stage 1 می‌خواند.  
+اهمیت: امتیاز fundamental وارد مسیر forecast نمی‌شود (مگر caller خارجی آن را جداگانه بدهد).  
+تصمیم: آیا Stage 3 ورودی اجباری Stage 5/9 است یا موازی؟  
+مسدودکننده: برای مرز ۱ بله؛ برای Stage 5 به‌تنهایی خیر.
+
+**G3 — نبود مسیر production برای Stage 8 از DB**  
+شواهد: `select_market_history_as_of` فقط در تعریف و تست خودش؛ `MarketEngine` فقط از تست با داده مصنوعی.  
+اهمیت: `MarketSignalResult` واقعی از persistence تولید نمی‌شود.  
+تصمیم: قرارداد mapping Jalali↔engine date + محل adapter (service جدید یا گسترش service موجود).  
+مسدودکننده: بله برای هر ادعای یکپارچگی Stage 8.
+
+**G4 — Stage 8 caller-supplied در مرز Stage 9**  
+شواهد: `decision/service.py:31` و docstring؛ تست stage789 صراحتاً market را از تست می‌گیرد.  
+اهمیت: بدون G3، Stage 9 فقط با evidence ساختگی/خارجی قابل اجراست.  
+تصمیم: همان G3.  
+مسدودکننده: وابسته به G3.
+
+**G5 — نبود persistence / consumer برای خروجی Stage 9**  
+شواهد: بدون مدل و بدون writer؛ فقط return به caller.  
+اهمیت: تصمیم قابل بازیابی/ارائه در سیستم نیست.  
+تصمیم: آیا Decision باید persist شود، API برگرداند، یا فقط in-process مصرف شود؟  
+مسدودکننده: برای «بسته شدن» pipeline بله؛ برای محاسبهٔ تک‌مرحله‌ای خیر.
+
+شکاف‌های سیاست مالی (مثل تأیید پارامتر تاریخی D9) از این فهرست جدا نگه داشته شده‌اند.
+
+---
+
+### 5. یک گام مهندسی بعدی توصیه‌شده
+
+**تصمیم و پیاده‌سازی قرارداد mapping و یک service boundary باریک برای Stage 8:**  
+تعیین کنید `MarketEngine` چگونه as-of و سری تاریخی را دریافت کند (بدون اختراع تبدیل تقویم در این مرحله اگر قرارداد هنوز باز است)، سپس یک تابع service (مثلاً در لایه market یا کنار valuation/decision) بنویسید که:
+
+1. `select_market_history_as_of(session, company_id, as_of_jalali)` را صدا بزند،  
+2. طبق قرارداد توافق‌شده ردیف‌ها را به شکل مورد نیاز `analyze_market` نگاشت کند،  
+3. `MarketSignalResult` برگرداند،
+
+تا مرز ۳ بسته شود و caller مرز ۴ دیگر مجبور به تأمین مصنوعی Stage 8 نباشد.  
+تا این قرارداد تاریخ روشن نشود، پیاده‌سازی mapping را شروع نکنید.
+
+---
+
+### 6. وضعیت نهایی
+
+**جزئی تأییدشده (partially verified)** از روی اسنپ‌شات تأمین‌شده:
+
+- وجود query تاریخی و سرویس‌های Stage 5/7/9 تأیید شد.
+- اتصال service-level Stage 5→7→9 (با market و fundamental caller-supplied) تأیید شد.
+- نبود entry point اجرایی، نبود مسیر DB→Stage 8→Engine، نبود persistence تصمیم، و ناسازگاری قرارداد تاریخ Stage 8 همگی با شواهد مستقیم سورس تأیید شدند.
+- هیچ مسیر orchestration کامل production قابل اثبات نیست.
