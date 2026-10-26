@@ -7,10 +7,8 @@ from typing import Optional, Tuple
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from src.ingestion.common.parsing import parse_jalali_components
+from src.core.jalali import JalaliDate, validate_jalali_date
 from src.models.market import MarketDaily
-
-JalaliDate = Tuple[int, int, int]
 
 
 @dataclass(frozen=True)
@@ -50,17 +48,8 @@ class MarketHistoryObservation:
 
 
 def _validate_jalali_date(value: object, *, label: str) -> JalaliDate:
-    if (
-        not isinstance(value, tuple)
-        or len(value) != 3
-        or any(type(part) is not int for part in value)
-    ):
-        raise ValueError(f"{label} must be a (year, month, day) integer tuple")
-    year, month, day = value
-    parsed = parse_jalali_components(f"{year:04d}-{month:02d}-{day:02d}")
-    if year < 1 or parsed != value:
-        raise ValueError(f"{label} is not a valid Jalali date: {value!r}")
-    return year, month, day
+    """Validate via the shared Stage 8 / ingestion Jalali contract."""
+    return validate_jalali_date(value, label=label)
 
 
 def select_market_price_as_of(

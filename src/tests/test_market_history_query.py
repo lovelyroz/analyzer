@@ -3,8 +3,8 @@
 These tests cover only the persistence-side contract of
 ``select_market_history_as_of``: Jalali as-of boundary, deterministic ordering,
 company isolation, and no fabrication of missing values. They do not exercise
-``MarketEngine`` (a Jalali-to-engine-date contract is not yet defined), so they
-are not evidence of an end-to-end Stage 8 production path.
+``MarketEngine``; the query-to-engine adapter is covered by
+``test_stage8_market_service.py``.
 """
 
 from decimal import Decimal

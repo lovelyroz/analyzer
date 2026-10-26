@@ -90,7 +90,7 @@ def _fundamental(company_id, score=85):
 def _market(company_id, trend="UPTREND", momentum="POSITIVE", liquidity="NORMAL", quality="VALID"):
     return MarketSignalResult(
         company_id=company_id,
-        as_of_date=_utc_now_naive(),
+        as_of_date=AS_OF,  # Jalali (year, month, day); not an execution timestamp
         trend_state=trend,
         momentum_state=momentum,
         liquidity_state=liquidity,

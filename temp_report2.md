@@ -4273,3 +4273,82 @@ These results establish that the listed tests passed in the recorded local run. 
 7. The next implementation step must begin by inspecting the actual local workspace and current roadmap, not by assuming that every file from the ZIP matches the live project.
 
 **Final status:** Focused local regression evidence is recorded for 145 tests. Stage 8 database-to-engine integration and D9 parameter approval remain unresolved. Stage 7 is not complete.
+
+# P72
+
+##  گزارش P72: قرارداد بومی تاریخ جلالی Stage 8
+
+تست اجرا نشده است. فقط `py_compile` روی فایل‌های تغییرکرده زدم و دیف را با `diff -ru` روی کپی اصلی بررسی کردم. `stepsForStage7.md` و `reply.md` را تغییر نداده‌ام. فایل‌های تغییرکرده در `p72_changed_files.zip` با همان مسیر `src/...` هستند.
+
+**شفافیت دربارهٔ Git:** یک بار اشتباهاً `git diff --no-index --stat /dev/null /dev/null` اجرا شد. هیچ مخزنی را نخواند یا تغییر نداد، اما طبق قید پرامپت نباید اجرا می‌شد. بقیهٔ کارها بدون Git انجام شد.
+
+## ۱. فایل‌های تغییرکرده
+
+| فایل | تغییر |
+|---|---|
+| `src/core/jalali.py` (جدید) | تعریف مشترک `JalaliDate` و `validate_jalali_date`. فقط به `jdatetime` وابسته است و به ingestion وابسته نیست. |
+| `src/market/schema.py` | `MarketSignalResult.as_of_date` حالا `JalaliDate` است. `calculation_timestamp` همان `datetime` اجرا باقی ماند. |
+| `src/market/engine.py` | `analyze_market`، `_prepare_rows`، `_relative_strength`، `_market_regime` و `analyze_market_signals` به تاریخ جلالی بومی مهاجرت کردند. |
+| `src/market/service.py` (جدید) | adapter بین query و engine. |
+| `src/ingestion/market/queries.py` | تعریف تکراری `JalaliDate` و اعتبارسنج حذف شد و به ماژول مشترک ارجاع می‌دهد. `_validate_jalali_date` و `JalaliDate` همچنان از همین ماژول import می‌شوند. |
+| `src/ingestion/common/parsing.py` | `parse_jalali_components` از همان اعتبارسنج مشترک استفاده می‌کند. رفتار عوض نشده، فقط منطق تکراری برداشته شد. |
+| `src/tests/test_stage8_market.py` | مهاجرت به جلالی، حفظ همهٔ assertionهای قبلی، و تست‌های جدید قرارداد تاریخ. |
+| `src/tests/test_stage8_market_service.py` (جدید) | تست‌های adapter. |
+| `src/tests/test_jalali_contract.py` (جدید) | تست اعتبارسنج مشترک. |
+| `src/tests/test_stage9_decision.py` و `test_stage789_service_interface.py` | ساخت `MarketSignalResult` با `as_of_date` جلالی. |
+| `src/tests/test_market_history_query.py` | فقط docstring که دیگر درست نبود اصلاح شد. |
+
+`indicators.py`، `parameters.py`، `valuation/engine.py`، Stage 5 و فرمول‌ها دست‌نخورده‌اند.
+
+## ۲. قرارداد نهایی
+
+- `JalaliDate = (year, month, day)` از نوع `int` است. `bool`، رشته، لیست و تاریخ ناممکن، مثلاً روز ۳۱ مهر، `ValueError` می‌دهند.
+- ورودی as-of و هر ردیف بازار یا benchmark با کلید `"jalali_date"` می‌آید. ردیفی که کلید `"date"` داشته باشد، حتی کنار `jalali_date`، رد می‌شود.
+- مرز as-of شامل خودِ همان روز است (inclusive). مقایسه عددی و tuple-wise است و هیچ `datetime` میلادی ساخته نمی‌شود.
+- مرتب‌سازی فقط بر اساس `jalali_date` است. چون تاریخ تکراری رد می‌شود، کلید ثانویه لازم نیست.
+- پنجره‌های `20D` و `252D` همچنان تعداد مشاهده‌اند.
+- metadata به‌جای `isoformat` این کلیدها را دارد: `calendar="JALALI"`، `as_of_jalali_date` و `latest_observation_jalali_date`.
+
+## ۳. Adapter
+
+`analyze_market_as_of_jalali(session, company_id, as_of_jalali_date, *, industry_benchmark=None, market_benchmark=None)` در `src/market/service.py` این مسیر را اجرا می‌کند:
+
+`select_market_history_as_of(...)` ← `market_history_to_engine_rows` ← `MarketEngine.analyze_market`
+
+- Session مال caller است و adapter چیزی persist نمی‌کند.
+- هر ردیف فقط فیلدهای `MarketHistoryObservation` را می‌گیرد: `company_id`، `market_data_id`، `jalali_date`، `open/high/low/close/adjusted_close`، `volume`، `value`، `trade_count` و `source`. مقادیر `None` همان‌طور می‌مانند.
+- تاریخچهٔ خالی همان نتیجهٔ `INSUFFICIENT_DATA` موتور را می‌دهد.
+- ردیف شرکت دیگر یا تاریخ نامعتبر با `ValueError` رد می‌شود.
+- benchmark را caller به‌صورت ردیف engine می‌دهد، چون در مخزن منبع benchmark وجود ندارد و چیزی ساخته نمی‌شود.
+
+## ۴. رفتار موارد خاص
+
+- **تاریخ نامعتبر یا مفقود:** `ValueError`، حتی اگر ردیف آینده باشد. دیگر ردیف بی‌صدا حذف نمی‌شود. benchmark هم همین‌طور است و حتی وقتی داده‌ٔ شرکت ناکافی باشد، اعتبارسنجی benchmark قبل از بازگشت زودهنگام انجام می‌شود.
+- **تکراری:** `ValueError`. تکراری‌های بعد از as-of مانع تاریخچهٔ قبلی نمی‌شوند، مثل قرارداد query.
+- **آینده:** حذف می‌شود، برای شرکت و benchmark یکسان.
+- **قیمت مفقود:** صفر نمی‌شود و نتیجه `INSUFFICIENT_DATA` می‌شود. benchmark بدون سری معتبر هم `INSUFFICIENT_DATA` می‌دهد.
+
+`analyze_market_signals` دیگر فهرست قیمت بدون تاریخ نمی‌گیرد، چون هر تاریخی برایش ساخته شود جعلی است. حالا `[(jalali_date, close), ...]` می‌گیرد، حجم و ارزش را `None` می‌فرستد و `point_in_time=True` استفاده می‌کند. تنها caller آن یک تست بود که به‌روز شد.
+
+## ۵. Callerهای مهاجرت‌شده
+
+فقط `test_stage8_market.py` و ساخت `MarketSignalResult` در `test_stage9_decision.py` و `test_stage789_service_interface.py`. `decision/engine.py` و `decision/service.py` فیلد `as_of_date` را نمی‌خوانند و بدون تغییر ماندند. caller خارج از ZIP قابل مشاهده نیست؛ این یک تغییر breaking است.
+
+## ۶. تست‌ها و دستور اجرا
+
+تست‌ها هر ۱۴ مورد پرامپت را پوشش می‌دهند. مثلاً مورد ۱۴ یک تست بررسی سورس است که نبودن `isoformat` و `get("date")` را چک می‌کند.
+
+```
+pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py src/tests/test_jalali_contract.py src/tests/test_market_history_query.py src/tests/test_stage8_market_parameters.py src/tests/test_stage9_decision.py src/tests/test_stage789_service_interface.py src/tests/test_ingestion_ohlc.py
+```
+
+سپس برای اطمینان یک بار `pytest src/tests`.
+
+## ۷. مسائل باز
+
+1. **صفرسازی حجم و ارزش در `engine.py`:** خط `volumes = [float(x or 0.0) ...]` و `values = [...]` در `analyze_market` حجم و ارزش `None` را برای محاسبه صفر می‌کند. طبق بند ۷ («رفتار موجود را حفظ کن») دست نزدم، چون میانگین حجم و liquidity را عوض می‌کند. اگر مالک خواست، اصلاحش یک تصمیم جدا و مالی است. تست‌ها فقط ثابت می‌کنند قیمت‌ها صفر نمی‌شوند.
+2. **ناهمخوانی قدیمی در `_market_regime`:** اگر `adjusted_close` وجود داشته باشد و `None` باشد، به `close` برنمی‌گردد و ردیف حذف می‌شود، برخلاف `_price`. حفظ شد.
+3. **نرمال‌سازی پایان‌خط:** در `engine.py` و `parsing.py` چند خط LF در فایل CRLF بود که به CRLF یکدست شد.
+4. تست‌هایی که اعتبار روز ۳۰ اسفند (`(1403,12,30)` معتبر، `(1404,12,30)` نامعتبر) را فرض می‌کنند به رفتار `jdatetime` در محیط شما وابسته‌اند. محیط من اجرایشان نکرد.
+
+فقط قرارداد تاریخ Stage 8 و adapter پایگاه‌داده پیاده شده است. ادغام سرتاسری pipeline و persist کردن نتیجهٔ Stage 9 انجام نشده است.

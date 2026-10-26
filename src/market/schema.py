@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from src.core.jalali import JalaliDate
+
 
 @dataclass
 class TechnicalIndicatorsResult:
@@ -25,7 +27,9 @@ class TechnicalIndicatorsResult:
 @dataclass
 class MarketSignalResult:
     company_id: int
-    as_of_date: datetime
+    # Jalali (year, month, day) market as-of date; never a Gregorian datetime.
+    # Execution time lives separately in ``calculation_timestamp``.
+    as_of_date: JalaliDate
     trend_alignment: str = "NEUTRAL"  # legacy field
     rsi_status: str = "NEUTRAL"  # legacy field; RSI is not Core V1
     money_flow_status: str = "NEUTRAL"  # legacy field

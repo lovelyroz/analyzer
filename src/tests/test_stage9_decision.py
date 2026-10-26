@@ -50,7 +50,7 @@ def make_valuation(status="ATTRACTIVE", risk="LOW", reliability=85.0, dispersion
 def make_market(trend="UPTREND", momentum="POSITIVE", liquidity="NORMAL"):
     return MarketSignalResult(
         company_id=1,
-        as_of_date=utc_now_naive(),
+        as_of_date=(1405, 2, 11),  # Jalali (year, month, day) market as-of date
         trend_state=trend,
         momentum_state=momentum,
         liquidity_state=liquidity,

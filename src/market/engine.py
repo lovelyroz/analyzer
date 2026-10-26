@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from statistics import pstdev
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+
+from src.core.jalali import JalaliDate, validate_jalali_date
 
 from src.market.indicators import (
     calculate_sma,
@@ -49,14 +51,24 @@ class MarketEngine:
     def analyze_market(
         self,
         company_id: int,
-        as_of_date: datetime,
+        as_of_date: JalaliDate,
         market_data: Sequence[Dict[str, Any]],
         *,
         industry_benchmark: Optional[Sequence[Dict[str, Any]]] = None,
         market_benchmark: Optional[Sequence[Dict[str, Any]]] = None,
         point_in_time: bool = True,
     ) -> MarketSignalResult:
-        rows = self._prepare_rows(market_data, as_of_date, point_in_time)
+        # Validate the as-of date and every observation/benchmark date up front
+        # so malformed input always fails closed, even when company data is
+        # insufficient. No Gregorian datetime is built from Jalali components.
+        as_of_date = validate_jalali_date(as_of_date, label="as_of_date")
+        rows = self._prepare_rows(market_data, as_of_date, point_in_time, label="market_data")
+        for series, label in (
+            (industry_benchmark, "industry_benchmark"),
+            (market_benchmark, "market_benchmark"),
+        ):
+            if series:
+                self._prepare_rows(series, as_of_date, True, label=label)
         prices = [self._price(row) for row in rows]
         volumes = [self._number(row.get("volume")) for row in rows]
         values = [self._number(row.get("value")) for row in rows]
@@ -66,6 +78,11 @@ class MarketEngine:
                 as_of_date=as_of_date,
                 calculation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
                 market_data_quality="INSUFFICIENT_DATA",
+                metadata={
+                    "calendar": "JALALI",
+                    "as_of_jalali_date": as_of_date,
+                    "point_in_time": point_in_time,
+                },
             )
 
         prices = [float(x) for x in prices]
@@ -156,7 +173,9 @@ class MarketEngine:
                 "market_score": None,
                 "decision_signal": None,
                 "point_in_time": point_in_time,
-                "as_of_date": as_of_date.isoformat(),
+                "calendar": "JALALI",
+                "as_of_jalali_date": as_of_date,
+                "latest_observation_jalali_date": rows[-1]["jalali_date"],
                 "price_basis": price_basis,
                 "distance_from_52w_high_window": DISTANCE_FROM_52W_HIGH_WINDOW,
                 "trading_value_stability_definition": "20D coefficient_of_variation",
@@ -166,24 +185,34 @@ class MarketEngine:
     def analyze_market_signals(
         self,
         company_id: int,
-        as_of_date: datetime,
-        close_prices: List[float],
+        as_of_date: JalaliDate,
+        close_prices: Sequence[Tuple[JalaliDate, float]],
         individual_buy_vol: float = 0.0,
         individual_sell_vol: float = 0.0,
         close_price_today: float = 0.0,
     ) -> MarketSignalResult:
-        """Compatibility adapter for the pre-V1 API; no Market Score is produced by V1."""
-        rows = [
-            {
-                "date": as_of_date,
-                "adjusted_close": price,
-                "close": price,
-                "volume": 0.0,
-                "value": 0.0,
-            }
-            for price in close_prices
-        ]
-        result = self.analyze_market(company_id, as_of_date, rows, point_in_time=False)
+        """Compatibility adapter for the pre-V1 API; no Market Score is produced by V1.
+
+        ``close_prices`` must be dated ``(jalali_date, close)`` pairs. A bare
+        price list cannot be given real dates, and this method never invents
+        any, so undated input is rejected. Volume and value are not supplied
+        by this API and are passed to the engine as missing (``None``).
+        """
+        rows = []
+        for item in close_prices:
+            if not isinstance(item, tuple) or len(item) != 2:
+                raise ValueError("close_prices items must be (jalali_date, close) pairs")
+            jalali_date, price = item
+            rows.append(
+                {
+                    "jalali_date": jalali_date,
+                    "adjusted_close": price,
+                    "close": price,
+                    "volume": None,
+                    "value": None,
+                }
+            )
+        result = self.analyze_market(company_id, as_of_date, rows, point_in_time=True)
         result.money_flow_status = (
             "INFLOW"
             if individual_buy_vol > individual_sell_vol
@@ -193,22 +222,49 @@ class MarketEngine:
 
     @staticmethod
     def _prepare_rows(
-        data: Sequence[Dict[str, Any]], as_of_date: datetime, point_in_time: bool
+        data: Sequence[Dict[str, Any]],
+        as_of_date: JalaliDate,
+        point_in_time: bool,
+        *,
+        label: str = "market_data",
     ) -> List[Dict[str, Any]]:
-        rows = []
-        for row in data:
-            date = row.get("date")
-            if isinstance(date, str):
-                try:
-                    date = datetime.fromisoformat(date)
-                except ValueError:
-                    continue
-            if date is None:
+        """Validate, cut off and order observation rows by native Jalali date.
+
+        * Every row must carry a valid ``jalali_date`` tuple; a missing or
+          invalid date raises ``ValueError`` (no row is skipped or repaired).
+        * A Gregorian ``"date"`` key is rejected rather than interpreted.
+        * With ``point_in_time`` the as-of boundary is inclusive: rows with
+          ``jalali_date <= as_of_date`` are kept, later rows are excluded.
+        * Two retained rows sharing one Jalali date raise ``ValueError``; nothing
+          is silently de-duplicated. Rows after the as-of date do not count.
+        * The result is sorted ascending by Jalali date only; dates are unique,
+          so no secondary key is needed.
+        """
+        as_of = validate_jalali_date(as_of_date, label="as_of_date")
+        rows: List[Dict[str, Any]] = []
+        seen = set()
+        for index, row in enumerate(data):
+            if not isinstance(row, Mapping):
+                raise ValueError(f"{label}[{index}] must be a mapping")
+            if "date" in row:
+                raise ValueError(
+                    f"{label}[{index}] has a Gregorian 'date' key; the Stage 8 "
+                    "contract uses only 'jalali_date' (year, month, day)"
+                )
+            if "jalali_date" not in row:
+                raise ValueError(f"{label}[{index}] is missing 'jalali_date'")
+            jalali_date = validate_jalali_date(
+                row["jalali_date"], label=f"{label}[{index}].jalali_date"
+            )
+            if point_in_time and jalali_date > as_of:
                 continue
-            if point_in_time and date > as_of_date:
-                continue
-            rows.append(dict(row, date=date))
-        return sorted(rows, key=lambda r: r["date"])
+            if jalali_date in seen:
+                raise ValueError(
+                    f"duplicate observations in {label} for jalali_date={jalali_date!r}"
+                )
+            seen.add(jalali_date)
+            rows.append(dict(row, jalali_date=jalali_date))
+        return sorted(rows, key=lambda r: r["jalali_date"])
 
     @staticmethod
     def _price(row: Dict[str, Any]) -> Optional[float]:
@@ -363,11 +419,11 @@ class MarketEngine:
         self,
         stock_returns: Dict[str, Optional[float]],
         benchmark: Optional[Sequence[Dict[str, Any]]],
-        as_of_date: datetime,
+        as_of_date: JalaliDate,
     ) -> str:
         if not benchmark:
             return "INSUFFICIENT_DATA"
-        rows = self._prepare_rows(benchmark, as_of_date, True)
+        rows = self._prepare_rows(benchmark, as_of_date, True, label="benchmark")
         prices = [self._price(r) for r in rows]
         if any(x is None for x in prices):
             return "INSUFFICIENT_DATA"
@@ -388,20 +444,10 @@ class MarketEngine:
         return "NEUTRAL"
 
     @staticmethod
-    def _market_regime(benchmark: Optional[Sequence[Dict[str, Any]]], as_of_date: datetime) -> str:
+    def _market_regime(benchmark: Optional[Sequence[Dict[str, Any]]], as_of_date: JalaliDate) -> str:
         if not benchmark:
             return "INSUFFICIENT_DATA"
-        rows = []
-        for row in benchmark:
-            date = row.get("date")
-            if isinstance(date, str):
-                try:
-                    date = datetime.fromisoformat(date)
-                except ValueError:
-                    continue
-            if date is not None and date <= as_of_date:
-                rows.append(dict(row, date=date))
-        rows.sort(key=lambda r: r["date"])
+        rows = MarketEngine._prepare_rows(benchmark, as_of_date, True, label="market_benchmark")
         prices = [
             float(r.get("adjusted_close", r.get("close")))
             for r in rows
