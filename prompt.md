@@ -1,116 +1,171 @@
-# P67 — Stage 7 Implementation Batch: Market Data Contract, Stage 8–9 Integration Readiness, and Safe Contract Fixes
+# P67 — Stage 7 Bounded Implementation: Stage 8 Market Data Contract, Integration, and Regression Coverage
 
-You are working in the local project folder `analyzer`.
+You are working on the local project folder `analyzer`, a financial-data application.
 
-This is an implementation task, not a report-only audit. Use the current repository state and the latest findings recorded in `reply.md`, especially P66, together with `stepsForStage7.md` and `07_Stage7_Valuation.md`.
+The attached ZIP is a curated evidence package. It contains the latest available `reply.md`, including the NotebookLM analysis, the Stage 7 roadmap, the valuation specification, relevant implementation files, and relevant tests.
 
-## 1. Mandatory operating constraints
+## 1. Mandatory starting procedure
 
+1. Read the complete `reply.md`, including the newly appended NotebookLM report and the P66 findings.
+2. Read `stepsForStage7.md` and `07_Stage7_Valuation.md`.
+3. Inspect the actual source and test files in the supplied package and, if available, the current local project folder `analyzer`.
+4. Treat current source code and explicit project contracts as authoritative for implementation details. Use NotebookLM's report as an analysis aid, not as proof that a behavior exists.
+5. If the package and working folder disagree, identify the discrepancy before editing. Do not silently overwrite newer user work.
+6. Do not repeat earlier report-only investigations. Implement every independent, bounded correction supported by existing contracts and evidence.
 
-- Do not run tests, the application, migrations, database initialization, or other execution commands. I will run tests myself.
-- You may inspect source code and existing tests, modify implementation code, and add or update tests.
-- Do not modify `stepsForStage7.md`, `07_Stage7_Valuation.md`, `reply.md`, or other planning/report files.
-- Do not redesign or consolidate `src/valuation/engine.py`. Its redesign remains the final technical step of Stage 7.
-- Do not invent financial data, schemas, model fields, database tables, industry mappings, thresholds, date policies, or parameter effective dates.
-- Preserve Jalali market-date contracts and existing public interfaces unless a specific incompatibility is demonstrated.
-- Never weaken or remove tests merely to obtain a passing result.
-- Continue with independent, safe tasks if another task is blocked. Clearly distinguish implemented changes from findings and blockers.
+If the working project folder is not accessible or a required source file is missing, state the exact limitation. Do not pretend to have edited files that you could not access.
 
-## 2. Work package A — Establish the actual Stage 8 market-data contract
+## 2. Non-negotiable restrictions
 
-Inspect only the files necessary to trace the existing market-data path, including:
+- Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants take precedence over convenience.
+- Do NOT execute pytest, any test, application command, database migration, or other code-execution command. I will run the tests myself.
+- Static inspection and editing are permitted. Provide exact PowerShell commands for me to execute later.
+- Do not use Git, GitHub, GitHub CLI/API, branches, remotes, commits, pushes, or pulls.
+- Do not redesign or broadly refactor `src/valuation/engine.py`. Its redesign remains the final technical step in the Stage 7 roadmap.
+- Do not edit `stepsForStage7.md`, `07_Stage7_Valuation.md`, `reply.md`, `temp_report.md`, `temp_report2.md`, or other planning/report files. Provide the complete implementation report in your final response so I can decide where to record it.
+- Do not remove, skip, weaken, or relax existing tests to obtain a pass.
+- Do not invent schemas, database fields, financial formulas, thresholds, industry mappings, parameter values, effective dates, benchmark data, provenance, or rounding rules.
+- Do not claim that tests passed, code ran successfully, or a production path was verified at runtime. No tests or application commands may be run in this task.
 
+## 3. Evidence and constraints already established
+
+Use these as leads and verify them against the supplied files:
+
+- `src/models/market.py` defines `MarketDaily`. Its date representation includes Jalali components, and `trade_date` may be nullable for legacy records.
+- `src/ingestion/market/queries.py` contains the existing `JalaliDate` and `select_market_price_as_of` query path used by Stage 7. Do not assume that a query selecting one price observation can supply the historical OHLCV sequence required by Stage 8.
+- `src/market/engine.py` accepts prepared market data and an as-of date. Establish its exact input contract from the actual code and tests.
+- `src/valuation/service.py` selects a market-price observation for Stage 7 valuation.
+- `src/decision/service.py` accepts a forecast result, a fundamental result, and a market result; its existence does not prove that a real caller produces all three correctly.
+- Previous audits did not establish a complete, real production path from Stages 3 and 5 through Stage 7, Stage 8, and Stage 9.
+- Stage 8 has not yet been shown to have an existing database query/service that supplies its required historical market-data sequence.
+- Stage 5 EPS must remain authoritative. Stage 7 must not recalculate EPS or introduce a replacement share-count calculation.
+- The project uses the Persian/Jalali calendar for the relevant market-date workflow. Do not introduce a Gregorian-calendar requirement where the existing contract does not require one.
+- D9 remains OPEN. The current parameter values have not been formally ratified, and the Genesis parameter set has no approved `effective_from` timestamp. Do not invent one or silently enable dated selection by assigning an arbitrary date.
+- Requests for dated parameter selection without an eligible dated version must retain the existing fail-closed behavior.
+- Preserve the scenario-dispersion threshold `0.50` and its strict `>` comparison semantics.
+- D1–D4 and D6 contain unresolved policy or input-contract gaps. Implement only behavior supported by an explicit existing contract; do not fabricate alert triggers, sector-specific formulas, or missing inputs.
+- Keep `review_priority` distinct from risk alerts.
+- `engine.py` redesign is the last technical step, not part of this task.
+
+## 4. Workstream A — Establish the actual Stage 8 market-data contract
+
+Inspect the following files together:
+
+- `src/models/market.py`
+- `src/ingestion/market/queries.py`
 - `src/market/engine.py`
+- `src/market/schema.py`
+- `src/market/indicators.py`
+- `src/market/parameters.py`
+- `src/tests/test_stage8_market.py`
+- `src/valuation/service.py`
 - `src/decision/service.py`
-- `src/decision/engine.py`
-- the existing market ORM models, repositories, and query functions
-- `src/valuation/service.py` and the existing `MarketDaily` query path, where relevant
-- relevant market and decision tests
 
-Determine, using actual source definitions:
+Determine and document from the actual code:
 
-1. What market data is stored, in which tables/models, and with what date, symbol/company, and OHLCV fields?
-2. Is there an existing repository or query that can provide the historical sequence required by `MarketEngine.analyze_market`?
-3. Can the data be filtered to the requested company/instrument and as-of date without using future observations?
-4. What date type and calendar does the market engine expect, and how does that compare with the persisted market-data contract?
-5. What minimum input is required by `calculate_decision_as_of_jalali`, and which parts of its input must be prepared by its caller?
+1. The precise data shape and required fields accepted by `MarketEngine.analyze_market`.
+2. The ordering, date semantics, and minimum history requirements, if explicitly defined.
+3. The available `MarketDaily` fields and whether they can support the engine's required inputs without fabricated values.
+4. Whether existing query functions can retrieve the necessary ordered historical observations for a company, bounded by the requested as-of date.
+5. Whether the existing Jalali date representation supports a reliable as-of filter for the complete history.
+6. How the resulting `MarketSignalResult` is supposed to reach Stage 9.
+7. Which caller, query, service, or contract is actually missing.
 
-Do not treat the existence of `MarketDaily` as proof that it contains all the fields or history required by Stage 8. Verify the schema and actual query semantics.
+Do not treat Stage 7's single-price selection query as proof of a valid Stage 8 historical-series source.
 
-## 3. Work package B — Implement only the real, bounded Stage 8 connection
+## 5. Workstream B — Implement the smallest safe Stage 8 connection when justified
 
-If the existing schema and query paths provide sufficient evidence, implement the smallest compatible market-data service or repository integration needed to load the existing historical data and produce the `MarketSignalResult` expected by Stage 9.
+If the existing model, query conventions, engine contract, and tests provide sufficient evidence, implement the smallest coherent production connection that retrieves historical market observations and supplies them to Stage 8.
 
 Requirements:
 
-- Reuse established models, repositories, session ownership, and date conventions.
-- Filter records according to the actual as-of-date contract. Do not include observations after the requested date.
-- Handle missing or insufficient market history using existing documented behavior. Do not invent financial fallback values or signals.
-- Preserve existing service and result contracts unless a demonstrated defect makes a narrow correction necessary.
-- Add focused tests for the real query/filtering contract, date boundary, missing data, and transfer of the resulting market signal to the existing decision service, as applicable.
-- Use the existing test fixtures and models rather than synthetic production infrastructure.
+- Reuse the established data model and query conventions where appropriate.
+- Respect the as-of boundary: future observations must not leak into historical analysis.
+- Preserve the existing Jalali date workflow and deterministic ordering.
+- Do not substitute missing OHLCV fields with zero or fabricated observations.
+- Do not invent a lookback window, indicator formula, fallback policy, or minimum observation count.
+- Do not create a speculative schema, orchestration layer, or application entry point.
+- Do not modify frozen upstream stages without explicit authorization.
+- Add focused regression tests for the supported contract, including future-data exclusion and missing or insufficient data where those behaviors are defined.
+- If a required policy or input is missing, complete every separable safe correction and report the exact blocker. Do not build a guessed service merely because a report suggested a possible filename.
 
-If the source schema or date semantics are insufficient to implement this safely, do not create a speculative service. Instead, identify the exact missing field, source, or contract and explain the smallest prerequisite needed. Continue with work packages C and D.
+If a new file such as `src/market/service.py` is justified, implement it only after confirming that the existing architecture and contracts support it.
 
-## 4. Work package C — Verify and correct clear Stage 7/8/9 contract defects
+## 6. Workstream C — Verify the Stage 7/8/9 interface
 
-Use P66 findings and the actual code to review the relevant service boundaries and tests.
+Inspect:
 
-- Verify the actual inputs and outputs for Stage 5 → Stage 7 and Stage 8 → Stage 9.
-- Check that missing market data, invalid date ranges, or unavailable signals are handled consistently with existing contracts.
-- Check that errors are not silently converted into fabricated market signals or financial outputs.
-- Review whether the current decision-service orchestration passes through the actual Stage 7 result and supplied Stage 8 result without unintended replacement or recalculation.
-- Review warning names and output channels only where an actual code-level inconsistency and its consumer impact can be demonstrated.
-- Correct clear, specification-backed defects and add regression tests.
-- Do not rename public warning tokens or alter output structures without checking known consumers and proving the required migration.
+- `src/valuation/service.py`
+- `src/valuation/schema.py`
+- `src/decision/service.py`
+- `src/decision/engine.py`
+- `src/decision/schema.py`
+- `src/tests/test_stage7_valuation.py`
+- `src/tests/test_stage8_market.py`
+- `src/tests/test_stage9_decision.py`
 
-Do not build a new application entry point, general orchestrator, persistence model for final decisions, or new database schema as part of this batch. Those require a separately proven contract and must not be invented to make integration tests look complete.
+Verify that:
 
-## 5. Work package D — Preserve and test the approved V1 policies
+1. Stage 7 receives the existing Stage 5 forecast and preserves its EPS.
+2. Stage 8 market results conform to the actual Stage 9 input contract.
+3. Company identity, period identity, and date/as-of consistency are checked where required by existing contracts.
+4. Missing market evidence cannot be misrepresented as valid market analysis.
+5. The interfaces do not silently discard required metadata or provenance.
+6. Any new integration test exercises the real service path, not only a private helper or a manually constructed result.
+7. No test is treated as proof of production integration unless it actually exercises that integration.
 
-Inspect existing tests and implementation for D1–D6. Add or correct focused regression tests where coverage is genuinely missing and the expected behavior is explicit.
+Fix clear, contract-supported defects. Do not create an application-wide orchestration system or final-decision persistence model without an established contract.
 
-- D1: Do not emit `ASSESSMENT_FLIP_RISK` without an approved, valid criterion.
-- D2: Do not activate the unwired multiple-dependence threshold or invent a dependency formula.
-- D3: Preserve Stage 5 EPS; do not recalculate EPS or introduce an unapproved EPS-dependence warning.
+## 7. Workstream D — Verify D1–D6 and related regression coverage
+
+Use `reply.md`, the specification, and actual source/tests to verify the current status of D1–D6.
+
+- D1: Do not emit an assessment-flip alert without a valid, defined criterion.
+- D2: Do not activate an unwired or undefined multiple-dependence metric.
+- D3: Preserve the authoritative Stage 5 EPS; do not recalculate it.
 - D4: Do not emit margin-assumption risk without valid required inputs.
-- D5: Keep `review_priority` separate from risk alerts.
-- D6: Preserve the current EPS/target-P/E valuation contract; do not invent sector-specific formulas or mappings.
+- D5: Keep review priority separate from risk alerts.
+- D6: Do not invent bank, holding-company, or other sector-specific formulas without approved input and formula contracts.
 
-Keep the P61 scenario-dispersion behavior unchanged: preserve the existing `0.50` thresholds and strict `>` comparison semantics. Do not attempt to unify independent thresholds without an approved policy.
+Implement missing regression tests or corrections only where expected behavior is explicit and demonstrable from the existing specification. Do not force previously failing tests to pass by changing their expected assertions to match unsupported behavior.
 
-Do not force changes where existing implementation and tests already correctly enforce the policy. State which cases are already covered and which received new coverage.
+If a test expects behavior that is not authorized by the current contract, preserve the test and explain precisely what policy or upstream contract is missing.
 
-## 6. Work package E — Verify and report test readiness
+## 8. Workstream E — Parameter and PIT safeguards
 
-Without running any tests or application commands:
+Inspect `src/valuation/parameters.py`, `src/valuation/engine.py`, `src/valuation/service.py`, and the relevant tests.
 
-- Inspect the changed code and tests for consistency.
-- Check imports, signatures, fixture usage, date types, and compatibility with existing callers by source inspection.
-- List every changed file and explain its purpose.
-- Provide exact PowerShell-compatible test commands for me to run.
-- Separate focused tests from broader regression tests.
-- Do not report any test as passed, and do not claim runtime behavior was verified.
+Make only bounded, independently justified corrections. Confirm that:
 
-Use the project virtual environment when giving commands if necessary. Do not assume the system Python has the project dependencies installed.
+- A dated parameter request cannot silently fall back to undated Genesis constants.
+- No unapproved `effective_from` timestamp is introduced.
+- No claim of complete PIT correctness is made without the required authoritative dates and provenance.
+- The audit metadata does not claim that historical parameter selection occurred when it did not.
+- No parameter values or financial thresholds are changed without approved evidence.
 
-## 7. Required final report
+Do not attempt to resolve owner-controlled D9 decisions in code. Do not make the final `engine.py` redesign part of this workstream.
 
-Return a concise but evidence-based report with these headings:
+## 9. Final static review
 
-1. **Implementation Summary**
-2. **Market Data Contract — Verified Facts**
-3. **Changes Made and Files Changed**
-4. **Stage 8–9 Connection Status**
-5. **D1–D6 Regression Coverage**
-6. **Remaining Blockers and Exact Missing Contracts**
-7. **PowerShell Test Commands for Owner Execution**
-8. **Execution Confirmation**
+Without executing code or tests:
 
-For each claimed fix, identify the relevant file/function and the corresponding test added or updated. Explicitly state if the Stage 8 connection remains unimplemented because the necessary source contract is missing.
+1. Review every changed source file and test.
+2. Check imports, type consistency, interface compatibility, missing-data behavior, as-of boundaries, and unintended changes to frozen contracts.
+3. Identify any test expectations that still need the owner's execution.
+4. Separate implemented corrections from unimplemented blockers and owner decisions.
+5. Do not claim runtime correctness from static review.
 
-Confirm that no tests or application commands were executed and no Git or remote operations were performed.
+## 10. Required final response
 
-## Acceptance criteria
+Return a concise but complete implementation report containing:
 
-This batch must produce real implementation/test progress wherever existing contracts support it, without fabricating data or architecture. If a safe connection cannot yet be built, the result must narrow the unresolved issue to concrete missing evidence or contract details. Stage 7 remains OPEN until the roadmap’s full exit criteria are met.
+1. **Files changed:** exact paths and a summary of each change.
+2. **Stage 8 contract:** actual accepted input shape, available database fields, date semantics, and any confirmed limitations.
+3. **Integration status:** which real service/query path is now connected, or the exact reason a safe connection could not be completed.
+4. **Regression coverage:** tests added or changed and the behavior each is intended to protect.
+5. **D1–D6 and PIT/D9:** what was safely corrected, what remains open, and why.
+6. **Static-review findings:** remaining compatibility or correctness concerns.
+7. **Owner-run PowerShell commands:** exact commands I should execute, starting with the focused tests and then the relevant Stage 7/8/9 suites. Do not execute them.
+8. **Next step:** identify the highest-priority remaining action in `stepsForStage7.md`. Keep the final `engine.py` redesign deferred until its designated last step.
+
+Do not declare Stage 7 complete or frozen. Do not claim any test passed. The user will run tests and provide the actual output before the next implementation batch.

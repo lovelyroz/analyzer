@@ -25,6 +25,30 @@ class MarketPriceObservation:
     market_data_id: int
 
 
+@dataclass(frozen=True)
+class MarketHistoryObservation:
+    """One persisted daily market row, exactly as stored.
+
+    Prices, volume, value and trade count keep their stored ``None`` when the
+    source row did not provide them; nothing is defaulted, zero-filled or
+    derived. The date is the original Jalali date; no Gregorian conversion is
+    performed or implied.
+    """
+
+    market_data_id: int
+    company_id: int
+    jalali_date: JalaliDate
+    open_price: Optional[Decimal]
+    high_price: Optional[Decimal]
+    low_price: Optional[Decimal]
+    close_price: Optional[Decimal]
+    adjusted_close: Optional[Decimal]
+    volume: Optional[int]
+    value: Optional[Decimal]
+    trade_count: Optional[int]
+    source: Optional[str]
+
+
 def _validate_jalali_date(value: object, *, label: str) -> JalaliDate:
     if (
         not isinstance(value, tuple)
@@ -120,6 +144,94 @@ def select_market_price_as_of(
         source_jalali_date=selected_date,
         source=selected.source,
         market_data_id=selected.market_data_id,
+    )
+
+
+def select_market_history_as_of(
+    session: Session,
+    company_id: int,
+    as_of_jalali_date: JalaliDate,
+) -> Tuple[MarketHistoryObservation, ...]:
+    """Return every persisted daily row on or before a Jalali date, oldest first.
+
+    This is a read-side retrieval helper only. It does not decide a lookback
+    window, a minimum observation count, a price basis or any indicator input;
+    those belong to the consumer's contract. The as-of boundary is inclusive and
+    uses the same numeric Jalali comparison as ``select_market_price_as_of``,
+    so rows dated after ``as_of_jalali_date`` never appear in the result.
+
+    * Rows without a complete, valid stored Jalali date (for example legacy
+      rows that only carry ``trade_date``) are excluded, never guessed.
+    * Missing OHLCV values are returned as ``None``, never as zero.
+    * An empty tuple means no dated row exists at or before the date.
+    * Invalid request dates raise ``ValueError``.
+    * Two rows sharing one company and Jalali date make the series ambiguous and
+      raise ``ValueError`` (the ingestion upsert contract is one row per
+      company and Jalali date); no row is silently preferred.
+    * Ordering is deterministic: Jalali year, month, day ascending, then
+      ``market_data_id``.
+    """
+    as_of = _validate_jalali_date(as_of_jalali_date, label="as_of_jalali_date")
+
+    stmt = (
+        select(MarketDaily)
+        .where(
+            MarketDaily.company_id == company_id,
+            MarketDaily.jalali_year >= 1,
+            MarketDaily.jalali_month.between(1, 12),
+            MarketDaily.jalali_day.between(1, 31),
+            _jalali_on_or_before(as_of),
+        )
+        .order_by(
+            MarketDaily.jalali_year.asc(),
+            MarketDaily.jalali_month.asc(),
+            MarketDaily.jalali_day.asc(),
+            MarketDaily.market_data_id.asc(),
+        )
+    )
+
+    history = []
+    seen_dates = set()
+    for row in session.scalars(stmt):
+        stored_date = (row.jalali_year, row.jalali_month, row.jalali_day)
+        if not _is_valid_stored_jalali_date(stored_date):
+            continue
+        if stored_date in seen_dates:
+            raise ValueError(
+                "duplicate market observations for company/date: "
+                f"company_id={company_id}, jalali_date={stored_date!r}"
+            )
+        seen_dates.add(stored_date)
+        history.append(
+            MarketHistoryObservation(
+                market_data_id=row.market_data_id,
+                company_id=row.company_id,
+                jalali_date=stored_date,
+                open_price=row.open_price,
+                high_price=row.high_price,
+                low_price=row.low_price,
+                close_price=row.close_price,
+                adjusted_close=row.adjusted_close,
+                volume=row.volume,
+                value=row.value,
+                trade_count=row.trade_count,
+                source=row.source,
+            )
+        )
+    return tuple(history)
+
+
+def _jalali_on_or_before(as_of: JalaliDate):
+    """SQL predicate: stored Jalali components <= ``as_of`` (numeric, no conversion)."""
+    year, month, day = as_of
+    return or_(
+        MarketDaily.jalali_year < year,
+        and_(MarketDaily.jalali_year == year, MarketDaily.jalali_month < month),
+        and_(
+            MarketDaily.jalali_year == year,
+            MarketDaily.jalali_month == month,
+            MarketDaily.jalali_day <= day,
+        ),
     )
 
 

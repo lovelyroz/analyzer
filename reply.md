@@ -526,7 +526,7 @@ python -m pytest src/tests/test_stage3_scoring.py src/tests/test_stage5_forecast
 * **عملیات گیت یا ریموت:** هیچ‌گونه عملیات Commit، Push، Branch یا دستورات Git انجام نگرفته است.
 
 ---
-# P67
+# P67 - notebooklm's Report
 گزارش اجرای **پرامپت P67** بر اساس ممیزی و بررسی دقیق کدهای سورس و مشخصات فنی پروژه ارائه می‌گردد.
 
 ---
@@ -634,3 +634,273 @@ pytest src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/te
 3. تمام یافته‌ها و گزارش فوق مستقیماً بر اساس بررسی سورس‌کد پروژه و اسناد مشخصات استخراج شده‌اند.
 
 ---
+# P67 - Claude's Report
+گزارش پیاده‌سازی P67
+
+من فقط به نسخه‌ی استخراج‌شده از analyzer.zip دسترسی داشتم، نه به پوشه‌ی زنده‌ی analyzer روی دستگاه شما. سه فایل خروجی (queries.py و دو فایل تست) را برای کپی در مسیرهای مشابه ارائه کرده‌ام. هیچ تست یا کد برنامه‌ای اجرا نشده است؛ فقط برای هر فایل ویرایش‌شده یک بررسی نحوی (py_compile) انجام شد.
+
+۱. فایل‌های تغییرکرده
+src/ingestion/market/queries.py (ویرایش): دو چیز به آن اضافه شد، بدون دست‌زدن به select_market_price_as_of.
+کلاس MarketHistoryObservation: ردیف ذخیره‌شده را همان‌طور که هست نگه می‌دارد و مقدارهای غایب None می‌مانند.
+تابع select_market_history_as_of(session, company_id, as_of_jalali_date): همه‌ی ردیف‌های تا تاریخ مبنا (خود آن هم شامل) را از قدیم به جدید برمی‌گرداند.
+src/tests/test_market_history_query.py (جدید): تست‌های قرارداد کوئری تاریخچه.
+src/tests/test_stage789_service_interface.py (جدید): تست رابط Stage 7→9 روی مسیر واقعی سرویس، بدون monkeypatch.
+
+هیچ تست موجودی تغییر نکرد. به engine.py، پارامترها، آستانه‌ها، stepsForStage7.md و reply.md هم دست نزدم.
+
+۲. قرارداد Stage 8
+
+محدودیت اصلی بسته: فایل‌های src/market/engine.py، schema.py، indicators.py و parameters.py در ZIP نبودند. src/models/market.py هم نبود، ولی محتوای معادل آن در src/market/market.py بود. همین‌طور src/ingestion/common/parsing.py و src/decision/rules.py و src/scoring/schema.py نبودند. بنابراین قرارداد موتور را فقط از test_stage8_market.py، فراخوانی‌های موجود و گزارش‌های reply.md استخراج کردم.
+
+ورودی MarketEngine.analyze_market: analyze_market(company_id, as_of_date, rows, ...) با پارامترهای اختیاری point_in_time و industry_benchmark. هر ردیف یک dict است با کلیدهای date (از نوع datetime میلادی)، close، adjusted_close، volume و value.
+رفتار شناخته‌شده در تست: نبود adjusted_close به CLOSE_FALLBACK می‌انجامد. ردیف‌های آینده با point_in_time=True حذف می‌شوند. تست‌ها با ۲۵۹ ردیف کار می‌کنند و افق‌های ۲۰ تا ۲۵۲ روزه دارند، اما حداقل تعداد مشاهده در تست‌ها صریحاً تعریف نشده است.
+فیلدهای MarketDaily: open_price، high_price، low_price، close_price، adjusted_close، volume، value، trade_count و source به‌علاوه‌ی مؤلفه‌های جلالی. فیلد trade_date میلادی و nullable است. برای ردیف‌هایی که فقط trade_date دارند، تاریخ جلالی وجود ندارد.
+قفل‌شدن تاریخ: مدل فقط روی تاریخ جلالی تکیه دارد، اما موتور datetime میلادی می‌خواهد. قاعده‌ی روشن‌نامه‌ی راه هم تبدیل جلالی به میلادی را بدون ضرورت اثبات‌شده ممنوع کرده است. این تنها مانع واقعی است.
+مسیر به Stage 9: calculate_decision_as_of_jalali یک MarketSignalResult آماده از فراخواننده می‌گیرد و فقط company_id آن را بررسی می‌کند. تطبیق as_of_date میلادی نتیجه با as_of_jalali_date ممکن نیست، چون نگاشتی تعریف نشده.
+۳. وضعیت اتصال
+
+اتصال کامل دیتابیس به Stage 8 انجام نشد، چون نگاشت تاریخ جلالی به ورودی date موتور هیچ قراردادی ندارد. src/market/service.py را عمداً نساختم.
+
+کاری که انجام شد، بخش جداپذیر و امن است: کوئری تاریخچه که ورودی لازم سرویس آینده را بدون تبدیل تاریخ فراهم می‌کند. این کوئری هنوز به هیچ مصرف‌کننده‌ای وصل نیست.
+
+ترتیب: سال/ماه/روز جلالی صعودی و سپس market_data_id. بنابراین مرزهای ماه و سال درست مرتب می‌شوند.
+نشت آینده: ردیف‌های بعد از تاریخ مبنا حذف می‌شوند، حتی با روز بزرگ‌تر در ماه قبل.
+ردیف‌های ناقص: ردیف‌های بدون تاریخ جلالی کامل یا معتبر کنار گذاشته می‌شوند.
+مقدارهای غایب: مقدارهای OHLCV غایب None می‌مانند و هیچ‌وقت صفر نمی‌شوند.
+ردیف تکراری: ردیف تکراری شرکت/تاریخ در محدوده‌ی تاریخچه صریحاً ValueError می‌دهد. تکرار بعد از تاریخ مبنا اثری ندارد.
+تاریخچه‌ی خالی: () برمی‌گردد.
+چیزی که اختراع نکردم: پنجره‌ی lookback، حداقل تعداد مشاهده، انتخاب پایه‌ی قیمت یا شاخص.
+۴. پوشش رگرسیون
+
+در test_market_history_query.py:
+
+ترتیب و مرزهای ماه/سال و شمول تاریخ مبنا؛
+نبود نشت داده‌ی آینده؛
+جداسازی بین شرکت‌ها؛
+تاریخچه‌ی خالی و حذف ردیف‌های قدیمی بدون تاریخ جلالی؛
+حفظ None به‌جای صفر و حفظ منشأ و شناسه؛
+ردیف تکراری و تاریخ مبنای نامعتبر.
+
+در test_stage789_service_interface.py (چهار تست):
+
+حفظ EPS مرحله ۵ (150/180/210) در مسیر واقعی سرویس؛
+حفظ منشأ قیمت جلالی؛
+نبود نشت قیمت آینده؛
+شکست بسته در نبود قیمت (Stage 9 اجرا نمی‌شود)؛
+انتقال شواهد ناکافی بازار با data_quality == "LIMITED" و اطمینان کمتر از حالت معتبر.
+
+توجه: در این تست‌ها MarketSignalResult توسط خود تست ساخته می‌شود. پس اتصال Stage 7→9 را اثبات می‌کنند، نه تولید Stage 8 از دیتابیس را.
+
+۵. D1–D6 و PIT/D9
+
+پس از بازبینی کد و تست‌ها، تغییر کدی لازم نبود:
+
+D1–D5: تست‌های موجود (test_v1_defers_undefined_flip_dependence_and_assumption_alerts و test_p3_flip_dependence_alerts_remain_explicitly_unresolved) عدم صدور هشدارهای تعویق‌شده را پین می‌کنند.
+D3: test_v1_uses_stage5_eps_without_recalculating_from_net_profit حفظ EPS را پوشش می‌دهد.
+D5: review_priority از alerts جداست.
+D6: قرارداد دو‌عاملی EPS و هدف P/E دست‌نخورده است.
+پراکندگی: آستانه‌ی 0.50 با > سخت‌گیرانه پابرجاست.
+PIT/D9: درخواست تاریخ‌دار بدون نسخه‌ی تاریخ‌دار LookupError می‌دهد. متادیتای مسیر قدیمی UNVERIFIED_LEGACY_GENESIS و point_in_time_selection_applied=False می‌گوید. هیچ effective_from یا مقدار پارامتری اضافه یا تغییر نکرد.
+
+باز می‌ماند (نیازمند تصمیم مالک): معیارهای D1–D4، فرمول‌های صنعتی D6، و تصویب پارامترها و effective_from در D9.
+
+۶. یافته‌های بازبینی ایستا
+پوشه‌ی forcast: در بسته پوشه‌ی src/forcast/ نوشته شده، اما کدها src.forecast را import می‌کنند. احتمالاً از نام‌گذاری بسته‌ی منتخب است؛ مطمئن نیستم، باید روی پوشه‌ی واقعی بررسی کنید.
+کپی تکراری: src/market/queries.py و src/ingestion/market/queries.py در بسته یکسان بودند. فقط نسخه‌ی ingestion را ویرایش کردم (همان که سرویس Stage 7 import می‌کند). اگر کپی دوم در پوشه‌ی واقعی هست، با آن ناسازگار می‌شود.
+وابسته به فایل‌های ندیده: در test_market_history_query.py تست‌های تاریخ مبنای (1405,13,1) و (1405,2,0) به اعتبارسنج جلالی و parse_jalali_components تکیه دارند که ندیدم.
+تست‌های رابط: وابسته به MarketSignalResult و FundamentalScoreResult به همان شکلی است که در test_stage9_decision.py ساخته شده‌اند. اگر پارامتر الزامی دیگری داشته باشند، شکست از ناسازگاری ساخت است نه منطق.
+هماهنگی تاریخ‌ها: data_cutoff_datetime پیش‌بینی (UTC) و تاریخ جلالی قیمت با هم تطبیق داده نمی‌شوند؛ نگاشتی برای آن تعریف نشده.
+(analyzer) PS D:\winprojects\analyzer> python -m pytest src/tests/test_market_history_query.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 17 items
+
+src/tests/test_market_history_query.py::test_history_is_ordered_oldest_first_across_month_and_year_boundaries PASSED [  5%]
+src/tests/test_market_history_query.py::test_history_as_of_boundary_is_inclusive_and_excludes_every_future_row PASSED [ 11%]
+src/tests/test_market_history_query.py::test_history_earlier_month_with_larger_day_is_not_excluded PASSED        [ 17%]
+src/tests/test_market_history_query.py::test_history_is_isolated_by_company PASSED                               [ 23%]
+src/tests/test_market_history_query.py::test_history_without_rows_returns_empty_tuple PASSED                     [ 29%]
+src/tests/test_market_history_query.py::test_history_excludes_legacy_rows_without_complete_jalali_date PASSED    [ 35%]
+src/tests/test_market_history_query.py::test_history_preserves_missing_values_as_none_and_provenance PASSED      [ 41%]
+src/tests/test_market_history_query.py::test_history_duplicate_company_date_fails_explicitly PASSED              [ 47%]
+src/tests/test_market_history_query.py::test_history_duplicate_after_as_of_does_not_block_earlier_history PASSED [ 52%]
+src/tests/test_market_history_query.py::test_history_rejects_invalid_as_of_dates[bad_date0] PASSED               [ 58%]
+src/tests/test_market_history_query.py::test_history_rejects_invalid_as_of_dates[bad_date1] PASSED               [ 64%]
+src/tests/test_market_history_query.py::test_history_rejects_invalid_as_of_dates[bad_date2] PASSED               [ 70%]
+src/tests/test_market_history_query.py::test_history_rejects_invalid_as_of_dates[bad_date3] PASSED               [ 76%]
+src/tests/test_market_history_query.py::test_history_rejects_invalid_as_of_dates[1405-02-11] PASSED              [ 82%]
+src/tests/test_market_history_query.py::test_history_rejects_invalid_as_of_dates[bad_date5] PASSED               [ 88%]
+src/tests/test_market_history_query.py::test_history_rejects_invalid_as_of_dates[bad_date6] PASSED               [ 94%]
+src/tests/test_market_history_query.py::test_history_rejects_invalid_as_of_dates[None] PASSED                    [100%]
+
+================================================= 17 passed in 0.77s ==================================================
+(analyzer) PS D:\winprojects\analyzer> python -m pytest src/tests/test_stage789_service_interface.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 4 items
+
+src/tests/test_stage789_service_interface.py::test_real_service_path_preserves_stage5_eps_and_market_provenance PASSED [ 25%]
+src/tests/test_stage789_service_interface.py::test_real_service_path_does_not_leak_future_market_prices PASSED   [ 50%]
+src/tests/test_stage789_service_interface.py::test_missing_price_fails_closed_before_stage9_runs PASSED          [ 75%]
+src/tests/test_stage789_service_interface.py::test_insufficient_market_evidence_is_not_presented_as_valid_market_analysis PASSED [100%]
+
+================================================== 4 passed in 1.25s ==================================================
+(analyzer) PS D:\winprojects\analyzer> python -m pytest src/tests/test_stage8_market.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 15 items
+
+src/tests/test_stage8_market.py::test_legacy_indicator_helpers_remain_available PASSED                           [  6%]
+src/tests/test_stage8_market.py::test_core_market_indicators PASSED                                              [ 13%]
+src/tests/test_stage8_market.py::test_market_engine_returns_state_not_score PASSED                               [ 20%]
+src/tests/test_stage8_market.py::test_market_output_contract_includes_52w_volume_and_value_context PASSED        [ 26%]
+src/tests/test_stage8_market.py::test_trading_value_stability_is_coefficient_of_variation PASSED                 [ 33%]
+src/tests/test_stage8_market.py::test_close_fallback_is_explicitly_flagged PASSED                                [ 40%]
+src/tests/test_stage8_market.py::test_point_in_time_excludes_future_rows PASSED                                  [ 46%]
+src/tests/test_stage8_market.py::test_adjusted_close_drives_historical_returns PASSED                            [ 53%]
+src/tests/test_stage8_market.py::test_missing_benchmark_does_not_create_synthetic_relative_strength PASSED       [ 60%]
+src/tests/test_stage8_market.py::test_relative_strength_uses_same_horizon PASSED                                 [ 66%]
+src/tests/test_stage8_market.py::test_negative_market_state_generates_context_alerts_not_decision PASSED         [ 73%]
+src/tests/test_stage8_market.py::test_drawdown_moderate_non_recovering_is_not_labeled_recovering PASSED          [ 80%]
+src/tests/test_stage8_market.py::test_drawdown_recovery_requires_rebound_from_recent_low PASSED                  [ 86%]
+src/tests/test_stage8_market.py::test_drawdown_deep_and_new_low_states_remain_distinct PASSED                    [ 93%]
+src/tests/test_stage8_market.py::test_legacy_api_is_compatibility_only PASSED                                    [100%]
+
+================================================= 15 passed in 0.09s ==================================================
+(analyzer) PS D:\winprojects\analyzer> python -m pytest src/tests/test_stage9_decision.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 19 items
+
+src/tests/test_stage9_decision.py::test_strong_buy_requires_aligned_families PASSED                              [  5%]
+src/tests/test_stage9_decision.py::test_jalali_orchestration_passes_stage7_result_to_stage9 PASSED               [ 10%]
+src/tests/test_stage9_decision.py::test_jalali_orchestration_rejects_mismatched_fundamental_and_market_identity PASSED [ 15%]
+src/tests/test_stage9_decision.py::test_value_trap_does_not_become_buy PASSED                                    [ 21%]
+src/tests/test_stage9_decision.py::test_strong_but_expensive_is_not_buy PASSED                                   [ 26%]
+src/tests/test_stage9_decision.py::test_low_forecast_reliability_limits_strong_conviction PASSED                 [ 31%]
+src/tests/test_stage9_decision.py::test_market_does_not_override_strong_fundamentals PASSED                      [ 36%]
+src/tests/test_stage9_decision.py::test_usd_share_value_is_context_not_a_new_score PASSED                        [ 42%]
+src/tests/test_stage9_decision.py::test_negative_eps_valuation_is_not_reconstructed_by_stage9 PASSED             [ 47%]
+src/tests/test_stage9_decision.py::test_no_position_sizing_contract PASSED                                       [ 52%]
+src/tests/test_stage9_decision.py::test_hysteresis_prevents_small_buy_to_hold_change PASSED                      [ 57%]
+src/tests/test_stage9_decision.py::test_hysteresis_allows_material_deterioration PASSED                          [ 63%]
+src/tests/test_stage9_decision.py::test_decision_history_contract PASSED                                         [ 68%]
+src/tests/test_stage9_decision.py::test_ranking_contract_has_no_new_score PASSED                                 [ 73%]
+src/tests/test_stage9_decision.py::test_dashboard_contract_carries_required_fields PASSED                        [ 78%]
+src/tests/test_stage9_decision.py::test_scenario_dispersion_threshold_boundaries PASSED                          [ 84%]
+src/tests/test_stage9_decision.py::test_scenario_dispersion_causes_ten_point_confidence_deduction PASSED         [ 89%]
+src/tests/test_stage9_decision.py::test_scenario_dispersion_blocks_strong_buy PASSED                             [ 94%]
+src/tests/test_stage9_decision.py::test_scenario_dispersion_penalty_distinct_from_valuation_risk_level_high PASSED [100%]
+
+================================================= 19 passed in 0.81s ==================================================
+(analyzer) PS D:\winprojects\analyzer> python -m pytest src/tests/test_stage7_valuation.py -v
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\winprojects\analyzer\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\winprojects\analyzer
+collected 90 items
+
+src/tests/test_stage7_valuation.py::test_jalali_service_uses_selected_price_and_preserves_provenance PASSED      [  1%]
+src/tests/test_stage7_valuation.py::test_jalali_service_fails_closed_without_eligible_observation PASSED         [  2%]
+src/tests/test_stage7_valuation.py::test_jalali_service_rejects_forecast_from_another_company PASSED             [  3%]
+src/tests/test_stage7_valuation.py::test_valuation_models PASSED                                                 [  4%]
+src/tests/test_stage7_valuation.py::test_valuation_engine_forward_pe_and_expected_fair_value PASSED              [  5%]
+src/tests/test_stage7_valuation.py::test_industry_forward_pe_requires_eight_valid_peers PASSED                   [  6%]
+src/tests/test_stage7_valuation.py::test_industry_ttm_is_fallback_after_historical_median PASSED                 [  7%]
+src/tests/test_stage7_valuation.py::test_negative_eps_does_not_create_fake_pe_or_fair_value PASSED               [  8%]
+src/tests/test_stage7_valuation.py::test_reliability_does_not_change_forward_pe_or_fair_value PASSED             [ 10%]
+src/tests/test_stage7_valuation.py::test_direct_probability_adjustments_are_rejected_in_favor_of_family_evidence PASSED [ 11%]
+src/tests/test_stage7_valuation.py::test_probability_evidence_is_family_level_and_equal_weighted PASSED          [ 12%]
+src/tests/test_stage7_valuation.py::test_probability_evidence_rejects_unknown_or_incomplete_family_data PASSED   [ 13%]
+src/tests/test_stage7_valuation.py::test_scenario_multiple_adjustments_require_economic_rationale_and_are_bounded PASSED [ 14%]
+src/tests/test_stage7_valuation.py::test_alerts_include_severity_and_driver_focus PASSED                         [ 15%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_drivers_present_and_bounded PASSED                       [ 16%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_missing_data_empty_drivers PASSED                        [ 17%]
+src/tests/test_stage7_valuation.py::test_p2_sensitivity_deterministic_repeated_runs PASSED                       [ 18%]
+src/tests/test_stage7_valuation.py::test_p2_alert_severity_levels_valid PASSED                                   [ 20%]
+src/tests/test_stage7_valuation.py::test_p2_alert_low_reliability_threshold_boundaries PASSED                    [ 21%]
+src/tests/test_stage7_valuation.py::test_p2_alert_high_dispersion_threshold_boundaries PASSED                    [ 22%]
+src/tests/test_stage7_valuation.py::test_p2_alert_divergence_ratios_boundaries PASSED                            [ 23%]
+src/tests/test_stage7_valuation.py::test_v1_sector_examples_use_only_eps_and_target_pe_drivers PASSED            [ 24%]
+src/tests/test_stage7_valuation.py::test_v1_uses_stage5_eps_without_recalculating_from_net_profit PASSED         [ 25%]
+src/tests/test_stage7_valuation.py::test_v1_defers_undefined_flip_dependence_and_assumption_alerts PASSED        [ 26%]
+src/tests/test_stage7_valuation.py::test_p3_sensitivity_recomputes_from_valuation_identity PASSED                [ 27%]
+src/tests/test_stage7_valuation.py::test_p3_nan_eps_is_guarded_as_invalid PASSED                                 [ 28%]
+src/tests/test_stage7_valuation.py::test_p3_zero_and_negative_price_guarded PASSED                               [ 30%]
+src/tests/test_stage7_valuation.py::test_p3_nonfinite_benchmark_series_filtered PASSED                           [ 31%]
+src/tests/test_stage7_valuation.py::test_p3_nonfinite_scores_fall_back_to_defaults PASSED                        [ 32%]
+src/tests/test_stage7_valuation.py::test_p3_flip_dependence_alerts_remain_explicitly_unresolved PASSED           [ 33%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_below_minimum_falls_back PASSED                           [ 34%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_at_minimum_selects_industry_forward PASSED                [ 35%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_above_minimum_and_median_provenance PASSED                [ 36%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_filters_invalid_values PASSED                             [ 37%]
+src/tests/test_stage7_valuation.py::test_p4_peer_count_empty_data_reports_zero_and_falls_back PASSED             [ 38%]
+src/tests/test_stage7_valuation.py::test_p4_benchmark_fallback_ignores_forward_count_for_ttm PASSED              [ 40%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_price_yields_null_outputs PASSED                           [ 41%]
+src/tests/test_stage7_valuation.py::test_p5_missing_eps_is_not_applicable_not_zero PASSED                        [ 42%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_reliability_echo_sanitized PASSED                          [ 43%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_probability_confidence_echo_finite PASSED                  [ 44%]
+src/tests/test_stage7_valuation.py::test_p5_missing_data_quality_does_not_crash PASSED                           [ 45%]
+src/tests/test_stage7_valuation.py::test_p5_nonfinite_multiple_adjustment_rejected PASSED                        [ 46%]
+src/tests/test_stage7_valuation.py::test_p5_nan_probability_evidence_rejected PASSED                             [ 47%]
+src/tests/test_stage7_valuation.py::test_p5_datetime_echoes_normalized_to_utc PASSED                             [ 48%]
+src/tests/test_stage7_valuation.py::test_p5_default_cutoff_inherits_forecast_cutoff_normalized PASSED            [ 50%]
+src/tests/test_stage7_valuation.py::test_p5_undated_benchmark_series_carry_no_provenance PASSED                  [ 51%]
+src/tests/test_stage7_valuation.py::test_p6_production_path_real_stage5_forecast PASSED                          [ 52%]
+src/tests/test_stage7_valuation.py::test_p6_cutoff_pit_limitation_pinned PASSED                                  [ 53%]
+src/tests/test_stage7_valuation.py::test_p6_missing_benchmarks_yield_guarded_nulls PASSED                        [ 54%]
+src/tests/test_stage7_valuation.py::test_p6_scenario_ordering_flag_and_probability_normalization PASSED          [ 55%]
+src/tests/test_stage7_valuation.py::test_p6_invalid_eps_variants_never_fabricate_values PASSED                   [ 56%]
+src/tests/test_stage7_valuation.py::test_p6_repeat_runs_identical_on_full_contract PASSED                        [ 57%]
+src/tests/test_stage7_valuation.py::test_p6_regression_prior_behavior_preserved PASSED                           [ 58%]
+src/tests/test_stage7_valuation.py::test_p10_expensive_base_upside_parameterized_outputs_unchanged PASSED        [ 60%]
+src/tests/test_stage7_valuation.py::test_p10_expensive_threshold_consumed_from_parameters PASSED                 [ 61%]
+src/tests/test_stage7_valuation.py::test_p12_calculation_timestamp_utc_aware_and_deterministic PASSED            [ 62%]
+src/tests/test_stage7_valuation.py::test_p32_input_refs_before_cutoff_leave_results_unchanged PASSED             [ 63%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_after_cutoff_rejected_on_valuation_path PASSED            [ 64%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_at_cutoff_boundary_accepted PASSED                        [ 65%]
+src/tests/test_stage7_valuation.py::test_p32_input_ref_missing_date_rejected PASSED                              [ 66%]
+src/tests/test_stage7_valuation.py::test_p32_input_refs_absent_preserves_legacy_path PASSED                      [ 67%]
+src/tests/test_stage7_valuation.py::test_p53_embedded_forecast_input_ref_at_cutoff_is_enforced_and_accepted PASSED [ 68%]
+src/tests/test_stage7_valuation.py::test_p53_stage5_dropped_future_input_is_not_reintroduced_to_stage7 PASSED    [ 70%]
+src/tests/test_stage7_valuation.py::test_p53_embedded_forecast_input_ref_without_availability_is_rejected PASSED [ 71%]
+src/tests/test_stage7_valuation.py::test_p53_explicit_empty_refs_do_not_bypass_embedded_forecast_provenance PASSED [ 72%]
+src/tests/test_stage7_valuation.py::test_p53_stage5_forecast_without_provenance_preserves_legacy_path PASSED     [ 73%]
+src/tests/test_stage7_valuation.py::test_p33_genesis_snapshot_matches_live_constants PASSED                      [ 74%]
+src/tests/test_stage7_valuation.py::test_p33_result_carries_parameter_audit PASSED                               [ 75%]
+src/tests/test_stage7_valuation.py::test_p33_resolve_exact_key_and_missing_raises PASSED                         [ 76%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_without_dated_records_raises PASSED                           [ 77%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_selection_mechanics PASSED                                    [ 78%]
+src/tests/test_stage7_valuation.py::test_p33_as_of_overlap_raises_ambiguity PASSED                               [ 80%]
+src/tests/test_stage7_valuation.py::test_p35_legacy_path_provenance_is_truthful_and_unchanged PASSED             [ 81%]
+src/tests/test_stage7_valuation.py::test_p35_snapshot_reports_values_actually_consumed_when_module_constant_changes PASSED [ 82%]
+src/tests/test_stage7_valuation.py::test_p35_as_of_selection_governs_calculation_and_snapshot_matches PASSED     [ 83%]
+src/tests/test_stage7_valuation.py::test_p35_selected_set_governs_peers_alerts_and_scenario_weights PASSED       [ 84%]
+src/tests/test_stage7_valuation.py::test_p35_missing_or_ambiguous_as_of_selection_fails_closed PASSED            [ 85%]
+src/tests/test_stage7_valuation.py::test_p35_invalid_parameter_set_raises_without_fallback_to_constants PASSED   [ 86%]
+src/tests/test_stage7_valuation.py::test_p35_isolation_from_global_mutation_and_snapshot_aliasing PASSED         [ 87%]
+src/tests/test_stage7_valuation.py::test_p35_repeated_as_of_calculations_are_deterministic PASSED                [ 88%]
+src/tests/test_stage7_valuation.py::test_d9_effective_cutoff_governs_selection_not_valuation_date PASSED         [ 90%]
+src/tests/test_stage7_valuation.py::test_d9_exact_effective_from_boundary_is_accepted PASSED                     [ 91%]
+src/tests/test_stage7_valuation.py::test_d9_future_effective_version_is_rejected PASSED                          [ 92%]
+src/tests/test_stage7_valuation.py::test_d9_missing_eligible_dated_version_fails_closed_without_genesis_fallback PASSED [ 93%]
+src/tests/test_stage7_valuation.py::test_d9_overlapping_eligible_versions_are_deterministic PASSED               [ 94%]
+src/tests/test_stage7_valuation.py::test_d9_conflicting_parameter_as_of_is_rejected PASSED                       [ 95%]
+src/tests/test_stage7_valuation.py::test_d9_without_any_cutoff_caller_supplied_as_of_is_labelled_truthfully PASSED [ 96%]
+src/tests/test_stage7_valuation.py::test_d9_metadata_distinguishes_dated_selection_from_legacy_genesis PASSED    [ 97%]
+src/tests/test_stage7_valuation.py::test_d9_legacy_path_stays_backward_compatible_and_never_claims_pit PASSED    [ 98%]
+src/tests/test_stage7_valuation.py::test_d9_cutoff_governed_selection_is_deterministic_on_repeat PASSED          [100%]
+
+================================================= 90 passed in 0.86s ==================================================
+(analyzer) PS D:\winprojects\analyzer> python -m pytest src/tests/test_market_history_query.py src/tests/test_stage789_service_interface.py src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -q
+................................................................................................................ [ 77%]
+.................................                                                                                [100%]
+145 passed in 1.27s
