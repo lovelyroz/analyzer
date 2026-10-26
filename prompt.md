@@ -1,218 +1,141 @@
-# P68 — Stage 7 Inter-Stage Contracts and Architecture Gap Audit (Read-Only, Project-Wide)
+# P68-A — Verify Architecture Evidence and Resolve Market-History Contradiction
 
-## 1. Project Context
+## Role and Objective
 
-You are reviewing the local project `analyzer`, a financial-data application.
+You are performing a focused, read-only follow-up to P68 for the financial-data application in the local project folder `analyzer`.
 
-The repository path on GitHub is `lovelyroz/analyzer`, but the local working-folder name is `analyzer`.
+The previous P68 report did not adequately establish the real inter-stage architecture and contains a potential contradiction with P67 concerning the market-history query.
 
-This task is an architecture and contract audit that must precede further Stage 7 implementation work.
+Your objective is to resolve that contradiction using the actual supplied project files, identify the evidence-backed application and service call paths, and report the remaining architecture gaps.
 
-Financial correctness, auditability, point-in-time integrity, deterministic behavior, and preservation of financial invariants take priority over implementation speed.
+**This is an investigation and reporting task only. Do not implement anything.**
 
-The Stage 7 remediation roadmap remains authoritative. Read `stepsForStage7.md` first, followed by `temp_report2.md`, `reply.md`, `07_Stage7_Valuation.md`, and any relevant stage specifications and prior reports included in the supplied project files.
+## 1. Mandatory Restrictions
 
-Treat reports as historical claims that must be checked against the actual supplied source code. Do not assume that a report accurately describes the current snapshot.
+- Inspect the supplied files and their actual contents. Do not rely on prior reports when the source code can verify a claim.
+- Do not assume that the supplied ZIP matches the current working tree. Identify any evidence that the supplied snapshot may be stale or incomplete.
+- Do not modify, create, rename, or delete project files.
+- Do not run tests, application code, database commands, migrations, or other executable project commands.
+- Do not perform Git or GitHub operations.
+- Do not redesign or modify `src/valuation/engine.py`.
+- Do not invent financial formulas, source data, historical dates, parameter effective dates, sector mappings, thresholds, lookback windows, or missing contract fields.
+- Do not mark an integration as complete merely because a service exists or its unit tests pass.
+- Distinguish clearly between:
+  1. Directly verified source-code evidence.
+  2. Evidence found only in tests.
+  3. Claims made only in reports or specifications.
+  4. Unknown or unverified behavior.
 
-## 2. Scope: Inspect the Supplied Project, Not a Fixed File List
+## 2. Resolve the P67/P68 Market-History Contradiction
 
-The user has supplied a collection of major project files. It may cover much of the application but may not contain every repository file.
+Inspect the actual current contents of at least:
 
-Inspect the supplied files and their directory structure before deciding which files are relevant.
+- `src/ingestion/market/queries.py`
+- `src/market/queries.py`, if present
+- `src/market/engine.py`
+- The relevant market data models and schemas
+- The tests for market-history queries and Stage 8
+- The P67 and P68 reports, including `temp_report2.md`, `reply.md`, and `stepsForStage7.md`, if supplied
 
-Do not restrict the audit to a predetermined list of files or assume that the earlier suggested ZIP file list is exhaustive.
+Determine precisely:
 
-Use the available project files to identify:
-- Application entry points and executable orchestration paths.
-- Package structure, module boundaries, and import relationships.
-- Services, engines, repositories, query modules, database models, schemas, and adapters.
-- Existing callers and consumers of Stages 3, 5, 7, 8, and 9.
-- Existing tests that establish contracts or integration behavior.
-- Configuration and dependency declarations that materially affect these paths.
-- Any additional files necessary to verify an architectural claim.
+1. Does `select_market_history_as_of(...)` exist in the supplied source?
+2. Does it return a historical series or only a single market-price observation?
+3. What is its exact signature, return type, ordering, cutoff behavior, duplicate handling, missing-value handling, and company-isolation behavior?
+4. Does it actually provide the date representation and OHLCV fields required by `MarketEngine.analyze_market`?
+5. Is there a verified caller that passes its result into the Stage 8 market engine?
+6. Are there duplicate or competing query modules? If so, explain their actual differences and whether either is used by a verified production path.
+7. Which claims in P67 and P68 are correct, incorrect, incomplete, or impossible to verify from the supplied files?
 
-Search across all supplied relevant source files for actual call sites and data-flow relationships. Follow calls through service and adapter layers when the evidence permits.
+Do not treat the presence of a query function or its tests as proof of end-to-end integration.
 
-Do not infer that a component is integrated merely because it exists, can be imported, or has unit tests.
+If the relevant files are missing or inconsistent, state exactly which files or evidence are missing. Do not resolve uncertainty by guessing.
 
-If the supplied collection is incomplete, identify the missing evidence and explain precisely which conclusions cannot be established. Do not claim to have inspected the entire repository unless the supplied material proves that it is complete.
+## 3. Establish Actual Inter-Stage Call Paths
 
-## 3. Strict Read-Only Restrictions
+Trace the source code, not just module names or architectural intentions, for these boundaries:
 
-This is an inspection and reporting task only.
+- Stage 3 ingestion/fundamental data → Stage 5 forecast
+- Stage 5 forecast/EPS → Stage 7 valuation
+- Database market history → Stage 8 market analysis
+- Stage 7 valuation and Stage 8 market results → Stage 9 decision
+- Stage 9 decision output → its actual consumer, persistence layer, or user-facing entry point
 
-- Do not edit, create, delete, or rename project files.
-- Do not modify `src/valuation/engine.py`.
-- Do not redesign the valuation engine in this task.
-- Do not implement interfaces, adapters, orchestration, migrations, or tests.
-- Do not run tests, the application, database operations, or scripts.
-- Do not perform Git or GitHub operations, including commits, branches, pushes, pulls, or remote changes.
-- Do not write the report into repository files. Return the report in your response only.
-- Do not ask the user to make financial or architectural decisions that can be resolved by inspecting the supplied evidence. Clearly identify decisions that genuinely require an authoritative product or domain specification.
+For every boundary, report:
 
-You may perform read-only source inspection and text searches within the supplied files.
+- Actual caller and callee, with file paths and function/method names.
+- The data passed between them and its source.
+- The relevant identity fields, such as company and reporting period, where applicable.
+- Date, cutoff, ordering, and point-in-time assumptions that are explicitly enforced.
+- Whether the path is production code, test-only wiring, or merely documented/intended.
+- Direct evidence supporting the conclusion.
+- Missing links or unverified assumptions.
 
-## 4. Primary Objective
+Search the supplied project broadly enough to locate the real application entry point and orchestration code. Do not assume `main.py` exists. Inspect the actual repository structure and likely entry points, including API routes, CLI entry points, application factories, scheduled jobs, and service orchestration where present.
 
-Establish, from actual code evidence, whether the application's stages are connected by real, usable, and temporally valid contracts.
+If no real entry point or end-to-end path can be demonstrated, report that as an evidence-backed gap. Do not create one.
 
-Investigate these paths independently:
+## 4. Financial and Point-in-Time Guardrails
 
-1. Source data and normalized financial statements → Stage 3 scoring.
-2. Stage 3 outputs and authoritative inputs → Stage 5 forecasting.
-3. Stage 5 forecast outputs → Stage 7 valuation.
-4. Database market-history records → Stage 8 market analysis.
-5. Stage 8 market outputs → Stage 9 decision analysis.
-6. Stage 7 valuation outputs → Stage 9 decision analysis.
-7. Stage 9 output → any real application consumer, API, UI, report, or persistence destination.
-8. A real application entry point or orchestration path that invokes the necessary services.
+Verify that the analysis respects these existing constraints:
 
-For each path, distinguish:
-- Proven production/application call path.
-- Proven service-level integration only.
-- Test-only connection.
-- Partial connection with an explicit missing contract.
-- No evidence found in the supplied files.
-- Unable to determine because required files or context are missing.
+- Stage 5 EPS remains authoritative; Stage 7 must not silently recompute it.
+- Stage 7 V1 valuation contract remains `Forecast EPS × Target P/E`; do not introduce unsupported industry-specific formulas.
+- A Jalali date cutoff alone does not establish full point-in-time correctness.
+- Do not invent historical parameter effective dates. Preserve D9 fail-closed behavior where applicable.
+- Do not invent market-data lookback windows, minimum observations, missing-value substitutions, price-selection rules, or date conversions.
+- Preserve unresolved D1–D6 and other documented decisions unless source evidence demonstrates that an item has already been resolved.
 
-Do not label a path as absent merely because a search for a conventional filename such as `main.py` returned nothing. Examine the actual application structure and call sites.
+Separate verified behavior from assumptions and recommendations.
 
-## 5. Required Contract Matrix
+## 5. Required Report
 
-For each stage boundary, document:
+Return a concise but evidence-rich report with these sections:
 
-- Producer and consumer, using exact module and symbol names where supported by the source.
-- Actual call site or evidence of the call path.
-- Input and output types, required fields, optional fields, and validation behavior.
-- Who loads data and who owns database-session lifecycle.
-- Company/entity identifier and its propagation.
-- Base-date and cutoff semantics.
-- Date representation and conversion responsibility.
-- Units, currency, share basis, and other financial semantics where explicitly established by the code or authoritative specifications.
-- Provenance and as-of availability requirements.
-- Error, missing-data, and empty-result behavior.
-- Whether the contract is implemented, partial, inferred, or missing.
-- The smallest safe next action needed to resolve a verified gap.
+### A. Snapshot and Scope
+- Identify which required files were available and which were missing.
+- Identify any evidence of stale, incomplete, or conflicting snapshots.
+- State whether source code or only reports/tests were available for each major conclusion.
 
-Do not invent a contract just to fill a table cell. Mark unknown fields as unknown and identify the evidence needed to resolve them.
+### B. P67/P68 Reconciliation
+Provide a claim-by-claim comparison of the market-history findings. Cite exact file paths and function names, and line numbers where available.
 
-## 6. Financial and Temporal Integrity
+### C. Inter-Stage Architecture Matrix
+Use a table with one row per boundary listed in Section 3 and these columns:
 
-Explicitly verify the implementation and integration implications of these existing constraints:
+- Boundary
+- Verified caller → callee
+- Data contract and source
+- Production path, test-only, intended, or unknown
+- Evidence
+- Gap / conclusion
 
-- Stage 5 EPS must be preserved by Stage 7; do not silently recalculate it.
-- Stage 7 V1 valuation contract remains `Forecast EPS × Target P/E`. Do not invent sector-specific formulas or industry mappings.
-- D1–D4 remain deferred unless authoritative criteria and valid inputs are established.
-- D5 `review_priority` remains distinct from risk alerts.
-- D6 does not authorize invented sector-specific valuation formulas.
-- D7: a cutoff date alone does not prove that data was historically available at that cutoff.
-- D8: alert contract/name differences require review before changing outputs.
-- D9: no historical parameter effective date has been approved. Do not introduce a guessed date such as `2026-01-01`. Dated selection must fail closed when no eligible version exists. A legacy path must not claim point-in-time parameter selection.
-- Scenario dispersion threshold remains `0.50` with strict `>` comparison.
-- Jalali/Shamsi dates are the required calendar convention. Do not introduce an unsupported Gregorian conversion or date-mapping rule.
-- Distinguish observation date from the date/time at which data became available.
-- Do not assume that market-history records, P/E benchmarks, or historical parameters are suitable for a cutoff merely because they can be queried.
+### D. Missing-Contract Register
+For each genuine gap, provide:
+- Gap ID
+- Evidence demonstrating the gap
+- Exact missing contract or connection
+- Why it matters for correctness or integration
+- What must be decided before implementation
+- Which existing specification or owner decision is needed, if any
 
-For every item, state whether it is verified in code, supported only by a report/specification, contradicted by current code, or unresolved.
+Do not propose unsupported implementation details.
 
-## 7. Market-History Integration
+### E. Recommended Next Step
+Recommend the single most appropriate next engineering task based on the evidence. Keep `src/valuation/engine.py` redesign deferred until the architecture and required contracts are sufficiently established.
 
-Inspect all relevant market query modules, database models, schemas, services, and engines included in the supplied files.
+### F. Final Status
+Choose and justify one:
+- Architecture path verified
+- Partially verified; specific evidence gaps remain
+- Cannot determine from supplied files
 
-In particular, verify the reported addition of `select_market_history_as_of(...)` and its relationship to any similarly named query module.
+Explicitly state whether P68 is now adequately answered and what evidence is still needed.
 
-Determine whether the returned Jalali-dated records can be passed into Stage 8 without:
-- Losing or fabricating dates.
-- Inventing a Gregorian conversion.
-- Silently dropping observations.
-- Applying an unsupported lookback window or minimum sample count.
-- Choosing an unsupported price field.
-- Treating observation date as historical availability evidence.
+## 6. Completion Standard
 
-If the database-to-Stage-8 path is incomplete, describe the exact missing contract and the authoritative information needed to complete it. Do not implement the bridge.
+This task is complete only if the report resolves the market-history contradiction as far as the supplied evidence allows and provides an evidence-backed assessment of all five inter-stage boundaries.
 
-## 8. Minimum Missing-Contract Register
+A report that only recommends implementing a historical query, repeats previous reports, or reports passing tests without tracing callers is insufficient.
 
-For each confirmed or strongly evidenced gap, provide:
-
-1. Gap ID.
-2. Stage boundary or architectural responsibility.
-3. Evidence: exact file path and symbol, and a concise description of the relevant code.
-4. What is missing or inconsistent.
-5. Why it matters to correctness or integration.
-6. The minimum contract or domain decision needed.
-7. Whether the decision can be derived from existing authoritative project material or requires an explicit owner decision.
-8. The smallest safe next action.
-9. The regression or integration test that should eventually prove the fix.
-10. Dependencies and recommended implementation order.
-
-Separate verified gaps from possible gaps that cannot be confirmed because files are missing.
-
-Do not recommend adding an interface, module, database field, or orchestration layer unless the audit establishes a concrete need.
-
-## 9. Evidence and Reporting Rules
-
-Every important architectural conclusion must cite actual supplied file paths and symbol names, and where feasible, the relevant function or class.
-
-Clearly distinguish:
-- Directly observed source-code facts.
-- Existing test evidence.
-- Historical report claims.
-- Architectural interpretations.
-- Unknowns caused by incomplete supplied files.
-
-Do not claim that tests passed; tests must not be run during this task. You may report test assertions visible in the supplied source, but they are not proof that the current code passes.
-
-If two reports disagree, explain the discrepancy and prioritize verified current source evidence while preserving relevant historical context.
-
-If multiple modules appear to implement similar responsibilities, identify the duplication and verify actual imports/callers before deciding which module is authoritative.
-
-## 10. Deliverables
-
-Return a structured report with these sections:
-
-A. Executive summary and evidence coverage.
-
-B. Supplied-file coverage:
-- Major directories and architectural layers inspected.
-- Relevant missing files or unavailable context.
-- Whether repository-wide completeness can be established.
-
-C. Application entry point and orchestration:
-- Actual entry point(s), if found.
-- Exact call paths and source evidence.
-- If no path is proven, state what was searched and what remains unverified.
-- Do not create or propose a fictitious `main.py`.
-
-D. Inter-stage contract matrix covering all eight paths in Section 4.
-
-E. Verified architecture and integration gaps, ranked by dependency and risk.
-
-F. Financial and temporal integrity review covering every constraint in Section 6.
-
-G. Minimal missing-contract register as specified in Section 8.
-
-H. Recommended implementation sequence, with explicit dependencies. This is a plan only; do not implement anything.
-
-I. Proposed owner-run PowerShell test commands for the eventual integration work. Commands must be derived from actual existing test paths and must not be executed. Identify where a new test will be needed rather than pretending it already exists.
-
-J. Final status:
-- Which gaps are verified.
-- Which remain uncertain.
-- What must happen before any Stage 7 engine redesign.
-- Whether Stage 7 must remain OPEN.
-
-## 11. Acceptance Criteria
-
-This audit is complete only if:
-- It examines the supplied project broadly rather than only a fixed list of files.
-- Important claims are tied to actual source evidence.
-- It distinguishes production integration from test-only integration.
-- It does not fabricate an application entry point or missing contract.
-- It respects all existing financial and temporal constraints.
-- It identifies the minimum evidence-backed next steps.
-- It makes no code changes and runs no tests.
-
-Stage 7 must remain OPEN unless the authoritative roadmap's acceptance criteria are actually satisfied by verified evidence.
-
-Return the report in your response only. Do not modify any project files.
+Do not make code changes or run tests. Return the report in your response only.
