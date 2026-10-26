@@ -4274,81 +4274,160 @@ These results establish that the listed tests passed in the recorded local run. 
 
 **Final status:** Focused local regression evidence is recorded for 145 tests. Stage 8 database-to-engine integration and D9 parameter approval remain unresolved. Stage 7 is not complete.
 
-# P72
+# P68–P72 Stage 8 Carry-Forward Summary — 
 
-##  گزارش P72: قرارداد بومی تاریخ جلالی Stage 8
+## 1. Architecture findings
 
-تست اجرا نشده است. فقط `py_compile` روی فایل‌های تغییرکرده زدم و دیف را با `diff -ru` روی کپی اصلی بررسی کردم. `stepsForStage7.md` و `reply.md` را تغییر نداده‌ام. فایل‌های تغییرکرده در `p72_changed_files.zip` با همان مسیر `src/...` هستند.
+- **P68-A correction:** The initial claim that the market-history query was absent was incorrect for the inspected snapshot. `src/ingestion/market/queries.py` contains `MarketHistoryObservation` and `select_market_history_as_of(...)`. The query exists, but existence alone does not establish engine integration.
+- **P68-B / P69:** No complete application-level orchestrator or verified production entry point was established. Stage 5 → Stage 7 valuation service and Stage 7 → Stage 9 decision service exist, but this does not prove an automatically executed end-to-end pipeline.
+- Stage 3 scoring is currently a caller-supplied Stage 9 input. A required Stage 3 → Stage 5 dependency has not been established.
+- Stage 9 returns a result; a downstream persistence/API consumer was not established.
+- The Jalali market-history query filters inclusively, orders observations by Jalali date, rejects duplicate company/date rows, and preserves missing OHLCV values as `None`. Legacy rows without valid stored Jalali components are not assigned guessed dates.
 
-**شفافیت دربارهٔ Git:** یک بار اشتباهاً `git diff --no-index --stat /dev/null /dev/null` اجرا شد. هیچ مخزنی را نخواند یا تغییر نداد، اما طبق قید پرامپت نباید اجرا می‌شد. بقیهٔ کارها بدون Git انجام شد.
+## 2. Stage 8 date-contract decision — P70/P71
 
-## ۱. فایل‌های تغییرکرده
+The approved implementation direction is a native Jalali contract:
 
-| فایل | تغییر |
-|---|---|
-| `src/core/jalali.py` (جدید) | تعریف مشترک `JalaliDate` و `validate_jalali_date`. فقط به `jdatetime` وابسته است و به ingestion وابسته نیست. |
-| `src/market/schema.py` | `MarketSignalResult.as_of_date` حالا `JalaliDate` است. `calculation_timestamp` همان `datetime` اجرا باقی ماند. |
-| `src/market/engine.py` | `analyze_market`، `_prepare_rows`، `_relative_strength`، `_market_regime` و `analyze_market_signals` به تاریخ جلالی بومی مهاجرت کردند. |
-| `src/market/service.py` (جدید) | adapter بین query و engine. |
-| `src/ingestion/market/queries.py` | تعریف تکراری `JalaliDate` و اعتبارسنج حذف شد و به ماژول مشترک ارجاع می‌دهد. `_validate_jalali_date` و `JalaliDate` همچنان از همین ماژول import می‌شوند. |
-| `src/ingestion/common/parsing.py` | `parse_jalali_components` از همان اعتبارسنج مشترک استفاده می‌کند. رفتار عوض نشده، فقط منطق تکراری برداشته شد. |
-| `src/tests/test_stage8_market.py` | مهاجرت به جلالی، حفظ همهٔ assertionهای قبلی، و تست‌های جدید قرارداد تاریخ. |
-| `src/tests/test_stage8_market_service.py` (جدید) | تست‌های adapter. |
-| `src/tests/test_jalali_contract.py` (جدید) | تست اعتبارسنج مشترک. |
-| `src/tests/test_stage9_decision.py` و `test_stage789_service_interface.py` | ساخت `MarketSignalResult` با `as_of_date` جلالی. |
-| `src/tests/test_market_history_query.py` | فقط docstring که دیگر درست نبود اصلاح شد. |
+- `JalaliDate = Tuple[int, int, int]`.
+- Engine as-of dates, market observations, benchmark observations, and `MarketSignalResult.as_of_date` use the same Jalali contract.
+- Engine input rows use `jalali_date`; ambiguous Gregorian `date` input is not accepted.
+- As-of filtering is inclusive. Future observations are excluded.
+- Invalid dates and duplicate retained observations fail explicitly.
+- Benchmark data must use the same Jalali contract and cutoff.
+- Indicator windows such as `20D` and `252D` retain their existing observation-count semantics.
+- `calculation_timestamp` remains separate from the Jalali market as-of date.
+- No Gregorian datetime is fabricated from Jalali components.
+- Migration inside the repository is a deliberate breaking change; external callers cannot be ruled out from repository inspection alone.
 
-`indicators.py`، `parameters.py`، `valuation/engine.py`، Stage 5 و فرمول‌ها دست‌نخورده‌اند.
+## 3. P72 implementation summary
 
-## ۲. قرارداد نهایی
+Reported changes include:
 
-- `JalaliDate = (year, month, day)` از نوع `int` است. `bool`، رشته، لیست و تاریخ ناممکن، مثلاً روز ۳۱ مهر، `ValueError` می‌دهند.
-- ورودی as-of و هر ردیف بازار یا benchmark با کلید `"jalali_date"` می‌آید. ردیفی که کلید `"date"` داشته باشد، حتی کنار `jalali_date`، رد می‌شود.
-- مرز as-of شامل خودِ همان روز است (inclusive). مقایسه عددی و tuple-wise است و هیچ `datetime` میلادی ساخته نمی‌شود.
-- مرتب‌سازی فقط بر اساس `jalali_date` است. چون تاریخ تکراری رد می‌شود، کلید ثانویه لازم نیست.
-- پنجره‌های `20D` و `252D` همچنان تعداد مشاهده‌اند.
-- metadata به‌جای `isoformat` این کلیدها را دارد: `calendar="JALALI"`، `as_of_jalali_date` و `latest_observation_jalali_date`.
+- New shared Jalali type/validation module: `src/core/jalali.py`.
+- Native Jalali migration in `src/market/engine.py` and `src/market/schema.py`.
+- New database-to-engine adapter: `src/market/service.py`.
+- Shared validation reused by market-history queries and ingestion parsing.
+- Updated Stage 8 and Stage 9 test constructors.
+- New tests for the Jalali contract and Stage 8 database adapter.
 
-## ۳. Adapter
+The adapter calls the existing `select_market_history_as_of(...)` query and passes stored Jalali observations to `MarketEngine.analyze_market(...)`. It does not own the SQLAlchemy session, persist results, create benchmark data, or implement full pipeline orchestration.
 
-`analyze_market_as_of_jalali(session, company_id, as_of_jalali_date, *, industry_benchmark=None, market_benchmark=None)` در `src/market/service.py` این مسیر را اجرا می‌کند:
+`src/valuation/engine.py`, Stage 5 EPS behavior, `src/market/indicators.py`, and financial formulas were reported unchanged.
 
-`select_market_history_as_of(...)` ← `market_history_to_engine_rows` ← `MarketEngine.analyze_market`
+## 4. Owner-run regression evidence
 
-- Session مال caller است و adapter چیزی persist نمی‌کند.
-- هر ردیف فقط فیلدهای `MarketHistoryObservation` را می‌گیرد: `company_id`، `market_data_id`، `jalali_date`، `open/high/low/close/adjusted_close`، `volume`، `value`، `trade_count` و `source`. مقادیر `None` همان‌طور می‌مانند.
-- تاریخچهٔ خالی همان نتیجهٔ `INSUFFICIENT_DATA` موتور را می‌دهد.
-- ردیف شرکت دیگر یا تاریخ نامعتبر با `ValueError` رد می‌شود.
-- benchmark را caller به‌صورت ردیف engine می‌دهد، چون در مخزن منبع benchmark وجود ندارد و چیزی ساخته نمی‌شود.
+On 2026-10-26, the owner ran this command locally:
 
-## ۴. رفتار موارد خاص
-
-- **تاریخ نامعتبر یا مفقود:** `ValueError`، حتی اگر ردیف آینده باشد. دیگر ردیف بی‌صدا حذف نمی‌شود. benchmark هم همین‌طور است و حتی وقتی داده‌ٔ شرکت ناکافی باشد، اعتبارسنجی benchmark قبل از بازگشت زودهنگام انجام می‌شود.
-- **تکراری:** `ValueError`. تکراری‌های بعد از as-of مانع تاریخچهٔ قبلی نمی‌شوند، مثل قرارداد query.
-- **آینده:** حذف می‌شود، برای شرکت و benchmark یکسان.
-- **قیمت مفقود:** صفر نمی‌شود و نتیجه `INSUFFICIENT_DATA` می‌شود. benchmark بدون سری معتبر هم `INSUFFICIENT_DATA` می‌دهد.
-
-`analyze_market_signals` دیگر فهرست قیمت بدون تاریخ نمی‌گیرد، چون هر تاریخی برایش ساخته شود جعلی است. حالا `[(jalali_date, close), ...]` می‌گیرد، حجم و ارزش را `None` می‌فرستد و `point_in_time=True` استفاده می‌کند. تنها caller آن یک تست بود که به‌روز شد.
-
-## ۵. Callerهای مهاجرت‌شده
-
-فقط `test_stage8_market.py` و ساخت `MarketSignalResult` در `test_stage9_decision.py` و `test_stage789_service_interface.py`. `decision/engine.py` و `decision/service.py` فیلد `as_of_date` را نمی‌خوانند و بدون تغییر ماندند. caller خارج از ZIP قابل مشاهده نیست؛ این یک تغییر breaking است.
-
-## ۶. تست‌ها و دستور اجرا
-
-تست‌ها هر ۱۴ مورد پرامپت را پوشش می‌دهند. مثلاً مورد ۱۴ یک تست بررسی سورس است که نبودن `isoformat` و `get("date")` را چک می‌کند.
-
-```
+```powershell
 pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py src/tests/test_jalali_contract.py src/tests/test_market_history_query.py src/tests/test_stage8_market_parameters.py src/tests/test_stage9_decision.py src/tests/test_stage789_service_interface.py src/tests/test_ingestion_ohlc.py
 ```
 
-سپس برای اطمینان یک بار `pytest src/tests`.
+**Result: 168 passed in 4.95s.**
 
-## ۷. مسائل باز
+This establishes success for the listed test files in that run. The full `pytest src/tests` suite was recommended but has not been reported as executed. Full application orchestration and end-to-end Stage 5 → Stage 8 → Stage 7/9 execution remain unverified.
 
-1. **صفرسازی حجم و ارزش در `engine.py`:** خط `volumes = [float(x or 0.0) ...]` و `values = [...]` در `analyze_market` حجم و ارزش `None` را برای محاسبه صفر می‌کند. طبق بند ۷ («رفتار موجود را حفظ کن») دست نزدم، چون میانگین حجم و liquidity را عوض می‌کند. اگر مالک خواست، اصلاحش یک تصمیم جدا و مالی است. تست‌ها فقط ثابت می‌کنند قیمت‌ها صفر نمی‌شوند.
-2. **ناهمخوانی قدیمی در `_market_regime`:** اگر `adjusted_close` وجود داشته باشد و `None` باشد، به `close` برنمی‌گردد و ردیف حذف می‌شود، برخلاف `_price`. حفظ شد.
-3. **نرمال‌سازی پایان‌خط:** در `engine.py` و `parsing.py` چند خط LF در فایل CRLF بود که به CRLF یکدست شد.
-4. تست‌هایی که اعتبار روز ۳۰ اسفند (`(1403,12,30)` معتبر، `(1404,12,30)` نامعتبر) را فرض می‌کنند به رفتار `jdatetime` در محیط شما وابسته‌اند. محیط من اجرایشان نکرد.
+## 5. P72 follow-up corrections required
 
-فقط قرارداد تاریخ Stage 8 و adapter پایگاه‌داده پیاده شده است. ادغام سرتاسری pipeline و persist کردن نتیجهٔ Stage 9 انجام نشده است.
+Two issues remain open and must not be treated as resolved:
+
+1. `src/market/engine.py` replaces missing volume and trading-value observations with `0.0`. This can distort volume and liquidity indicators and conflicts with the P72 requirement not to zero-fill missing OHLCV data.
+2. `_market_regime` does not fall back to `close` when `adjusted_close` exists but is `None`, unlike the engine's `_price` helper.
+
+The next task should fix these narrowly, preserve existing numerical formulas and thresholds, and add focused regression tests. The owner will run the tests locally.
+
+## 6. Continuing project constraints
+
+- Keep Stage 7 open.
+- D9 remains open: no unsupported historical parameter effective dates or versions.
+- Do not claim complete PIT proof without valid input provenance and historical parameter evidence.
+- Do not claim end-to-end pipeline integration until a real caller path is implemented and verified.
+- Keep the `src/valuation/engine.py` redesign as the last technical Stage 7 step.
+- Agents must not run tests, application/database commands, or Git commands. The owner runs tests and reviews the results.
+
+
+
+# P73
+
+Report P72 confirms the same two flaws. I will now modify `engine.py`.
+
+`engine.py` has been modified. I will now update the import in the test file and add targeted tests.
+
+# Report P73
+
+Both fixes (A and B) have been implemented; however, no tests have been run yet, and nothing has been verified.
+
+## 1. Modified Files
+
+- `src/market/engine.py`
+- `src/tests/test_stage8_market.py` (addition of a test and an import statement only)
+- `P73.diff` is a standard diff generated using `diff -u` (not Git); it is provided for your review.
+
+All other files remain unchanged. I verified this by comparing them against the original versions using `cmp`: `indicators.py`, `schema.py`, `service.py`, `parameters.py`, as well as the test files for the service and parameters. `valuation/engine.py`, `stepsForStage7.md`, and `temp_report2.md` also remain untouched.
+
+## 2. Handling Missing 'Volume' and 'Value' Data
+
+The `float(x or 0.0)` conversions have been removed, allowing `None` values ​​to persist within the `volumes` and `values` data. To address this, a helper function named `_complete_window` was introduced. This function returns the last N observations only if all of them are present (i.e., none are `None`). Other functions now utilize this helper.
+
+No window sizes, minimum sample requirements, or thresholds have been altered, and `indicators.py` remains unchanged.
+
+| Criterion / Status | Required Window | Behavior with `None` in Window | |---|---|---|
+| `volume_ratio` | The last 21 volume observations (the most recent one plus the 20 preceding it) | `None` |
+| `average_volume_20d` | The last 20 volume observations | `None` |
+| `average_trading_value_20d` | The last 20 trading value observations | `None` |
+| `trading_value_stability_20d` | The last 20 trading value observations | `None` |
+| `liquidity_state` | The last 20 trading value observations, with a baseline extending up to the last 60 observations | `INSUFFICIENT_DATA` |
+| `price_volume_state` | Dependent on `volume_ratio` | `INSUFFICIENT_DATA` |
+| `INFO:ABNORMAL_VOLUME` alert | Dependent on `volume_ratio` | Not triggered |
+| `WARNING:LOW_LIQUIDITY` alert | Dependent on `liquidity_state` | Not triggered |
+
+- **Actual Zero Value:** An actual zero (`0.0`) is considered a valid observation representing "no trading activity" and is distinct from `None`. For instance, if 11 out of the last 20 trading value observations are actual zeros, the status is set to `VERY_LOW` and an alert is issued. If those same 11 entries are `None`, the status becomes `INSUFFICIENT_DATA` and no alert is issued.
+- **Independence:** Volume-based metrics are independent of trading value metrics, and vice versa. The absence of data for one does not affect the other.
+- **Price-based Calculations:** These remain unchanged.
+
+## 3. Fallback fix in `_market_regime`
+
+The previous code used `r.get("adjusted_close", r.get("close"))`. When the `adjusted_close` key was present but its value was `None`, the fallback was not performed and that row was deleted. Now the same `MarketEngine._price` is used:
+
+- If `adjusted_close` has a numeric value (even `0.0`), it is used.
+- If `adjusted_close` is `None`, `close` is used.
+- A row with both prices `None` is discarded as before and is not replaced with zero.
+
+The regime threshold and the `cumulative_return` formula have not changed.
+
+## 4. Added tests and run commands
+
+All are in `test_stage8_market.py`:
+
+- **volume:** Average and ratio window, boundaries 20, 21, and 22, no abnormal volume warning, difference of true zero with `None`.
+
+- **value:** Three positions in the last 20 observations, boundaries 21, 60, and 61 for liquidity, difference of 11 missing values ​​with 11 true zeros.
+
+- **Missing everything and helper functions:** All missing volume and value case, and direct test of helper functions.
+- **`_market_regime`:**
+- Fallback to `close` for three cases UP, DOWN, and NEUTRAL, with comparison to expected formula and with the same series in `adjusted_close`.
+- Pass this fallback through `analyze_market`.
+- No fallback when `adjusted_close` is numeric.
+- Behavior when both prices are missing.
+
+Here are the commands for you to run:
+
+```
+python -m pytest src/tests/test_stage8_market.py -q
+python -m pytest src/tests/test_stage8_market_service.py src/tests/test_stage8_market_parameters.py -q
+```
+
+## 5. Remaining points
+
+- **Liquidity window explanation:** `_liquidity_state` already reads the baseline on up to the last 60 values. I fail-closed `None` in these same 60 observations, even if it is outside the last 20 observations. This is my understanding of the `required window'. If you meant only the last 20 observations, the `values[-60:]` condition should be returned to `values[-20:]`. In that case, `None` values ​​should be explicitly excluded when calculating the baseline, which is a new decision about incomplete data.
+- **`NaN`:** The value `NaN` (not `None`) is still passed as a number. I didn't touch it in this task because it wasn't in the P73 scope.
+- **Service Test:** I didn't add a new test for the database path. I just read that it doesn't depend on zero-fill.
+
+## 6. Verifications
+
+- No tests were run and no database/migration program or command was executed.
+- No Git commands were used.
+- I just did a syntax check with `ast.parse` on the two changed files, which doesn't execute any code.
+- I have manually calculated the expected values ​​of the tests, but none of them are verified as correct until you run them.
+
+Files: `engine.py`, `test_stage8_market.py`, `P73.diff`
+

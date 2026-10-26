@@ -86,8 +86,8 @@ class MarketEngine:
             )
 
         prices = [float(x) for x in prices]
-        volumes = [float(x or 0.0) for x in volumes]
-        values = [float(x or 0.0) for x in values]
+        # Missing volume/value observations stay ``None``; they are never
+        # converted to 0.0. Prices are validated above and are always floats.
         price_basis = "ADJUSTED_CLOSE" if all(row.get("adjusted_close") is not None for row in rows) else "CLOSE_FALLBACK"
 
         returns = {name: cumulative_return(prices, n) for name, n in RETURN_HORIZONS.items()}
@@ -101,7 +101,7 @@ class MarketEngine:
         peak = max(prices)
         current_dd = prices[-1] / peak - 1.0 if peak else None
 
-        vr = volume_ratio(volumes, AVERAGE_VOLUME_WINDOW)
+        vr = self._volume_ratio(volumes, AVERAGE_VOLUME_WINDOW)
         avg_volume = self._average(volumes, AVERAGE_VOLUME_WINDOW)
         avg_value = self._average(values, AVERAGE_VOLUME_WINDOW)
         trading_value_stability = self._coefficient_of_variation(values, TRADING_VALUE_STABILITY_WINDOW)
@@ -281,16 +281,41 @@ class MarketEngine:
             return None
 
     @staticmethod
-    def _average(values: List[float], window: int) -> Optional[float]:
-        if len(values) < window:
+    def _complete_window(values: Sequence[Optional[float]], size: int) -> Optional[List[float]]:
+        """Return the last ``size`` observations, or ``None`` if they are not all present.
+
+        Fewer than ``size`` observations, or any missing (``None``) observation
+        inside the window, means the window is incomplete. Missing values are
+        never replaced by zero and never silently dropped.
+        """
+        if size <= 0 or len(values) < size:
             return None
-        return sum(values[-window:]) / float(window)
+        sample = values[-size:]
+        if any(x is None for x in sample):
+            return None
+        return [float(x) for x in sample]
 
     @staticmethod
-    def _coefficient_of_variation(values: List[float], window: int) -> Optional[float]:
-        if len(values) < window:
+    def _volume_ratio(volumes: Sequence[Optional[float]], window: int) -> Optional[float]:
+        # volume_ratio uses the latest volume plus the ``window`` volumes before
+        # it, i.e. ``window + 1`` observations. All of them must be present.
+        sample = MarketEngine._complete_window(volumes, window + 1)
+        if sample is None:
             return None
-        sample = values[-window:]
+        return volume_ratio(sample, window)
+
+    @staticmethod
+    def _average(values: Sequence[Optional[float]], window: int) -> Optional[float]:
+        sample = MarketEngine._complete_window(values, window)
+        if sample is None:
+            return None
+        return sum(sample) / float(window)
+
+    @staticmethod
+    def _coefficient_of_variation(values: Sequence[Optional[float]], window: int) -> Optional[float]:
+        sample = MarketEngine._complete_window(values, window)
+        if sample is None:
+            return None
         mean = sum(sample) / float(window)
         if mean <= 0:
             return None
@@ -398,8 +423,14 @@ class MarketEngine:
         return "STABLE_DRAWDOWN"
 
     @staticmethod
-    def _liquidity_state(avg_value: Optional[float], values: List[float]) -> str:
+    def _liquidity_state(avg_value: Optional[float], values: Sequence[Optional[float]]) -> str:
         if avg_value is None or avg_value <= 0:
+            return "INSUFFICIENT_DATA"
+        # The state reads the last 20 observations (active days) and up to the
+        # last 60 (baseline). A missing value in the observations it reads is
+        # unknown, not zero activity, so the state fails closed. A real 0.0
+        # value is still a genuine no-trade observation.
+        if any(v is None for v in values[-60:]):
             return "INSUFFICIENT_DATA"
         active = sum(v > 0 for v in values[-20:]) / min(20, len(values))
         if active < LIQUIDITY_ACTIVE_DAY_MINIMUM:
@@ -448,11 +479,9 @@ class MarketEngine:
         if not benchmark:
             return "INSUFFICIENT_DATA"
         rows = MarketEngine._prepare_rows(benchmark, as_of_date, True, label="market_benchmark")
-        prices = [
-            float(r.get("adjusted_close", r.get("close")))
-            for r in rows
-            if r.get("adjusted_close", r.get("close")) is not None
-        ]
+        # Same fallback as ``_price``: adjusted_close unless it is None, then close.
+        # Rows with neither price are skipped, as before.
+        prices = [p for p in (MarketEngine._price(r) for r in rows) if p is not None]
         r20 = cumulative_return(prices, RETURN_HORIZONS["20D"])
         if r20 is None:
             return "INSUFFICIENT_DATA"
