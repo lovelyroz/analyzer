@@ -1,0 +1,42 @@
+
+https://github.com/lovelyroz/analyzer/blob/master/stepsForStage7.md
+https://github.com/lovelyroz/analyzer/blob/master/temp_report2.md
+https://github.com/lovelyroz/analyzer/blob/master/reply.md
+https://github.com/lovelyroz/analyzer/blob/master/07_Stage7_Valuation.md
+https://github.com/lovelyroz/analyzer/blob/master/requirements.txt
+README.md، اگر وجود دارد
+.github/workflows/tests.yml، اگر وجود دارد
+src/core/database.py
+src/scoring/engine.py
+src/scoring/schema.py
+src/forecast/service.py
+src/forecast/engine.py
+src/forecast/queries.py
+src/forecast/schema.py
+src/valuation/service.py
+src/valuation/engine.py
+src/valuation/parameters.py
+src/valuation/schema.py
+src/valuation/models.py
+src/market/engine.py
+src/market/schema.py
+src/market/indicators.py
+src/market/parameters.py
+src/ingestion/market/queries.py
+src/market/queries.py، اگر وجود دارد
+src/models/market.py
+src/decision/service.py
+src/decision/engine.py
+src/decision/schema.py
+src/ingestion/service.py
+src/ingestion/codal/pipeline.py
+src/models/report.py
+src/models/normalized.py
+src/tests/test_stage3_scoring.py
+src/tests/test_stage5_forecast.py
+src/tests/test_stage7_valuation.py
+src/tests/test_stage8_market.py
+src/tests/test_stage9_decision.py
+src/tests/test_market_history_query.py
+src/tests/test_stage789_service_interface.py
+src/tests/test_codal_extraction.py

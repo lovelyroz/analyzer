@@ -4193,3 +4193,83 @@ I am assuming that `normalize_datetime(None)` returns `None`. The previous code 
 ### 3. Unadded Assertions
 
 * **All 6 requirements and assertions specified in Prompt 59 have been fully addressed; no items have been omitted or excluded.**
+# P64–P67 : Stage 7 — Consolidated Carry-Forward Report
+
+## 1. Parameter-Versioning Decision Gate — P64
+
+- No approved source establishes the historical effective date of the current Stage 7 parameter values.
+- The proposed date `2026-01-01T00:00:00Z` is not authorized and must not be inserted into the default registry without explicit owner approval.
+- D9 remains **OPEN**. The current dated-selection path must fail closed when no eligible dated parameter version exists.
+- The legacy parameter path must continue to report honestly that Point-in-Time parameter selection was not applied.
+- Do not invent historical parameter values, effective dates, or coverage rules.
+
+## 2. Architecture and Policy Findings — P66
+
+- Stage 3 scoring exists, but the production caller that prepares KPI results from financial statements remains unproven.
+- Stage 5 forecast generation exists, but the full production caller chain into Stage 7 remains unproven.
+- Stage 7 valuation is connected internally to the Stage 9 decision service.
+- Stage 8 market analysis exists, but a complete database-to-Stage-8 production path has not been established.
+- The Stage 9 service accepts caller-supplied fundamental, forecast, and market results. This does not itself prove that all upstream stages are automatically orchestrated.
+- No verified main application entry point or final-decision persistence model was established in these reports.
+
+### D1–D6 status
+
+- **D1–D4:** Deferred pending approved definitions, required inputs, and financial trigger criteria. Do not emit unsupported risk alerts.
+- **D5:** Keep `review_priority` separate from risk alerts.
+- **D6:** Preserve the V1 valuation identity `Forecast EPS × Target P/E`. Do not invent sector-specific formulas for banks, holdings, or other industries.
+- Preserve the scenario-dispersion threshold `0.50` and strict `>` comparison.
+
+## 3. P67 Implementation — Market History Query and Regression Coverage
+
+The Claude report states that implementation files were generated from a ZIP snapshot rather than the live `analyzer` workspace. The owner subsequently ran tests against the local project; therefore, the test results below are local execution evidence, while the implementation report's static-review caveats remain relevant.
+
+Reported implementation files:
+
+- `src/ingestion/market/queries.py` — added `MarketHistoryObservation` and `select_market_history_as_of(session, company_id, as_of_jalali_date)`.
+- `src/tests/test_market_history_query.py` — added tests for the market-history query contract.
+- `src/tests/test_stage789_service_interface.py` — added tests for the real Stage 7-to-Stage 9 service path.
+
+The query is reported to return market-history rows through the requested Jalali date, ordered oldest to newest. It preserves missing values as `None`, excludes rows after the cutoff, isolates companies, rejects duplicate company/date rows within the selected history, and returns an empty tuple when no rows qualify.
+
+The implementation deliberately does **not** invent a lookback window, minimum observation count, price-selection rule, or market indicator.
+
+### Remaining Stage 8 limitation
+
+The new history query does not, by itself, connect database history to `MarketEngine.analyze_market`. The engine consumes rows with Gregorian `datetime` dates, whereas the storage contract uses Jalali date components and allows legacy rows with a null `trade_date`.
+
+No conversion rule or date-mapping policy should be invented. A future Stage 8 service must remain blocked until the date contract and input mapping are established from authoritative project evidence.
+
+The Claude report also identified a potential duplicate-query-file consistency concern between `src/market/queries.py` and `src/ingestion/market/queries.py`, as well as files that were absent from its ZIP. Recheck the actual workspace before relying on the ZIP's static-review conclusions.
+
+## 4. Owner-Run Test Evidence
+
+The following results were recorded in `reply.md` from PowerShell runs in the local `analyzer` environment:
+
+| Test file | Result |
+|---|---:|
+| `src/tests/test_market_history_query.py` | 17 passed |
+| `src/tests/test_stage789_service_interface.py` | 4 passed |
+| `src/tests/test_stage8_market.py` | 15 passed |
+| `src/tests/test_stage9_decision.py` | 19 passed |
+| `src/tests/test_stage7_valuation.py` | 90 passed |
+| Combined regression command covering all five files above | **145 passed in 1.27s** |
+
+Combined command recorded:
+
+```powershell
+python -m pytest src/tests/test_market_history_query.py src/tests/test_stage789_service_interface.py src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -q
+```
+
+These results establish that the listed tests passed in the recorded local run. They do not prove full application-level orchestration, database-to-Stage-8 integration, historical parameter validity, or completion of Stage 7.
+
+## 5. Required Carry-Forward Constraints
+
+1. Keep Stage 7 **OPEN**.
+2. Keep D9 open until parameter values, effective dates, and historical-coverage policy are formally approved.
+3. Do not create an assumed Jalali-to-Gregorian mapping.
+4. Do not claim automatic database-to-Stage-8 integration until an actual service path and regression evidence establish it.
+5. Preserve existing financial invariants, EPS provenance, fail-closed behavior, and deterministic ordering.
+6. Keep `src/valuation/engine.py` redesign as the final technical Stage 7 step.
+7. The next implementation step must begin by inspecting the actual local workspace and current roadmap, not by assuming that every file from the ZIP matches the live project.
+
+**Final status:** Focused local regression evidence is recorded for 145 tests. Stage 8 database-to-engine integration and D9 parameter approval remain unresolved. Stage 7 is not complete.
