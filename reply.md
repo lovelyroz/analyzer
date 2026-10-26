@@ -2083,3 +2083,160 @@ Alternatives بررسی‌شده:
 - کارهای صرفاً مستندسازی قرارداد یا طراحی امضای پیشنهادی بدون merge رفتار جدید، بلامانع است.
 
 **وضعیت:** امکان‌سنجی انجام شد؛ توصیهٔ فنی B با شرط تصویب قرارداد type/as-of/benchmark؛ پیاده‌سازی هنوز مجاز نیست.
+# P71
+**گزارش P71 — نهایی‌سازی قرارداد تاریخ جلالی Stage 8 (فقط خواندن)**
+
+اسنپ‌شات: `analyzer.zip` → `/home/workdir/artifacts/analyzer/`  
+زمینه: `stepsForStage7.md`، P69، P70؛ جهت مصوب: Jalali بومی، بدون ساخت `datetime` میلادی از اجزای جلالی.
+
+---
+
+### 1. قراردادهای فعلی تأییدشده (شواهد سورس)
+
+| عنصر | قرارداد فعلی | محل |
+|------|--------------|-----|
+| نوع جلالی مشترک | `JalaliDate = Tuple[int, int, int]` | `ingestion/market/queries.py:13` |
+| اعتبارسنجی جلالی | `_validate_jalali_date`؛ نامعتبر → `ValueError` | `queries.py:52-63` |
+| تاریخچه | `MarketHistoryObservation.jalali_date`؛ بدون تبدیل میلادی | `queries.py:28-40, 150-173` |
+| مرز as-of query | inclusive عددی؛ مرتب صعودی؛ duplicate → `ValueError`؛ OHLCV گم‌شده = `None` | `queries.py:155-221` |
+| نوشتن persistence | مسیر جلالی: `trade_date=None` همیشه | `ingestion/market/ingestion.py:104-108` |
+| ورودی engine | `as_of_date: datetime`؛ ردیف `Dict` با `"date"` datetime/ISO | `market/engine.py:49-59, 195-211` |
+| خروجی | `MarketSignalResult.as_of_date: datetime`؛ metadata `isoformat` | `schema.py:28`؛ `engine.py:134, 159` |
+| شاخص‌ها | پنجره = تعداد مشاهده در سری مرتب، نه day-count تقویمی | `indicators.py` (همه helpers) |
+| مصرف Stage 9 | فقط stateهای رشته‌ای و `market_data_quality` / `market_regime`؛ **خواندن `as_of_date` ندارد** | `decision/engine.py:66-69, 229, 305`؛ `decision/service.py:46` فقط `company_id` |
+| callerهای `datetime` در مخزن | تقریباً فقط `test_stage8_market.py`، ساخت تست در `test_stage9_decision.py` / `test_stage789_service_interface.py`، و خود engine | جستجوی سورس غیرتست: صفر caller تولیدی خارج از market |
+
+محدودیت کشف: caller خارجی خارج از این ZIP قابل مشاهده نیست.
+
+---
+
+### 2. قرارداد پیشنهادی نهایی تاریخ Stage 8
+
+**نوع واحد**
+
+```text
+JalaliDate = Tuple[int, int, int]   # (year, month, day) — همان تعریف queries.py
+```
+
+اعتبار: همان `_validate_jalali_date` (یا معادل مشترک exportشده). اجزای نامعتبر → `ValueError`، fail-closed.
+
+| سطح | نوع پیشنهادی | معنا |
+|-----|--------------|------|
+| ورودی as-of Stage 8 | `JalaliDate` | مرز inclusive؛ همان تقویم و همان مقایسهٔ عددی query |
+| تاریخ هر ردیف بازار | `JalaliDate` در کلید `"jalali_date"` (نه `"date"` میلادی) | تاریخ مشاهدهٔ ذخیره‌شده؛ بدون ساخت Gregorian |
+| ردیف‌های benchmark (industry / market) | همان: `"jalali_date": JalaliDate` | تقویم مختلط ممنوع |
+| `MarketSignalResult.as_of_date` | **تغییر به `JalaliDate`** | همان as-of مصوب اجرا؛ نه زمان اجرا |
+| metadata تاریخ بازار | `calendar: "JALALI"`، `as_of_jalali_date: JalaliDate`، در صورت نیاز `source_jalali_dates` خلاصه | بدون `isoformat` میلادی جعلی |
+| `calculation_timestamp` | `datetime` UTC-naive (رفتار فعلی) | زمان اجرا؛ **جدا از as-of بازار** |
+
+**قواعد عملیاتی (مستقیم از رفتار query + engine، بدون قانون تقویم جدید)**
+
+1. **فیلتر inclusive:** ردیف با `jalali_date <= as_of` نگه داشته می‌شود؛ بعد از as-of حذف می‌شود (معادل `_jalali_on_or_before`).
+2. **ترتیب:** صعودی بر اساس `(year, month, day)` سپس در صورت نیاز `market_data_id` برای قطعیت.
+3. **Duplicate:** دو ردیف با یک `company_id` و یک `jalali_date` → `ValueError` (همان قرارداد query/ingestion).
+4. **تاریخ نامعتبر / مفقود:** ردیف بدون `jalali_date` معتبر از سری حذف یا کل درخواست رد می‌شود (fail-closed؛ هم‌راستا با رد ردیف `date is None` فعلی در `_prepare_rows`).
+5. **OHLCV مفقود:** `None` می‌ماند؛ صفرسازی ممنوع؛ اگر قیمت قابل استفاده نباشد → `market_data_quality="INSUFFICIENT_DATA"` (رفتار موجود).
+6. **پنجره‌های `20D` / `252D` و غیره:** تعداد مشاهده در سری مرتب‌شده پس از فیلتر as-of؛ **بازتعریف به روز تقویمی ممنوع**.
+7. **بدون تبدیل:** هیچ `datetime` میلادی از `(y,m,d)` جلالی ساخته نمی‌شود.
+
+**شکل ردیف ورودی engine (پیشنهاد)**
+
+```text
+{
+  "jalali_date": (jy, jm, jd),          # الزامی، معتبر
+  "open" | "open_price": ...,             # اختیاری
+  "high" | "high_price": ...,
+  "low" | "low_price": ...,
+  "close" | "close_price": ...,
+  "adjusted_close": ...,
+  "volume": ...,
+  "value": ...,
+  # سایر کلیدهای موجود engine در صورت نیاز
+}
+```
+
+Adapter از `MarketHistoryObservation` فقط فیلدهای موجود را کپی می‌کند؛ مقدار نمی‌سازد.
+
+**Benchmark**
+
+- همان کلید `"jalali_date"` و همان as-of.
+- نبود benchmark یا سری خالی پس از فیلتر → همان `INSUFFICIENT_DATA` برای relative strength / market regime (رفتار فعلی وقتی `benchmark` خالی است).
+- منبع یا مقدار benchmark اختراع نمی‌شود.
+
+---
+
+### 3. سازگاری و مهاجرت
+
+**مصرف‌کنندگان داخل مخزن**
+
+| مصرف‌کننده | وابستگی به نوع `as_of_date` | اقدام |
+|------------|------------------------------|--------|
+| `DecisionEngine` / `decision/service` | فقط state رشته‌ای و `company_id` | بدون تغییر منطقی؛ ساخت تست‌ها باید `JalaliDate` بدهند |
+| `test_stage8_market.py` | تمام فراخوانی‌ها `datetime` | به‌روزرسانی اجباری به جلالی |
+| `test_stage9_decision.py`, `test_stage789_service_interface.py` | ساخت `MarketSignalResult(as_of_date=datetime...)` | به‌روزرسانی فیلد به `JalaliDate` |
+| `analyze_market_signals` (legacy) | `datetime` | یا جلالی کند یا به‌عنوان legacy صریح با قرارداد جدا مستند شود |
+
+**استراتژی مهاجرت پیشنهادی:**  
+**شکست آگاهانه (deliberate breaking change)** داخل مخزن، با به‌روزرسانی هم‌زمان همهٔ callerهای کشف‌شده در همین ZIP.
+
+دلیل رد dual-mode موقت:
+- مقایسهٔ مختلط جلالی/میلادی در `_prepare_rows` مبهم و خلاف جهت P70/P71 است.
+- همهٔ callerهای production داخل مخزن کشف‌شده‌اند (عملاً فقط تست + خود market).
+- لایهٔ سازگاری که `datetime` را «مثل جلالی» جا بزند، دوباره خطر ساخت تاریخ جعلی دارد.
+
+اگر caller خارج از مخزن وجود داشته باشد در این اسنپ‌شات قابل اثبات نیست؛ در release note باید breaking change روی نوع `as_of_date` و کلید ردیف اعلام شود.
+
+---
+
+### 4. توالی پیاده‌سازی فایل‌به‌فایل و تست
+
+| ترتیب | فایل | تغییر قرارداد | چرا | اثر caller | تست |
+|------|------|----------------|-----|------------|-----|
+| 1 | `src/market/schema.py` | `MarketSignalResult.as_of_date: JalaliDate` | خروجی باید همان تقویم as-of باشد | تست‌های سازندهٔ result | type/provenance |
+| 2 | `src/market/engine.py` | امضای `analyze_market` / helpers: `as_of_date: JalaliDate`؛ `_prepare_rows` روی `jalali_date`؛ benchmark هم‌تقویم؛ metadata بدون `isoformat` میلادی جعلی | حذف وابستگی به datetime ردیف | فقط market + تست‌ها | مرز as-of، ترتیب، duplicate |
+| 3 | `src/market/engine.py` `analyze_market_signals` | ورودی جلالی یا علامت صریح legacy | جلوگیری از ردیف مصنوعی میلادی | تست legacy | یک تست سازگاری |
+| 4 | جدید `src/market/service.py` (یا `adapter.py`) | `select_market_history_as_of` → ردیف‌های جلالی → `analyze_market` | تنها مسیر DB→Stage 8 | orchestration بعدی | قرارداد adapter |
+| 5 | `src/tests/test_stage8_market.py` | داده و as-of جلالی؛ حفظ ترتیب قیمت‌ها برای رگرسیون شاخص | مهاجرت deliberate | — | همهٔ کیس‌های فعلی + مرز جلالی |
+| 6 | `test_stage9_decision.py`, `test_stage789_service_interface.py` | `MarketSignalResult(..., as_of_date=(y,m,d))` | هم‌ترازی با schema | — | عبور رگرسیون Stage 9 |
+| 7 | اختیاری: export `JalaliDate` از یک نقطهٔ مشترک | یک type واحد | جلوگیری از تعریف تکراری | importها | — |
+
+**ثابت بماند:** منطق عددی `indicators.py` و معنای observation-count برای `20D`/`252D`؛ EPS Stage 5؛ `valuation/engine.py` دست‌نخورده.
+
+**ماتریس تست الزامی (مالک بعداً اجرا می‌کند)**
+
+1. as-of روی آخرین روز موجود: آن روز **داخل** سری  
+2. as-of قبل از همهٔ ردیف‌ها: سری خالی / `INSUFFICIENT_DATA`  
+3. ردیف بعد از as-of خارج می‌ماند  
+4. ترتیب خروجی قطعی؛ تکرار اجرا یکسان  
+5. `jalali_date` نامعتبر → `ValueError`  
+6. duplicate جلالی → `ValueError`  
+7. benchmark هم‌تقویم با همان as-of؛ benchmark غایب → `INSUFFICIENT_DATA` برای RS/regime  
+8. OHLCV خالی بدون zero-fill  
+9. `MarketSignalResult.as_of_date` برابر as-of ورودی؛ `calculation_timestamp` جدا و datetime اجرا  
+10. سری قیمت معادل (همان ترتیب مقادیر) → همان مقادیر شاخص نسبت به baseline فعلی  
+11. به‌روزرسانی callerهای داخل مخزن؛ عدم باقی ماندن مسیر میلادی مبهم در Stage 8 core  
+
+---
+
+### 5. وضعیت آمادگی پیاده‌سازی
+
+**Ready for implementation** برای خود قرارداد تاریخ Stage 8 و مسیر engine/adapter، با این قیود:
+
+از شواهد پروژه و سورس، موارد زیر دیگر نیاز به تصمیم محصولی جدا ندارند و در قرارداد بالا بسته شده‌اند:
+- نوع as-of و ردیف = `JalaliDate` (هم‌راستا با `queries.py` و جهت P70 گزینه B)
+- عدم ساخت Gregorian از جلالی  
+- inclusive / مرتب‌سازی / duplicate / OHLCV = رفتار query موجود  
+- پنجره‌ها = تعداد مشاهده  
+- benchmark هم‌تقویم؛ نبود داده → `INSUFFICIENT_DATA`  
+- مهاجرت breaking داخل مخزن (caller تولیدی غیرتست برای نوع `as_of_date` یافت نشد؛ Stage 9 فیلد را نمی‌خواند)  
+- `calculation_timestamp` جدا از as-of  
+
+**خارج از این قرارداد (مسدودکنندهٔ orchestration کامل، نه مسدودکنندهٔ پیاده‌سازی قرارداد تاریخ Stage 8):**
+- D-B مالکیت Session / منبع واحد as-of در pipeline  
+- D-C تولید خودکار Stage 3  
+- D-D مقصد persist Stage 9  
+- D-E شکل entry application  
+
+این‌ها می‌توانند بعد از (یا موازی با) پیاده‌سازی قرارداد تاریخ Stage 8 بسته شوند و نباید شروع کار روی `schema` / `engine` / adapter جلالی را متوقف کنند.
+
+**حکم نهایی:** قرارداد تاریخ Stage 8 از نظر فنی برای شروع پیاده‌سازی مشخص است. در این تسک کدی نوشته نشد؛ مرحلهٔ بعد می‌تواند تغییر type و `_prepare_rows` و adapter باشد، بدون بازطراحی `valuation/engine.py` و بدون تبدیل تقویم.

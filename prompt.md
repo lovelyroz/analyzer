@@ -1,111 +1,114 @@
-# P70 — Stage 8 Jalali Date Contract Feasibility Audit (Read-Only)
+# P71 — Finalize the Stage 8 Jalali Date Contract (Read-Only)
 
 You are reviewing the financial-data project in the local folder `analyzer`.
 
 ## Objective
 
-Resolve the technical feasibility questions behind P69 decision D-A: how Stage 8 can consume persisted market history using the project's Jalali date contract without introducing an unsupported Gregorian conversion or weakening point-in-time correctness.
+Produce a final, implementation-ready contract proposal for Stage 8 date handling, based on P69 and P70 and the exact current `analyzer.zip`.
 
-This is a read-only investigation. Do not implement a solution yet.
+The technical direction is to prefer native Jalali date handling over inventing Gregorian dates. Your task is to specify the complete contract and identify compatibility risks, not to reopen the investigation from scratch.
 
-## Authoritative context
+## Required context
 
-1. Read `stepsForStage7.md` first, then the latest P68-B and P69 reports in `reply.md`.
-2. Inspect the exact current `analyzer.zip` supplied for this task. Verify relevant source files directly; do not rely solely on earlier reports or a potentially stale workspace.
-3. The current audit reports that:
-   - `src/ingestion/market/queries.py` defines `MarketHistoryObservation` and `select_market_history_as_of(...)`.
-   - The query returns original Jalali date components and does not convert them to Gregorian dates.
-   - `src/market/engine.py` currently accepts `as_of_date: datetime` and market rows represented as dictionaries with a `date` field.
-   - No production adapter connecting the history query to `MarketEngine.analyze_market` has been demonstrated.
-4. The project requires Jalali/Shamsi calendar support. Do not assume Gregorian conversion is acceptable or invent a conversion policy.
-5. Preserve all Stage 7 rules, especially financial correctness, deterministic behavior, PIT limitations, and preservation of Stage 5 EPS.
+1. Read `stepsForStage7.md`, P69, and P70 in `reply.md`.
+2. Verify the relevant current source in the supplied ZIP, particularly:
+   - `src/market/engine.py`
+   - `src/market/schema.py`
+   - `src/ingestion/market/queries.py`
+   - `src/models/market.py`
+   - `src/tests/test_stage8_market.py`
+   - `src/decision/service.py`
+   - all other actual callers or consumers of `MarketSignalResult.as_of_date`, `analyze_market`, and `analyze_market_signals`.
+3. Do not trust prior reports when the source can be checked directly.
 
-## Investigation tasks
+## Proposed direction to evaluate
 
-### 1. Verify the actual date and data contracts
+Use an explicit Jalali date contract for Stage 8:
+- One documented Jalali date type, consistent with the existing `JalaliDate` tuple contract where appropriate.
+- Market observation dates and the market as-of boundary use the same calendar and comparison semantics.
+- The engine does not fabricate Gregorian `datetime` values from Jalali components.
+- `MarketSignalResult.as_of_date` must accurately represent the approved date contract.
+- `calculation_timestamp`, if retained as an execution timestamp, remains semantically distinct from the market as-of date.
+- Industry and market benchmark rows must follow an explicit compatible date contract. Do not silently mix Jalali and Gregorian dates.
 
-Inspect the relevant definitions and callers in at least:
+These are design constraints to evaluate and refine against the actual source, not authorization to change code.
 
-- `src/ingestion/market/queries.py`
-- `src/models/market.py`
-- `src/market/engine.py`
-- `src/market/indicators.py`
-- `src/market/schema.py`
-- `src/tests/test_market_history_query.py`
-- `src/tests/test_stage8_market.py`
-- any existing market-ingestion code that writes `MarketDaily` dates
+## Tasks
 
-Record the exact source fields and types used for:
-- Jalali year/month/day;
-- `trade_date`, including its nullability and actual write behavior;
-- `MarketHistoryObservation`;
-- `MarketEngine.as_of_date`;
-- the market-row `date` field;
-- any industry or market benchmark date handling.
+### 1. Establish the complete public contract
 
-Do not assume that `trade_date` contains a valid or authoritative date merely because the field exists.
+Specify exact proposed types and meanings for:
+- the Stage 8 as-of input;
+- each market row's date field;
+- industry and market benchmark row dates;
+- `MarketSignalResult.as_of_date`;
+- date values in metadata;
+- `calculation_timestamp`.
 
-### 2. Trace how dates are actually used inside Stage 8
+Clarify inclusive as-of filtering, chronological ordering, duplicate-date handling, and invalid or missing dates. Do not invent calendar rules.
 
-Follow `as_of_date` and each market row's date through the engine and its helper methods.
+### 2. Determine backward-compatibility requirements
 
-Determine whether dates are used only for filtering and provenance or whether calculations depend on Gregorian datetime semantics, timezone behavior, calendar-day differences, or benchmark alignment.
+Identify all current callers and tests that supply `datetime` values or consume `MarketSignalResult.as_of_date`.
 
-Identify every function that would need consideration if the engine were to accept Jalali dates directly.
+Recommend the safest migration strategy:
+- a deliberate breaking change with all in-repository callers updated;
+- or a temporary, explicitly documented compatibility layer, only if it can avoid ambiguous mixed-calendar comparisons.
 
-### 3. Compare the feasible architecture options
+Do not retain dual-mode support merely to avoid changing tests. Do not break known callers silently. If external callers cannot be discovered, state that limitation explicitly.
 
-Evaluate these options against the actual source code:
+### 3. Define benchmark behavior
 
-A. Adapt the persisted Jalali history to the existing datetime-based engine using an already-existing, authoritative date source, but only if the source and semantics are proven.
+Specify what must be true of benchmark dates and the as-of boundary.
 
-B. Modify the Stage 8 input contract so the engine and all relevant helpers can work with Jalali date components directly.
+Do not invent benchmark sources or values. If benchmark observations are absent, preserve the engine's existing insufficient-data semantics. Do not claim that relative-strength or market-regime results are valid without the required data.
 
-C. Another minimal approach, but only if supported by existing project contracts.
+### 4. Provide a file-by-file implementation plan
 
-For each option, explain:
-- which files and functions would need changes;
-- whether it preserves a consistent as-of boundary;
-- whether it can correctly handle benchmarks;
-- how it treats missing `trade_date` and missing OHLCV;
-- risks to determinism, historical correctness, and existing callers;
-- what contract decision or additional evidence is still needed.
+For every proposed file change, explain:
+- the exact function, field, or contract to change;
+- why the change is necessary;
+- expected impact on callers;
+- tests required to demonstrate correctness.
 
-Do not select an option merely because it requires fewer code changes. Do not introduce a parallel date convention without justification.
+Preserve existing financial calculations and observation-count window semantics such as `20D` and `252D`; do not reinterpret them as calendar-day windows.
 
-### 4. Identify the safest recommendation
+Include tests for:
+- Jalali as-of boundary inclusion and exclusion;
+- chronological ordering and deterministic output;
+- invalid and missing dates;
+- duplicate dates;
+- benchmark date alignment;
+- missing OHLCV without zero-filling;
+- `MarketSignalResult` provenance;
+- compatibility or intentional migration of existing callers;
+- unchanged indicator results for equivalent ordered price sequences.
 
-Recommend one option only if the evidence supports it. Otherwise, identify the precise unresolved question that prevents a safe decision.
+### 5. Decide whether implementation can begin
 
-Distinguish clearly between:
-- verified current behavior;
-- conclusions directly supported by source;
-- proposed design;
-- unresolved owner decisions.
+End with one of:
+- **Ready for implementation**, if the contract is fully specified from existing evidence;
+- **Blocked**, with only the exact unresolved decisions that genuinely require owner approval.
 
-Do not implement the adapter, change the engine, add tests, or edit specifications during this audit.
+Do not ask the owner to decide details that follow directly from the established project requirements and source behavior. Clearly separate a necessary owner decision from an implementation detail that the engineering plan can resolve.
 
 ## Strict restrictions
 
-- Read-only: no code, test, specification, or report edits.
+- Read-only. Do not edit code, tests, specifications, or reports.
 - Do not run tests, the application, database commands, or Git commands.
-- Do not invent Jalali-to-Gregorian conversion rules, dates, trading calendars, lookback windows, minimum sample counts, fallback prices, or benchmark data.
-- Do not create synthetic observations to make the interface work.
-- Do not claim full PIT correctness from a cutoff alone.
-- Do not redesign `src/valuation/engine.py`.
-- Do not repeat the claim that the market-history query is missing unless the supplied snapshot genuinely differs and direct source evidence proves it.
-- Do not claim end-to-end integration has been verified.
+- Do not invent Jalali-to-Gregorian conversion rules, historical dates, benchmarks, or financial formulas.
+- Do not change `src/valuation/engine.py`.
+- Preserve Stage 5 EPS and all Stage 7 financial/PIT constraints.
+- Do not claim end-to-end integration or PIT correctness beyond the evidence.
+- Do not modify `reply.md`.
 
-## Required report
+## Required output
 
-Return a concise but evidence-based report containing:
+Return a concise but technically complete report with:
+1. verified current contracts and source references;
+2. the finalized proposed date contract;
+3. compatibility analysis;
+4. exact implementation sequence and test plan;
+5. explicit implementation readiness status.
 
-1. Exact snapshot and files inspected.
-2. Current date contracts and actual date usage, with file/function references.
-3. Comparison of options A, B, and C.
-4. One recommendation, if justified, and why.
-5. Exact unresolved decisions, if any.
-6. Exact files likely to change in a later implementation and the contract tests required.
-7. A clear statement of whether implementation can safely begin.
-
-Return the report in your response for review. Do not modify `reply.md` or any repository file. Do not begin implementation.
+This is the final design review before any Stage 8 date-contract code changes. No implementation in this task.
