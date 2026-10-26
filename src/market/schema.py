@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
+import math
 
 from src.core.jalali import JalaliDate
 
@@ -54,3 +55,22 @@ class MarketSignalResult:
     market_contract_version: str = "MARKET_CONTRACT_V1"
     model_version: str = "STAGE8_V1"
     metadata: Dict[str, object] = field(default_factory=dict)
+
+def _number(val):
+    if val is None:
+        return None
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid numeric value: {val}")
+    
+    if not math.isfinite(f):
+        raise ValueError(f"Non-finite numeric value (NaN/inf) is not permitted: {val}")
+    
+    return f
+
+def _price(val):
+    f = _number(val)
+    if f is None or f <= 0:
+        raise ValueError(f"Price must be a positive finite number: {val}")
+    return f

@@ -8,6 +8,7 @@ import pytest
 from src.core.jalali import JalaliDate
 from src.market import engine as engine_module
 from src.market import schema as schema_module
+from src.market.schema import _number, _price
 from src.market.engine import MarketEngine
 from src.market.indicators import calculate_rsi, calculate_sma, cumulative_return, maximum_drawdown, price_position, realized_volatility
 from src.market.parameters import (
@@ -738,3 +739,23 @@ def test_market_regime_preserves_behavior_when_both_prices_are_missing():
     # Too few usable prices stays INSUFFICIENT_DATA.
     short = benchmark_rows([100.0] * 20)
     assert MarketEngine._market_regime(short, jd(19)) == "INSUFFICIENT_DATA"
+    
+def test_stage8_non_finite_primary_prices():
+    non_finite_inputs = [float('nan'), float('inf'), float('-inf'), "NaN", "inf", "-inf", "+inf"]
+    for val in non_finite_inputs:
+        with pytest.raises(ValueError):
+            _price(val)
+
+def test_stage8_non_finite_optional_volume_value():
+    non_finite_inputs = [float('nan'), float('inf'), float('-inf'), "NaN", "inf"]
+    for val in non_finite_inputs:
+        with pytest.raises(ValueError):
+            _number(val)
+
+def test_stage8_finite_and_zero_preserved():
+    # Ordinary finite values and genuine zeros must be accepted
+    assert _number(0) == 0.0
+    assert _number(0.0) == 0.0
+    assert _number(100.5) == 100.5
+    assert _price(10.0) == 10.0
+    assert _number(None) is None
