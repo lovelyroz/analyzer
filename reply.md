@@ -1784,3 +1784,149 @@ def select_market_history_as_of(
 - اتصال service-level Stage 5→7→9 (با market و fundamental caller-supplied) تأیید شد.
 - نبود entry point اجرایی، نبود مسیر DB→Stage 8→Engine، نبود persistence تصمیم، و ناسازگاری قرارداد تاریخ Stage 8 همگی با شواهد مستقیم سورس تأیید شدند.
 - هیچ مسیر orchestration کامل production قابل اثبات نیست.
+# P69 
+**گزارش P69 — قرارداد حداقلی Pipeline و طرح یکپارچه‌سازی (فقط خواندن)**
+
+اسنپ‌شات: `analyzer.zip` در `/home/workdir/artifacts/analyzer/`  
+مبنای audit: P68-B + `stepsForStage7.md` (به‌ویژه نتیجهٔ ممیزی P48 و قواعد Stage 7)  
+بدون تغییر فایل، بدون اجرا، بدون بازطراحی `valuation/engine.py`.
+
+---
+
+### 1. قراردادهای تأییدشده و شواهد سورس
+
+| موضوع | رفتار تأییدشده در سورس | محل |
+|------|------------------------|-----|
+| Stage 5 ورودی | Stage 1 facts + اختیاری `TrendResult` (Stage 4)؛ **نه** Stage 3 | `forecast/service.py` docstring و `generate_and_persist_forecast` (~L294)؛ `load_financial_facts` با PIT روی `publication_datetime` |
+| Stage 3 نقش در Stage 9 | `FundamentalScoreResult` ورودی **مستقل و اجباری** `DecisionEngine.make_decision` و `calculate_decision_as_of_jalali` | `decision/service.py:30-45, 65-70`؛ `decision/engine.py:35` |
+| Stage 3 → Stage 5 | هیچ caller تولیدی | جستجوی غیرتست؛ مطابق P48 در `stepsForStage7.md` |
+| Stage 5 → Stage 7 | `CompanyForecastResult` به `calculate_valuation_as_of_jalali`؛ EPS از forecast حفظ می‌شود | `valuation/service.py:18-69` |
+| Stage 7 → Stage 9 | داخل `calculate_decision_as_of_jalali` valuation ساخته و به `make_decision` داده می‌شود | `decision/service.py:56-73` |
+| Stage 8 query | `select_market_history_as_of` → `Tuple[MarketHistoryObservation,...]`؛ مرتب Jalali صعودی؛ duplicate → `ValueError`؛ missing OHLCV = `None` | `ingestion/market/queries.py:150-221` |
+| Stage 8 engine input | `as_of_date: datetime` + `Sequence[Dict]` با کلید `"date"` (datetime/ISO)؛ فیلتر PIT روی همان datetime | `market/engine.py:49-59, 195-217` |
+| `trade_date` | `nullable=True`؛ «may be null for Jalali-sourced rows» | `models/market.py:10` |
+| قیمت تک‌نقطه‌ای Stage 7 | از `select_market_price_as_of` (نه history) | `valuation/service.py:45` |
+| Entry / downstream Stage 9 | فقط اسکریپت‌های DB؛ `FinalDecisionResult` فقط return | `scripts/*`؛ نبود مدل Decision |
+| قواعد پروژه | حفظ EPS Stage 5؛ بدون تبدیل جلالی خودسرانه؛ fail-closed PIT؛ عدم شبیه‌سازی با داده جعلی | `stepsForStage7.md` بخش ۲ |
+
+**نتیجه دربارهٔ Stage 3:**  
+از قرارداد سرویس/اسکیما، Stage 3 **ورودی مستقل Stage 9** است، نه ورودی اجباری Stage 5. وابستگی Stage 3→Stage 5 در سورس اثبات نشده و به‌عنوان تصمیم محصولی باز باقی می‌ماند (نه استنتاج از «وجود دو مرحله»).
+
+---
+
+### 2. تصمیم‌های معماری باز (مرتب‌شده بر اساس اثر روی پیاده‌سازی)
+
+| # | تصمیم | اثر | چرا قبل از کد لازم است |
+|---|--------|-----|-------------------------|
+| **D-A** | نگاشت تاریخ Jalali observation ↔ `as_of_date` / `"date"` در `MarketEngine` | مسدودکننده Stage 8 | `trade_date` ممکن است null باشد؛ query صراحتاً تبدیل انجام نمی‌دهد؛ هیچ قرارداد پروژه‌ای برای تبدیل امن وجود ندارد |
+| **D-B** | مالکیت `Session` و منبع واحد `as_of_jalali` در یک اجرای تحلیل | مسدودکننده orchestration | هیچ entry/owner فعلی وجود ندارد |
+| **D-C** | آیا Stage 3 باید قبل از Stage 9 تولید شود و توسط همان orchestrator؟ | شکل pipeline | قرارداد فعلی آن را caller-supplied می‌داند |
+| **D-D** | مقصد نتیجهٔ Stage 9 (return-only در مقابل persist/API بعدی) | محدودهٔ V1 | مدل/consumer در سورس نیست |
+| **D-E** | شکل entry (کتابخانهٔ قابل فراخوانی در مقابل CLI/API) | محل کد orchestration | مخزن انتخابی نکرده |
+
+تصمیم‌های سیاست مالی (D1–D9 در `stepsForStage7.md`) از این فهرست جدا هستند.
+
+---
+
+### 3. قرارداد حداقلی پیشنهادی Orchestration
+
+**پیشنهاد طراحی (نه رفتار موجود):** یک تابع هماهنگی نازک که مسئولیت‌های سرویس‌های موجود را تکرار نکند.
+
+**ورودی‌های حداقلی (از caller / مالک اجرا):**
+- `session: Session` — ساخته و بسته توسط caller (الگوی فعلی سرویس‌ها)
+- `company_id: int`
+- `period_id: int` (هم‌تراز با `forecast_period_id`)
+- `as_of_jalali: JalaliDate` — منبع واحد برای قیمت Stage 7 و (پس از D-A) Stage 8
+- `data_cutoff_datetime: datetime` — برای Stage 5 PIT
+- اختیاری: `trend_result`, `extra_facts`, گزینه‌های valuation/decision
+- تا قبل از بستن D-C: `fundamental_result: FundamentalScoreResult` همچنان caller-supplied (مطابق قرارداد فعلی)
+
+**جریان حداقلی:**
+1. Stage 5: `generate_and_persist_forecast(session, company_id, period_id, trend_result=..., data_cutoff_datetime=...)` → `CompanyForecastResult`
+2. Stage 8 (پس از D-A): adapter جدید → `select_market_history_as_of` → نگاشت طبق قرارداد مصوب → `MarketEngine.analyze_market` → `MarketSignalResult`
+3. Stage 7+9: `calculate_decision_as_of_jalali(session, forecast_result, as_of_jalali, fundamental_result, market_result, ...)` → `ValuationDecisionResult`
+
+**خروجی:** همان `ValuationDecisionResult`؛ بدون persist جدید مگر D-D خلاف آن را تصویب کند.
+
+**قرارداد حداقلی Stage 8 adapter (پس از D-A):**
+
+| بخش | الزام مبتنی بر سورس موجود |
+|-----|---------------------------|
+| هویت | `company_id` از آرگومان؛ با `MarketHistoryObservation.company_id` یکسان |
+| as-of Jalali | همان tuple؛ مرز inclusive مطابق query |
+| ترتیب / duplicate | حفظ ترتیب صعودی query؛ duplicate → fail (همان `ValueError`) |
+| OHLCV گم‌شده | `None` بماند؛ صفرسازی ممنوع |
+| شکل ردیف engine | `Dict` با حداقل کلیدهای مورد استفادهٔ `_price` / volume / value و کلید `"date"` |
+| `as_of_date` engine | باید از قرارداد مصوب D-A بیاید؛ حدس از `datetime.now` یا از تاریخ Stage دیگر ممنوع |
+| نگاشت تاریخ | **تا تصویب D-A کد نشود.** گزینه‌های ممکن برای تصمیم مالک: (۱) گسترش engine برای پذیرش Jalali بدون تبدیل؛ (۲) الزام `trade_date` غیرnull برای ردیف‌های قابل استفاده در Stage 8 و استفادهٔ فقط از آن به‌عنوان `"date"`؛ (۳) منبع تقویم رسمی دیگر. گزینهٔ تبدیل خودسرانهٔ Jalali→Gregorian بدون مشخصات پروژه مجاز نیست. |
+
+Benchmark / lookback / حداقل نمونه / قیمت جایگزین: خارج از محدودهٔ این قرارداد حداقلی (engine در صورت کمبود داده `INSUFFICIENT_DATA` برمی‌گرداند).
+
+---
+
+### 4. توالی پیاده‌سازی وابستگی‌دار
+
+| گام | اقدام | فایل‌های محتمل | قرارداد برقرارشونده | پیش‌نیاز | ثابت‌های مالی/PIT |
+|-----|--------|------------------|---------------------|----------|-------------------|
+| **0** | تصویب D-A (و ترجیحاً D-B) | — (تصمیم مالک) | قانون تاریخ Stage 8 | — | بدون تبدیل تأییدنشده |
+| **1** | Adapter Stage 8 (فقط پس از D-A) | جدید مثلاً `src/market/service.py` یا `src/market/adapter.py`؛ در صورت نیاز لمس محدود `market/engine.py` **فقط اگر** D-A گسترش engine را بخواهد | DB history → `MarketSignalResult` | D-A | fail-closed روی duplicate/invalid Jalali؛ بدون synthetic row |
+| **2** | تست قرارداد adapter | `src/tests/test_stage8_market_service.py` (جدید) | مرز query↔engine | گام ۱ | موارد منفی: as-of قبل از همهٔ ردیف‌ها، duplicate، OHLCV خالی، `trade_date` null در صورت اتکا به آن |
+| **3** | Orchestrator نازک (اختیاری library function) | جدید مثلاً `src/orchestration/pipeline.py` **یا** گسترش کنترل‌شدهٔ `decision/service.py` فقط اگر از نظر مالک همان مرز باشد | Session + as_of واحد؛ 5→7+8→9 | گام ۱؛ D-B | EPS از Stage 5 دست‌نخورده؛ cutoff Stage 5 جدا از as-of بازار مگر قرارداد بگوید |
+| **4** | یکپارچه‌سازی fundamental (در صورت تصویب D-C) | همان orchestrator؛ احتمالاً فراخوانی `KPIEngine` + `FundamentalScoringEngine` | Stage 3 دیگر caller-supplied نباشد | D-C + منبع KPI معتبر | بدون اختراع peer/history |
+| **5** | مقصد Stage 9 | فقط در صورت تصویب D-D | persist یا API | D-D، D-E | — |
+| **آخر** | هرگونه بازطراحی `valuation/engine.py` | `src/valuation/engine.py` | — | پس از ثبات مسیر داده | مطابق `stepsForStage7.md` |
+
+**جداسازی:**  
+- الزام تأییدشده: حفظ EPS Stage 5، PIT موجود Stage 5، fail-closed query بازار، caller-supplied بودن فعلی Stage 3 و Stage 8.  
+- انتخاب طراحی پیشنهادی: وجود یک adapter و یک orchestrator نازک؛ مسیر فایل دقیق orchestrator.
+
+---
+
+### 5. تست‌هایی که مالک بعداً باید اجرا کند
+
+پس از پیاده‌سازی (Agent در این فاز اجرا نمی‌کند):
+
+1. **واحد adapter Stage 8**  
+   - مرز inclusive as-of  
+   - ترتیب و isolation شرکت  
+   - duplicate → خطا  
+   - سری خالی / کیفیت ناکافی → `INSUFFICIENT_DATA` یا رفتار مصوب  
+   - ردیف با OHLCV خالی بدون صفرسازی  
+   - اگر D-A به `trade_date` وابسته است: ردیف با `trade_date is None` رد یا مسیر مصوب
+
+2. **رگرسیون غیررگرسیون**  
+   - `test_market_history_query.py`  
+   - `test_stage8_market.py`  
+   - `test_stage7_valuation.py`  
+   - `test_stage789_service_interface.py`  
+   - `test_stage9_decision.py`  
+   - `test_stage5_forecast.py` (نمونهٔ代表)
+
+3. **قرارداد orchestrator (در صورت پیاده‌سازی گام ۳)**  
+   - یک `as_of_jalali` به قیمت Stage 7 و Stage 8  
+   - `forecast.company_id` / `period_id` با valuation و decision  
+   - عدم تغییر EPS سناریوها نسبت به خروجی Stage 5  
+   - session توسط caller بسته می‌شود (بدون leak در الگوی تست)
+
+4. **منفی یکپارچه**  
+   - نبود قیمت بازار → `MarketPriceUnavailableError`  
+   - fundamental یا market با `company_id` ناسازگار → `ValueError`  
+   - cutoff طوری که Stage 5 fact نداشته باشد → رفتار موجود Stage 5
+
+---
+
+### 6. آیا قبل از تسویهٔ تصمیم‌های باز کدنویسی امن است؟
+
+| کار | قبل از D-A؟ | قبل از D-B/D-C/D-D؟ |
+|-----|-------------|----------------------|
+| Adapter Stage 8 با نگاشت تاریخ | **خیر** | — |
+| گسترش `MarketEngine` برای Jalali | فقط اگر D-A صریحاً آن را انتخاب کند | — |
+| Orchestrator کامل end-to-end | **خیر** (به Stage 8 واقعی وابسته است) | ترجیحاً پس از D-B |
+| تست/مستندسازی قراردادهای موجود بدون رفتار جدید | بله | بله |
+| هر تغییر در `valuation/engine.py` | خیر (تأخیر اجباری) | خیر |
+
+**حکم:** تا تصویب **D-A** (قرارداد تاریخ Stage 8) هیچ کد یکپارچه‌سازی Stage 8 یا orchestrator وابسته به آن امن نیست. کارهای صرفاً مستندسازی یا تست رفتار فعلی بدون افزودن مسیر production می‌توانند ادامه یابند. بازطراحی `src/valuation/engine.py` همچنان آخرین گام فنی باقی می‌ماند.
+
+---
+
+**وضعیت گزارش:** طرح حداقلی مبتنی بر شواهد سورس و `stepsForStage7.md`؛ ادعاهای P68-B در موارد entry points، نبود 3→5، mismatch تاریخ Stage 8، و نبود consumer Stage 9 در همین اسنپ‌شات تأیید شدند.
