@@ -1,0 +1,353 @@
+diff -u -r --strip-trailing-cr -x __pycache__ src_orig/market/engine.py src/market/engine.py
+--- src_orig/market/engine.py	2026-10-26 16:41:30.052683819 +0000
++++ src/market/engine.py	2026-10-26 16:41:30.107986188 +0000
+@@ -86,8 +86,8 @@
+             )
+ 
+         prices = [float(x) for x in prices]
+-        volumes = [float(x or 0.0) for x in volumes]
+-        values = [float(x or 0.0) for x in values]
++        # Missing volume/value observations stay ``None``; they are never
++        # converted to 0.0. Prices are validated above and are always floats.
+         price_basis = "ADJUSTED_CLOSE" if all(row.get("adjusted_close") is not None for row in rows) else "CLOSE_FALLBACK"
+ 
+         returns = {name: cumulative_return(prices, n) for name, n in RETURN_HORIZONS.items()}
+@@ -101,7 +101,7 @@
+         peak = max(prices)
+         current_dd = prices[-1] / peak - 1.0 if peak else None
+ 
+-        vr = volume_ratio(volumes, AVERAGE_VOLUME_WINDOW)
++        vr = self._volume_ratio(volumes, AVERAGE_VOLUME_WINDOW)
+         avg_volume = self._average(volumes, AVERAGE_VOLUME_WINDOW)
+         avg_value = self._average(values, AVERAGE_VOLUME_WINDOW)
+         trading_value_stability = self._coefficient_of_variation(values, TRADING_VALUE_STABILITY_WINDOW)
+@@ -281,16 +281,41 @@
+             return None
+ 
+     @staticmethod
+-    def _average(values: List[float], window: int) -> Optional[float]:
+-        if len(values) < window:
++    def _complete_window(values: Sequence[Optional[float]], size: int) -> Optional[List[float]]:
++        """Return the last ``size`` observations, or ``None`` if they are not all present.
++
++        Fewer than ``size`` observations, or any missing (``None``) observation
++        inside the window, means the window is incomplete. Missing values are
++        never replaced by zero and never silently dropped.
++        """
++        if size <= 0 or len(values) < size:
++            return None
++        sample = values[-size:]
++        if any(x is None for x in sample):
++            return None
++        return [float(x) for x in sample]
++
++    @staticmethod
++    def _volume_ratio(volumes: Sequence[Optional[float]], window: int) -> Optional[float]:
++        # volume_ratio uses the latest volume plus the ``window`` volumes before
++        # it, i.e. ``window + 1`` observations. All of them must be present.
++        sample = MarketEngine._complete_window(volumes, window + 1)
++        if sample is None:
+             return None
+-        return sum(values[-window:]) / float(window)
++        return volume_ratio(sample, window)
+ 
+     @staticmethod
+-    def _coefficient_of_variation(values: List[float], window: int) -> Optional[float]:
+-        if len(values) < window:
++    def _average(values: Sequence[Optional[float]], window: int) -> Optional[float]:
++        sample = MarketEngine._complete_window(values, window)
++        if sample is None:
++            return None
++        return sum(sample) / float(window)
++
++    @staticmethod
++    def _coefficient_of_variation(values: Sequence[Optional[float]], window: int) -> Optional[float]:
++        sample = MarketEngine._complete_window(values, window)
++        if sample is None:
+             return None
+-        sample = values[-window:]
+         mean = sum(sample) / float(window)
+         if mean <= 0:
+             return None
+@@ -398,9 +423,15 @@
+         return "STABLE_DRAWDOWN"
+ 
+     @staticmethod
+-    def _liquidity_state(avg_value: Optional[float], values: List[float]) -> str:
++    def _liquidity_state(avg_value: Optional[float], values: Sequence[Optional[float]]) -> str:
+         if avg_value is None or avg_value <= 0:
+             return "INSUFFICIENT_DATA"
++        # The state reads the last 20 observations (active days) and up to the
++        # last 60 (baseline). A missing value in the observations it reads is
++        # unknown, not zero activity, so the state fails closed. A real 0.0
++        # value is still a genuine no-trade observation.
++        if any(v is None for v in values[-60:]):
++            return "INSUFFICIENT_DATA"
+         active = sum(v > 0 for v in values[-20:]) / min(20, len(values))
+         if active < LIQUIDITY_ACTIVE_DAY_MINIMUM:
+             return "VERY_LOW"
+@@ -448,11 +479,9 @@
+         if not benchmark:
+             return "INSUFFICIENT_DATA"
+         rows = MarketEngine._prepare_rows(benchmark, as_of_date, True, label="market_benchmark")
+-        prices = [
+-            float(r.get("adjusted_close", r.get("close")))
+-            for r in rows
+-            if r.get("adjusted_close", r.get("close")) is not None
+-        ]
++        # Same fallback as ``_price``: adjusted_close unless it is None, then close.
++        # Rows with neither price are skipped, as before.
++        prices = [p for p in (MarketEngine._price(r) for r in rows) if p is not None]
+         r20 = cumulative_return(prices, RETURN_HORIZONS["20D"])
+         if r20 is None:
+             return "INSUFFICIENT_DATA"
+diff -u -r --strip-trailing-cr -x __pycache__ src_orig/tests/test_stage8_market.py src/tests/test_stage8_market.py
+--- src_orig/tests/test_stage8_market.py	2026-10-26 16:41:30.052814161 +0000
++++ src/tests/test_stage8_market.py	2026-10-26 16:42:29.496696586 +0000
+@@ -12,6 +12,7 @@
+ from src.market.indicators import calculate_rsi, calculate_sma, cumulative_return, maximum_drawdown, price_position, realized_volatility
+ from src.market.parameters import (
+     DRAWDOWN_WINDOWS,
++    MARKET_REGIME_RETURN_THRESHOLD,
+     MA_WINDOWS,
+     PRICE_POSITION_WINDOWS,
+     RETURN_HORIZONS,
+@@ -502,3 +503,238 @@
+     engine_source = inspect.getsource(engine_module)
+     assert "jdatetime" not in engine_source  # engine uses only the shared tuple validator
+     assert "datetime(" not in engine_source
++
++
++# --- P73: missing volume/value are missing, never zero ---------------------
++
++
++def with_missing(data, field_name, positions):
++    """Return rows where ``field_name`` is None at the given (negative) positions."""
++    data = [dict(r) for r in data]
++    for pos in positions:
++        data[pos] = dict(data[pos], **{field_name: None})
++    return data
++
++
++def full_rows():
++    # Constant volume 1000.0 and value 100000.0 over 259 ordered observations.
++    return rows(list(range(1, 260)))
++
++
++def test_complete_volume_and_value_baseline():
++    result = MarketEngine().analyze_market(1, AS_OF, full_rows())
++    ind = result.indicators
++    assert ind.volume_ratio == 1.0
++    assert ind.average_volume_20d == 1000.0
++    assert ind.average_trading_value_20d == 100000.0
++    assert ind.trading_value_stability_20d == 0.0
++    assert result.liquidity_state == "NORMAL"
++    assert result.price_volume_state == "WEAK_PRICE_VOLUME_CONFIRMATION"
++
++
++@pytest.mark.parametrize("position", [-1, -2, -20])
++def test_missing_volume_in_average_window_fails_closed_not_zero(position):
++    data = with_missing(full_rows(), "volume", [position])
++    result = MarketEngine().analyze_market(1, AS_OF, data)
++    ind = result.indicators
++    # A zero-filled window would give 950.0 for the average; missing must stay missing.
++    assert ind.average_volume_20d is None
++    assert ind.volume_ratio is None
++    assert result.price_volume_state == "INSUFFICIENT_DATA"
++    assert "INFO:ABNORMAL_VOLUME" not in result.alerts
++    # Value-based metrics do not depend on volume and are unchanged.
++    assert ind.average_trading_value_20d == 100000.0
++    assert ind.trading_value_stability_20d == 0.0
++    assert result.liquidity_state == "NORMAL"
++    # Price indicators are unchanged.
++    assert ind.returns == MarketEngine().analyze_market(1, AS_OF, full_rows()).indicators.returns
++    assert result.market_data_quality == "VALID"
++
++
++def test_missing_volume_respects_existing_window_boundaries():
++    # volume_ratio reads 21 observations (latest + prior 20); the average reads 20.
++    at_21 = MarketEngine().analyze_market(1, AS_OF, with_missing(full_rows(), "volume", [-21]))
++    assert at_21.indicators.volume_ratio is None
++    assert at_21.indicators.average_volume_20d == 1000.0
++
++    at_22 = MarketEngine().analyze_market(1, AS_OF, with_missing(full_rows(), "volume", [-22]))
++    assert at_22.indicators.volume_ratio == 1.0
++    assert at_22.indicators.average_volume_20d == 1000.0
++
++
++def test_missing_volume_cannot_create_abnormal_volume_or_confirmation():
++    data = full_rows()
++    data[-1] = dict(data[-1], volume=3000.0)
++    complete = MarketEngine().analyze_market(1, AS_OF, data)
++    assert complete.indicators.volume_ratio == 3.0
++    assert "INFO:ABNORMAL_VOLUME" in complete.alerts
++    assert complete.price_volume_state == "PRICE_VOLUME_CONFIRMATION"
++
++    # One missing prior volume: zero-filling would lower the baseline and raise the ratio.
++    missing = MarketEngine().analyze_market(1, AS_OF, with_missing(data, "volume", [-5]))
++    assert missing.indicators.volume_ratio is None
++    assert "INFO:ABNORMAL_VOLUME" not in missing.alerts
++    assert missing.price_volume_state == "INSUFFICIENT_DATA"
++
++
++def test_real_zero_volume_is_distinct_from_missing_volume():
++    zero = MarketEngine().analyze_market(1, AS_OF, rows(list(range(1, 260)), volume=0.0))
++    assert zero.indicators.average_volume_20d == 0.0  # a genuine observation of no volume
++    assert zero.indicators.volume_ratio is None  # existing zero-average rule, unchanged
++
++    missing = MarketEngine().analyze_market(1, AS_OF, rows(list(range(1, 260)), volume=None))
++    assert missing.indicators.average_volume_20d is None
++    assert missing.indicators.volume_ratio is None
++
++
++@pytest.mark.parametrize("position", [-1, -10, -20])
++def test_missing_value_in_last_20_fails_closed_not_zero(position):
++    data = with_missing(full_rows(), "value", [position])
++    result = MarketEngine().analyze_market(1, AS_OF, data)
++    ind = result.indicators
++    assert ind.average_trading_value_20d is None  # zero-filled would be 95000.0
++    assert ind.trading_value_stability_20d is None
++    assert result.liquidity_state == "INSUFFICIENT_DATA"
++    assert "WARNING:LOW_LIQUIDITY" not in result.alerts
++    # Volume metrics do not depend on value and are unchanged.
++    assert ind.average_volume_20d == 1000.0
++    assert ind.volume_ratio == 1.0
++    assert result.market_data_quality == "VALID"
++
++
++def test_missing_value_in_liquidity_baseline_window_fails_closed_for_liquidity_only():
++    # Outside the 20-observation windows but inside the 60-observation baseline.
++    for position in (-21, -60):
++        result = MarketEngine().analyze_market(1, AS_OF, with_missing(full_rows(), "value", [position]))
++        assert result.indicators.average_trading_value_20d == 100000.0
++        assert result.indicators.trading_value_stability_20d == 0.0
++        assert result.liquidity_state == "INSUFFICIENT_DATA"
++        assert "WARNING:LOW_LIQUIDITY" not in result.alerts
++
++    # Outside every window the state reads: nothing changes.
++    outside = MarketEngine().analyze_market(1, AS_OF, with_missing(full_rows(), "value", [-61]))
++    assert outside.indicators.average_trading_value_20d == 100000.0
++    assert outside.liquidity_state == "NORMAL"
++
++
++def test_missing_values_are_not_classified_as_low_liquidity_but_real_zeros_are():
++    positions = list(range(-11, 0))  # 11 of the last 20 observations
++
++    missing = MarketEngine().analyze_market(1, AS_OF, with_missing(full_rows(), "value", positions))
++    assert missing.liquidity_state == "INSUFFICIENT_DATA"
++    assert "WARNING:LOW_LIQUIDITY" not in missing.alerts
++
++    zeros = full_rows()
++    for pos in positions:
++        zeros[pos] = dict(zeros[pos], value=0.0)
++    genuine = MarketEngine().analyze_market(1, AS_OF, zeros)
++    assert genuine.indicators.average_trading_value_20d == 45000.0
++    assert genuine.liquidity_state == "VERY_LOW"
++    assert "WARNING:LOW_LIQUIDITY" in genuine.alerts
++
++
++def test_all_volume_and_value_missing_fails_closed_for_every_dependent_output():
++    data = rows(list(range(1, 260)), volume=None, value=None)
++    result = MarketEngine().analyze_market(1, AS_OF, data)
++    ind = result.indicators
++    assert ind.volume_ratio is None
++    assert ind.average_volume_20d is None
++    assert ind.average_trading_value_20d is None
++    assert ind.trading_value_stability_20d is None
++    assert result.liquidity_state == "INSUFFICIENT_DATA"
++    assert result.price_volume_state == "INSUFFICIENT_DATA"
++    assert "WARNING:LOW_LIQUIDITY" not in result.alerts
++    assert "INFO:ABNORMAL_VOLUME" not in result.alerts
++    # Price-derived outputs are still produced.
++    assert result.market_data_quality == "VALID"
++    assert result.trend_state in {"UPTREND", "STRONG_UPTREND"}
++
++
++def test_window_helpers_do_not_fill_or_drop_missing_observations():
++    engine = MarketEngine
++    series = [1.0] * 19 + [None]
++    assert engine._average(series, 20) is None
++    assert engine._coefficient_of_variation(series, 20) is None
++    assert series[-1] is None  # input not repaired
++
++    # A missing observation outside the window is irrelevant.
++    assert engine._average([None] + [1.0] * 20, 20) == 1.0
++    assert engine._volume_ratio([1.0] * 20 + [None], 20) is None
++    assert engine._volume_ratio([None] + [1.0] * 21, 20) == 1.0
++
++    assert engine._liquidity_state(100.0, [100.0] * 59 + [None]) == "INSUFFICIENT_DATA"
++    assert engine._liquidity_state(100.0, [None] + [100.0] * 60) == "NORMAL"
++
++
++# --- P73: market-regime price fallback matches _price ----------------------
++
++
++def benchmark_rows(closes, adjusted=None):
++    return [
++        {
++            "jalali_date": jd(i),
++            "close": close,
++            "adjusted_close": None if adjusted is None else adjusted[i],
++        }
++        for i, close in enumerate(closes)
++    ]
++
++
++def expected_regime(closes):
++    ret = cumulative_return(closes, RETURN_HORIZONS["20D"])
++    if ret >= MARKET_REGIME_RETURN_THRESHOLD:
++        return "MARKET_UP"
++    if ret <= -MARKET_REGIME_RETURN_THRESHOLD:
++        return "MARKET_DOWN"
++    return "MARKET_NEUTRAL"
++
++
++@pytest.mark.parametrize(
++    "closes, expected",
++    [
++        ([100.0] * 20 + [110.0], "MARKET_UP"),
++        ([100.0] * 20 + [90.0], "MARKET_DOWN"),
++        ([100.0] * 20 + [102.0], "MARKET_NEUTRAL"),
++    ],
++)
++def test_market_regime_falls_back_to_close_when_adjusted_close_is_none(closes, expected):
++    bench = benchmark_rows(closes, adjusted=None)  # adjusted_close key present, value None
++    assert all("adjusted_close" in r and r["adjusted_close"] is None for r in bench)
++    regime = MarketEngine._market_regime(bench, jd(20))
++    assert regime == expected == expected_regime(closes)
++    # Identical to the same series supplied as adjusted_close.
++    assert regime == MarketEngine._market_regime(benchmark_rows(closes, adjusted=closes), jd(20))
++
++
++def test_market_regime_close_fallback_flows_through_analyze_market():
++    closes = [100.0] * 20 + [110.0]
++    result = MarketEngine().analyze_market(
++        1, AS_OF, rows(list(range(1, 260))), market_benchmark=benchmark_rows(closes)
++    )
++    assert result.market_regime == "MARKET_UP"
++
++
++def test_market_regime_does_not_fall_back_when_adjusted_close_is_numeric():
++    closes = [100.0] * 20 + [110.0]
++    flat_adjusted = [100.0] * 21  # numeric adjusted_close wins over a rising close
++    assert MarketEngine._market_regime(benchmark_rows(closes, adjusted=flat_adjusted), jd(20)) == "MARKET_NEUTRAL"
++
++    # Per-row choice: early rows fall back to close, the last row has a numeric adjusted_close.
++    up = benchmark_rows([100.0] * 20 + [1.0], adjusted=[None] * 20 + [110.0])
++    assert MarketEngine._market_regime(up, jd(20)) == "MARKET_UP"
++    down = benchmark_rows([100.0] * 20 + [1000.0], adjusted=[None] * 20 + [90.0])
++    assert MarketEngine._market_regime(down, jd(20)) == "MARKET_DOWN"
++
++
++def test_market_regime_preserves_behavior_when_both_prices_are_missing():
++    all_missing = benchmark_rows([None] * 21, adjusted=None)
++    assert MarketEngine._market_regime(all_missing, jd(20)) == "INSUFFICIENT_DATA"
++
++    # A row with neither price is skipped, not zero-filled.
++    valid = benchmark_rows([100.0] * 20 + [110.0])
++    valid.append({"jalali_date": jd(21), "close": None, "adjusted_close": None})
++    assert MarketEngine._market_regime(valid, jd(21)) == "MARKET_UP"
++
++    # Too few usable prices stays INSUFFICIENT_DATA.
++    short = benchmark_rows([100.0] * 20)
++    assert MarketEngine._market_regime(short, jd(19)) == "INSUFFICIENT_DATA"
