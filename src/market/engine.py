@@ -42,7 +42,7 @@ from src.market.parameters import (
     VOLATILITY_LOW_RATIO,
     VOLATILITY_WINDOWS,
 )
-from src.market.schema import MarketSignalResult, TechnicalIndicatorsResult
+from src.market.schema import MarketSignalResult, TechnicalIndicatorsResult, _number, _price
 
 
 class MarketEngine:

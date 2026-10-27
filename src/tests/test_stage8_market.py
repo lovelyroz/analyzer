@@ -759,3 +759,36 @@ def test_stage8_finite_and_zero_preserved():
     assert _number(100.5) == 100.5
     assert _price(10.0) == 10.0
     assert _number(None) is None
+
+
+def test_analyze_market_rejects_non_finite_prices():
+    engine = MarketEngine()
+    invalid_rows = [{"date": (1403, 1, 1), "close": float('nan'), "volume": 1000}]
+    with pytest.raises(ValueError):
+        engine.analyze_market("TEST", (1403, 1, 1), invalid_rows)
+
+def test_analyze_market_rejects_non_finite_volume_value():
+    engine = MarketEngine()
+    invalid_rows = [{"date": (1403, 1, 1), "close": 100.0, "volume": float('inf'), "value": float('nan')}]
+    with pytest.raises(ValueError):
+        engine.analyze_market("TEST", (1403, 1, 1), invalid_rows)
+
+def test_analyze_market_rejects_non_finite_benchmark():
+    engine = MarketEngine()
+    rows = [{"date": (1403, 1, 1), "close": 100, "volume": 1000}]
+    invalid_benchmark = [{"date": (1403, 1, 1), "close": float('inf')}]
+    with pytest.raises(ValueError):
+        try:
+            engine.analyze_market("TEST", (1403, 1, 1), rows, industry_benchmark=invalid_benchmark)
+        except TypeError:
+            engine.analyze_market("TEST", (1403, 1, 1), rows, market_benchmark=invalid_benchmark)
+
+    
+def test_analyze_market_finite_and_zero_controls():
+    engine = MarketEngine()
+    rows = [
+        {"jalali_date": (1403, 1, 1), "close": 100.0, "volume": 0},
+        {"jalali_date": (1403, 1, 2), "close": 105.5, "volume": 5000}
+    ]
+    result = engine.analyze_market("TEST", (1403, 1, 2), rows)
+    assert result is not None
