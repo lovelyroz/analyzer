@@ -136,3 +136,59 @@ python -m pytest src/tests/test_stage3_scoring.py src/tests/test_stage5_forecast
 ```
 
 ---
+# گزارش اصلاح‌شده ممیزی شواهدمحور **Stage 7 Prompt 1 — Audit Corrections Only** بر اساس الزامات قیدشده در فایل `PROMPT.md` آماده شده است. در این اصلاحیه، تمام ادعاهای ممیزی قبلی با سورس‌کدها، اسناد مشخصات و تست‌های واقعی تطبیق داده شده و موارد نادرست اصلاح گردیده‌اند.
+
+---
+
+### ۱. ماتریس شکاف‌های اصلاح‌شده (Corrected Gap Matrix)
+
+| عنوان موضوع / ادعای قبلی | شواهد دقیق سورس‌کد و تست‌ها | وضعیت واقعی و سطح اطمینان | اقدام اصلاحی / توصیه |
+| :--- | :--- | :--- | :--- |
+| **استخراج تاریخچه بازار Stage 8** | `src/ingestion/market/queries.py::select_market_history_as_of`<br>`src/market/service.py::analyze_market_as_of_jalali`<br>`src/tests/test_stage8_market_service.py` | **ALREADY IMPLEMENTED (پیاده‌سازی‌شده و موجود)**<br>ادعای مفقود بودن کوئری تاریخچه بازار نادرست بود. تابع کوئری `select_market_history_as_of` و سرویس آداپتور `analyze_market_as_of_jalali` کاملاً پیاده‌سازی و تست شده‌اند. | **عدم پیاده‌سازی مجدد**. این قابلیت موجود است؛ صرفاً فراخواننده ارکستریتور در نقطه ورود اصلی برنامه وجود ندارد. |
+| **حاکمیت پارامترها و انتخاب تاریخی (D9 / P54)** | `src/valuation/parameters.py:resolve_parameter_set_as_of`<br>`src/valuation/service.py:calculate_valuation_as_of_jalali`<br>`src/valuation/engine.py:_resolve_parameter_governing_timestamp` | **UNRESOLVED OWNER POLICY (سیاست معوق مالک)**<br>پیشنهاد قبلی مبنی بر ثبت تاریخ فرضی `2026-01-01` **فاقد پشتیبانی مشخصات (UNSUPPORTED)** است. رفتار Fail-Closed سیستم با صدور `LookupError` هنگام درخواست تاریخ‌دار روی ثبت‌کننده Genesis کاملاً درست و قفل‌شده است. | **عدم حدس زدن تاریخ اعتبار فرضی**. تاریخ اعتبار و مقادیر پارامترها باید رسماً توسط مالک پروژه تصویب شوند. |
+| **نقطه ورود اصلی برنامه (Main Entrypoint)** | بررسی کل سورس‌کد در `src/` | **CONFIRMED ABSENCE (عدم وجود قطعی)**<br>هیچ اسکریپت CLI، سرویس API یا حلقه ارکستراسیون اصلی در کد وجود ندارد که Session دیتابیس را مدیریت کرده و لوله‌ها را اجرا کند. | طراحی و پیاده‌سازی مرز نقطه ورود اصلی در فازهای بعدی. |
+| **فراخواننده‌های تولیدی Stage 3 و Stage 5** | `src/scoring/engine.py:calculate_score`<br>`src/forecast/service.py:generate_and_persist_forecast` | **CONFIRMED ABSENCE OF PRODUCTION CALLER**<br>موتورها و سرویس‌ها وجود دارند اما فراخواننده‌ای در مسیر اجرایی برنامه برای ارسال خروجی‌های آن‌ها به Stage 7 و Stage 9 وجود ندارد. | اتصال فراخواننده‌ها در نقطه ورود اصلی برنامه. |
+| **لایه ماندگاری تصمیمات Stage 9** | `src/decision/schema.py:FinalDecisionResult`<br>`src/core/database.py` | **CONFIRMED MISSING PERSISTENCE MODEL**<br>هیچ مدل دیتابیس (SQLAlchemy Table) یا ریپازیتوری برای ذخیره `FinalDecisionResult` در SQLite وجود ندارد. | ایجاد مدل ماندگاری دیتابیس برای Stage 9 در Scope مربوط به Prompt 2. |
+
+---
+
+### ۲. فایل‌های تغییریافته و دلیل تغییرات (Files Actually Modified)
+
+مطابق با قیود **AUDIT ONLY + LIMITED DOCS ONLY**، هیچ‌یک از کدهای سورس (`src/`) یا تست‌ها تغییر نکرده و تستی اجرا نشده است. اصلاحات مستنداتی شامل موارد زیر است:
+
+1. **فایل `/workspace/out/WORKFLOW_RULES.md`**:
+   - **دلیل تغییر**: شفاف‌سازی قوانین پروژه، به ویژه ممنوعیت حدس زدن تاریخ‌های فرضی (مانند `2026-01-01`)، تاکید بر عدم پیاده‌سازی مجدد توابع موجود (نظیر `select_market_history_as_of`) و الزام به لزوم تطبیق کدهای موجود پیش از ادعای کمبود.
+2. **فایل `/workspace/out/stepsForStage7.md`**:
+   - **دلیل تغییر**: تصحیح وضعیت Stage 8 (ثبت موجود بودن کوئری و سرویس تاریخچه بازار)، اصلاح وضعیت D9 (حفظ رفتار Fail-Closed و منع ساخت تاریخ فرضی)، و بروزرسانی محدوده پیشنهادی برای Prompt 2.
+
+---
+
+### ۳. تصمیمات سیاستی حل‌نشده و شواهد مفقود (Unresolved Policy Decisions)
+
+* **تصویب و تاریخ اعتبار پارامترها (D9)**: ثبت‌کننده `DEFAULT_REGISTRY` فقط شامل رکورد Genesis با `effective_from = None` است. تعیین تاریخ اعتبار رسمی یا تصویب مقادیر عددی ۳۸ پارامتر نیازمند مصوبه مستقیم مالک سیستم است. ایجاد تاریخ فرضی بر خلاف اصول مالی و فنی پروژه است.
+* **هشدارهای ۵ گانه تعویق‌افتاده (D1–D5)**: به دلیل عدم وجود فرمول مالی مصوب در اسناد مشخصات، هشدارهای `ASSESSMENT_FLIP_RISK` و ۴ هشدار دیگر در حالت تعویق (Deferred) باقی می‌مانند تا از ساخت فرمول‌های غیرمصوب جلوگیری شود.
+* **درایورهای اختصاصی صنعت (D6)**: تحلیل درایورها بر اساس همان الگوی دوعاملی قفل‌شده `{EPS, TARGET_PE}` باقی می‌ماند و فرمول‌های ساختگی برای NII بانک یا NAV هولدینگ ایجاد نخواهد شد.
+
+---
+
+### ۴. محدوده اصلاح‌شده برای Prompt 2 (Revised Prompt 2 Scope)
+
+محدوده Prompt 2 صرفاً بر اساس **یافته‌های قطعی و تاییدشده** تنظیم شده و تمامی موارد نادرست (مانند پیاده‌سازی مجدد کوئری بازار یا فرض تاریخ `2026-01-01`) از آن حذف گردیده‌اند:
+
+1. **پیاده‌سازی لایه ماندگاری Stage 9 (Persistence Layer)**:
+   * **فایل‌های هدف**: `src/decision/models.py` (جدید) یا `src/decision/schema.py` و `src/core/database.py`.
+   * **تغییرات**: ایجاد مدل SQLAlchemy و ریپازیتوری ذخیره‌سازی برای `FinalDecisionResult` جهت امکان ثبت تصمیمات نهایی در دیتابیس SQLite.
+   * **تست‌ها**: تست‌های واحد ذخیره و بازیابی تصمیمات Stage 9.
+
+2. **طراحی مرز نقطه ورود تولیدی (Production Orchestrator Boundary)**:
+   * **فایل‌های هدف**: ایجاد نقطه ورود / ارکستریتور اصلی پروژه.
+   * **تغییرات**: فراخوانی یکپارچه و مستقیم سرویس‌های موجود (`src/forecast/service.py` ، `src/market/service.py` و `src/decision/service.py`) و مدیریت Session دیتابیس بدون دستکاری کد داخلی Stage 7.
+
+3. **تست‌های رگرسیون مورد نیاز**:
+   ```bash
+   python -m pytest src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py src/tests/test_stage8_market_service.py -q
+   ```
+
+---
+
+💡 **پیشنهاد گام بعدی**: در صورت تایید این گزارش ممیزی اصلاح‌شده، می‌توانیم آماده‌سازی الزامات ساختاری Prompt 2 (ایجاد مدل دیتابیس Stage 9 و ارکستریتور اصلی) را آغاز کنیم.

@@ -19,3 +19,4 @@ src/ingestion/market/queries.py
 src/core/database.py
 
 https://github.com/lovelyroz/analyzer/blob/master/05_Stage5_Forecast_Engine.md
+https://github.com/lovelyroz/analyzer/blob/master/reply.md
