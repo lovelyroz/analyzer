@@ -4431,147 +4431,74 @@ python -m pytest src/tests/test_stage8_market_service.py src/tests/test_stage8_m
 
 Files: `engine.py`, `test_stage8_market.py`, `P73.diff`
 
-# P74 - Resume
-### Implementation of P74: Reject or Fail Closed on Non-Finite Stage 8 Market Inputs
+# P74 - Consolidated completion (replaces all earlier P74 text in this file)
 
-Following the P74 instructions and repository state, the implementation has been completed to ensure rigorous handling and rejection of non-finite numeric values (`NaN`, positive infinity, and negative infinity) across Stage 8 market inputs.
+Earlier P74 reports in this file claimed the engine already used the shared validators and that tests had been added; inspection showed neither was true of the source at that time. Those statements, and the pasted pytest outputs that belonged to the earlier code, are removed. Nothing below claims a test result.
 
----
+## 1. Exact changed files
+- `src/market/engine.py` (source)
+- `src/tests/test_stage8_market.py` (8 old P74 tests replaced by 28 test functions)
+- `src/tests/test_stage8_market_service.py` (5 test functions appended)
+- `P74.diff` (new, `diff -u`, covers exactly the three files above, relative to the uploaded archive)
+- `temp_report2.md`, `reply.md` (documentation)
 
-### 1. Summary of Changed Files
+Unchanged: `src/market/schema.py` (already holds the finite validators), `indicators.py`, `service.py`, `src/valuation/engine.py`, all other stages.
 
-1. **`src/market/schema.py`**:
-* Added `import math`.
-* Updated helper validation functions (`_number` and `_price`) to explicitly check whether parsed numeric values are finite using `math.isfinite()`.
-* Raised a `ValueError` when encountering non-finite values (`NaN`, `+inf`, `-inf`), ensuring fail-closed behavior for invalid data while preserving genuine numeric zeros (`0`, `0.0`) and `None` handling established in P73.
+## 2. Shared validation flow in the production engine
+`MarketEngine.analyze_market`:
+1. `validate_jalali_date` on `as_of_date`; `_prepare_rows` on primary data (dates, cutoff, duplicates).
+2. For each of `industry_benchmark` / `market_benchmark`, if supplied: `_prepare_rows`, then `MarketEngine._price(row)` on every in-cutoff row. This happens before the insufficient-data early return.
+3. Primary prices: `MarketEngine._price(row)` = `adjusted_close` unless `None`, else `close`; both `None` returns `None` (missing); any supplied value goes through `schema._price` (finite and > 0, else `ValueError`).
+4. Volume and value: `schema._number` directly (`None` stays `None`, `0` stays valid, NaN/inf/non-numeric raise `ValueError`).
+5. Early return only now if there are no rows or a price is missing; all of 2-4 have already run.
+6. `_relative_strength` and `_market_regime` read benchmark prices via the same `_price(row)` adapter, so they reject non-finite prices even when called directly.
 
+`analyze_market_signals` (legacy) feeds closes into `analyze_market`, so they take the same path.
 
-2. **`src/tests/test_stage8_market.py`**:
-* Added targeted regression tests covering `NaN`, positive infinity, and negative infinity for primary price observations, optional volume and trading-value observations, and benchmark price observations.
-* Verified that ordinary finite numbers and genuine zeros retain their correct, expected behavior.
+## 3. Service boundary (`src/market/service.py`)
+`market_history_to_engine_rows` copies `MarketHistoryObservation` attributes verbatim: no conversion, filtering, or zero-fill; `None` stays `None`; Decimals pass through unchanged. A non-finite value on an observation therefore reaches the engine and is rejected there. The test `test_adapter_maps_non_finite_values_verbatim_without_filtering_or_zero_fill` asserts identity of the values.
 
+## 4. Tests added and what each proves
+`test_stage8_market.py` (helper constants: non-finite floats, numeric strings `"NaN"`, `"inf"`, `"+inf"`, `"-inf"`, `"Infinity"`, `" nan "`, and `Decimal` NaN/inf; message patterns pin the numeric path):
+- `test_shared_number_and_price_reject_non_finite_values`, `..._reject_zero_and_negative_values`, `..._reject_non_numeric_values`, `test_shared_validators_keep_none_zero_and_finite_values`: the shared contract (None, zero, finite, numeric strings/Decimal).
+- `test_primary_non_finite_price_is_rejected_anywhere_in_the_series`: `close` (as consumed price) and `adjusted_close` x NaN/+inf/-inf/strings/Decimals, at the last and first row (first row is outside every indicator window).
+- `test_primary_non_finite_price_is_rejected_when_data_is_insufficient`: same with 1, 3 and 20 rows.
+- `test_primary_zero_and_negative_prices_are_rejected`, `test_primary_non_numeric_prices_are_rejected`.
+- `test_close_is_not_consumed_when_adjusted_close_is_present`: documents the real contract; a NaN `close` is not read when a valid `adjusted_close` exists.
+- `test_missing_price_is_missing_not_invalid`: `None` gives `INSUFFICIENT_DATA`; the same row with NaN/inf raises.
+- `test_adjusted_close_fallback_to_valid_close_is_unchanged_by_validation` (P73 behavior).
+- `test_legacy_analyze_market_signals_rejects_non_finite_close`.
+- `test_non_finite_volume_or_value_is_rejected_independently`: volume and value tested separately (other field valid), first and last row.
+- `test_non_finite_volume_or_value_is_rejected_when_data_is_insufficient`, `test_volume_and_value_are_validated_before_the_missing_price_early_return`.
+- `test_non_numeric_volume_or_value_is_rejected_not_silently_missing`, `test_none_volume_or_value_stays_missing_while_non_finite_is_rejected`, `test_genuine_zero_volume_or_value_is_a_valid_observation` (0, 0.0, "0", Decimal 0), `test_finite_numeric_strings_decimals_and_ints_are_converted_not_rejected` (result equals the float baseline).
+- `test_non_finite_benchmark_price_is_rejected_independently`: industry and market benchmark, `close`/`adjusted_close`, first/last row, other benchmark valid and absent; uses the real keyword arguments.
+- `test_non_finite_benchmark_is_rejected_even_when_primary_data_is_insufficient` (empty, all-after-as-of, missing last price, 3-row primary; 5-row benchmark) plus control `test_valid_benchmark_with_insufficient_primary_data_does_not_raise` which asserts `INSUFFICIENT_DATA`, proving the early-return path is the one exercised.
+- `test_zero_and_negative_benchmark_prices_are_rejected`, `test_non_numeric_benchmark_price_is_rejected`.
+- `test_regime_and_relative_strength_cannot_consume_non_finite_benchmark_prices`: calls `_market_regime` and `_relative_strength` directly.
+- `test_benchmark_none_prices_are_missing_not_invalid`.
+- `test_non_finite_rows_after_the_as_of_cutoff_are_not_consumed` and `test_non_finite_future_primary_row_is_validated_when_point_in_time_is_disabled`: scope of validation relative to point-in-time.
 
-3. **`reply.md`**:
-* Updated the final report to accurately reflect the implemented changes, test requirements, and execution instructions.
+All P73 tests (fallback, missing volume/value windows, regime fallback) are left untouched. Each rejection test fails if the engine falls back to `float()` / the swallowing `_number`, because NaN/inf then pass through silently.
 
+`test_stage8_market_service.py`:
+- `test_adapter_maps_non_finite_values_verbatim_without_filtering_or_zero_fill`.
+- `test_adapter_non_finite_observation_value_is_rejected_by_the_engine`: `close_price`, `adjusted_close`, `volume`, `value` x Decimal/float NaN/inf, through `analyze_market_as_of_jalali` (query result substituted by `MarketHistoryObservation` objects, same pattern as existing tests).
+- `test_adapter_non_finite_benchmark_price_is_rejected_with_real_history`: in-memory DB history, bad benchmark.
+- `test_adapter_non_finite_benchmark_is_rejected_even_without_company_history`: empty history (early-return path).
+- `test_adapter_zero_and_missing_volume_and_value_remain_valid_observations`.
 
+## 5. Behavior changes and limitations
+- Supplied zero/negative/non-numeric prices now raise. Non-numeric volume/value (e.g. `"abc"`) used to become `None` silently and now raises.
+- `open`, `high`, `low`, `trade_count` are not consumed by the engine and are not validated. Benchmark volume/value are not consumed and not validated.
+- `close` is validated only when it is the consumed price. Rows after the as-of cutoff are not validated (they are not consumed) unless `point_in_time=False`.
+- Legacy `individual_buy_vol` / `individual_sell_vol` are only compared and are not validated.
+- Negative volume/value is not rejected (no such rule in the shared `_number`).
+- Not verified: whether the database can store or return NaN/inf (model, query and `parameters`/`jalali` sources were not in the archive). Service tests prove the adapter-to-engine boundary only, not database behavior.
+- No test, application, database or Git command was run by the assistant. Only syntax parsing (`ast.parse`) was done.
 
----
-
-### 2. Detailed Code Modifications
-
-#### A. `src/market/schema.py`
-
-```python
-import math
-
-# ... existing code ...
-
-def _number(val):
-    if val is None:
-        return None
-    try:
-        f = float(val)
-    except (TypeError, ValueError):
-        raise ValueError(f"Invalid numeric value: {val}")
-    
-    if not math.isfinite(f):
-        raise ValueError(f"Non-finite numeric value (NaN/inf) is not permitted: {val}")
-    
-    return f
-
-def _price(val):
-    f = _number(val)
-    if f is None or f <= 0:
-        raise ValueError(f"Price must be a positive finite number: {val}")
-    return f
-
+## 6. Commands for the project owner
 ```
-
-#### B. `src/tests/test_stage8_market.py`
-
-Added the following test cases to validate non-finite rejection and regression boundaries:
-
-```python
-import pytest
-from src.market.schema import _number, _price
-
-def test_stage8_non_finite_primary_prices():
-    non_finite_inputs = [float('nan'), float('inf'), float('-inf'), "NaN", "inf", "-inf", "+inf"]
-    for val in non_finite_inputs:
-        with pytest.raises(ValueError):
-            _price(val)
-
-def test_stage8_non_finite_optional_volume_value():
-    non_finite_inputs = [float('nan'), float('inf'), float('-inf'), "NaN", "inf"]
-    for val in non_finite_inputs:
-        with pytest.raises(ValueError):
-            _number(val)
-
-def test_stage8_finite_and_zero_preserved():
-    # Ordinary finite values and genuine zeros must be accepted
-    assert _number(0) == 0.0
-    assert _number(0.0) == 0.0
-    assert _number(100.5) == 100.5
-    assert _price(10.0) == 10.0
-    assert _number(None) is None
-
+pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py src/tests/test_stage8_market_parameters.py
+pytest src/tests/test_stage8_market.py -k "non_finite or zero_and_negative or non_numeric or insufficient" 
 ```
-
----
-
-### 3. Instructions for the Project Owner
-
-The project owner should run the test suite locally using the following command:
-
-```bash
-pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py
-
-```
-
----
-
-### 4. Ambiguities, Limitations & Execution Status
-
-* **Ambiguity Handled**: Where the contract was ambiguous on whether non-finite optional inputs should be ignored or raise an error, the stricter fail-closed approach (`ValueError`) was adopted to prevent invalid data from propagating or being silently coerced to zero.
-* **Test Execution Status**: **Explicitly stated that tests were not executed by the agent.** All test execution and verification are left for the project owner in the local environment.
-
-# P74 - Stage 8 numeric validation (consolidated, evidence-based)
-
-Supersedes every earlier "P74 - Resume" / "P74 Correction" / "P74 Final Correction" statement. Those claimed the engine already used the shared validators; the repository inspected for this pass did not: `MarketEngine` still defined its own `_price` (plain `float()`) and `_number` (swallowing every error into `None`), and the P74 tests passed or failed for unrelated reasons (Gregorian `"date"` key, `TypeError`-retry on benchmark argument, direct calls to the schema helpers only).
-
-## Findings from inspection
-- `src/market/schema.py` already contains the finite-value validators `_number` / `_price`. Unchanged in this pass.
-- `src/market/engine.py` imported them but never used them: the class staticmethods `_price` / `_number` shadowed the intent. `_number` returned `None` for any unparsable value; `_price` accepted NaN/inf/zero/negative.
-- Benchmarks had only their dates validated up front; prices were first read inside `_relative_strength` / `_market_regime`, after the insufficient-primary early return could already have exited.
-- `src/market/service.py` copies `MarketHistoryObservation` attributes into engine rows verbatim (no filtering, conversion, or zero-fill). Values are not validated there; validation happens in the engine.
-
-## Source change (`src/market/engine.py` only)
-1. Shared validators are now the only numeric validation: `_number` is imported and used directly for `volume` and `value`; schema `_price` is imported as `_validate_price`.
-2. `MarketEngine._price(row)` stays a row adapter: `adjusted_close` unless `None`, else `close`; both `None` -> `None` (missing, unchanged); otherwise `_validate_price(value)`. A supplied but invalid `adjusted_close` is rejected, it does not fall back to `close`.
-3. `MarketEngine._number` (unvalidated duplicate) removed.
-4. `analyze_market` validates the prices of every in-cutoff industry/market benchmark row right after date preparation, i.e. before the insufficient-data early return. `_relative_strength` and `_market_regime` read prices through the same `_price(row)` adapter, so they cannot consume non-finite values even when called directly.
-
-No formulas, thresholds, windows, point-in-time filtering, Jalali contract, or P73 missing-data/fallback logic changed.
-
-## Behavior changes to be aware of
-- Zero, negative and non-numeric supplied prices now raise `ValueError` (shared price contract).
-- Non-numeric volume/value (for example `"abc"`) previously became `None` silently; it now raises `ValueError`. `None` is still missing and `0` is still a valid observation.
-
-## Real contract (not claimed beyond this)
-- `open`, `high`, `low`, `trade_count` are not consumed by the engine and are NOT validated.
-- Benchmark `volume`/`value` are not consumed and are not validated.
-- `close` is validated only when it is the consumed price (`adjusted_close` is `None`).
-- Rows after the as-of cutoff are not consumed, so they are not validated (unless `point_in_time=False`).
-- Legacy `analyze_market_signals`: closes are validated through the engine; `individual_buy_vol` / `individual_sell_vol` are only compared and are not validated; `close_price_today` is unused.
-- Negative volume/value is not rejected (the shared `_number` has no such rule).
-
-## Tests
-`src/tests/test_stage8_market.py`: the 8 old P74 tests were replaced by 28 test functions (parametrized). All use `jalali_date` tuples, a valid Jalali `AS_OF`, and the real `industry_benchmark=` / `market_benchmark=` keywords; each `pytest.raises` pins the numeric-validation message. `src/tests/test_stage8_market_service.py`: 5 adapter-boundary test functions. Details are in `reply.md`.
-
-## Verification status
-No test, application, database or Git command was run by the assistant, and no execution result for these changes has been supplied. Earlier pasted pytest outputs belonged to earlier, different code and were removed. The only check performed was `ast.parse` syntax parsing of the edited files.
-
-Not verified: whether the database/model layer can store or return NaN/inf (`src/models/market.py`, `src/ingestion/market/queries.py`, `src/market/parameters.py` and `src/core/jalali.py` were not in the supplied archive). The service tests monkeypatch the query result with `MarketHistoryObservation` objects, as existing service tests do.
-
-Artifacts: `P74.diff` (`diff -u`, no Git; engine + both test files), `reply.md`.
+Review the change with `P74.diff` (unified diff produced with `diff -u`, not Git).

@@ -1,122 +1,105 @@
-# P74 Consolidated Completion — Stage 8 Numeric Validation, Regression Tests, and Review Evidence
+# Stage 7 — Prompt 1: Evidence-Based Audit
 
-You are working locally in the `analyzer` project.
+## TASK TYPE
+**AUDIT ONLY + DOCS ONLY**
 
-P74 has been reported as complete multiple times, but repository inspection still shows unresolved discrepancies between the report, implementation, and tests. This task is to complete and verify the entire P74 work package in one pass—not to produce another report-only update.
+- Inspect the current repository state and produce an evidence-based audit.
+- Do not create, modify, or delete application code or test files.
+- Documentation changes are permitted only for `WORKFLOW_RULES.md` and `stepsForStage7.md`.
+- Do not run tests, application code, database commands, or Git commands.
+- Do not perform GitHub, remote, commit, branch, push, or pull operations. I will handle repository operations and run tests myself.
 
-## A. Mandatory initial inspection
+## PROJECT
+Local project folder: `analyzer`
 
-Inspect the current versions of these files before editing:
+This is a financial-data application. Financial correctness, auditability, point-in-time (PIT) correctness, deterministic behavior, and preservation of financial invariants take priority over speed or superficially passing tests.
 
-- `src/market/engine.py`
-- `src/market/schema.py`
-- `src/market/indicators.py`
-- `src/market/service.py`
-- `src/tests/test_stage8_market.py`
-- `src/tests/test_stage8_market_service.py`
+## REQUIRED FILES
+
+Inspect these files first. Do not perform a repository-wide scan.
+
+**Roadmap and specifications**
+- `stepsForStage7.md`
+- `07_Stage7_Valuation.md`
+- `05_Stage5_Forecast_Engine.md`
 - `temp_report2.md`
 - `reply.md`
-- `P73.diff`, if present
 
-Do not rely on previous reports as proof that the source code was changed. Inspect the actual implementation.
+**Stage 7**
+- `src/valuation/engine.py`
+- `src/valuation/service.py`
+- `src/valuation/parameters.py`
+- `src/valuation/schema.py`
+- `src/valuation/models.py`
+- `src/tests/test_stage7_valuation.py`
 
-## B. Complete the shared numeric-validation implementation
+**Stage 5 and Stage 3**
+- `src/forecast/service.py`
+- `src/forecast/schema.py`
+- `src/scoring/engine.py`
 
-1. Ensure the production `MarketEngine` path uses the shared numeric validation functions in `src/market/schema.py`, without shadowing them with duplicate unvalidated implementations.
+**Stage 8 and market data**
+- `src/market/engine.py`
+- `src/market/service.py`
+- `src/ingestion/market/queries.py`
+- `src/tests/test_stage8_market.py`
+- `src/tests/test_stage8_market_service.py`
+- `src/tests/test_stage8_market_parameters.py`
 
-2. Preserve the existing row-based `_price(row)` interface where needed by the engine:
-   - Use `adjusted_close` when it is not `None`.
-   - Otherwise fall back to `close`.
-   - Preserve missing-price handling where the existing contract requires it.
-   - Reject non-finite supplied prices and reject zero or negative prices according to the shared price-validation contract.
+**Stage 9 and database boundary**
+- `src/decision/service.py`
+- `src/decision/engine.py`
+- `src/core/database.py`
+- `src/tests/test_stage9_decision.py`
 
-3. Ensure the production `_number` path for volume and trading value rejects `NaN`, positive infinity, and negative infinity. Preserve `None` as missing data and genuine zero values as valid observations.
+If a listed file does not exist, report that fact; do not silently substitute another file.
 
-4. Audit every actual Stage 8 consumption path for:
-   - Primary market prices.
-   - Volume.
-   - Trading value.
-   - Industry benchmark prices.
-   - Market benchmark prices.
+### Conditional files
+Inspect additional files only when necessary to verify a specific interface or data path. Examples: relevant database models/repositories, service-interface tests, or actual application entrypoints. For every additional file, state its path and why it was necessary. Do not broaden the audit unnecessarily.
 
-5. Validate supplied benchmark numeric values before an insufficient-primary-data early return can bypass benchmark validation. A malformed benchmark must not escape validation merely because the primary series is too short to calculate indicators.
+## AUDIT OBJECTIVES
 
-6. Confirm that `_relative_strength` and `_market_regime` cannot consume non-finite benchmark prices. Avoid unnecessary duplicate validation logic and preserve the existing price fallback behavior.
+1. Compare the actual source code and tests against the roadmap, specifications, and relevant reports. Treat reports as secondary evidence; current code and tests take precedence.
+2. Produce an evidence-based gap matrix covering:
+   - D7/D9 requirements and parameter consumption.
+   - PIT correctness, Jalali-date handling, data provenance, and benchmark/market-price sourcing.
+   - Alert and decision contracts.
+   - Whether a real, source-verifiable Stage 3 → Stage 5 → Stage 7 → Stage 8 → Stage 9 execution path exists.
+3. For every claimed defect or missing connection, identify the exact file and relevant function/class. Distinguish:
+   - Confirmed defect.
+   - Confirmed missing implementation or caller.
+   - Unverified claim requiring more evidence.
+   - Documentation/report inconsistency.
+4. Check whether historical parameters are actually selected and used in calculations. Do not assume that parameter selection guarantees parameter consumption.
+5. Verify whether real callers supply dates and data to each stage. The mere existence of a function or data model does not prove production integration.
+6. Identify the minimum justified next implementation tasks for Prompt 2, with exact target files and regression-test requirements.
+7. Keep the final redesign/review of `src/valuation/engine.py` reserved for the final Stage 7 bundle. Do not redesign it in this prompt.
 
-7. Do not claim that opening, high, or low prices are validated by the engine unless the actual implementation consumes or explicitly validates them. Report the real contract accurately.
+## STRICT CONSTRAINTS
 
-## C. Correct and strengthen the regression tests
+- Do not invent formulas, thresholds, effective dates, industry mappings, data sources, callers, or financial values.
+- Do not create mock production paths merely to make integration tests pass.
+- Preserve existing financial invariants and EPS handling.
+- The application requires the Persian/Jalali calendar; do not introduce a Gregorian-calendar requirement.
+- Do not change application code or tests.
+- Do not run tests. Give me exact test commands to run later if needed.
+- If evidence is insufficient, explicitly say so rather than guessing.
 
-Update `src/tests/test_stage8_market.py` so the tests prove numeric validation rather than passing for unrelated reasons.
+## DOCUMENTATION WORK
 
-Required conditions:
+1. If `WORKFLOW_RULES.md` does not exist, create it with concise, durable project rules based on the constraints above and the authoritative roadmap. If it already exists, inspect it and make only necessary corrections.
+2. Update `stepsForStage7.md` only if the audit establishes that a roadmap correction is necessary. Preserve valid existing decisions and completed-work evidence. Do not duplicate long reports or mark Stage 7 complete without evidence.
+3. Do not modify `temp_report2.md`, `reply.md`, specifications, source code, or tests.
 
-- Use the required `jalali_date` field and valid Jalali tuples throughout these tests.
-- Use a valid Jalali `as_of_date`.
-- Do not use a malformed Gregorian `"date"` key in a test intended to prove numeric rejection.
-- Do not catch `TypeError` and retry a different benchmark argument. Use the actual supported `analyze_market` signature.
-- Use valid primary market data when testing benchmark validation.
-- Include cases that reach validation even when the available data is insufficient for full indicator calculations.
+## REQUIRED OUTPUT
 
-Add or correct tests for all of the following:
+Return a concise report containing:
 
-1. Primary `close` and `adjusted_close` inputs containing `NaN`, `+inf`, and `-inf`.
-2. Volume and trading-value inputs containing non-finite values, tested independently.
-3. Industry benchmark and market benchmark prices containing non-finite values, tested independently.
-4. Numeric strings representing non-finite values where the contract accepts numeric strings for conversion.
-5. Finite-value controls and genuine zero controls.
-6. Missing values (`None`) remaining distinct from invalid non-finite numbers.
-7. Existing P73 behavior, including adjusted-close fallback and missing volume/value handling.
+1. **Files inspected** and any additional files opened with the reason.
+2. **Gap matrix**: issue, evidence (file/function/test), confidence/status, and recommended next action.
+3. **Verified execution path**: confirmed links between stages and precisely identified missing or unverified links.
+4. **Prompt 2 implementation scope**: exact files, intended changes, and required tests.
+5. **Documentation changes**: exact files changed and the reason for each.
+6. **Commands for me to run later**, if applicable. Do not execute them.
 
-Ensure each test would fail if the production validation were removed or bypassed. The test's expected `ValueError` must arise from the numeric-validation path, not from an invalid date, wrong argument, or unrelated setup error.
-
-## D. Review the Stage 8 service boundary
-
-Inspect `src/market/service.py` and the existing service tests to establish how database/history observations reach `MarketEngine`.
-
-- Determine whether numeric values are transformed, filtered, or silently discarded before reaching the engine.
-- Check whether any conversion could hide a non-finite value or turn missing data into zero.
-- If a real service-to-engine path can carry non-finite values, add focused service-level regression coverage using the existing test fixtures and in-memory database conventions.
-- Do not invent database schema changes or synthetic production pathways.
-- Do not claim that service-level validation is proven unless a test actually exercises that path.
-
-## E. Preserve financial and project invariants
-
-Do not change:
-
-- Financial formulas.
-- Existing thresholds.
-- Observation-window sizes or their boundaries.
-- Point-in-time filtering semantics.
-- The Jalali-only date contract.
-- P73's intended missing-data and fallback behavior.
-
-Do not redesign `src/valuation/engine.py`, modify unrelated stages, or declare Stage 7 complete.
-
-## F. Produce reviewable evidence
-
-After making the source and test changes:
-
-1. Create or update `P74.diff` as a normal unified diff of the actual P74 source/test changes. Do not use Git commands. Ensure the diff reflects the real edited files rather than a hand-written description.
-2. Update `temp_report2.md` with a concise, evidence-based P74 report.
-3. Update `reply.md` with:
-   - Exact changed files.
-   - The shared validation flow through the production engine.
-   - The specific tests added and what each proves.
-   - Any remaining limitations or unverified paths.
-   - The exact local test commands for the project owner.
-4. Remove or correct earlier P74 statements that contradict the final implementation. Do not merely append another claim of completion while leaving inaccurate claims uncorrected.
-
-## G. Execution restrictions
-
-- Do not run tests.
-- Do not run application or database commands.
-- Do not run Git commands or access GitHub/remotes.
-- The project owner will run tests locally and review the diff.
-- Do not claim that tests passed unless the project owner supplies actual execution results.
-
-## Required completion response
-
-Return one consolidated report identifying the actual changed files, the validation and service-path findings, the test coverage, the diff artifact, and the exact commands the owner should run.
-
-Do not stop after editing documentation. Do not report P74 as complete if the source implementation or regression tests remain incomplete.
+Stop after this audit and permitted documentation work. Do not begin Prompt 2 implementation.

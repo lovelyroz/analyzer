@@ -1,3 +1,21 @@
-pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py src/tests/test_stage8_market_parameters.py
-pytest src/tests/test_stage8_market.py -k "non_finite or zero_and_negative or non_numeric or insufficient"
-cls
+src/valuation/engine.py
+src/valuation/service.py
+src/valuation/parameters.py
+src/valuation/schema.py
+src/valuation/models.py
+src/forecast/schema.py
+src/market/engine.py
+https://github.com/lovelyroz/analyzer/blob/master/src/market/service.py
+https://github.com/lovelyroz/analyzer/blob/master/src/forecast/service.py
+https://github.com/lovelyroz/analyzer/blob/master/src/tests/test_stage8_market_parameters.py
+src/tests/test_stage7_valuation.py
+src/tests/test_stage8_market.py
+src/tests/test_stage8_market_service.py
+src/tests/test_stage9_decision.py
+src/decision/service.py
+src/decision/engine.py
+src/scoring/engine.py
+src/ingestion/market/queries.py
+src/core/database.py
+
+https://github.com/lovelyroz/analyzer/blob/master/05_Stage5_Forecast_Engine.md
