@@ -271,3 +271,83 @@ def test_adapter_has_no_gregorian_conversion():
     source = inspect.getsource(market_service)
     for forbidden in ("jdatetime", "fromisoformat", "isoformat", "strptime", "timedelta", "datetime("):
         assert forbidden not in source, forbidden
+
+
+# --- P74: numeric validation across the adapter boundary -------------------
+#
+# ``market_history_to_engine_rows`` copies attribute values verbatim, so a
+# non-finite observation value reaches ``MarketEngine`` unchanged. These tests
+# use the existing pattern of substituting the query result with
+# ``MarketHistoryObservation`` objects (as the date/foreign-company tests do);
+# they prove the adapter -> engine boundary, NOT that the database can store or
+# return such values (the model/query sources are outside this test module).
+
+NON_FINITE_OBSERVATION_VALUES = [
+    Decimal("NaN"), Decimal("Infinity"), Decimal("-Infinity"), float("nan"), float("inf"), float("-inf"),
+]
+
+
+def _history(company_id, size=3, **last_overrides):
+    """Observations on jd(0..size-1); ``last_overrides`` apply to the final one."""
+    history = [
+        _observation(company_id, jd(i), market_data_id=i + 1, volume=1000, value=Decimal("100000.00"))
+        for i in range(size - 1)
+    ]
+    values = dict(volume=1000, value=Decimal("100000.00"))
+    values.update(last_overrides)
+    history.append(_observation(company_id, jd(size - 1), market_data_id=size, **values))
+    return tuple(history)
+
+
+def _use_history(monkeypatch, history):
+    monkeypatch.setattr(market_service, "select_market_history_as_of", lambda *a, **k: history)
+
+
+@pytest.mark.parametrize("bad", NON_FINITE_OBSERVATION_VALUES, ids=repr)
+def test_adapter_maps_non_finite_values_verbatim_without_filtering_or_zero_fill(bad):
+    (row,) = market_history_to_engine_rows([
+        _observation(1, jd(0), close_price=bad, adjusted_close=bad, volume=bad, value=bad)
+    ])
+    for key in ("close", "adjusted_close", "volume", "value"):
+        assert row[key] is bad, key  # not transformed, dropped or replaced by 0
+
+
+@pytest.mark.parametrize("bad", NON_FINITE_OBSERVATION_VALUES, ids=repr)
+@pytest.mark.parametrize("field_name", ["close_price", "adjusted_close", "volume", "value"])
+def test_adapter_non_finite_observation_value_is_rejected_by_the_engine(db, monkeypatch, field_name, bad):
+    session, company_id, _ = db
+    _use_history(monkeypatch, _history(company_id, **{field_name: bad}))
+    with pytest.raises(ValueError, match="Non-finite numeric value"):
+        analyze_market_as_of_jalali(session, company_id, jd(2))
+
+
+@pytest.mark.parametrize("which", ["industry_benchmark", "market_benchmark"])
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")], ids=repr)
+def test_adapter_non_finite_benchmark_price_is_rejected_with_real_history(db, which, bad):
+    session, company_id, _ = db
+    _add_series(session, company_id, range(1, 260))
+    benchmark = [
+        {"jalali_date": jd(i), "close": float(i + 1), "adjusted_close": float(i + 1)} for i in range(259)
+    ]
+    benchmark[-1] = dict(benchmark[-1], adjusted_close=bad)
+    with pytest.raises(ValueError, match="Non-finite numeric value"):
+        analyze_market_as_of_jalali(session, company_id, AS_OF, **{which: benchmark})
+
+
+@pytest.mark.parametrize("which", ["industry_benchmark", "market_benchmark"])
+def test_adapter_non_finite_benchmark_is_rejected_even_without_company_history(db, which):
+    session, _, other_id = db  # no market rows stored: the engine's early-return path
+    benchmark = [{"jalali_date": jd(i), "close": float(i + 1), "adjusted_close": float("inf")} for i in range(5)]
+    with pytest.raises(ValueError, match="Non-finite numeric value"):
+        analyze_market_as_of_jalali(session, other_id, AS_OF, **{which: benchmark})
+
+
+def test_adapter_zero_and_missing_volume_and_value_remain_valid_observations(db, monkeypatch):
+    session, company_id, _ = db
+    _use_history(monkeypatch, _history(company_id, volume=0, value=Decimal("0")))
+    zero = analyze_market_as_of_jalali(session, company_id, jd(2))
+    assert zero.market_data_quality == "VALID"
+
+    _use_history(monkeypatch, _history(company_id, volume=None, value=None))
+    missing = analyze_market_as_of_jalali(session, company_id, jd(2))
+    assert missing.market_data_quality == "VALID"

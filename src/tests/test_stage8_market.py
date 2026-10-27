@@ -1,5 +1,6 @@
 import inspect
 from dataclasses import replace
+from decimal import Decimal
 from datetime import datetime, timezone
 from typing import get_type_hints
 
@@ -739,56 +740,379 @@ def test_market_regime_preserves_behavior_when_both_prices_are_missing():
     # Too few usable prices stays INSUFFICIENT_DATA.
     short = benchmark_rows([100.0] * 20)
     assert MarketEngine._market_regime(short, jd(19)) == "INSUFFICIENT_DATA"
-    
-def test_stage8_non_finite_primary_prices():
-    non_finite_inputs = [float('nan'), float('inf'), float('-inf'), "NaN", "inf", "-inf", "+inf"]
-    for val in non_finite_inputs:
-        with pytest.raises(ValueError):
-            _price(val)
-
-def test_stage8_non_finite_optional_volume_value():
-    non_finite_inputs = [float('nan'), float('inf'), float('-inf'), "NaN", "inf"]
-    for val in non_finite_inputs:
-        with pytest.raises(ValueError):
-            _number(val)
-
-def test_stage8_finite_and_zero_preserved():
-    # Ordinary finite values and genuine zeros must be accepted
-    assert _number(0) == 0.0
-    assert _number(0.0) == 0.0
-    assert _number(100.5) == 100.5
-    assert _price(10.0) == 10.0
-    assert _number(None) is None
 
 
-def test_analyze_market_rejects_non_finite_prices():
-    engine = MarketEngine()
-    invalid_rows = [{"date": (1403, 1, 1), "close": float('nan'), "volume": 1000}]
-    with pytest.raises(ValueError):
-        engine.analyze_market("TEST", (1403, 1, 1), invalid_rows)
+# --- P74: shared finite-number validation -----------------------------------
+#
+# Every ``pytest.raises`` below pins the numeric-validation message of the shared
+# ``schema._number`` / ``schema._price`` helpers. Dates are valid Jalali tuples,
+# ``AS_OF`` is a valid Jalali as-of date, and the benchmark kwargs are the real
+# ``analyze_market`` keyword arguments, so a date/argument/setup error cannot
+# satisfy these assertions.
 
-def test_analyze_market_rejects_non_finite_volume_value():
-    engine = MarketEngine()
-    invalid_rows = [{"date": (1403, 1, 1), "close": 100.0, "volume": float('inf'), "value": float('nan')}]
-    with pytest.raises(ValueError):
-        engine.analyze_market("TEST", (1403, 1, 1), invalid_rows)
+NON_FINITE_FLOATS = [float("nan"), float("inf"), float("-inf")]
+NON_FINITE_STRINGS = ["NaN", "nan", "inf", "+inf", "-inf", "Infinity", "-Infinity", " nan "]
+NON_FINITE_DECIMALS = [Decimal("NaN"), Decimal("Infinity"), Decimal("-Infinity")]
+NON_FINITE = NON_FINITE_FLOATS + NON_FINITE_STRINGS + NON_FINITE_DECIMALS
 
-def test_analyze_market_rejects_non_finite_benchmark():
-    engine = MarketEngine()
-    rows = [{"date": (1403, 1, 1), "close": 100, "volume": 1000}]
-    invalid_benchmark = [{"date": (1403, 1, 1), "close": float('inf')}]
-    with pytest.raises(ValueError):
-        try:
-            engine.analyze_market("TEST", (1403, 1, 1), rows, industry_benchmark=invalid_benchmark)
-        except TypeError:
-            engine.analyze_market("TEST", (1403, 1, 1), rows, market_benchmark=invalid_benchmark)
+NON_FINITE_MATCH = "Non-finite numeric value"
+NON_POSITIVE_MATCH = "positive finite"
+INVALID_MATCH = "Invalid numeric value"
 
-    
-def test_analyze_market_finite_and_zero_controls():
-    engine = MarketEngine()
-    rows = [
-        {"jalali_date": (1403, 1, 1), "close": 100.0, "volume": 0},
-        {"jalali_date": (1403, 1, 2), "close": 105.5, "volume": 5000}
+BENCHMARKS = ["industry_benchmark", "market_benchmark"]
+PRICE_FIELDS = ["close", "adjusted_close"]
+
+
+def valid_rows(size=259):
+    return rows([float(p) for p in range(1, size + 1)])
+
+
+def with_bad_price(data, field_name, bad, position=-1):
+    """Make ``field_name`` of one row ``bad`` so that it is the price the engine consumes.
+
+    For ``close`` the row's ``adjusted_close`` is ``None`` (the close fallback is
+    what the engine reads). For ``adjusted_close`` the row keeps a valid ``close``,
+    which proves an invalid adjusted close is rejected and does not fall back.
+    """
+    data = [dict(r) for r in data]
+    if field_name == "close":
+        data[position] = dict(data[position], adjusted_close=None, close=bad)
+    else:
+        data[position] = dict(data[position], adjusted_close=bad)
+    return data
+
+
+def with_missing_price(data):
+    data = [dict(r) for r in data]
+    data[-1] = dict(data[-1], close=None, adjusted_close=None)
+    return data
+
+
+POISON_ROW = {
+    "jalali_date": FUTURE,
+    "close": float("nan"),
+    "adjusted_close": float("nan"),
+    "volume": float("inf"),
+    "value": float("nan"),
+}
+
+# Primary series that make ``analyze_market`` take (or approach) its
+# insufficient-data path. ``EARLY_RETURN`` ones return before any indicator.
+EARLY_RETURN_PRIMARY = {
+    "empty": lambda: [],
+    "all_after_as_of": lambda: rows(list(range(1, 30)), start_index=400),
+    "missing_last_price": lambda: with_missing_price(valid_rows(30)),
+}
+INSUFFICIENT_PRIMARY = dict(EARLY_RETURN_PRIMARY, short_series=lambda: valid_rows(3))
+
+
+# ---- Shared validators (src.market.schema) ----------------------------------
+
+
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+def test_shared_number_and_price_reject_non_finite_values(bad):
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        _number(bad)
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        _price(bad)
+
+
+@pytest.mark.parametrize("bad", [0, 0.0, -1, -0.5, "0", "-5", Decimal("0")], ids=repr)
+def test_shared_price_rejects_zero_and_negative_values(bad):
+    with pytest.raises(ValueError, match=NON_POSITIVE_MATCH):
+        _price(bad)
+
+
+@pytest.mark.parametrize("bad", ["abc", "", "1,000", [1.0], {}], ids=repr)
+def test_shared_number_and_price_reject_non_numeric_values(bad):
+    with pytest.raises(ValueError, match=INVALID_MATCH):
+        _number(bad)
+    with pytest.raises(ValueError, match=INVALID_MATCH):
+        _price(bad)
+
+
+def test_shared_validators_keep_none_zero_and_finite_values():
+    assert _number(None) is None  # missing stays missing
+    for zero in (0, 0.0, "0", Decimal("0")):
+        value = _number(zero)
+        assert value == 0.0 and isinstance(value, float)  # genuine zero is a valid observation
+    for finite in (100.5, "100.5", Decimal("100.5")):
+        assert _number(finite) == 100.5
+        assert _price(finite) == 100.5
+    assert _price(10) == 10.0
+    # The shared price validator has no "missing" notion: the engine adapter
+    # (``MarketEngine._price``) decides missing before calling it.
+    with pytest.raises(ValueError, match=NON_POSITIVE_MATCH):
+        _price(None)
+
+
+# ---- Primary prices ----------------------------------------------------------
+
+
+@pytest.mark.parametrize("position", [-1, 0])
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+@pytest.mark.parametrize("field_name", PRICE_FIELDS)
+def test_primary_non_finite_price_is_rejected_anywhere_in_the_series(field_name, bad, position):
+    data = with_bad_price(valid_rows(), field_name, bad, position)
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data)
+
+
+@pytest.mark.parametrize("size", [1, 3, 20])
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+@pytest.mark.parametrize("field_name", PRICE_FIELDS)
+def test_primary_non_finite_price_is_rejected_when_data_is_insufficient(field_name, bad, size):
+    # Too short for the long indicator windows; validation must still run.
+    data = with_bad_price(valid_rows(size), field_name, bad)
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data)
+
+
+@pytest.mark.parametrize("bad", [0, 0.0, -1.0, "0", "-2.5"], ids=repr)
+@pytest.mark.parametrize("field_name", PRICE_FIELDS)
+def test_primary_zero_and_negative_prices_are_rejected(field_name, bad):
+    # A zero adjusted_close is "supplied", so it is rejected, not replaced by close.
+    data = with_bad_price(valid_rows(), field_name, bad)
+    with pytest.raises(ValueError, match=NON_POSITIVE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data)
+
+
+@pytest.mark.parametrize("bad", ["abc", "", [1.0]], ids=repr)
+@pytest.mark.parametrize("field_name", PRICE_FIELDS)
+def test_primary_non_numeric_prices_are_rejected(field_name, bad):
+    data = with_bad_price(valid_rows(), field_name, bad)
+    with pytest.raises(ValueError, match=INVALID_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data)
+
+
+def test_close_is_not_consumed_when_adjusted_close_is_present():
+    # Real contract: ``close`` is read only when ``adjusted_close`` is None.
+    baseline = MarketEngine().analyze_market(1, AS_OF, valid_rows())
+    data = valid_rows()
+    data[-1] = dict(data[-1], close=float("nan"))  # adjusted_close stays valid
+    result = MarketEngine().analyze_market(1, AS_OF, data)
+    assert without_timestamp(result) == without_timestamp(baseline)
+    assert result.metadata["price_basis"] == "ADJUSTED_CLOSE"
+
+
+def test_missing_price_is_missing_not_invalid():
+    result = MarketEngine().analyze_market(1, AS_OF, with_missing_price(valid_rows()))
+    assert result.market_data_quality == "INSUFFICIENT_DATA"  # None: no error, no zero-fill
+    assert result.indicators.returns == {}
+
+    for bad in NON_FINITE_FLOATS:
+        invalid = with_bad_price(valid_rows(), "close", bad)  # same row, invalid instead of missing
+        with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+            MarketEngine().analyze_market(1, AS_OF, invalid)
+
+
+def test_adjusted_close_fallback_to_valid_close_is_unchanged_by_validation():
+    data = valid_rows()
+    data[-1] = dict(data[-1], adjusted_close=None)
+    result = MarketEngine().analyze_market(1, AS_OF, data)
+    assert result.metadata["price_basis"] == "CLOSE_FALLBACK"
+    assert result.indicators.returns["20D"] == (259 / 239 - 1)
+
+
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+def test_legacy_analyze_market_signals_rejects_non_finite_close(bad):
+    closes = [(jd(i), float(i + 1)) for i in range(30)]
+    closes[-1] = (jd(29), bad)
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market_signals(1, AS_OF, closes)
+
+
+# ---- Volume and trading value (independent of each other) -------------------
+
+
+@pytest.mark.parametrize("position", [-1, 0])
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+@pytest.mark.parametrize("field_name", ["volume", "value"])
+def test_non_finite_volume_or_value_is_rejected_independently(field_name, bad, position):
+    # Only ``field_name`` is invalid; the other field and every price are valid.
+    # Position 0 lies outside every indicator window: the whole series is validated.
+    data = full_rows()
+    data[position] = dict(data[position], **{field_name: bad})
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data)
+
+
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+@pytest.mark.parametrize("field_name", ["volume", "value"])
+def test_non_finite_volume_or_value_is_rejected_when_data_is_insufficient(field_name, bad):
+    data = valid_rows(3)
+    data[1] = dict(data[1], **{field_name: bad})
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data)
+
+
+@pytest.mark.parametrize("field_name", ["volume", "value"])
+def test_volume_and_value_are_validated_before_the_missing_price_early_return(field_name):
+    data = with_missing_price(valid_rows(5))  # would return INSUFFICIENT_DATA...
+    data[0] = dict(data[0], **{field_name: float("inf")})  # ...but this row is invalid
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data)
+
+
+@pytest.mark.parametrize("bad", ["abc", "", [1.0]], ids=repr)
+@pytest.mark.parametrize("field_name", ["volume", "value"])
+def test_non_numeric_volume_or_value_is_rejected_not_silently_missing(field_name, bad):
+    data = full_rows()
+    data[-1] = dict(data[-1], **{field_name: bad})
+    with pytest.raises(ValueError, match=INVALID_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data)
+
+
+@pytest.mark.parametrize("field_name", ["volume", "value"])
+def test_none_volume_or_value_stays_missing_while_non_finite_is_rejected(field_name):
+    average = {"volume": "average_volume_20d", "value": "average_trading_value_20d"}[field_name]
+    missing = MarketEngine().analyze_market(1, AS_OF, with_missing(full_rows(), field_name, [-1]))
+    assert missing.market_data_quality == "VALID"
+    assert getattr(missing.indicators, average) is None  # missing, not 0.0 and not an error
+
+    invalid = full_rows()
+    invalid[-1] = dict(invalid[-1], **{field_name: float("nan")})  # same row, invalid instead
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, invalid)
+
+
+@pytest.mark.parametrize("zero", [0, 0.0, "0", Decimal("0")], ids=repr)
+@pytest.mark.parametrize("field_name", ["volume", "value"])
+def test_genuine_zero_volume_or_value_is_a_valid_observation(field_name, zero):
+    average = {"volume": "average_volume_20d", "value": "average_trading_value_20d"}[field_name]
+    result = MarketEngine().analyze_market(1, AS_OF, rows(list(range(1, 260)), **{field_name: zero}))
+    assert result.market_data_quality == "VALID"
+    assert getattr(result.indicators, average) == 0.0  # a real zero, not None
+
+
+@pytest.mark.parametrize(
+    "convert",
+    [str, lambda x: Decimal(str(x)), int],
+    ids=["numeric-string", "decimal", "int"],
+)
+def test_finite_numeric_strings_decimals_and_ints_are_converted_not_rejected(convert):
+    # Decimal is what the database adapter hands to the engine.
+    converted = [
+        {
+            "jalali_date": jd(i),
+            "close": convert(float(i + 1)),
+            "adjusted_close": convert(float(i + 1)),
+            "volume": convert(1000.0),
+            "value": convert(100000.0),
+        }
+        for i in range(259)
     ]
-    result = engine.analyze_market("TEST", (1403, 1, 2), rows)
-    assert result is not None
+    baseline = MarketEngine().analyze_market(1, AS_OF, rows(list(range(1, 260))))
+    result = MarketEngine().analyze_market(1, AS_OF, converted)
+    assert without_timestamp(result) == without_timestamp(baseline)
+
+
+# ---- Industry and market benchmark prices (independent of each other) -------
+
+
+@pytest.mark.parametrize("position", [-1, 0])
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+@pytest.mark.parametrize("field_name", PRICE_FIELDS)
+@pytest.mark.parametrize("which", BENCHMARKS)
+def test_non_finite_benchmark_price_is_rejected_independently(which, field_name, bad, position):
+    other = next(name for name in BENCHMARKS if name != which)
+    kwargs = {
+        which: with_bad_price(valid_rows(), field_name, bad, position),
+        other: valid_rows(),  # the other benchmark is valid
+    }
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, valid_rows(), **kwargs)
+    # And with the invalid benchmark as the only benchmark supplied.
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(
+            1, AS_OF, valid_rows(), **{which: with_bad_price(valid_rows(), field_name, bad, position)}
+        )
+
+
+@pytest.mark.parametrize("primary_name", list(INSUFFICIENT_PRIMARY))
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+@pytest.mark.parametrize("which", BENCHMARKS)
+def test_non_finite_benchmark_is_rejected_even_when_primary_data_is_insufficient(which, bad, primary_name):
+    primary = INSUFFICIENT_PRIMARY[primary_name]()
+    # A 5-row benchmark is also too short for any benchmark calculation.
+    benchmark = with_bad_price(valid_rows(5), "adjusted_close", bad)
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, primary, **{which: benchmark})
+
+
+@pytest.mark.parametrize("primary_name", list(EARLY_RETURN_PRIMARY))
+@pytest.mark.parametrize("which", BENCHMARKS)
+def test_valid_benchmark_with_insufficient_primary_data_does_not_raise(which, primary_name):
+    # Control for the test above: these primaries really take the early return.
+    primary = EARLY_RETURN_PRIMARY[primary_name]()
+    result = MarketEngine().analyze_market(1, AS_OF, primary, **{which: valid_rows(5)})
+    assert result.market_data_quality == "INSUFFICIENT_DATA"
+
+
+@pytest.mark.parametrize("bad", [0, 0.0, -1.0, "0", "-2.5"], ids=repr)
+@pytest.mark.parametrize("field_name", PRICE_FIELDS)
+@pytest.mark.parametrize("which", BENCHMARKS)
+def test_zero_and_negative_benchmark_prices_are_rejected(which, field_name, bad):
+    benchmark = with_bad_price(valid_rows(30), field_name, bad)
+    with pytest.raises(ValueError, match=NON_POSITIVE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, valid_rows(), **{which: benchmark})
+
+
+@pytest.mark.parametrize("which", BENCHMARKS)
+def test_non_numeric_benchmark_price_is_rejected(which):
+    benchmark = with_bad_price(valid_rows(30), "adjusted_close", "abc")
+    with pytest.raises(ValueError, match=INVALID_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, valid_rows(), **{which: benchmark})
+
+
+@pytest.mark.parametrize("size", [3, 259])
+@pytest.mark.parametrize("bad", NON_FINITE, ids=repr)
+@pytest.mark.parametrize("field_name", PRICE_FIELDS)
+def test_regime_and_relative_strength_cannot_consume_non_finite_benchmark_prices(field_name, bad, size):
+    # Called directly, bypassing analyze_market's up-front benchmark validation.
+    benchmark = with_bad_price(valid_rows(size), field_name, bad)
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine._market_regime(benchmark, AS_OF)
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine()._relative_strength({"20D": 0.10}, benchmark, AS_OF)
+
+
+@pytest.mark.parametrize("which", BENCHMARKS)
+def test_benchmark_none_prices_are_missing_not_invalid(which):
+    benchmark = with_missing_price(valid_rows(30))
+    result = MarketEngine().analyze_market(1, AS_OF, valid_rows(), **{which: benchmark})
+    assert result.market_data_quality == "VALID"
+    relative_strength = {
+        "industry_benchmark": result.relative_strength_industry,
+        "market_benchmark": result.relative_strength_market,
+    }[which]
+    assert relative_strength == "INSUFFICIENT_DATA"  # missing latest price: unknown, not zero
+    # Same row with an invalid number instead of None is rejected.
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(
+            1, AS_OF, valid_rows(), **{which: with_bad_price(valid_rows(30), "close", float("nan"))}
+        )
+
+
+# ---- Point-in-time scope of the validation -----------------------------------
+
+
+@pytest.mark.parametrize("poisoned", ["primary"] + BENCHMARKS)
+def test_non_finite_rows_after_the_as_of_cutoff_are_not_consumed(poisoned):
+    baseline = MarketEngine().analyze_market(
+        1, AS_OF, valid_rows(), industry_benchmark=valid_rows(), market_benchmark=valid_rows()
+    )
+    series = {"primary": valid_rows(), **{name: valid_rows() for name in BENCHMARKS}}
+    series[poisoned] = series[poisoned] + [dict(POISON_ROW)]
+    result = MarketEngine().analyze_market(
+        1, AS_OF, series["primary"],
+        industry_benchmark=series["industry_benchmark"],
+        market_benchmark=series["market_benchmark"],
+    )
+    assert without_timestamp(result) == without_timestamp(baseline)
+
+
+def test_non_finite_future_primary_row_is_validated_when_point_in_time_is_disabled():
+    data = valid_rows() + [dict(POISON_ROW)]
+    with pytest.raises(ValueError, match=NON_FINITE_MATCH):
+        MarketEngine().analyze_market(1, AS_OF, data, point_in_time=False)

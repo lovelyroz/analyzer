@@ -42,7 +42,10 @@ from src.market.parameters import (
     VOLATILITY_LOW_RATIO,
     VOLATILITY_WINDOWS,
 )
-from src.market.schema import MarketSignalResult, TechnicalIndicatorsResult, _number, _price
+# Shared numeric validation. ``_price`` is imported under an alias because
+# ``MarketEngine._price(row)`` below is only a row adapter around it.
+from src.market.schema import MarketSignalResult, TechnicalIndicatorsResult, _number
+from src.market.schema import _price as _validate_price
 
 
 class MarketEngine:
@@ -63,15 +66,23 @@ class MarketEngine:
         # insufficient. No Gregorian datetime is built from Jalali components.
         as_of_date = validate_jalali_date(as_of_date, label="as_of_date")
         rows = self._prepare_rows(market_data, as_of_date, point_in_time, label="market_data")
+        # Benchmark prices are validated numerically here as well, before the
+        # insufficient-primary-data early return below can skip them. Only rows
+        # inside the as-of cutoff are consumed (and so validated); ``_price``
+        # raises ValueError for NaN/inf/non-numeric/non-positive prices.
         for series, label in (
             (industry_benchmark, "industry_benchmark"),
             (market_benchmark, "market_benchmark"),
         ):
             if series:
-                self._prepare_rows(series, as_of_date, True, label=label)
+                for benchmark_row in self._prepare_rows(series, as_of_date, True, label=label):
+                    self._price(benchmark_row)
+        # Primary prices, volume and trading value go through the shared
+        # validators (schema ``_price`` / ``_number``). ``None`` stays missing,
+        # a genuine 0 stays 0, anything non-finite raises ValueError.
         prices = [self._price(row) for row in rows]
-        volumes = [self._number(row.get("volume")) for row in rows]
-        values = [self._number(row.get("value")) for row in rows]
+        volumes = [_number(row.get("volume")) for row in rows]
+        values = [_number(row.get("value")) for row in rows]
         if not rows or any(price is None for price in prices):
             return MarketSignalResult(
                 company_id=company_id,
@@ -268,17 +279,19 @@ class MarketEngine:
 
     @staticmethod
     def _price(row: Dict[str, Any]) -> Optional[float]:
+        """Row adapter: ``adjusted_close`` unless it is ``None``, else ``close``.
+
+        Both missing -> ``None`` (missing price, existing contract). A supplied
+        value is validated by the shared ``schema._price``: it must be a finite
+        number greater than zero, otherwise ``ValueError``. A supplied but
+        invalid ``adjusted_close`` is rejected; it does not fall back to ``close``.
+        """
         value = row.get("adjusted_close")
         if value is None:
             value = row.get("close")
-        return float(value) if value is not None else None
-
-    @staticmethod
-    def _number(value: Any) -> Optional[float]:
-        try:
-            return float(value) if value is not None else None
-        except (TypeError, ValueError):
+        if value is None:
             return None
+        return _validate_price(value)
 
     @staticmethod
     def _complete_window(values: Sequence[Optional[float]], size: int) -> Optional[List[float]]:
@@ -479,8 +492,9 @@ class MarketEngine:
         if not benchmark:
             return "INSUFFICIENT_DATA"
         rows = MarketEngine._prepare_rows(benchmark, as_of_date, True, label="market_benchmark")
-        # Same fallback as ``_price``: adjusted_close unless it is None, then close.
-        # Rows with neither price are skipped, as before.
+        # Same fallback and the same shared validation as ``_price`` (non-finite or
+        # non-positive supplied prices raise ValueError). Rows with neither price
+        # are skipped, as before.
         prices = [p for p in (MarketEngine._price(r) for r in rows) if p is not None]
         r20 = cumulative_return(prices, RETURN_HORIZONS["20D"])
         if r20 is None:

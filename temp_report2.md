@@ -4535,3 +4535,43 @@ pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py
 
 * **Ambiguity Handled**: Where the contract was ambiguous on whether non-finite optional inputs should be ignored or raise an error, the stricter fail-closed approach (`ValueError`) was adopted to prevent invalid data from propagating or being silently coerced to zero.
 * **Test Execution Status**: **Explicitly stated that tests were not executed by the agent.** All test execution and verification are left for the project owner in the local environment.
+
+# P74 - Stage 8 numeric validation (consolidated, evidence-based)
+
+Supersedes every earlier "P74 - Resume" / "P74 Correction" / "P74 Final Correction" statement. Those claimed the engine already used the shared validators; the repository inspected for this pass did not: `MarketEngine` still defined its own `_price` (plain `float()`) and `_number` (swallowing every error into `None`), and the P74 tests passed or failed for unrelated reasons (Gregorian `"date"` key, `TypeError`-retry on benchmark argument, direct calls to the schema helpers only).
+
+## Findings from inspection
+- `src/market/schema.py` already contains the finite-value validators `_number` / `_price`. Unchanged in this pass.
+- `src/market/engine.py` imported them but never used them: the class staticmethods `_price` / `_number` shadowed the intent. `_number` returned `None` for any unparsable value; `_price` accepted NaN/inf/zero/negative.
+- Benchmarks had only their dates validated up front; prices were first read inside `_relative_strength` / `_market_regime`, after the insufficient-primary early return could already have exited.
+- `src/market/service.py` copies `MarketHistoryObservation` attributes into engine rows verbatim (no filtering, conversion, or zero-fill). Values are not validated there; validation happens in the engine.
+
+## Source change (`src/market/engine.py` only)
+1. Shared validators are now the only numeric validation: `_number` is imported and used directly for `volume` and `value`; schema `_price` is imported as `_validate_price`.
+2. `MarketEngine._price(row)` stays a row adapter: `adjusted_close` unless `None`, else `close`; both `None` -> `None` (missing, unchanged); otherwise `_validate_price(value)`. A supplied but invalid `adjusted_close` is rejected, it does not fall back to `close`.
+3. `MarketEngine._number` (unvalidated duplicate) removed.
+4. `analyze_market` validates the prices of every in-cutoff industry/market benchmark row right after date preparation, i.e. before the insufficient-data early return. `_relative_strength` and `_market_regime` read prices through the same `_price(row)` adapter, so they cannot consume non-finite values even when called directly.
+
+No formulas, thresholds, windows, point-in-time filtering, Jalali contract, or P73 missing-data/fallback logic changed.
+
+## Behavior changes to be aware of
+- Zero, negative and non-numeric supplied prices now raise `ValueError` (shared price contract).
+- Non-numeric volume/value (for example `"abc"`) previously became `None` silently; it now raises `ValueError`. `None` is still missing and `0` is still a valid observation.
+
+## Real contract (not claimed beyond this)
+- `open`, `high`, `low`, `trade_count` are not consumed by the engine and are NOT validated.
+- Benchmark `volume`/`value` are not consumed and are not validated.
+- `close` is validated only when it is the consumed price (`adjusted_close` is `None`).
+- Rows after the as-of cutoff are not consumed, so they are not validated (unless `point_in_time=False`).
+- Legacy `analyze_market_signals`: closes are validated through the engine; `individual_buy_vol` / `individual_sell_vol` are only compared and are not validated; `close_price_today` is unused.
+- Negative volume/value is not rejected (the shared `_number` has no such rule).
+
+## Tests
+`src/tests/test_stage8_market.py`: the 8 old P74 tests were replaced by 28 test functions (parametrized). All use `jalali_date` tuples, a valid Jalali `AS_OF`, and the real `industry_benchmark=` / `market_benchmark=` keywords; each `pytest.raises` pins the numeric-validation message. `src/tests/test_stage8_market_service.py`: 5 adapter-boundary test functions. Details are in `reply.md`.
+
+## Verification status
+No test, application, database or Git command was run by the assistant, and no execution result for these changes has been supplied. Earlier pasted pytest outputs belonged to earlier, different code and were removed. The only check performed was `ast.parse` syntax parsing of the edited files.
+
+Not verified: whether the database/model layer can store or return NaN/inf (`src/models/market.py`, `src/ingestion/market/queries.py`, `src/market/parameters.py` and `src/core/jalali.py` were not in the supplied archive). The service tests monkeypatch the query result with `MarketHistoryObservation` objects, as existing service tests do.
+
+Artifacts: `P74.diff` (`diff -u`, no Git; engine + both test files), `reply.md`.
