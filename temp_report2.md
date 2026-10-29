@@ -4502,3 +4502,43 @@ pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py s
 pytest src/tests/test_stage8_market.py -k "non_finite or zero_and_negative or non_numeric or insufficient" 
 ```
 Review the change with `P74.diff` (unified diff produced with `diff -u`, not Git).
+
+---
+
+# Consolidated carry-forward summary — `reply.md` (Prompt 1-A through Prompt 1-D and later carry-forward notes)
+
+**Purpose:** Preserve durable findings from the temporary `reply.md` report before clearing it. This is a summary of recorded reports, not a fresh source-code audit. Historical claims and test counts below retain the scope and limitations of their original reports.
+
+## 1. Completed audit/documentation tasks
+
+The evidence-audit and documentation-alignment work represented by **S7-T001–S7-T006** is complete as audit/documentation work. Their completion does **not** mean that the underlying architecture gaps or owner decisions are resolved.
+
+- **Production path:** Stage services and internal service-to-service calls exist, including the Stage 7 valuation service and Stage 9 decision service. The reports did not establish a real production entrypoint/orchestrator that owns the database session and runs the full Stage 3/5/7/8/9 path. Therefore end-to-end production integration remains unproven.
+- **Stage 9 persistence:** The reports found no verified ORM/table/repository/session-write path for persisting `FinalDecisionResult`. Whether persistence is required and what its contract should be remain product/architecture decisions; do not invent a persistence model.
+- **D9 parameter versioning:** The registry/selection mechanism and actual parameter consumption are present. When a dated parameter version is requested but none is registered, selection fails closed with `LookupError`; the undated genesis/legacy path is not proof of historical point-in-time selection. Approved dated versions/effective dates and values have not been supplied.
+- **PIT and provenance:** Forecast references are checked against cutoff constraints, and market-price selection uses Jalali as-of dates. The available MarketDaily contract does not establish publication/availability time. Historical/industry P/E benchmark series are supplied as numeric sequences without per-observation timestamps/provenance, so Stage 7 cannot independently prove their PIT correctness from those inputs alone. A cutoff date alone does not establish complete PIT correctness.
+- **Alert/driver contracts:** D1–D5 remain deliberately deferred until their financial definitions and thresholds are approved. D6 currently covers EPS and TARGET_PE only; sector-specific driver chains (including bank NII and holding NAV/P-NAV) are not established. D7 remains limited by temporal provenance. D8 alert names and consumer behavior were audited, but emitted alert strings are not all consumed identically downstream. Do not label deferred behavior as implemented or passed.
+- **No unsupported financial policy:** Do not invent formulas, thresholds, industry mappings, dated parameter values, market publication timestamps, benchmark provenance, an entrypoint, or a Stage 9 persistence target.
+
+## 2. Owner decisions / evidence still needed
+
+1. Decide whether historical parameter selection is required; if yes, approve the D9/R8 policy and real dated parameter records. If not, explicitly accept the legacy-only behavior for the intended use.
+2. Decide the required PIT/provenance contract for benchmark P/E observations and who supplies the evidence.
+3. Decide whether market data needs an availability/publication timestamp beyond its Jalali trading date.
+4. Decide whether a production entrypoint/orchestrator is in scope and identify the real input sources/session lifecycle.
+5. Decide whether Stage 9 persistence is a product requirement and, only then, approve its contract.
+
+## 3. Test evidence and its limits
+
+The working notes record user-provided results of **772 passed** for:
+`pytest src/tests/test_stage8_market.py src/tests/test_stage8_market_service.py src/tests/test_stage8_market_parameters.py`
+and **603 passed, 109 deselected** for:
+`pytest src/tests/test_stage8_market.py -k "non_finite or zero_and_negative or non_numeric or insufficient"`
+
+These are results for the named Stage 8 market test commands only. They do not prove that the whole project test suite passed, that Stage 7 is complete, or that a real Stage 7-to-Stage 9 end-to-end path exists. Do not represent them as fresh test runs during this documentation cleanup.
+
+## 4. Scope and disposition
+
+The Prompt 1-A through 1-D reports describe audits and documentation alignment; no new source-code or test changes were authorized by those audit tasks. Older reports in `reply.md` include historical/overlapping claims, including reports later corrected or superseded. This summary intentionally preserves only the durable findings and current blockers; the detailed historical report is being cleared from `reply.md` after this carry-forward.
+
+**Current Stage 7 status: OPEN.** Completed audits should not be repeated absent new source changes, contradictory evidence, or a specific regression. Remaining work is limited to the active tasks in `tasksToDo.md` and the current roadmap in `stepsForStage7.md`.
