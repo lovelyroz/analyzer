@@ -1,95 +1,106 @@
-# Prompt 1-A — Complete the Existing Stage 7 Audit
+# Prompt 1-B — Evidence Gaps in the Existing Stage 7 Audit
 
-**TASK TYPE: AUDIT ONLY + LIMITED REPORT CORRECTIONS**
+**Prompt ID:** Prompt 1-B  
+**Parent Prompt:** Prompt 1  
+**Task IDs:** S7-T001, S7-T002, S7-T003, S7-T004, S7-T005  
+**Task type:** AUDIT ONLY + SUPPLEMENTAL REPORT CORRECTION
 
-This is a supplemental correction to the existing main Prompt 1. Do not treat it as a new main prompt number.
+## Objective
 
-Use Sources for this Prompt
+Continue the existing Prompt 1 audit. Do not restart the audit or repeat findings that are already adequately evidenced in `reply.md`.
 
-## Task IDs
+Close only the evidence gaps listed below. Update `reply.md` with a clearly labelled `Prompt 1-B Supplemental Audit` section. Preserve previous reports as historical records.
 
-- S7-T001 — Verify the real production execution path
-- S7-T002 — Verify Stage 9 persistence
-- S7-T003 — Verify D9 and actual consumption of versioned parameters
-- S7-T004 — Verify PIT, provenance, and input contracts
-- S7-T005 — Verify alert contracts and decisions D1–D8
+## Required reading — before inspecting code
 
-Read `stepsForStage7.md` first. Follow their current instructions.
+3. `stepsForStage7.md`
+4. `reply.md`, including the Prompt 1-A report and earlier findings
+5. `PROMPT.md`
+6. `07_Stage7_Valuation.md`
 
+Use the current task register and authoritative Stage 7 specifications. Do not infer that a previous report is correct merely because it exists.
 
-## Required work
+## Required source and test inspection
 
-### 1. Verify S7-T001 — Production execution path
+Inspect the existing files relevant to each finding, including:
 
-Inspect the actual source and identify confirmed callers and entrypoints.
+- **T001 — Production execution path:** `src/scoring/`, `src/forecast/`, `src/valuation/service.py`, `src/market/service.py`, `src/decision/service.py`, and the actual application entrypoints, callers, dependency wiring and session lifecycle files discovered in the repository.
+- **T002 — Stage 9 persistence:** `src/decision/schema.py`, `src/decision/engine.py`, `src/decision/service.py`, `src/core/database.py`, and all relevant SQLAlchemy model, table, repository and persistence modules discovered in the repository.
+- **T003 — D9:** `src/valuation/parameters.py`, `src/valuation/service.py`, the relevant sections of `src/valuation/engine.py`, and direct Stage 7 parameter-selection and consumption tests.
+- **T004 — PIT and provenance:** Stage 5/7 specifications, `src/forecast/queries.py`, `src/forecast/schema.py`, `src/valuation/schema.py`, `src/valuation/service.py`, `src/valuation/engine.py`, `src/market/service.py`, `src/market/schema.py`, `src/ingestion/market/queries.py`, and relevant direct tests.
+- **T005 — D1–D8:** `stepsForStage7.md`, `07_Stage7_Valuation.md`, `src/valuation/engine.py`, `src/valuation/parameters.py`, relevant schemas, tests, and actual consumers of alert/driver outputs.
 
-Distinguish:
-- a function or service that exists;
-- a caller that invokes it;
-- a complete production execution path;
-- a link that remains unverified.
+Follow actual references and imports to identify additional relevant files. Do not claim a repository-wide absence based only on the initial file list. In the report, enumerate the additional files actually inspected and identify the evidence supporting each conclusion.
 
-Do not claim that an entrypoint or caller is absent based only on a limited file list or a previous report. Identify the files and search scope supporting any absence claim.
+## Required corrections
 
-### 2. Verify S7-T002 — Stage 9 persistence
+### S7-T001
+Establish the actual call chain using file and function names. Separate:
+- an existing service;
+- an internal service-to-service call;
+- an actual production caller;
+- a complete end-to-end path, including session ownership and upstream inputs.
 
-Inspect existing SQLAlchemy models, database table definitions, repositories, and relevant schema code.
+If no production entrypoint or caller is found, document the search scope and inspected evidence. State “not found in the inspected scope” unless the evidence genuinely supports a broader conclusion. Do not design or implement an entrypoint.
 
-Determine whether `FinalDecisionResult` is persisted, partially persisted, or not persisted. A schema or dataclass alone does not prove database persistence. Conversely, inspecting only `src/decision/schema.py` and `src/core/database.py` does not prove project-wide absence.
+### S7-T002
+Determine whether Stage 9 persistence is absent, partial or present. Inspect the relevant model/table/repository/persistence code before deciding. Distinguish result schemas and dataclasses from persisted records.
 
-Do not implement persistence.
+List the relevant persistence files actually inspected. If the evidence cannot establish repository-wide absence, explicitly mark the finding unverified rather than asserting that persistence does not exist.
 
-### 3. Verify S7-T003 — D9 parameter selection and consumption
+Do not design or implement persistence.
 
-Trace parameter selection through the valuation service into the actual calculation.
+### S7-T003
+Trace the selected parameter set from date-based resolution into the actual valuation calculations. Identify which calculations consume resolved parameters, which metadata is merely recorded, and what happens when no valid dated version exists.
 
-Determine whether the selected parameter set is actually consumed by the calculation or merely recorded in metadata. Verify the current behavior when a dated parameter selection has no eligible version.
+List the direct tests inspected and what each test establishes. Do not invent an effective date, parameter value, fallback or owner approval.
 
-Do not add a guessed effective date or change the existing policy. Keep D9 unresolved wherever approved policy or valid historical parameter evidence is missing.
+### S7-T004
+Create a concise evidence matrix covering at least:
+- market price and historical observations;
+- forecast inputs and their availability/publication provenance;
+- historical and industry benchmark series;
+- market signals and other Stage 7 inputs;
+- the resulting valuation/decision outputs and their provenance.
 
-### 4. Verify S7-T004 — PIT and provenance
+For each category, state the available temporal fields, validation performed, evidence source and remaining limitation. Distinguish data cutoff, report date, publication time and actual availability time. Do not claim PIT correctness solely because a cutoff parameter exists.
 
-Trace the actual date and provenance information available for:
-- market prices;
-- Stage 5 forecast inputs;
-- benchmark series;
-- market signals;
-- valuation and decision outputs.
+### S7-T005
+Cover **every decision D1–D8 individually**. For each, record:
+- the governing policy/specification;
+- implementation status;
+- exact source symbols, if implemented;
+- tests and actual consumers inspected;
+- whether the capability is deferred, partially implemented, implemented or unverified.
 
-Distinguish date cutoff from proof that information was available at that time. Record missing contracts or evidence without inventing replacements.
+Do not group D1–D6 together in a way that leaves D7 or D8 unexamined. Do not infer implementation from a test name or from a status string alone. Do not create financial formulas, thresholds or industry mappings that lack approved specifications.
 
-### 5. Verify S7-T005 — D1–D8
+## Global constraints
 
-Compare the current source and tests with the approved Stage 7 V1 specifications and the decisions recorded in `stepsForStage7.md`.
+- **Audit and report only.**
+- Do not modify source code, tests, configuration, schemas, task register or roadmap.
+- The only permitted modification is appending the `Prompt 1-B Supplemental Audit` section to `reply.md`.
+- Do not run tests, application code, database commands or Git commands.
+- Do not create or propose synthetic financial data as evidence of real integration.
+- Do not implement an orchestrator, entrypoint or Stage 9 persistence.
+- Do not redesign `src/valuation/engine.py`; its final review remains reserved for the final technical bundle.
+- Do not change the main prompt numbering or create a new main prompt.
+- Do not mark any task DONE merely because this report was produced.
+- Do not claim any file was inspected or modified unless that actually occurred.
+- Do not claim tests passed unless their actual output was provided by the user.
 
-Preserve deferred features. Do not introduce unapproved formulas, thresholds, or industry-specific drivers. Do not change alert contracts without checking actual consumers.
+## Required report format
 
-### 6. Correct the existing report
+Append a section to `reply.md` containing:
 
-Append a clearly titled **Prompt 1-A Supplemental Audit** section to `reply.md`.
+1. Prompt ID and Task IDs.
+2. Evidence gaps addressed for T001–T005.
+3. Findings with exact file paths and function/class names.
+4. Additional files actually inspected, grouped by Task ID.
+5. Tests inspected and what they establish; state explicitly that tests were not executed.
+6. Any remaining uncertainty and the exact evidence or owner decision required.
+7. Files modified — expected: `reply.md` only.
+8. Recommended task statuses, with reasons; do not modify `tasksToDo.md`.
+9. A concise decision on whether Prompt 1’s audit acceptance criteria are now satisfied. If not, list only the remaining gaps that genuinely block acceptance.
 
-For each Task ID, provide:
-- verdict: VERIFIED, PARTIALLY VERIFIED, UNVERIFIED, or BLOCKED;
-- exact source paths and function/model names;
-- concise evidence for each material claim;
-- remaining uncertainty and the evidence needed to resolve it;
-- whether the prior report contained a false, unsupported, or overly broad claim.
-
-Correct the following known risks explicitly:
-- Stage 8 already has `select_market_history_as_of` and `analyze_market_as_of_jalali`; do not propose implementing them again.
-- The earlier suggestion to use `2026-01-01` as a parameter effective date was unsupported and must not be used.
-- Files created in an agent's temporary workspace must not be reported as repository changes unless verified in the actual repository.
-- Do not assume that a missing file with a familiar name proves the capability is absent elsewhere.
-
-Do not overwrite or erase the historical audit trail. Clearly label corrected conclusions and superseded claims.
-
-## Required final report
-
-Include:
-1. Findings for S7-T001 through S7-T005.
-2. Exact files inspected, including any additional models, repositories, or entrypoints.
-3. Files actually modified and why.
-4. Task status recommendations, without claiming tests passed.
-5. A minimal recommendation for continuing the existing main Prompt 1.
-
-Do not start implementation. Stop after the supplemental audit report.
+Stop after updating the supplemental report. Do not proceed to implementation or Prompt 2.

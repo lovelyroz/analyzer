@@ -127,3 +127,213 @@
 ۳. **تثبیت محدوده Stage 7 بدون پیاده‌سازی فرمول‌های حدسی:** حفظ عدم انحراف از سیاست‌های V1 و خودداری از دستکاری تست‌های رگرسیون تا زمان تصویب مشخصات مالی جدید.
 
 ---
+# گزارش ممیزی متمم پرامپت 1-B (Prompt 1-B Supplemental Audit Report)
+
+**شناسه پرامپت:** Prompt 1-B  
+**پرامپت والدی:** Prompt 1  
+**شناسه‌های وظایف (Task IDs):** S7-T001, S7-T002, S7-T003, S7-T004, S7-T005  
+**نوع وظیفه:** AUDIT ONLY + SUPPLEMENTAL REPORT CORRECTION (فقط ممیزی و ارزیابی شواهد سورس‌کد، بدون تغییر در کدهای اجرایی یا اجرای تست‌ها)
+
+---
+
+## ۱. شکاف‌های شواهد بررسی‌شده (Evidence Gaps Addressed)
+
+در این گزارش، شکاف‌های شواهد ذکرشده در `PROMPT.md` برای وظایف ۵ گانه ممیزی Stage 7 بر اساس بررسی مستقیم سورسکدها، مدل‌ها، سرویس‌ها و تست‌های موجود در مخزن پروژه به شرح زیر بسته‌شده‌اند:
+
+1. **S7-T001 (مسیر اجرای تولیدی):** تفکیک دقیق توابع موجود، فراخوانی‌های داخلی سرویس به سرویس، فراخواننده‌های تولیدی، و ارزیابی مسیر اجرایی سرتاسری پروژه همراه با مالکیت Session و ورودی‌های بالادستی.
+2. **S7-T002 (ذخیره‌سازی Stage 9):** بررسی جامع تمامی مدل‌های SQLAlchemy، جداول دیتابیس، مخازن (Repositories) و سرویس‌ها برای تعیین وضعیت قطعیت وجود یا عدم وجود ماندگاری دیتابیسی برای `FinalDecisionResult`.
+3. **S7-T003 (انتخاب و مصرف پارامترهای D9):** ردیابی نحوه انتخاب نسخه‌های پارامتر بر اساس تاریخ، بررسی مقادیر مصرف‌شده در محاسبات در برابر متادیتای ثبتی، و رفتار سیستم در صورت عدم وجود نسخه تاریخ‌دار مصوب.
+4. **S7-T004 (عدم انحراف زمانی Point-in-Time و منشأ داده‌ها):** تدوین ماتریس جامع شواهد برای فیلدهای زمانی و اعتبارسنجی‌های انجام‌شده روی قیمت‌های بازار، ورودی‌های پیش‌بینی Stage 5، سری‌های بنچمارک P/E، سیگنال‌های بازار و خروجی‌های ارزش‌گذاری/تصمیم‌گیری.
+5. **S7-T005 (ارزیابی انفرادی تصمیمات D1 تا D8):** بررسی تک‌تک تصمیمات D1 تا D8 به صورت جداگانه از منظر مستندات حاکم، وضعیت پیاده‌سازی، نمادهای دقیق سورس‌کد، تست‌ها و مصرف‌کنندگان خروجی.
+
+---
+
+## ۲. یافته‌های تفکیکی ممیزی به همراه مسیر دقیق فایل‌ها و توابع
+
+### **S7-T001 — Production Execution Path**
+* **رأی (Verdict):** **UNVERIFIED / GAP IDENTIFIED** (سرویس‌ها و اتصالات داخلی وجود دارند، اما هیچ نقطه ورود یا فراخواننده تولیدی سرتاسری در scope بررسی‌شده یافت نشد).
+* **مسیرهای دقیق سورس و توابع/کلاس‌ها:**
+  * `src/forecast/service.py` :: `generate_and_persist_forecast`
+  * `src/valuation/service.py` :: `calculate_valuation_as_of_jalali`
+  * `src/market/service.py` :: `analyze_market_as_of_jalali`
+  * `src/decision/service.py` :: `calculate_decision_as_of_jalali`
+  * `src/decision/engine.py` :: `DecisionEngine.make_decision`
+  * `src/ingestion/market/queries.py` :: `select_market_price_as_of`, `select_market_history_as_of`
+  * `src/core/database.py` :: `SessionLocal`
+* **یافته‌ها و شواهد:**
+  * *سرویس‌های موجود:* سرویس `calculate_valuation_as_of_jalali` قیمت روزانه را از دیتابیس استخراج کرده و به `ValuationEngine` می‌دهد. سرویس `analyze_market_as_of_jalali` سری OHLCV را از دیتابیس خوانده و به `MarketEngine` ارسال می‌کند. سرویس `calculate_decision_as_of_jalali` خروجی Stage 7 را مستقیم به `DecisionEngine.make_decision` متصل می‌کند.
+  * *فراخوانی‌های داخلی:* تابع `calculate_decision_as_of_jalali` در `src/decision/service.py` صریحاً `calculate_valuation_as_of_jalali` را فراخوانی می‌کند.
+  * *فراخواننده تولیدی سرتاسری (Production Caller):* **در scope بررسی‌شده یافت نشد (Not found in the inspected scope).** هیچ فایل CLI، API، Orchestrator یا Worker در مخزن وجود ندارد که مدیریت `SessionLocal` را بر عهده گرفته، خروجی‌های Stage 3 (Scoring)، Stage 5 (Forecast) و Stage 8 (Market) را استخراج نموده و زنجیره اجرایی را تا Stage 9 فراخوانی کند. جستجوی فراخواننده‌ها تنها به فایلهای تست محدود شد.
+
+---
+
+### **S7-T002 — Stage 9 Persistence**
+* **رأی (Verdict):** **ABSENT (UNVERIFIED PERSISTENCE GAP)** (ذخیره‌سازی دیتابیسی خروجی تصمیم نهایی پیاده‌سازی نشده است).
+* **مسیرهای دقیق سورس و توابع/کلاس‌ها:**
+  * `src/decision/schema.py` :: `FinalDecisionResult`
+  * `src/decision/engine.py` :: `DecisionEngine.make_decision`
+  * `src/decision/service.py` :: `calculate_decision_as_of_jalali` -> `ValuationDecisionResult`
+  * `src/core/database.py` :: `Base`
+  * `src/models/` :: `report.py`, `normalized.py`, `market.py`, `entity.py`, `period.py`, `share_action.py`, `fx.py`, `audit.py`
+* **یافته‌ها و شواهد:**
+  * `FinalDecisionResult` صرفاً یک `@dataclass` پایتون جهت انباشت خروجی تصمیم‌گیری و ساخت داشبورد است.
+  * تابع `calculate_decision_as_of_jalali` خروجی را در قالب داتاکلاس `ValuationDecisionResult` برمی‌گرداند.
+  * در تمامی مدل‌های SQLAlchemy پروژه (`Base`)، هیچ جدول دیتابیسی، مدل ORM، کلاس Repository یا دستور `session.add()` / `session.commit()` برای ذخیره‌سازی `FinalDecisionResult` وجود ندارد.
+  * سیستم فاقد لایه ماندگاری برای خروجی‌های Stage 9 است.
+
+---
+
+### **S7-T003 — D9 Parameter Selection and Consumption**
+* **رأی (Verdict):** **PARTIALLY VERIFIED / D9 UNRESOLVED** (مکانیسم انتخاب فیل‌کلوز کار می‌کند، اما ثبت‌کننده فاقد نسخه‌های تاریخ‌دار مصوب است).
+* **مسیرهای دقیق سورس و توابع/کلاس‌ها:**
+  * `src/valuation/parameters.py` :: `ParameterRegistry`, `DEFAULT_REGISTRY`, `resolve_parameter_set`, `resolve_parameter_set_as_of`, `consume_parameter_set`, `ConsumedParameters`, `select_parameter_set_for_valuation`, `GENESIS_VERSION_KEY`
+  * `src/valuation/engine.py` :: `ValuationEngine.calculate_valuation`, `_resolve_parameter_governing_timestamp`
+  * `src/valuation/service.py` :: `calculate_valuation_as_of_jalali`
+  * `src/tests/test_stage7_valuation.py` :: `test_p33_*`, `test_p35_*`, `test_p36_*`, `test_d9_*`
+* **یافته‌ها و شواهد:**
+  * *ردیابی انتخاب:* تاریخ قطع داده (`data_cutoff_datetime`) مبنای اصلی انتخاب پارامترهاست (`_resolve_parameter_governing_timestamp`).
+  * *رفتار Fail-Closed:* اگر انتخاب تاریخ‌دار روی ثبت‌کننده پیش‌فرض (`DEFAULT_REGISTRY`) فراخوانی شود، به دلیل اینکه Genesis فاقد `effective_from` است، صریحاً خطای `LookupError` صادر می‌کند ("R8: historical selection requires R8-dated records").
+  * *حالت میراثی:* در صورت عدم ارسال درخواست انتخاب تاریخ‌دار، موتور از مقادیر ثوابت پایتون استفاده کرده و متادیتای `mode: FIXED_GENESIS_LEGACY` و `point_in_time_selection_applied: False` را ثبت می‌کند.
+  * *مصرف واقعی:* شیء `ConsumedParameters` دقیقاً مقادیر انتخاب‌شده را فریز می‌کند. ۳۳ پارامتر مستقیماً در فرمول‌ها مصرف می‌شوند و ۵ پارامتر غیرمصرفی به همراه ثوابت خارج از ثبت‌کننده (`LITERALS_OUTSIDE_REGISTRY`) در متادیتا گزارش می‌شوند.
+  * *علت مفتوح ماندن D9:* انتخاب تاریخ‌دار پارامترهای تاریخی نیازمند امضا و ثبت سند تصمیم مالک پروژه (R8) شامل تعیین تاریخ‌های `effective_from` و مقادیر مربوطه است.
+
+---
+
+### **S7-T004 — Point-in-Time (PIT) and Provenance Evidence Matrix**
+* **رأی (Verdict):** **PARTIALLY VERIFIED** (حفاظت PIT روی ورودی‌های پیش‌بینی Stage 5 اعمال می‌شود، اما سری‌های بنچمارک P/E فاقد شناسنامه زمانی هستند).
+
+#### **ماتریس شواهد منشأ زمانی و PIT:**
+
+| دسته‌بندی ورودی / خروجی | فیلدهای زمانی موجود | اعتبارسنجی انجام‌شده | منبع اثبات در کد | محدودیت و ریسک باقیمانده |
+| :--- | :--- | :--- | :--- | :--- |
+| **قیمت روزانه بازار** | `jalali_year`, `jalali_month`, `jalali_day`, `trade_date` (قابل NULL) | مقایسه عددی تاریخ جلالی `<=` تاریخ درخواست (`as_of_jalali_date`)؛ حذف مشاهدات آینده. | `src/ingestion/market/queries.py::select_market_price_as_of` | مقایسه بر اساس جلالی انجام می‌شود؛ اعتبارسنجی UTC Datetime مستقیم در برابر Cutoff پیش‌بینی ندارد. |
+| **ورودی‌های پیش‌بینی Stage 5** | `available_at` (در `ForecastInputRef`), `publication_datetime` (در `ReportVersion`), `data_cutoff_datetime` | کوئری `_period_rows` شرط `publication_datetime <= cutoff_dt` را اعمال می‌کند. Stage 5 ورودی‌های بعد از Cutoff را حذف می‌کند. Stage 7 در `_reject_unverifiable_forecast_refs` ورودی‌های فاقد تاریخ یا بعد از Cutoff را رد می‌کند. | `src/forecast/queries.py`, `src/forecast/engine.py`, `src/valuation/engine.py` | منشأ زمانی برای ورودی‌ها opt-in است؛ اگر Stage 5 ورودی بدون ref ارسال کند، مسیر میراثی آن را می‌پذیرد. |
+| **سری‌های بنچمارک تاریخی و صنعتی** | اعداد شناور بدون تاریخ (`historical_pe_values`, `industry_forward_pe_values`, `industry_ttm_pe_values`) | **هیچ اعتبارسنجی زمانی انجام نمی‌شود.** فقط فیلتر عددی `NaN`/`inf`/`<=0` اعمال می‌گردد. | `src/valuation/engine.py::calculate_valuation` | سری‌های بنچمارک P/E فاقد تاریخ مشاهده یا انتشار هستند؛ Stage 7 قادر به اعتبارسنجی PIT بودن بنچمارک‌ها نیست. |
+| **سیگنال‌های بازار (Stage 8)** | تاپل `jalali_date` روی مشاهدات | `select_market_history_as_of` مشاهدات بعد از تاریخ جلالی درخواست را حذف می‌کند. | `src/ingestion/market/queries.py`, `src/market/service.py` | وابسته به ارسال داده توسط فراخواننده است؛ اعتبارسنجی UTC Datetime ندارد. |
+| **خروجی‌های ارزش‌گذاری و تصمیم** | `calculation_timestamp` (UTC), `data_cutoff_datetime` (UTC), `valuation_date`, `market_price_date` | تاریخ‌های `valuation_date` و `market_price_date` نرمال‌سازی شده و در متادیتا منعکس می‌شوند. | `src/valuation/engine.py`, `src/decision/engine.py` | پذیرش `valuation_date > data_cutoff_datetime` بدون صادر شدن خطا یا هشدار (اثبات‌شده در تست `test_p6_cutoff_pit_limitation_pinned`). |
+
+---
+
+### **S7-T005 — Individual Decision Verification (D1–D8)**
+* **رأی (Verdict):** **PARTIALLY IMPLEMENTED / POLICY OPEN**.
+
+#### **ارزیابی تک‌تک تصمیمات D1 تا D8:**
+
+1. **تصمیم D1 (Assessment Flip Risk):**
+   * *سند حاکم:* `07_Stage7_Valuation.md` §50; `stepsForStage7.md` D1.
+   * *وضعیت پیاده‌سازی:* **DEFERRED / UNRESOLVED** (صفر ارجاع به `ASSESSMENT_FLIP_RISK` در کل سورسکد `src/valuation/`).
+   * *علت:* فرمول شوک، وضعیت‌های مشمول Flip، روش شوک (یک‌عاملی یا مشترک) و Severity تصویب نشده‌اند.
+   * *تست‌های بررسی‌شده:* تست `test_p2_required_flip_dependence_alerts_missing` (در فایل `test_stage7_valuation.py:425` که به عنوان تست اثبات عدم پیاده‌سازی، Fail می‌ماند).
+2. **تصمیم D2 (Multiple Dependence):**
+   * *سند حاکم:* `07_Stage7_Valuation.md` §51; `stepsForStage7.md` D2.
+   * *وضعیت پیاده‌سازی:* **DEFERRED / UNRESOLVED** (ثابت `ALERT_THRESHOLDS["high_dependence_share"] = 0.60` در `parameters.py:73` تعریف شده اما در `engine.py` معطل و بدون ارجاع است).
+   * *علت:* فرمول سهم انحراف ارزش منصفانه از ضریب P/E در برابر EPS تصویب نشده است. ارزیابی P26 اثبات کرد که شوک‌های یک‌عاملی روی فرمول خطی ارزش، همواره سهم ۵۰/۵۰ تولید می‌کنند و آستانه 0.60 بدون تغییر فرمول غیرقابل دستیابی است.
+3. **تصمیم D3 (EPS Dependence & Revision):**
+   * *سند حاکم:* `07_Stage7_Valuation.md` §52; `stepsForStage7.md` D3.
+   * *وضعیت پیاده‌سازی:* **DEFERRED / UNRESOLVED** (هیچ کدی برای `HIGH_EPS_DEPENDENCE` یا `FORECAST_RISK` در Stage 7 وجود ندارد).
+   * *علت:* روند تجدیدنظر پیش‌بینی (`revision_trend`) در Stage 5 (`src/forecast/repo.py`) محاسبه شده و مستقیماً به Stage 9 (`src/decision/engine.py`) متصل می‌شود و از مرز Stage 7 عبور نمی‌کند.
+4. **تصمیم D4 (Margin Assumption Risk):**
+   * *سند حاکم:* `07_Stage7_Valuation.md` §53; `stepsForStage7.md` D4.
+   * *وضعیت پیاده‌سازی:* **DEFERRED / UNRESOLVED** (مرز ورودی Stage 7 فاقد هرگونه سری حاشیه سود یا هزینه است).
+   * *علت:* تابع `calculate_valuation` تنها سود پیش‌بینی‌شده (EPS) و ضریب P/E را ورودی می‌گیرد و بدون توسعه قرارداد ورودی، محاسبه هشدار حاشیه سود غیرممکن است.
+5. **تصمیم D5 (High Impact + High Uncertainty):**
+   * *سند حاکم:* `07_Stage7_Valuation.md` §45–47; `stepsForStage7.md` D5.
+   * *وضعیت پیاده‌سازی:* **DEFERRED / UNRESOLVED** (مقادیر `driver_impact`، `driver_uncertainty` و `review_priority` برای دو متغیر EPS و Target P/E در `src/valuation/engine.py:469-498` محاسبه می‌شوند، اما هشدار متظاهر صادر نمی‌شود).
+   * *علت:* خروجی `review_priority` صرفاً جنبه متادیتای اطلاع‌رسانی دارد و آستانه صریحی برای صدور هشدار تصویب نشده است.
+6. **تصمیم D6 (Sector Driver Chains & P/NAV):**
+   * *سند حاکم:* `07_Stage7_Valuation.md` §42–44; `stepsForStage7.md` D6.
+   * *وضعیت پیاده‌سازی:* **DEFERRED / UNRESOLVED** (رتبه‌بندی درایورها در موتور همیشه منحصر به `["EPS", "TARGET_PE"]` است؛ `nav_per_share` در متادیتا ثبت می‌شود اما تابع `calculate_nav_fair_value` در `models.py` فراخوانی نمی‌شود).
+   * *تست‌های بررسی‌شده:* تست `test_p2_sector_driver_decomposition_missing` (در فایل `test_stage7_valuation.py:406` به عنوان تست اثبات عدم پیاده‌سازی، Fail می‌ماند).
+7. **تصمیم D7 (PIT Benchmark Provenance):**
+   * *سند حاکم:* `07_Stage7_Valuation.md` §56–57, §85; `stepsForStage7.md` D7.
+   * *وضعیت پیاده‌سازی:* **DEFERRED / UNRESOLVED**.
+   * *علت:* ورودی‌های بنچمارک به صورت اعداد شناور فاقد تاریخ وارد می‌شوند و امکان اعتبارسنجی PIT بودن آنها در Stage 7 وجود ندارد.
+8. **تصمیم D8 (Alert Vocabulary & Triggers):**
+   * *سند حاکم:* `07_Stage7_Valuation.md` §10, §49, §54–55; `stepsForStage7.md` D8.
+   * *وضعیت پیاده‌سازی:* **PARTIALLY IMPLEMENTED (VOCABULARY MISMATCH)**.
+   * *علت:* هشدارهای انحراف بنچمارکی با نسبت 1.50 پیاده‌سازی شده‌اند اما به جای اسامی سند (`HISTORICAL/INDUSTRY_VALUATION_DIVERGENCE`) با اسامی `WATCH:FORWARD_PE_ABOVE/BELOW_*` صادر می‌شوند. همچنین `INSUFFICIENT_PEER_DATA` به عنوان Flag صادر می‌شود نه Alert.
+
+---
+
+## ۳. فایلهای اضافی بررسی‌شده (Additional Files Inspected)
+
+### **گروه‌بندی فایلهای بررسی‌شده به تفکیک Task ID:**
+
+* **جهت S7-T001 (Production Execution Path):**
+  * `src/scoring/engine.py`
+  * `src/forecast/engine.py`, `src/forecast/service.py`
+  * `src/valuation/service.py`
+  * `src/market/service.py`
+  * `src/decision/service.py`, `src/decision/engine.py`
+  * `src/ingestion/market/queries.py`
+  * `src/core/database.py`
+* **جهت S7-T002 (Stage 9 Persistence):**
+  * `src/decision/schema.py`, `src/decision/engine.py`, `src/decision/service.py`
+  * `src/core/database.py`
+  * `src/models/report.py`, `src/models/normalized.py`, `src/models/market.py`, `src/models/entity.py`, `src/models/period.py`, `src/models/share_action.py`, `src/models/fx.py`, `src/models/audit.py`
+* **جهت S7-T003 (D9 Parameter Governance):**
+  * `src/valuation/parameters.py`, `src/valuation/engine.py`, `src/valuation/service.py`
+  * `src/tests/test_stage7_valuation.py`
+* **جهت S7-T004 (PIT and Provenance):**
+  * `src/forecast/queries.py`, `src/forecast/schema.py`, `src/forecast/engine.py`
+  * `src/valuation/schema.py`, `src/valuation/service.py`, `src/valuation/engine.py`
+  * `src/market/schema.py`, `src/market/service.py`, `src/ingestion/market/queries.py`
+* **جهت S7-T005 (D1–D8 Policies):**
+  * `07_Stage7_Valuation.md`, `stepsForStage7.md`, `reply.md` / `temp_report2.md`
+  * `src/valuation/engine.py`, `src/valuation/parameters.py`, `src/valuation/schema.py`
+  * `src/decision/engine.py`
+
+---
+
+## ۴. تست‌های بررسی‌شده و آنچه اثبات می‌کنند (Tests Inspected)
+
+*(توضیح صریح: مطابق با دستورالعمل‌های اکید پرامپت، هیچ تستی در این نوبت اجرا نشده است و نتایج زیر بر اساس مستندات ثبت‌شده در مخزن است)*:
+
+1. **`test_p33_genesis_snapshot_matches_live_constants`:** اثبات می‌کند که اسنپ‌شات Genesis دقیقاً ۳۸ پارامتر دارد و `effective_from` آنها `None` است.
+2. **`test_p33_as_of_without_dated_records_raises`:** اثبات می‌کند که فراخوانی انتخاب تاریخ‌دار بر روی ثبت‌کننده پیش‌فرض منجر به صادر شدن خطای `LookupError` می‌شود.
+3. **`test_p35_as_of_selection_governs_calculation_and_snapshot_matches`:** اثبات می‌کند که در صورت وجود ثبت‌کننده تاریخ‌دار، پارامتر انتخاب‌شده مستقیماً وضعیت ارزش‌گذاری و محاسبات را تغییر می‌دهد.
+4. **`test_d9_effective_cutoff_governs_selection_not_valuation_date`:** اثبات می‌کند که `data_cutoff_datetime` (نه `valuation_date`) حاکم بر انتخاب پارامترها است.
+5. **`test_p5_undated_benchmark_series_carry_no_provenance`:** اثبات می‌کند که ورودی‌های بنچمارک به صورت اعداد فاقد تاریخ پذیرفته می‌شوند و اعتبارسنجی PIT ندارند.
+6. **`test_p6_cutoff_pit_limitation_pinned`:** اثبات می‌کند که پذیرش `valuation_date > data_cutoff_datetime` بدون خطای PIT انجام می‌شود.
+7. **`test_p32_input_ref_after_cutoff_rejected_on_valuation_path`:** اثبات می‌کند که در صورت وجود شناسنامه زمانی در ورودی پیش‌بینی، ورودی‌های بعد از Cutoff رد می‌شوند.
+8. **`test_p2_sector_driver_decomposition_missing` (تست Fail):** اثبات می‌کند که تجزیه درایورها بر اساس صنعت (REVENUE, NII, NAV) پیاده‌سازی نشده است.
+9. **`test_p2_required_flip_dependence_alerts_missing` (تست Fail):** اثبات می‌کند که هشدارهای پنج‌گانه D1 تا D5 در کد صادر نمی‌شوند.
+
+---
+
+## ۵. عدم‌قطعیت‌های باقیمانده و شواهد یا تصمیمات لازم
+
+1. **عدم‌قطعیت D9:** نیازمند تصویب رسمی "فرم تصمیم‌گیری مالک پروژه" (R8) شامل تعیین تاریخ‌های `effective_from` و مقادیر پارامترها جهت فعال‌سازی انتخاب تاریخ‌دار بر روی ثبت‌کننده عمومی.
+2. **عدم‌قطعیت D1 تا D6:** نیازمند تصویب مشخصات مالی صریح برای فرمول‌های شوک، آستانه‌های وابستگی متغیرها، و نگاشت درایورهای صنعت.
+3. **عدم‌قطعیت مسیر اجرای تولیدی (S7-T001):** نیازمند تعریف یا پیاده‌سازی یک نقطه ورود سرتاسری (CLI/API Orchestrator) برای مدیریت Session دیتابیس و پاس دادن ورودی‌های آماده‌شده بین Stageها.
+4. **عدم‌قطعیت ماندگاری Stage 9 (S7-T002):** نیازمند تصمیم‌گیری معماری در خصوص ایجاد جدول دیتابیس برای ذخیره‌سازی `FinalDecisionResult`.
+
+---
+
+## ۶. فایلهای اصلاح‌شده (Files Modified)
+
+* **فایلهای اصلاح‌شده در سورس‌کد پروژه:** **۰ فایل.**
+* **توضیح:** مطابق با الزامات صریح پرامپت 1-B (`Audit and report only` / `Do not modify source code, tests, configuration`), هیچ فایل سورس‌کدی تغییر داده نشده است.
+
+---
+
+## ۷. توصیه‌های وضعیت وظایف (Recommended Task Statuses)
+
+* **S7-T001 (Production Execution Path):** وضعیت **OPEN / GAP IDENTIFIED** (نیازمند ایجاد نقطه ورود اجرایی سرتاسری).
+* **S7-T002 (Stage 9 Persistence):** وضعیت **OPEN / PERSISTENCE GAP** (فاقد مدل دیتابیس جهت ذخیره‌سازی).
+* **S7-T003 (D9 Parameter Governance):** وضعیت **OPEN / R8 PENDING** (مکانیسم کد آمادگی دارد، اما نیازمند امضای سند تصمیم R8 است).
+* **S7-T004 (Point-in-Time & Provenance):** وضعیت **PARTIALLY VERIFIED** (مرز Stage 5 حاکم است اما سری‌های بنچمارک فاقد تاریخ هستند).
+* **S7-T005 (D1–D8 Alert Policies):** وضعیت **DEFERRED / POLICY OPEN** (تصمیمات D1 تا D6 مفتوح هستند و تا زمان تصویب نباید پیاده‌سازی شوند).
+
+---
+
+## ۸. تصمیم در خصوص احراز معیارهای پذیرش ممیزی پرامپت ۱ (Audit Acceptance Criteria Decision)
+
+**نتیجه:** معیارهای پذیرش ممیزی کامل پرامپت ۱ به دلیل وجود **شکاف‌های ساختاری باقیمانده** زیر به طور کامل برآورده نشده است و پرامپت ۱ در مرحله ممیزی متوقف می‌ماند:
+
+1. **عدم وجود نقطه ورود اجرایی تولیدی (S7-T001):** نبود CLI/API جهت هماهنگی Session و زنجیره سرتاسری Stage 3/5/7/8/9.
+2. **عدم وجود ماندگاری دیتابیسی خروجی تصمیم نهایی (S7-T002):** نبود مدل ORM برای ذخیره‌سازی `FinalDecisionResult`.
+3. **عدم امضای سند D9 (S7-T003):** نبود نسخه‌های تاریخ‌دار مصوب R8 در ثبت‌کننده پارامترها.
+4. **مفتوح بودن تصمیمات مالی D1 تا D6 (S7-T005):** نبود فرمول‌ها و آستانه‌های مصوب برای هشدارهای شوک و درایورهای صنعتی.
+
+---
