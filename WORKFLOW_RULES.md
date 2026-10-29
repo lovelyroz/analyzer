@@ -1,3 +1,4 @@
+# This file should be checked regularly so that the commands are not forgotten.
 # Follow the steps below to generate each new prompt
 ## Make each prompt in 2 blocks. One for Agent and one for User
 
