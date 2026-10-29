@@ -337,87 +337,113 @@
 4. **مفتوح بودن تصمیمات مالی D1 تا D6 (S7-T005):** نبود فرمول‌ها و آستانه‌های مصوب برای هشدارهای شوک و درایورهای صنعتی.
 
 ---
-### گزارش ممیزی پروژه analyzer (مطابق با الزامات و مرزهای دسترسی PROMPT.md)
+# Prompt 1-C
+# گزارش ممیزی Stage 7 (اجرای پرامپت Prompt 1-C)
 
-این گزارش ممیزی مستند بر اساس بررسی دقیق فایلهای ارائه‌شده در محدودیت دسترسی تعیین‌شده در سند `PROMPT.md` و بدون اجرای آزمون‌ها یا تغییر در سورس‌کد تنظیم شده است.
-
----
-
-### ۱. مرز دسترسی و فایلهای بررسی‌شده (Supplied Files & Access Boundary)
-
-**الف) فایلهای ارائه‌شده که به طور کامل بررسی شدند (۱۲ فایل):**
-1. `stepsForStage7.md`
-2. `reply.md`
-3. `07_Stage7_Valuation.md`
-4. `src/core/database.py`
-5. `src/decision/schema.py`
-6. `src/decision/engine.py`
-7. `src/decision/service.py`
-8. `src/valuation/service.py`
-9. `src/valuation/parameters.py`
-10. `src/forecast/service.py`
-11. `src/market/service.py`
-12. `src/tests/test_stage7_valuation.py`
-
-**ب) فایلهای ارائه‌شده که قابل بررسی نبودند:**
-* هیچ‌کدام (تمام ۱۲ فایل ارائه‌شده در محدوده مجاز بررسی شدند).
-
-**ج) فایلهای اضافی مورد نیاز جهت رفع عدم‌قطعیت‌های باقیمانده:**
-1. **فایلهای ارکستریتور و نقاط ورود برنامه (Application Entrypoints / CLI / API / Worker):** جهت احراز نحوه فراخوانی زنجیره‌ای سرویس‌ها و مدیریت Session دیتابیس در سطح کل پروژه.
-2. **مدل‌ها، migrations و مخازن ماندگاری (ORM Repositories):** جهت ارزیابی وجود یا عدم وجود جداول دیتابیسی برای ذخیره‌سازی خروجی Stage 9 در فایلهای خارج از لیست ارائه‌شده.
+**شناسه کارهای ممیزی:** S7-T001, S7-T002, S7-T005  
+**نوع ممیزی:** صرفاً ممیزی و تحلیل خطوط لوله و کدها (Audit Only — بدون هیچ‌گونه تغییر در کد، تست یا پیکربندی).
 
 ---
 
-### ۲. S7-T001 — بررسی مسیر اجرای تولیدی (Production Execution Path)
+### ۱. محدوده دقیق دسترسی و فایل‌های بررسیشده (Inspection Boundary)
 
-بر اساس بررسی فایلهای ارائه‌شده، وضعیت اتصالات و مسیرهای اجرایی به تفکیک طبقه‌بندی‌های سه‌گانه مصوب به شرح زیر است:
+مطابق با الزامات صریح پرامپت 1-C، صرفاً فایل‌های تامین‌شده و در دسترس مورد بازبینی قرار گرفتند:
 
-* **مستقیماً تاییدشده از سورس ارائه‌شده (Directly Verified):**
-  * تابع `calculate_valuation_as_of_jalali` در `src/valuation/service.py` قیمت روزانه بازار را از دیتابیس (`select_market_price_as_of`) خوانده و به `ValuationEngine` تحویل می‌دهد.
-  * تابع `calculate_decision_as_of_jalali` در `src/decision/service.py` خروجی `ValuationResult` حاصل از Stage 7 را به `DecisionEngine().make_decision` متصل می‌کند.
-* **جزئیاً تاییدشده از سورس ارائه‌شده (Partially Verified):**
-  * اتصال داخلی سرویس به سرویس بین Stage 7 و Stage 9 تایید شده است؛ اما ورودی‌های Stage 3 (`FundamentalScoreResult`) و Stage 8 (`MarketSignalResult`) صرفاً به عنوان پارامتر ورودی دریافت می‌شوند و نحوه استخراج تولیدی آن‌ها در مرز فایلهای ارائه‌شده ارزیابی کامل نشده است.
-* **غیرقابل اعتبارسنجی به دلیل عدم ارائه فایلهای فراخواننده (Not Verifiable because a required caller or entrypoint file was not supplied):**
-  * هیچ فایل فراخواننده یا نقطه ورود تولیدی (CLI/API) در لیست ارائه‌شده وجود ندارد تا مدیریت `SessionLocal` دیتابیس و پاس دادن ورودی‌ها در یک مسیر سرتاسری را اثبات کند. مطابق با دستورالعمل، جستجو در فایلهای ارائه‌شده اثبات‌کننده عدم وجود فراخواننده در کل مخزن پروژه نیست.
+#### فایل‌های الزامی بررسیشده:
+* `stepsForStage7.md`
+* `reply.md`
+* `07_Stage7_Valuation.md`
+* `src/core/database.py`
+* `src/decision/schema.py`
+* `src/decision/engine.py`
+* `src/decision/service.py`
+* `src/valuation/service.py`
+* `src/valuation/parameters.py`
+* `src/forecast/service.py`
+* `src/market/service.py`
+* `src/tests/test_stage7_valuation.py`
 
----
+#### فایل‌های تکمیلی در دسترس و بررسی‌شده:
+* `PROMPT.md`, `temp_report2.md`, `src/valuation/engine.py`, `src/valuation/models.py`, `src/valuation/schema.py`, `src/market/engine.py`, `src/market/parameters.py`, `src/market/schema.py`, `src/forecast/engine.py`, `src/forecast/schema.py`, `src/forecast/queries.py`, `src/ingestion/market/queries.py`, `src/scoring/engine.py`, `src/scoring/schema.py`, `src/tests/test_stage9_decision.py`, `src/tests/test_stage8_market_service.py`, `src/tests/test_stage8_market_parameters.py`, `src/ingestion/codal/pipeline.py`, `src/ingestion/service.py`, `.github/workflows/tests.yml`, `05_Stage5_Forecast_Engine.md`.
 
-### ۳. S7-T002 — بررسی ماندگاری Stage 9 (Stage 9 Persistence)
-
-طبق طبقه‌بندی رسمی دستورالعمل:
-
-* **طبقه‌بندی یافته:** **NOT FOUND IN SUPPLIED FILES** (هیچ مسیر ماندگاری در فایلهای ارائه‌شده یافت نشد).
-* **تحلیل شواهد:**
-  * کلاس `FinalDecisionResult` در `src/decision/schema.py` صرفاً یک `@dataclass` پایتونی جهت انباشت خروجی است.
-  * تابع `calculate_decision_as_of_jalali` خروجی را در قالب `ValuationDecisionResult` در حافظه برمی‌گرداند.
-  * در فایلهای دیتابیس ارائه‌شده (`src/core/database.py`) هیچ مدل SQLAlchemy یا کدی برای ذخیره‌سازی دیتابیسی (`session.add`) خروجی Stage 9 وجود ندارد.
-* **فایلهای مفقود مورد نیاز برای اعتبارسنجی پروژه-شمول:** مدل‌های ORM، فایل‌های Migration و مخازن ذخیره‌سازی احتمالی خارج از لیست فایلهای ارائه‌شده.
-
----
-
-### ۴. S7-T005 — تفسیر منطقی تست‌های D1 تا D6 (D1/D6 Test Interpretation)
-
-بررسی متنی Assertionها در فایل `src/tests/test_stage7_valuation.py` و فایلهای پیاده‌سازی مربوطه بدون اجرای کدها:
-
-* **تفسیر تست‌های درایورهای صنعت (D6):**
-  * تست `test_v1_sector_examples_use_only_eps_and_target_pe_drivers` صریحاً تأیید می‌کند که خروجی درایورها برای شرکت‌های غیرمالی، بانک و هولدینگ صرفاً به دو درایور `EPS` و `TARGET_PE` محدود است. این امر منطقاً اثبات می‌کند که زنجیره‌های اختصاصی صنعت (مانند REVENUE, NII, NAV) طبق سیاست‌های V1 معطل (Deferred) شده‌اند.
-* **تفسیر تست‌های هشدارهای پنج‌گانه (D1 تا D5):**
-  * تست `test_v1_defers_undefined_flip_dependence_and_assumption_alerts` عدم وجود ۵ عنوان هشدار تعریف‌نشده (`ASSESSMENT_FLIP_RISK`, `HIGH_MULTIPLE_DEPENDENCE`, `HIGH_EPS_DEPENDENCE`, `MARGIN_ASSUMPTION_RISK`, `HIGH_IMPACT_HIGH_UNCERTAINTY`) را در خروجی‌های `alerts` و `valuation_risk_flags` بررسی می‌کند. این Assertion منطقاً اثبات می‌کند که فرمول‌های غیرمصوب در نسخه V1 صادر نمی‌شوند و تا زمان تصویب نهایی معطل باقی می‌مانند.
-
-*(توضیح صریح: هیچ تستی در این نوبت اجرا نشده و وضعیت اجرای زمان اجرا (Pass/Fail) از روی نام تست‌ها استنباط نشده است).*
+#### فایل‌های مستثنی‌شده (فاقد دسترسی در ورودی ممیزی):
+* `src/models/market.py`, `src/models/normalized.py`, `src/models/report.py`, `src/tests/test_codal_extraction.py`, `src/tests/test_market_history_query.py`, `src/tests/test_stage3_scoring.py`, `src/tests/test_stage5_forecast.py`, `src/tests/test_stage8_market.py`, `zErrors.md`.
 
 ---
 
-### ۵. گزارش نهایی و محدودیت‌های دسترسی (Reporting and Access Limitations)
+### ۲. S7-T001 — تحلیل مسیر اجرای تولیدی (Production Execution Path)
 
-1. **فایلهای ارائه‌شده و دقیقاً بررسی‌شده:** ۱۲ فایل ذکرشده در بخش ۱ به طور کامل ارزیابی شدند.
-2. **فایلهای ارائه‌شده که قابل بررسی نبودند:** هیچ‌کدام.
-3. **فایلهای اضافی مورد نیاز جهت حل سوالات باقیمانده:** فایلهای Orchestrator/CLI/API و مدل‌های ORM ذخیره‌سازی دیتابیس در خارج از مرز ارائه‌شده.
-4. **نتایج پشتیبانی‌شده توسط شواهد ارائه‌شده:**
-   * وجود اتصالات داخلی بین سرویس‌های Stage 7 و Stage 9.
-   * معطل ماندن سیاست‌های مالی D1 تا D6 و عدم صدور هشدارهای فاقد فرمول مصوب.
-5. **نتایج غیرقابل اعتبارسنجی به دلیل محدودیت دسترسی:**
-   * اثبات قطعی وجود یا عدم وجود فراخواننده تولیدی سرتاسری در کل پروژه.
-   * اثبات قطعی وجود یا عدم وجود مدل‌های ماندگاری Stage 9 در کل پروژه.
+بررسی دقیق سرویس‌های مراحل مختلف در فایل‌های موجود، نتایج زیر را به دست می‌دهد:
+
+1. **Stage 5 Forecast Service (`src/forecast/service.py`):**
+   * **توابع:** تابع `generate_and_persist_forecast` خروجی `CompanyForecastResult` را تولید کرده و رکوردهای پیش‌بینی را در `ForecastRecordRepository` ذخیره می‌کند.
+   * **وضعیت فراخوانی:** این سرویس در فایل‌های تست (مانند `test_stage7_valuation.py`) فراخوانی شده است؛ اما **هیچ فایل نقطه ورود اصلی (CLI، API یا Pipeline Runner)** در فایل‌های تامین‌شده وجود ندارد که فراخوانی آن را در مسیر اجرای برنامه ثبت کند.
+   * **طبقه بندی:** **Partially verified / Exists but caller unproven** (سرویس وجود دارد اما فراخواننده تولیدی آن اثبات نشده است).
+
+2. **Stage 7 Valuation Service (`src/valuation/service.py`):**
+   * **توابع:** تابع `calculate_valuation_as_of_jalali` با استخراج قیمت روزانه بازار از `select_market_price_as_of` (`src/ingestion/market/queries.py`) و ارسال آن به `ValuationEngine.calculate_valuation` خروجی ارزش‌گذاری را محاسبه می‌کند.
+   * **وضعیت فراخوانی:** این تابع در `src/decision/service.py` (داخل `calculate_decision_as_of_jalali`) فراخوانی می‌شود. با این حال، خود `calculate_decision_as_of_jalali` فاقد فراخواننده در نقطه ورود اصلی برنامه است.
+   * **طبقه بندی:** **Partially verified** (اتصال داخلی به Stage 9 برقرار است، اما نقطه ورود اجرایی برنامه تامین نشده است).
+
+3. **Stage 8 Market Service (`src/market/service.py`):**
+   * **توابع:** تابع `analyze_market_as_of_jalali` داده‌های تاریخی را از `select_market_history_as_of` خوانده و به `MarketEngine.analyze_market` ارسال می‌کند.
+   * **وضعیت فراخوانی:** این سرویس به صورت مستقیم در `src/decision/service.py` ارکستره نشده است؛ سرویس Stage 9 خروجی آماده `market_result` را به عنوان ورودی دریافت می‌کند. هیچ فراخواننده اجرایی جهت خواندن داده بازار و پاس دادن آن به Stage 9 در کد تامین‌شده مشاهده نشد.
+   * **طبقه بندی:** **Partially verified / Exists but caller unproven**.
+
+4. **Stage 9 Decision Service (`src/decision/service.py`):**
+   * **توابع:** تابع `calculate_decision_as_of_jalali` نتایج Stage 5 (`forecast_result`)، Stage 3 (`fundamental_result`) و Stage 8 (`market_result`) را دریافت کرده و متغیرهای Stage 7 و Stage 9 را ارکستره می‌کند.
+   * **طبقه بندی:** **Partially verified** (زنجیره داخلی Stage 5 → Stage 7 → Stage 9 برقرار است، اما زنجیره سرتاسری تولیدی Stage 3 → 5 → 7 → 8 → 9 از نقطه ورود واقعی برنامه اثبات نشده است).
 
 ---
+
+### ۳. S7-T002 — تحلیل ماندگاری داده‌های تصمیم در Stage 9 (Persistence Analysis)
+
+بررسی دقیق ساختار پایگاه‌داده، مدل‌ها و سرویس‌های مرتبط با Stage 9 نتایج زیر را روشن می‌سازد:
+
+1. **ساختار کلاس خروجی (`src/decision/schema.py`):**
+   * کلاس `FinalDecisionResult` یک Dataclass استاندارد پایتون است و از `Base` در SQLAlchemy ارث‌بری نمی‌کند.
+2. **رفتار موتور تصمیم (`src/decision/engine.py`):**
+   * متد `DecisionEngine.make_decision` یک نمونه از `FinalDecisionResult` را در حافظه ساخته و برمی‌گرداند؛ هیچ عملیات دیتابیسی انجام نمی‌دهد.
+3. **رفتار سرویس ارکستراسیون (`src/decision/service.py`):**
+   * تابع `calculate_decision_as_of_jalali` پارامتر `session: Session` را دریافت کرده و خروجی `ValuationDecisionResult(valuation=valuation, decision=decision)` را برمی‌گرداند.
+   * در این مرز هیچ‌گونه متد `session.add()`، `session.commit()` یا متد ذخیره‌سازی برای `FinalDecisionResult` وجود ندارد.
+4. **ساختار پایگاه‌داده (`src/core/database.py`):**
+   * صرفاً شامل تعاریف `engine` SQLite، `SessionLocal` و `Base` است و فاقد جدول یا مدل برای Stage 9 است.
+
+#### طبقه‌بندی رسمی:
+* **NOT FOUND IN SUPPLIED FILES** (هیچ مسیر ماندگاری برای خروجی تصمیم Stage 9 در فایل‌های تامین‌شده پیدا نشد).
+
+#### فایل‌های دقیق مورد نیاز جهت اثبات ماندگاری در صورت وجود در مخزن:
+* مدل ORM مربوط به جدول تصمیمات Stage 9 (مانند `src/models/decision.py` یا مخزن `src/decision/repo.py` در صورت وجود در کل پروژه).
+* فایل‌های مایگریشن دیتابیس (Alembic یا اسکریپت‌های SQL).
+* سرویس‌ها یا فراخواننده‌های ماندگاری که خروجی `FinalDecisionResult` را به دیتابیس منتقل کنند.
+
+---
+
+### ۴. S7-T005 — تفسیر تست‌های مربوط به سیاست‌های D1 و D6
+
+بررسی فایل `src/tests/test_stage7_valuation.py` و فایل‌های پیاده‌سازی مرتبط (`src/valuation/engine.py`, `src/valuation/parameters.py`, `src/valuation/models.py`) موارد زیر را اثبات می‌کند:
+
+#### الف) تفکیک تعاملات صنعت و Driverهای اختصاصی (D6 Analysis):
+* **مشخصات در سند:** در سند `07_Stage7_Valuation.md` بخش‌های ۴۲ تا ۴۴ زنجیره‌های Driver اختصاصی صنعت (درآمد برای غیرمالی، تسهیلات/NII برای بانک، و NAV/P/NAV برای هولدینگ) مطرح شده است.
+* **کد پیاده‌سازی:** در `src/valuation/engine.py` محور اصلی محاسبات ارزش‌گذاری Forward P/E (\\(Fair Value = Forecast EPS \times Target PE\\)) است. متد `_driver_analysis` خروجی `valuation_driver_ranking` را دائماً برابر با `["EPS", "TARGET_PE"]` تنظیم می‌کند. پارامتر `nav_per_share` صرفاً در متادیتای خروجی ثبت می‌شود و تاثیری در ارزش منصفانه ندارد.
+* **اثبات منطقی تست‌ها:** تست‌های `test_v1_sector_examples_use_only_eps_and_target_pe_drivers` و `test_v1_uses_stage5_eps_without_recalculating_from_net_profit` اثبات می‌کنند که تحت سیاست V1، ارزش‌گذاری تمامی صنایع صرفاً بر پایه دو Driver اصلی (`EPS` و `TARGET_PE`) و مستقیم از EPS پیش‌بینی‌شده Stage 5 انجام می‌شود و هیچ فرمول ساختگی بدون مشخصات برای تفکیک صنایع اعمال نمی‌گردد.
+* **وابستگی‌های معوق:** پیاده‌سازی زنجیره‌های اختصاصی صنعت (D6) نیازمند تصمیم مالک پروژه در خصوص فرمول‌ها، ورودی‌های جدید زنجیره و نگاشت صنایع است.
+
+#### ب) هشدارها و تحلیل حساسیت (D1–D5 Analysis):
+* **مشخصات در سند:** در سند مشخصات پنج هشدار پیش‌فرض شامل `ASSESSMENT_FLIP_RISK` ،`HIGH_MULTIPLE_DEPENDENCE` ،`HIGH_EPS_DEPENDENCE` ،`MARGIN_ASSUMPTION_RISK` و `HIGH_IMPACT_HIGH_UNCERTAINTY` درج شده است.
+* **کد پیاده‌سازی:** در `src/valuation/engine.py` هشدارها به هشدارهای با مشخصات روشن (مانند عدم قطعیت سناریو، قابلیت اطمینان پایین، انحراف از بنچمارک و وضعیت‌های قیمتی) محدود شده‌اند. ثابت `high_dependence_share = 0.60` در `src/valuation/parameters.py` تعریف شده اما در موتور ارزش‌گذاری استفاده نشده است (فاقد مرجع کاربردی).
+* **اثبات منطقی تست‌ها:** تست‌های `test_v1_defers_undefined_flip_dependence_and_assumption_alerts` و `test_p3_flip_dependence_alerts_remain_explicitly_unresolved` اثبات می‌کنند که هشدارهای تعریف‌نشده D1–D5 به طور صریح از لیست‌های `alerts` و `valuation_risk_flags` حذف شده‌اند تا از انتشار هشدارهای غیرمصوب و فاقد فرمول شفاف جلوگیری شود. تغییر وضعیت ارزش‌گذاری (مثلا از ATTRACTIVE به FAIR) بر اساس محاسبات آستانه‌ای رخ می‌دهد، اما هشدار `ASSESSMENT_FLIP_RISK` تولید نمی‌شود.
+* **وابستگی‌های معوق:** پیاده‌سازی این هشدارها مستلزم تصویب صریح آستانه‌ها، اندازه شوک، و فرمول سهم وابستگی توسط مالک پروژه است.
+
+---
+
+### ۵. خلاصه محدودیت‌های دسترسی و نتایج ممیزی (Summary Report)
+
+1. **فایل‌های بررسیشده:** ۱۲ فایل اصلی الزامی در پرامپت 1-C به همراه ۲۱ فایل تکمیلی موجود در لیست پروپوزال ممیزی شدند.
+2. **فایل‌های مفقود جهت تکمیل ارزیابی کلی:**
+   * فایل نقطه ورود اصلی اجرای برنامه (مانند `main.py` یا اسکریپت CLI ارکستراسیون سرتاسری) جهت اثبات اجرا در تولید.
+   * مدل‌های ORM دیتابیس برای Stage 9 جهت بررسی امکان ماندگاری نتایج تصمیم.
+3. **نتایج تاییدشده در کد:**
+   * مرزهای ارکستراسیون سرویس Stage 7 به Stage 9 در `src/decision/service.py` درست و متصل است.
+   * مدل ارزش‌گذاری Stage 7 بر روی محور اصلی Forward P/E منطبق بر مشخصات مصوب V1 به صورت کاملاً قطعی و Backtestable عمل می‌کند.
