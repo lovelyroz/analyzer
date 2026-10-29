@@ -447,3 +447,218 @@
 3. **نتایج تاییدشده در کد:**
    * مرزهای ارکستراسیون سرویس Stage 7 به Stage 9 در `src/decision/service.py` درست و متصل است.
    * مدل ارزش‌گذاری Stage 7 بر روی محور اصلی Forward P/E منطبق بر مشخصات مصوب V1 به صورت کاملاً قطعی و Backtestable عمل می‌کند.
+
+
+---
+
+# Prompt 1-C-B — Final Evidence Closure Report (S7-T001, S7-T002)
+
+**Prompt ID:** Prompt 1-C-B  
+**Task IDs:** S7-T001, S7-T002  
+**Work type:** AUDIT ONLY + REPORT/DOCUMENTATION UPDATES  
+
+## Exact files supplied and actually inspected
+
+### Supplied and inspected (production Python and tests under the extracted tree; paths shown as present on disk, corresponding to the `src/...` names in the prompt):
+
+- core/database.py, core/jalali.py, core/point_in_time.py
+- decision/__init__.py, decision/engine.py, decision/rules.py, decision/schema.py, decision/service.py
+- evaluation/* (all listed modules)
+- forecast/* (all listed modules including service.py, repo.py)
+- ingestion/* (service, codal/*, common/*, fx/*, market/*)
+- kpi/* (all listed)
+- market/__init__.py, market/engine.py, market/indicators.py, market/parameters.py, market/schema.py, market/service.py
+- migrations/__init__.py, migrations/runner.py
+- models/* (audit, entity, forecast, fx, market, normalized, normalized_provenance, period, report, share_action)
+- scoring/* (all listed)
+- scripts/init_db.py, scripts/migrate_db.py, scripts/seed_data.py
+- trend/* (all listed)
+- debug_alerts.py, requirements.txt, .github/workflows/tests.yml
+- tests/test_stage789_service_interface.py, test_stage9_decision.py, test_stage7_valuation.py, test_stage5_forecast.py, test_market_history_query.py, test_stage3_scoring.py, test_stage1_database_architecture.py, test_stage1_database_integrity.py, test_codal_extraction.py, test_stage8_market.py, test_stage8_market_parameters.py
+- Documentation: WORKFLOW_RULES.md, tasksToDo.md, stepsForStage7.md, reply.md, 00_a_Master_Architecture.md, 05_Stage5_Forecast_Engine.md, 07_Stage7_Valuation.md, 08_Stage8_Market_Engine.md, 09_Stage9_Decision_Dashboard.md, 10_Production_Codal_Extraction_and_Data_Load.md, 11_Database_Architecture_Stage1.md, 12_Database_Architecture_V1.1.md, 99_Architecture_Change_Log.md, PROJECT_HANDOFF_INSTRUCTIONS.md
+
+### Explicitly missing from the supplied set (not inspected; conclusions involving them are UNVERIFIED where dependent):
+
+- src/valuation/__init__.py
+- src/valuation/engine.py
+- src/valuation/models.py
+- src/valuation/parameters.py
+- src/valuation/schema.py
+- src/valuation/service.py
+- src/tests/test_stage8_market_service.py (file not present; test_stage8_market.py is present instead)
+- temp_report2.md (listed in mandatory workflow documents; not present in the three zip archives)
+
+Because the entire `valuation/` package is absent, any call chain that depends on the body of `calculate_valuation_as_of_jalali`, its imports, or its internal session/price/parameter usage cannot be fully re-verified from source in this delivery. Import statements and call sites that name those symbols were still examined in the supplied files that reference them.
+
+## S7-T001 Verdict
+
+**Verdict: NOT FOUND IN THE COMPLETE SUPPLIED SOURCE SET** for a real end-to-end production execution path connecting Stage 3 → 5 → 7 → 8 → 9.
+
+Service definitions and limited service-to-service links exist; production callers and a complete upstream-to-Stage-9 path do not appear in the supplied files. Test-only callers are present. Database session ownership is defined (`SessionLocal`) but never shown in a production orchestrator within the supplied set.
+
+### Evidence table (S7-T001)
+
+| Connection | Caller / call site | Upstream input | Downstream consumer | Caller classification | Evidence | Limitation |
+|---|---|---|---|---|---|---|
+| Stage 5 production function | Definition: `forecast/service.py` :: `generate_and_persist_forecast` | Session (caller-owned), Stage 1 facts + TrendResult via internal queries/adapter | Returns `CompanyForecastResult`; persists via `ForecastRecordRepository.save` | Service definition + internal persistence; no production caller | Function at line ~294; repository save at ~408–410; only non-test references are exports in `forecast/__init__.py` | No production caller found in supplied set |
+| Stage 5 callers | Only in `tests/test_stage5_forecast.py` (multiple call sites) | Test fixtures / in-memory session | Test assertions | Test-only | Multiple `generate_and_persist_forecast(...)` calls inside test functions | Bounded to supplied tests |
+| Stage 8 production function | Definition: `market/service.py` :: `analyze_market_as_of_jalali` | Session (caller-owned), company_id, as_of_jalali_date; optional benchmarks | Returns `MarketSignalResult` from `MarketEngine.analyze_market` | Service definition; no production caller | Function lines 51–82; uses `select_market_history_as_of` then engine | No production caller found |
+| Stage 8 callers | Only in tests (`test_stage8_market.py`, interface tests supply MarketSignalResult directly) | Test data | Test assertions | Test-only | No non-test call sites outside definition | Bounded to supplied set |
+| Stage 9 orchestration service | Definition: `decision/service.py` :: `calculate_decision_as_of_jalali` | Session, `CompanyForecastResult`, Jalali date, `FundamentalScoreResult`, `MarketSignalResult` | Calls `calculate_valuation_as_of_jalali` then `DecisionEngine.make_decision`; returns `ValuationDecisionResult` | Service-to-service call (to missing valuation module) + engine | Lines 26–74; explicit call at 56–64 and 65–73 | Body of valuation service not in supplied files → partial UNVERIFIED |
+| Stage 9 engine | `decision/engine.py` :: `DecisionEngine.make_decision` | Fundamental, ValuationResult, MarketSignalResult, optional reliability etc. | Returns `FinalDecisionResult` dataclass | Service definition | Lines 31–50+; constructs `FinalDecisionResult` | No production caller |
+| Stage 9 callers | `tests/test_stage9_decision.py`, `tests/test_stage789_service_interface.py` | Test fixtures / in-memory Session | Test assertions | Test-only | e.g. `_run` → `calculate_decision_as_of_jalali` in interface test; many direct `make_decision` in decision tests | No production caller |
+| Stage 3 scoring | Definition: `scoring/engine.py` :: `FundamentalScoringEngine.calculate_score` | company_id, period_id, industry, kpi_results, optional peers/history | Returns `FundamentalScoreResult` | Service definition; no production caller | Class and method present | No production caller found in supplied set |
+| Database session ownership | `core/database.py` :: `SessionLocal` | N/A | Used by `scripts/seed_data.py` and tests | Utility / test / seed only | `SessionLocal = sessionmaker(...)`; seed script opens session and commits seed data | No production pipeline owns a Session for valuation/decision |
+| Executable entrypoints | `scripts/init_db.py`, `scripts/migrate_db.py`, `scripts/seed_data.py` (`if __name__ == "__main__"`) | N/A | DB init / migrate / seed | Utility-only (ingestion infrastructure, not valuation/decision pipeline) | Explicit `__main__` blocks | Do not invoke Stage 3/5/7/8/9 decision path |
+| Other entrypoints | `debug_alerts.py` | Hard-coded test-like inputs | Prints valuation alerts | Debug utility (imports missing valuation) | Top-level script using `ValuationEngine` | Not a production orchestrator; depends on missing valuation package |
+| Complete E2E production path Stage 3/5/7/8/9 | — | — | — | **Not found** | Exhaustive search of all supplied `.py` for callers of the named symbols and for CLI/API/worker/orchestrator patterns yielded only tests + DB utilities | Entire valuation package missing; no main/CLI/API in supplied set |
+
+**Conclusion for S7-T001:** Within the complete supplied production source set there is no verified production caller that (a) owns a Session, (b) obtains real upstream Stage 3/5/8 outputs, and (c) drives them through Stage 7 into Stage 9. Service boundaries and one internal call (decision → valuation) exist as definitions. The path is therefore **not found** as a real production execution path. Remaining uncertainty is limited to the missing valuation package body and any non-supplied deployment/config files outside the declared scope.
+
+## S7-T002 Verdict
+
+**Verdict: NOT FOUND IN SUPPLIED FILES** for persistence of `FinalDecisionResult` or `ValuationDecisionResult`.
+
+### Evidence table (S7-T002)
+
+| Output object | Persistence mechanism checked | Exact write site if present | Stored fields/identity if present | Conclusion | Limitation |
+|---|---|---|---|---|---|
+| `FinalDecisionResult` (decision/schema.py) | SQLAlchemy ORM models under models/, Base registration in init_db.py / migrations/runner.py | None | N/A | No ORM model or table for decision results | MappingDecision exists but is ingestion mapping, unrelated |
+| `ValuationDecisionResult` (decision/service.py) | Same models + all session.add/commit sites | None | N/A | Returned only as in-memory dataclass | — |
+| `DecisionEngine.make_decision` return | Trace through decision/service.py and all non-test callers | No write after return | N/A | Result leaves the service as return value only | Callers are tests only |
+| `calculate_decision_as_of_jalali` return | Same | No write | N/A | No session.add of the result | Session is input parameter; never used for decision write in this service |
+| Forecast persistence (contrast) | forecast/repo.py :: ForecastRecordRepository.save | `self.session.add(row)` + input-ref adds | ForecastVersion / ForecastInputRef | PRESENT for Stage 5 only | Shows the reusable pattern exists but is not applied to Stage 9 |
+| Ingestion persistence (contrast) | ingestion/service.py, codal/pipeline, market/ingestion, common/run_tracker | Multiple session.add + commit | Reports, facts, runs, market rows | PRESENT for ingestion | Unrelated to decision |
+| File / serialization writers for decision | Search of all supplied .py for dump/json/write of FinalDecisionResult | None | N/A | NOT FOUND | Bounded to supplied files |
+| Migrations / model bootstrap | migrations/runner.py, scripts/init_db.py | Registers entity, period, report, normalized, market, forecast, etc.; no decision table | N/A | No decision persistence schema | — |
+
+**Conclusion for S7-T002:** No concrete persistence path (database or other) for the Stage 9 decision result exists in the supplied source set. A clear contrast exists with Stage 5 forecast persistence and ingestion persistence. Architectural decision on whether persistence is required remains with the owner; this audit does not implement any model or repository.
+
+## Second-pass verification
+
+- Re-checked every call site of `generate_and_persist_forecast`, `analyze_market_as_of_jalali`, `calculate_decision_as_of_jalali`, `make_decision`, and `SessionLocal` via full-text search across all supplied `.py` files.
+- Confirmed absence of non-test callers for the decision/valuation/market analysis path.
+- Confirmed no `session.add` / repository save of `FinalDecisionResult` or `ValuationDecisionResult`.
+- Confirmed `MappingDecision` is an ingestion mapping table, not Stage 9.
+- Corrected any prior over-broad language that implied valuation source had been re-inspected in this delivery: the valuation package was not supplied and was not inspected.
+- No contradiction found in the supplied files that would reverse the “no production caller” or “no Stage 9 persistence” findings.
+
+## Earlier report corrections
+
+Material over-broad or now-unverifiable claims from prior sections of `reply.md` (Prompt 1-A / 1-C style reports):
+
+1. Prior claim that `src/valuation/service.py :: calculate_valuation_as_of_jalali` was inspected and that it “extracts daily price via select_market_price_as_of and hands it to ValuationEngine”.  
+   **Corrected:** That file was not present in the three supplied archives for this prompt. Only the import and the call site inside `decision/service.py` were examined. Internal behavior of the valuation service is **UNVERIFIED** in this delivery.
+
+2. Prior language treating service existence + internal decision→valuation call as “PARTIALLY VERIFIED” production path.  
+   **Corrected:** Per current acceptance criteria, a production execution path requires an actual production caller and end-to-end supply of upstream outputs. None was found; verdict is therefore **NOT FOUND IN THE COMPLETE SUPPLIED SOURCE SET**.
+
+3. Any implication that absence of a model proves the application “could never” persist decisions outside the repo.  
+   **Corrected:** Conclusion is strictly “not found in the supplied source set”. External deployment, unpublished modules, or configuration outside the declared file list are not claimed.
+
+## Acceptance criteria (PASS / NOT PASS)
+
+### S7-T001
+- Every supplied production Python file considered for callers/entrypoints → **PASS** (full search performed).
+- Actual caller chain traced from source, not inferred → **PASS**.
+- Test callers separated from production callers → **PASS**.
+- Database session/transaction ownership evidenced or explicitly unverified → **PASS** (SessionLocal defined; no production pipeline ownership shown).
+- Every claimed absence bounded to exact supplied source set → **PASS**.
+- Report states whether real Stage 3/5/7/8/9 E2E production path is verified / partially verified / not found → **PASS** (not found).
+- Remaining uncertainty identifies exact missing file → **PASS** (valuation package + any external entrypoint outside scope).
+
+### S7-T002
+- FinalDecisionResult / ValuationDecisionResult traced to every caller in supplied production source → **PASS**.
+- All supplied ORM models, migrations, repositories checked → **PASS**.
+- Distinguishes database vs other persistence → **PASS**.
+- Any persistence claim supported by actual write call → **PASS** (none claimed).
+- Absence bounded to supplied source set → **PASS**.
+- Conclusion is one of PRESENT / PARTIAL / NOT FOUND IN SUPPLIED FILES / UNVERIFIED → **PASS** (NOT FOUND IN SUPPLIED FILES).
+
+## Task status changes
+
+| Task ID | Previous status | New status | Reason |
+|---|---|---|---|
+| S7-T001 | OPEN | DONE | Audit acceptance criteria satisfied. Implementation gap (no production caller / E2E path) is documented; the audit task itself is complete. |
+| S7-T002 | OPEN | DONE | Audit acceptance criteria satisfied. Persistence is NOT FOUND IN SUPPLIED FILES; architectural gap left for owner decision. No model/repository created. |
+
+(Unrelated tasks left unchanged.)
+
+## Remaining blockers and exact owner decisions / files required
+
+1. **Owner decision – production entrypoint (S7-T001 / S7-T009):** Whether a CLI, API, worker, or other orchestrator should own `SessionLocal`, assemble Stage 3/5/8 outputs, and invoke `calculate_decision_as_of_jalali`. No such component exists in the supplied set.
+2. **Owner decision – Stage 9 persistence (S7-T002):** Whether `FinalDecisionResult` (or a subset) must be stored. If yes, a model + migration + write path are required; none exist today.
+3. **Missing source for full Stage 7 re-audit:** The complete `src/valuation/` package must be supplied before any further claims about the body of `calculate_valuation_as_of_jalali`, parameter consumption, or PIT internals can be closed.
+4. **temp_report2.md** was listed in the mandatory workflow set but was not among the supplied archives; any statements that depended exclusively on it remain un-rechecked.
+
+Stage 7 remains OPEN; this prompt does not close it.
+
+## Files modified
+
+- `reply.md` (appended this final evidence-closure section only)
+- `tasksToDo.md` (S7-T001 and S7-T002 status updated to DONE with reasons)
+
+## Tests and commands
+
+No tests or application/database commands were run by the agent.
+
+
+---
+
+# Prompt 1-C-B — Addendum: Valuation Package Now Supplied and Re-Verified
+
+**Date of addendum:** 2026-10-29  
+**Reason:** User supplied the previously missing files via `src4.zip` (`valuation/*`, `tests/test_stage8_market_service.py`, `temp_report2.md`).
+
+## Files newly inspected
+
+- valuation/__init__.py
+- valuation/engine.py
+- valuation/models.py
+- valuation/parameters.py
+- valuation/schema.py
+- valuation/service.py
+- tests/test_stage8_market_service.py
+- temp_report2.md (historical evidence only; not treated as authoritative over current source)
+
+## Re-verification of S7-T001 after valuation inspection
+
+**Updated chain evidence for Stage 7:**
+
+| Connection | Caller / call site | Upstream input | Downstream consumer | Caller classification | Evidence | Limitation |
+|---|---|---|---|---|---|---|
+| Stage 7 production function | Definition: `valuation/service.py` :: `calculate_valuation_as_of_jalali` | Session (caller-owned), company_id, period_id, CompanyForecastResult, as_of_jalali_date, **valuation_options | Calls `select_market_price_as_of` then `ValuationEngine().calculate_valuation`; returns `ValuationResult` with market_price_observation metadata | Service definition | Lines 18–70 of valuation/service.py; no commit/add | No production caller |
+| Stage 7 → Stage 9 | `decision/service.py` lines 56–64 | Same Session + forecast + fundamentals + market | Feeds ValuationResult into `DecisionEngine.make_decision` | Service-to-service | Explicit call site | Still no outer production orchestrator |
+| Stage 7 callers outside tests | None found after full re-search including valuation package | — | — | **Not found** | grep across all .py excluding tests shows only definition + export + the decision service call | — |
+
+**S7-T001 final verdict remains unchanged:**  
+**NOT FOUND IN THE COMPLETE SUPPLIED SOURCE SET** for a real end-to-end production execution path.  
+
+The valuation service body is now verified: it is a pure boundary that reads a market price observation and delegates to `ValuationEngine`. It owns no transaction, persists nothing, and has no production caller. Combined with the absence of any CLI/API/worker that assembles Stage 3/5/8 outputs and drives `calculate_decision_as_of_jalali`, the E2E production path is still not present.
+
+## Re-verification of S7-T002 after valuation inspection
+
+- `valuation/service.py` contains zero `session.add`, `session.commit`, or repository writes.
+- `valuation/engine.py`, `valuation/schema.py`, `valuation/models.py`, `valuation/parameters.py` contain no persistence of `ValuationResult` or decision objects.
+- `FinalDecisionResult` / `ValuationDecisionResult` still have no write path anywhere in the now-complete supplied set.
+
+**S7-T002 final verdict remains unchanged:**  
+**NOT FOUND IN SUPPLIED FILES**.
+
+## Corrections relative to the first pass of this prompt
+
+- Previous “UNVERIFIED” notes that depended solely on the absence of the valuation package are resolved for the service definition and its immediate call to the engine.
+- No claim that previously overstated a production path was restored; the stricter “not found” conclusion is retained and strengthened by the additional evidence.
+- `temp_report2.md` was scanned for historical statements about callers/persistence; none reverse the source-based findings above.
+
+## Task status
+
+S7-T001 and S7-T002 remain **DONE** (audit criteria satisfied). The documented architecture gaps (missing production entrypoint; missing Stage 9 persistence) are owner decisions, not incomplete audit work.
+
+## Files modified in this addendum step
+
+- `reply.md` only (this addendum section).
+
+## Tests and commands
+
+No tests or application/database commands were run by the agent.
