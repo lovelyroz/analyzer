@@ -1,4 +1,12 @@
 # This file should be checked regularly so that the commands are not forgotten.
+
+# temporary rules for Stage 7:
+    Primary reference documents moving forward:
+    - stepsForStage7.md: Roadmap and final criteria.
+    - tasksToDo.md: Active tasks and their current status only.
+    - temp_report2.md: History of reports and key evidence.
+    - reply.md: Interim report on the execution of the current prompt.
+
 # Follow the steps below to generate each new prompt
 ## Make each prompt in 2 blocks. One for Agent and one for User
 
