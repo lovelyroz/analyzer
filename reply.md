@@ -662,3 +662,180 @@ S7-T001 and S7-T002 remain **DONE** (audit criteria satisfied). The documented a
 ## Tests and commands
 
 No tests or application/database commands were run by the agent.
+
+
+---
+
+# Prompt 1-D — Stage 7 Evidence Audit and Documentation Alignment
+
+**Prompt ID:** Prompt 1-D  
+**Task IDs:** S7-T003, S7-T004, S7-T005, S7-T006  
+**Work type:** AUDIT + DOCS ONLY  
+**Code changes:** none  
+**Test changes:** none  
+**Test execution:** none (prohibited)
+
+## Exact files actually inspected
+
+### Workflow / prior evidence
+WORKFLOW_RULES.md, tasksToDo.md, stepsForStage7.md, reply.md, temp_report2.md, PROJECT_HANDOFF_INSTRUCTIONS.md
+
+### Specifications
+05_Stage5_Forecast_Engine.md, 07_Stage7_Valuation.md, 08_Stage8_Market_Engine.md, 09_Stage9_Decision_Dashboard.md, 00_a_Master_Architecture.md
+
+### Valuation package
+valuation/__init__.py, valuation/engine.py, valuation/models.py, valuation/parameters.py, valuation/schema.py, valuation/service.py
+
+### Forecast / scoring / market / decision / PIT
+forecast/schema.py, forecast/service.py, forecast/repo.py, scoring/engine.py, market/engine.py, market/schema.py, market/parameters.py, market/service.py, ingestion/market/queries.py, core/point_in_time.py, core/jalali.py, core/database.py, decision/engine.py, decision/rules.py, decision/schema.py, decision/service.py
+
+### Direct tests
+tests/test_stage7_valuation.py, test_stage9_decision.py, test_stage789_service_interface.py, test_stage5_forecast.py, test_stage8_market.py, test_stage8_market_service.py, test_stage8_market_parameters.py, test_market_history_query.py
+
+No listed required file was missing for this prompt after src4.zip.
+
+---
+
+## S7-T003 — D9 and versioned parameter consumption
+
+### Verdict
+**Mechanism implemented and evidenced; D9 remains UNRESOLVED as a policy/contract item** (no R8-dated parameter versions exist; historical selection fails closed).
+
+### How parameters are represented and versioned
+- Live module constants in `valuation/parameters.py` (SCENARIO_WEIGHTS, VALUATION_THRESHOLDS, CONFIDENCE_THRESHOLDS, RISK_THRESHOLDS, ALERT_THRESHOLDS, etc.).
+- `ParameterRecord` / `ParameterSetVersion` / `ParameterRegistry` / `DEFAULT_REGISTRY` with a single genesis set: `GENESIS_VERSION_KEY = "STAGE7_V1/GENESIS"`, `effective_from=None` for every genesis record (`_UNVERSIONED_GENESIS_NOTE` states temporal validity is unknown and never valid for historical selection).
+- Genesis is built programmatically from live constants so recorded values cannot drift from executed values (`_genesis_records`, `GENESIS_VERSION`).
+
+### Selection when an as-of date is supplied
+- `resolve_parameter_set_as_of(as_of, registry)` (parameters.py ~239–280): only versions with non-None `effective_from <= as_of` participate; newest wins; overlaps raise `LookupError`; undated genesis never participates; `as_of=None` raises.
+- With only DEFAULT_REGISTRY (genesis only) this **always** raises `LookupError` naming missing R8-dated records.
+- `select_parameter_set_for_valuation(parameter_registry, parameter_as_of)` (parameters.py ~451+):
+  - Neither registry nor as-of → `FIXED_GENESIS_LEGACY`, `point_in_time_selection_applied=False`.
+  - Dated path → `resolve_parameter_set_as_of`; missing version fails closed (no silent fallback to current constants).
+- Engine (`ValuationEngine.calculate_valuation`, engine.py ~72–90, `_resolve_parameter_governing_timestamp` ~314–347): data_cutoff (from forecast or explicit) governs; conflicting `parameter_as_of` raises; no cutoff + caller as-of labelled `CALLER_SUPPLIED`; otherwise fails closed. No invention of valuation_date as as-of.
+
+### What happens when no valid version can be selected
+- Loud `LookupError` from `resolve_parameter_set_as_of` (message requires R8-dated records). Proven by implementation and tests:
+  - `test_p33_as_of_without_dated_records_raises`
+  - `test_p35_missing_or_ambiguous_as_of_selection_fails_closed`
+  - `test_d9_missing_eligible_dated_version_fails_closed_without_genesis_fallback`
+
+### Do selected values actually influence calculation?
+**Yes.** `consume_parameter_set` freezes a `ConsumedParameters` object; the engine reads **only** from it for registry-governed values (scenario weights, valuation/confidence/risk/alert thresholds, min_industry_peers, sensitivity_perturbation, probability blend/families, scenario multiple bounds, model/contract version). Metadata snapshot is produced from the same `values` mapping (`ConsumedParameters.snapshot`), so recorded and consumed cannot disagree.
+
+Evidence of real consumption (not metadata-only):
+- engine.py uses `params.valuation_thresholds`, `params.alert_thresholds`, `params.scenario_weights`, `params.min_industry_peers`, etc. in status, alerts, probabilities, peer checks.
+- Tests: `test_p35_as_of_selection_governs_calculation_and_snapshot_matches`, `test_p35_selected_set_governs_peers_alerts_and_scenario_weights`, `test_p10_expensive_threshold_consumed_from_parameters`, `test_p35_legacy_path_provenance_is_truthful_and_unchanged` (33 consumed names, 5 recorded-not-consumed including dead `ALERT_THRESHOLDS.high_dependence_share` and empty `INDUSTRY_TARGET_PE`).
+
+### Metadata / model-version / effective-date correspondence
+- Legacy path metadata: `mode=FIXED_GENESIS_LEGACY`, `point_in_time_selection_applied=False`, version_key genesis, effective_from=None — truthful; does not claim PIT.
+- Dated path: `point_in_time_selection_applied=True`, `as_of_source` in {EFFECTIVE_DATA_CUTOFF, CALLER_SUPPLIED}, snapshot matches selected set.
+- Tests: `test_d9_metadata_distinguishes_dated_selection_from_legacy_genesis`, `test_d9_effective_cutoff_governs_selection_not_valuation_date`, `test_d9_exact_effective_from_boundary_is_accepted`, `test_d9_future_effective_version_is_rejected`, `test_d9_conflicting_parameter_as_of_is_rejected`.
+
+### Test coverage of real selection + consumption + missing historical version
+Covered by the p33 / p35 / d9 tests listed above. Synthetic registries exercise dated selection mechanics without inventing production R8 dates.
+
+### What remains for the owner (D9 policy)
+- No R8-dated parameter versions exist in DEFAULT_REGISTRY. Inventing `effective_from` dates is forbidden.
+- D9 is **not** resolved merely because a version identifier and selection mechanism exist. Historical backtests require owner-approved dated records (or an explicit approved contract that undated genesis is never used for history — already the code behaviour).
+
+**Acceptance criterion:** PASS (path, consumption, fail-closed behaviour, and tests reported with evidence). D9 policy remains open for owner.
+
+---
+
+## S7-T004 — PIT, provenance, and input contracts
+
+### Verdict
+**PARTIAL.** Market-price Jalali as-of selection and forecast cutoff/parameter governance are evidenced. Benchmark PE series and full publication-time evidence for several inputs remain caller-supplied without temporal provenance inside Stage 7.
+
+### Input-by-input evidence matrix
+
+| Input | Identity | Observation / report date | Availability / publication time | As-of filtering rule | Provenance link | Behaviour when temporal evidence absent | Status |
+|---|---|---|---|---|---|---|---|
+| Stage 5 forecast (`CompanyForecastResult`) | company_id, forecast_period_id, industry_code, scenario EPS chains | `data_cutoff_datetime` on result | Optional `ForecastInputRef.available_at` when refs supplied | Engine defaults cutoff from forecast; `_reject_unverifiable_forecast_refs` blocks undated or post-cutoff refs | `ForecastInputRef` sequence optional on engine call | Raises if refs present but undated/post-cutoff; no refs → no extra PIT claim | Proven for cutoff identity; full publication chain depends on upstream Stage 5 refs being supplied |
+| Market price (valuation) | company_id, market_data_id, price, price_basis | `source_jalali_date` on `MarketPriceObservation` | **Not stored** on MarketDaily rows in supplied models | `select_market_price_as_of`: latest valid positive price on or before Jalali as-of; duplicate same-date raises | Metadata `market_price_observation` written by valuation/service.py | `MarketPriceUnavailableError` if none | Observation date + as-of filter proven; publication/availability time **not** in supplied market schema |
+| Historical PE benchmark | Caller-supplied sequence `historical_pe_values` | None in Stage 7 | None | Non-finite filtered; empty → insufficient benchmark path | None inside Stage 7 | Continues with reduced evidence; alert `CRITICAL:INSUFFICIENT_BENCHMARK_DATA` when peer count low | **Gap:** no timestamps/provenance on benchmark series |
+| Industry forward / TTM PE | Caller-supplied `industry_forward_pe_values`, `industry_ttm_pe_values` | None | None | Same filtering; peer minimum from params | None | Same | **Gap:** caller must supply; no repository-backed PIT series in supplied code |
+| Stage 8 market signals | `MarketSignalResult` from `analyze_market_as_of_jalali` | as_of_date (Jalali) on result; history rows have jalali_date | Not on MarketDaily | `select_market_history_as_of` then engine | service maps observation fields | Empty history → engine INSUFFICIENT_DATA | As-of filter proven; publication time absent |
+| Parameter set (D9) | version_key, effective_from | effective_from on dated versions | N/A | resolve_parameter_set_as_of | selection metadata | LookupError | Proven fail-closed |
+| Report versions (Stage 1 path) | ReportVersion | publication_datetime | publication_datetime ≤ cutoff | `core/point_in_time.py::select_report_version` | Direct | Returns None | Proven for report path; not wired into valuation engine call in supplied production path |
+
+### Key limitations (explicit)
+1. **Cutoff alone is not full PIT** — policy in stepsForStage7.md §2; code does not claim otherwise for benchmarks.
+2. Market daily rows lack a publication/availability timestamp; Jalali calendar date of the bar is the only temporal field.
+3. Benchmark PE series are pure caller inputs with no Stage 7-side temporal contract.
+4. Production caller that would assemble these inputs under a single as-of is still absent (S7-T001).
+
+**Acceptance criterion:** PASS (matrix with contracts, evidence, gaps, and required owner/file decisions).
+
+---
+
+## S7-T005 — Alert and decision contracts D1–D8
+
+### Per-decision status
+
+| ID | Approved policy (stepsForStage7.md) | Current implementation | Direct tests | Consumer evidence | Status |
+|---|---|---|---|---|---|
+| **D1** ASSESSMENT_FLIP_RISK | No new alert without valid criterion for assumption/status change | Not produced by `_alerts` (engine.py ~639–675). No symbol emits this name. | `test_v1_defers_undefined_flip_dependence_and_assumption_alerts`, `test_p3_flip_dependence_alerts_remain_explicitly_unresolved` assert name absent from alerts and valuation_risk_flags | Decision engine does not read this alert name | **Intentionally deferred** — matches policy |
+| **D2** HIGH_MULTIPLE_DEPENDENCE | Current dependence criterion not approved; keep disabled | `ALERT_THRESHOLDS.high_dependence_share = 0.60` recorded in genesis but listed in `recorded_not_consumed_names`; **not read** by `_alerts` or formulas. Comment in parameters.py: "Declared but unwired dead definition; must not be activated without D2" | Same deferral tests | None | **Intentionally deferred** |
+| **D3** HIGH_EPS_DEPENDENCE | No new alert without valid criterion; preserve Stage 5 EPS | Not emitted. EPS taken from Stage 5 forecast chains only (`test_v1_uses_stage5_eps_without_recalculating_from_net_profit`) | Deferral tests + EPS preservation tests | None for this alert | **Intentionally deferred**; EPS contract preserved |
+| **D4** MARGIN_ASSUMPTION_RISK | Outside V1 until valid dated input exists | Not emitted | Deferral tests | None | **Intentionally deferred** |
+| **D5** HIGH_IMPACT_HIGH_UNCERTAINTY | Preserve `review_priority`; no extra alert without independent criterion | `review_priority` computed and returned on `ValuationResult`; no additional alert of this name | Deferral tests; driver analysis path present | Decision uses valuation status/risk/confidence, not this alert name | **Intentionally deferred** for alert; review_priority preserved |
+| **D6** Industry-specific models | Keep EPS + TARGET_PE drivers; do not invent industry formulas | `INDUSTRY_TARGET_PE = {}` unused; fair value from Stage 5 EPS × target PE hierarchy; NAV accepted as optional input only | `test_v1_sector_examples_use_only_eps_and_target_pe_drivers` | N/A | **Implemented as V1 policy** — no invented industry chains |
+| **D7** PIT | Examine temporal evidence per input; cutoff alone insufficient | See S7-T004 matrix. Parameter selection fail-closed; market price Jalali as-of; forecast ref rejection; benchmarks lack timestamps | d9/p33/p35 tests; market query tests | N/A | **Partially evidenced**; remaining gaps explicit (benchmarks, market publication time) |
+| **D8** Alert contract | Verify real names, producers, consumers before treating as operational | **Produced names** (engine `_alerts`): `WARNING:HIGH_SCENARIO_DISPERSION`, `WARNING:LOW_FORECAST_RELIABILITY`, `CRITICAL:INSUFFICIENT_BENCHMARK_DATA`, `WATCH:VALUATION_ABOVE_TARGET_PE`, `WATCH:VALUATION_BELOW_TARGET_PE`, `WATCH:FORWARD_PE_ABOVE_HISTORICAL`, `WATCH:FORWARD_PE_BELOW_HISTORICAL`, `WATCH:FORWARD_PE_ABOVE_INDUSTRY`, `WATCH:FORWARD_PE_BELOW_INDUSTRY`, `INFO:TOP_DRIVER:...`. Stored on `ValuationResult.alerts` and folded into `valuation_risk_flags`. | Stage 7 tests exercise dispersion/reliability/benchmark paths | `decision/engine.py` consumes `valuation_status`, `valuation_risk_level`, `valuation_confidence`, expected upside — **not** the individual alert strings. No other consumer of alert strings found in supplied decision path | **Operational for valuation output schema**; limited downstream consumption (risk/status fields, not alert name list) |
+
+No genuine discrepancy that would reclassify a deferred D1–D5 item as a defect requiring implementation. Deferred remains deferred.
+
+**Acceptance criterion:** PASS.
+
+---
+
+## S7-T006 — Documentation alignment
+
+### Changes made
+1. **reply.md** — this Prompt 1-D report appended (historical sections retained; corrections only where current evidence requires).
+2. **stepsForStage7.md** — status notes for D9/PIT/alerts and package-1 audit completion updated to match T001–T005 evidence; Stage 7 remains OPEN; four-package order preserved; no completion claim.
+3. **tasksToDo.md** — S7-T003, S7-T004, S7-T005, S7-T006 marked DONE with audit results; other tasks unchanged.
+
+### Corrections to earlier statements
+- Prior language that could be read as “D9 resolved because a version key exists” is corrected: mechanism exists; policy/R8-dated records do not; D9 remains open for owner.
+- Prior implication that benchmark PE series carry PIT evidence inside Stage 7 is corrected: they are caller-supplied sequences without timestamps in the supplied contract.
+- Deferred alerts D1–D5 remain deferred; not reported as missing bugs.
+
+### Acceptance criterion
+PASS for documentation alignment to the completed audits.
+
+---
+
+## Acceptance criteria summary
+
+| Task | Outcome |
+|---|---|
+| S7-T003 | **PASS** (audit complete; D9 policy still owner-blocked) |
+| S7-T004 | **PASS** (matrix delivered; residual PIT gaps explicit) |
+| S7-T005 | **PASS** (every D1–D8 status evidence-backed) |
+| S7-T006 | **PASS** (docs aligned to evidence only) |
+
+## Owner decisions / contracts still required
+
+1. **R8 / D9:** Approve and register dated parameter versions (`effective_from` + values) if historical parameter selection is a product requirement; or formally accept that only the legacy undated genesis path is used for current runs.
+2. **Benchmark PIT:** Decide whether historical/industry PE series must carry observation dates and availability timestamps, and who supplies them.
+3. **Market publication time:** Decide whether MarketDaily needs an availability/publication field for stricter PIT (currently only Jalali bar date exists).
+4. **Production entrypoint** (from S7-T001): still required before E2E path can be claimed.
+5. **Stage 9 persistence** (from S7-T002): still an owner product decision.
+
+## Files changed
+- reply.md (this report)
+- stepsForStage7.md (roadmap status alignment only)
+- tasksToDo.md (T003–T006 status → DONE)
+
+## Tests and commands
+No tests, application code, database commands, or Git commands were run by the agent. No production or test code was modified.
+
+## Recommended next Task IDs
+- **S7-T009** (owner decision on real integrated path) once production-entrypoint intent is clear.
+- **S7-T007** remains BLOCKED until owner supplies R8-dated parameter policy (or explicit acceptance of legacy-only).
+- Do **not** advance to S7-T011 (final engine review) until package-2/3 blockers above are resolved.
+
+**Stage 7 remains OPEN.**

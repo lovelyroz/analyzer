@@ -1,140 +1,50 @@
-# Prompt 1-C-B — Comprehensive Evidence Closure for Stage 7
-## Task IDs: S7-T001, S7-T002
-## Work Type: AUDIT ONLY + REPORT/DOCUMENTATION UPDATES
+# Prompt 1-D — Stage 7 Evidence Audit and Documentation Alignment
 
-You are auditing the current `lovelyroz/analyzer` repository snapshot for a financial-data application.
+**Task IDs:** S7-T003, S7-T004, S7-T005, S7-T006  
+**Work type:** AUDIT + DOCS ONLY  
+**Code changes:** NOT AUTHORIZED  
+**Test changes:** NOT AUTHORIZED  
+**Test execution:** PROHIBITED
 
-Your task is to close the remaining evidence gaps in:
-- **S7-T001 — Verify the real production execution path**
-- **S7-T002 — Verify Stage 9 persistence**
+## 1. Mission
 
-This is a source-evidence audit, not an implementation task.
+Continue Stage 7 remediation for the financial-data application in the local project folder `analyzer`.
 
-## 1. Mandatory workflow and authority
+Read and follow `WORKFLOW_RULES.md`, `tasksToDo.md`, and `stepsForStage7.md` before beginning. Use `tasksToDo.md` as the task-status register and `stepsForStage7.md` as the authoritative Stage 7 roadmap.
 
-Read and follow:
+Complete the three remaining evidence audits:
+
+- **S7-T003:** D9 and actual consumption of versioned valuation parameters.
+- **S7-T004:** Point-in-Time (PIT), provenance, and input contracts.
+- **S7-T005:** Alert and decision contracts D1–D8.
+
+Then perform **S7-T006**, aligning `reply.md` and `stepsForStage7.md` only to conclusions supported by the completed audits.
+
+This is an evidence-gathering and documentation task. Do not implement fixes or redesign the valuation engine.
+
+## 2. Exact required files
+
+The following files must be provided to you. Inspect only these files and any additional files explicitly listed below. Do not assume that you can inspect the rest of the repository.
+
+### Workflow and prior evidence
+
 - `WORKFLOW_RULES.md`
 - `tasksToDo.md`
 - `stepsForStage7.md`
 - `reply.md`
 - `temp_report2.md`
-- `07_Stage7_Valuation.md`
-- `09_Stage9_Decision_Dashboard.md`
-- `10_Production_Codal_Extraction_and_Data_Load.md`
-- `11_Database_Architecture_Stage1.md`
-- `12_Database_Architecture_V1.1.md`
-- `00_a_Master_Architecture.md`
 - `PROJECT_HANDOFF_INSTRUCTIONS.md`
 
-Treat `stepsForStage7.md` as the authoritative Stage 7 roadmap and `tasksToDo.md` as the task register. Earlier reports are historical evidence, not unquestionable facts. Where an earlier conclusion conflicts with current source code, document the conflict and explain which evidence resolves it.
+### Specifications
 
-Stage 7 remains OPEN unless its actual exit criteria are later verified. This prompt does not authorize closing Stage 7.
+- `05_Stage5_Forecast_Engine.md`
+- `07_Stage7_Valuation.md`
+- `08_Stage8_Market_Engine.md`
+- `09_Stage9_Decision_Dashboard.md`
+- `00_a_Master_Architecture.md`
 
-## 2. Strict file-access boundary
+### Stage 7 valuation package
 
-You may examine only the files explicitly supplied for this prompt. Do not assume you can access the rest of the repository, hidden files, a local checkout, Git history, or remote search results.
-
-The complete production Python file set to supply is listed below. These paths were enumerated from the repository's current directory structure. Supply every listed file, including files that appear unrelated at first glance, because a caller or persistence path may be located outside the obvious Stage 7/9 modules.
-
-### Core, decision, evaluation, forecast
-
-- `src/core/database.py`
-- `src/core/jalali.py`
-- `src/core/point_in_time.py`
-- `src/decision/__init__.py`
-- `src/decision/engine.py`
-- `src/decision/rules.py`
-- `src/decision/schema.py`
-- `src/decision/service.py`
-- `src/evaluation/__init__.py`
-- `src/evaluation/aggregate.py`
-- `src/evaluation/artifact.py`
-- `src/evaluation/metrics.py`
-- `src/evaluation/observation.py`
-- `src/evaluation/pipeline.py`
-- `src/evaluation/reliability.py`
-- `src/evaluation/schema.py`
-- `src/forecast/__init__.py`
-- `src/forecast/adapter.py`
-- `src/forecast/builder.py`
-- `src/forecast/drivers.py`
-- `src/forecast/engine.py`
-- `src/forecast/queries.py`
-- `src/forecast/repo.py`
-- `src/forecast/schema.py`
-- `src/forecast/service.py`
-
-### Ingestion
-
-- `src/ingestion/__init__.py`
-- `src/ingestion/service.py`
-- `src/ingestion/codal/__init__.py`
-- `src/ingestion/codal/acquisition.py`
-- `src/ingestion/codal/adapter.py`
-- `src/ingestion/codal/ingestion.py`
-- `src/ingestion/codal/numbers.py`
-- `src/ingestion/codal/parser.py`
-- `src/ingestion/codal/pdf_extract.py`
-- `src/ingestion/codal/pipeline.py`
-- `src/ingestion/codal/validator.py`
-- `src/ingestion/common/__init__.py`
-- `src/ingestion/common/idempotency.py`
-- `src/ingestion/common/identity.py`
-- `src/ingestion/common/parsing.py`
-- `src/ingestion/common/run_tracker.py`
-- `src/ingestion/common/validation.py`
-- `src/ingestion/fx/__init__.py`
-- `src/ingestion/fx/adapter.py`
-- `src/ingestion/fx/ingestion.py`
-- `src/ingestion/fx/validator.py`
-- `src/ingestion/market/__init__.py`
-- `src/ingestion/market/adapter.py`
-- `src/ingestion/market/ingestion.py`
-- `src/ingestion/market/queries.py`
-- `src/ingestion/market/validator.py`
-
-### KPI, market, migrations, models
-
-- `src/kpi/__init__.py`
-- `src/kpi/conditional.py`
-- `src/kpi/engine.py`
-- `src/kpi/industry.py`
-- `src/kpi/period_utils.py`
-- `src/kpi/schema.py`
-- `src/kpi/universal.py`
-- `src/market/__init__.py`
-- `src/market/engine.py`
-- `src/market/indicators.py`
-- `src/market/parameters.py`
-- `src/market/schema.py`
-- `src/market/service.py`
-- `src/migrations/__init__.py`
-- `src/migrations/runner.py`
-- `src/models/audit.py`
-- `src/models/entity.py`
-- `src/models/forecast.py`
-- `src/models/fx.py`
-- `src/models/market.py`
-- `src/models/normalized.py`
-- `src/models/normalized_provenance.py`
-- `src/models/period.py`
-- `src/models/report.py`
-- `src/models/share_action.py`
-
-### Scoring, scripts, trend, valuation
-
-- `src/scoring/__init__.py`
-- `src/scoring/engine.py`
-- `src/scoring/functions.py`
-- `src/scoring/schema.py`
-- `src/scoring/weights.py`
-- `src/scripts/init_db.py`
-- `src/scripts/migrate_db.py`
-- `src/scripts/seed_data.py`
-- `src/trend/__init__.py`
-- `src/trend/engine.py`
-- `src/trend/schema.py`
-- `src/trend/utils.py`
 - `src/valuation/__init__.py`
 - `src/valuation/engine.py`
 - `src/valuation/models.py`
@@ -142,181 +52,179 @@ The complete production Python file set to supply is listed below. These paths w
 - `src/valuation/schema.py`
 - `src/valuation/service.py`
 
-### Root-level/runtime and workflow references
+### Forecast, scoring, market, decision, and PIT interfaces
 
-- `debug_alerts.py`
-- `requirements.txt`
-- `.github/workflows/tests.yml`
+- `src/forecast/schema.py`
+- `src/forecast/service.py`
+- `src/forecast/repo.py`
+- `src/scoring/engine.py`
+- `src/market/engine.py`
+- `src/market/schema.py`
+- `src/market/parameters.py`
+- `src/market/service.py`
+- `src/ingestion/market/queries.py`
+- `src/core/point_in_time.py`
+- `src/core/jalali.py`
+- `src/core/database.py`
+- `src/decision/engine.py`
+- `src/decision/rules.py`
+- `src/decision/schema.py`
+- `src/decision/service.py`
 
-### Required tests and specifications
+### Directly relevant tests
 
-- `src/tests/test_stage789_service_interface.py`
-- `src/tests/test_stage9_decision.py`
 - `src/tests/test_stage7_valuation.py`
+- `src/tests/test_stage9_decision.py`
+- `src/tests/test_stage789_service_interface.py`
 - `src/tests/test_stage5_forecast.py`
-- `src/tests/test_stage8_market_service.py`
-- `src/tests/test_market_history_query.py`
-- `src/tests/test_stage3_scoring.py`
-- `src/tests/test_stage1_database_architecture.py`
-- `src/tests/test_stage1_database_integrity.py`
-- `src/tests/test_codal_extraction.py`
 - `src/tests/test_stage8_market.py`
+- `src/tests/test_stage8_market_service.py`
 - `src/tests/test_stage8_market_parameters.py`
-- `05_Stage5_Forecast_Engine.md`
-- `08_Stage8_Market_Engine.md`
-- `99_Architecture_Change_Log.md`
+- `src/tests/test_market_history_query.py`
 
-If any listed file is not supplied, do not pretend to have inspected it. List the exact missing path, explain which acceptance criterion it affects, and classify the relevant conclusion as UNVERIFIED. Do not replace a missing file with assumptions or a filename guess. Do not infer repository-wide absence merely because a symbol is absent from a subset of supplied files.
+If a listed file is unavailable, report its exact path and the specific acceptance criterion that cannot be verified. Do not silently omit it. If another file is necessary, name that exact path and explain why it is required; do not claim conclusions that depend on an unprovided file.
 
-## 3. S7-T001 — Production execution path
+## 3. Mandatory restrictions
 
-Determine, from the supplied source code, whether the project contains a real production execution path connecting the relevant stages.
+1. Do not run tests, application code, scripts, database commands, Git commands, or shell commands.
+2. Do not use GitHub, GitHub CLI, remote APIs, commits, branches, pushes, or pulls.
+3. Do not modify production code or test code.
+4. Only the following documentation files may be changed:
+   - `reply.md`
+   - `stepsForStage7.md`
+   - `tasksToDo.md`
+5. Do not rewrite `src/valuation/engine.py`; it is reserved for S7-T011, the final technical task.
+6. Do not invent financial formulas, alert thresholds, industry mappings, data sources, parameter values, effective dates, historical observations, or missing callers.
+7. Do not treat a report's assertion as proof when the current source or tests can verify the claim.
+8. Do not treat a report date, cutoff date, or model-version label alone as proof of PIT correctness.
+9. Do not recompute Stage 5 EPS in Stage 7.
+10. Preserve the existing Jalali date conventions and established financial contracts.
+11. A missing item in the supplied file set is not proof that it is absent from the entire repository or from external deployment code.
 
-At minimum, trace these symbols and their actual callers:
+## 4. S7-T003 — D9 and versioned parameter consumption
 
-- Stage 3: scoring production functions and their input requirements.
-- Stage 5: `generate_and_persist_forecast` and any forecast retrieval/persistence functions.
-- Stage 7: `calculate_valuation_as_of_jalali`.
-- Stage 8: `analyze_market_as_of_jalali`.
-- Stage 9: `calculate_decision_as_of_jalali` and `DecisionEngine.make_decision`.
-- Database/session ownership, including `SessionLocal`, session creation, transaction boundaries, commit/rollback, and closure.
-- Any executable entrypoint, CLI, API route, worker, scheduled task, orchestrator, pipeline runner, or application startup path present in the supplied files.
+Inspect the current implementation and tests to determine:
 
-Search for direct imports and calls, indirect call chains, `if __name__ == "__main__"` blocks, and framework registration/dispatch where relevant. Inspect the complete supplied source set, not just the obvious service files.
+- How valuation parameters are represented and versioned.
+- How parameter selection is performed when an as-of Jalali date is supplied.
+- What happens when no parameter version can be validly selected.
+- Whether the selected parameter values actually influence the valuation calculation, or are merely attached to metadata.
+- Whether metadata, model-version identifiers, and effective-date fields correspond to the parameters actually consumed by the calculation.
+- Whether the tests exercise the real selection and consumption path, including the absence of a valid historical version.
 
-Explicitly distinguish:
+### Required evidence
 
-1. A function or service definition.
-2. A service-to-service call.
-3. A test-only caller.
-4. A database utility or ingestion script that does not run the valuation/decision pipeline.
-5. A real production caller.
-6. A complete end-to-end path that supplies actual upstream outputs and carries the result through Stage 9.
+For each material conclusion, cite exact file paths, function/class names, relevant line ranges when available, and the associated test name or assertion.
 
-For each claimed connection, provide:
-- Exact file path and function/class/method name.
-- The relevant call site or a short exact code excerpt.
-- The inputs passed and where they originate.
-- The returned output and its next consumer.
-- Whether the path is production, test-only, utility-only, or unverified.
-- Any missing link that prevents the next stage from being reached.
+Distinguish:
 
-Do not treat the existence of `SessionLocal`, a service, a model, a passing unit test, or a mocked call as proof of a production pipeline.
+- Proven by current implementation.
+- Proven by an existing test.
+- Not demonstrated by the supplied code or tests.
+- Requires an explicit owner decision or an approved financial contract.
 
-Do not design or propose an implementation of a new orchestrator in this prompt. Report the smallest missing link or owner decision, if any.
+Do not infer that Genesis/default parameters are valid for historical dates unless an explicit, approved contract supports that behavior. Do not invent an effective date or historical version.
 
-### S7-T001 acceptance criteria
+**Acceptance criterion:** The parameter-selection path, actual parameter consumption, invalid/missing-version behavior, and test coverage are reported with evidence. Do not mark D9 resolved merely because a version identifier exists.
 
-Accept the audit conclusion only if:
-- Every supplied production Python file in the declared scope has been considered for callers/entrypoints.
-- The actual caller chain for the named services is traced from source, not inferred from function names.
-- Test callers are separated from production callers.
-- Database session and transaction ownership are evidenced or explicitly unverified.
-- Every claimed absence is bounded to the exact supplied source set.
-- The report states whether a real Stage 3/5/7/8/9 end-to-end production path is verified, partially verified, or not found in the complete supplied source set.
-- Any remaining uncertainty identifies the exact missing file or non-source evidence and why it is necessary.
+## 5. S7-T004 — PIT, provenance, and input contracts
 
-If the complete supplied production source set contains no production caller, you may conclude that no such caller was found in that supplied source set. Do not claim that the application could never be invoked externally unless deployment/configuration evidence proves that broader claim.
+Trace the available evidence for the following inputs and interfaces:
 
-## 4. S7-T002 — Stage 9 persistence
+- Stage 5 forecast and its provenance/reference information.
+- Valuation market price and its Jalali as-of selection.
+- Historical benchmark inputs and their timestamps/provenance.
+- Stage 8 market signals and their actual source path.
+- The as-of date and its propagation across relevant service boundaries.
+- Any other input consumed by valuation that materially affects PIT correctness.
 
-Determine whether `FinalDecisionResult` or the containing `ValuationDecisionResult` is persisted anywhere in the supplied application source.
+For each input, distinguish the date of the underlying observation or report from evidence that the information was actually available by the requested analysis date.
 
-Do not restrict this audit to whether a dedicated SQLAlchemy model exists. Check for all plausible persistence mechanisms evidenced by the supplied files, including:
+Determine whether the available source and tests prove:
 
-- SQLAlchemy ORM models and table definitions.
-- Repositories and database write paths.
-- `session.add`, `flush`, `commit`, transaction handling, and repository calls.
-- Serialization or output writers that store decision results to files or another configured destination.
-- Migrations and model-registration/bootstrap logic.
-- Any production caller that receives the Stage 9 result and then stores, publishes, or forwards it to a persistent destination.
-- Existing persistence patterns for other stage outputs, so the report can distinguish a reusable pattern from actual Stage 9 persistence.
+1. The identity of the data being consumed.
+2. The observation/report date, where applicable.
+3. The availability/publication time, where required for PIT.
+4. The as-of filtering rule.
+5. The provenance linking the input to its source.
+6. The behavior when the required temporal evidence is absent.
 
-Trace `FinalDecisionResult` from its definition, through `DecisionEngine.make_decision`, through `calculate_decision_as_of_jalali`, and into all callers found in the supplied source set.
+Do not assume that an as-of query alone establishes full PIT correctness. Do not classify metadata references as proof that the corresponding data were actually used.
 
-Explicitly distinguish these outcomes:
+**Acceptance criterion:** Provide an input-by-input evidence matrix with the actual contract, evidence, unresolved temporal/provenance gaps, and the exact missing file or owner decision needed to close each gap. Where the code cannot establish PIT correctness, report that limitation explicitly rather than inventing a remedy.
 
-- **PRESENT:** a concrete persistence path for the decision result is implemented and traceable.
-- **PARTIAL:** only some data, metadata, or a transformed subset is persisted, or a persistence component exists without a proven end-to-end write path.
-- **NOT FOUND IN SUPPLIED FILES:** no persistence path is evidenced within the complete supplied scope.
-- **UNVERIFIED:** one or more required files or necessary evidence are missing.
+## 6. S7-T005 — Alert and decision contracts D1–D8
 
-A model or schema alone is not proof that data is saved. A `Session` parameter alone is not proof of persistence. The absence of `session.add()` inside the decision service alone is not proof that no caller persists the result.
+Compare the current source and direct tests against the approved policies in `stepsForStage7.md` and `07_Stage7_Valuation.md`.
 
-Do not create a new ORM model, migration, repository, output writer, or persistence contract. Do not decide whether persistence is a product requirement; report the current implementation and the architectural decision that remains for the owner.
+Assess each decision separately:
 
-### S7-T002 acceptance criteria
+- **D1 — `ASSESSMENT_FLIP_RISK`:** no new alert without a valid criterion for changes in assumptions/status.
+- **D2 — `HIGH_MULTIPLE_DEPENDENCE`:** the current criterion is not approved as valid; keep the alert disabled pending validation.
+- **D3 — `HIGH_EPS_DEPENDENCE`:** no new alert without a valid criterion; preserve Stage 5 EPS.
+- **D4 — `MARGIN_ASSUMPTION_RISK`:** outside V1 until a valid, dated input exists.
+- **D5 — `HIGH_IMPACT_HIGH_UNCERTAINTY`:** preserve `review_priority`; do not create an additional alert without an independent valid criterion.
+- **D6 — Industry-specific models:** preserve existing EPS and TARGET_PE drivers; do not invent industry formulas or mappings.
+- **D7 — PIT:** evaluate actual temporal evidence for every relevant input; a cutoff alone is insufficient.
+- **D8 — Alert contract:** verify actual names, structures, producers, consumers, and tests before concluding that an alert is operationally supported.
 
-Accept the audit conclusion only if:
-- `FinalDecisionResult` and `ValuationDecisionResult` are traced to every caller found in the supplied production source.
-- All supplied ORM models, model-registration paths, migrations, and relevant repositories have been checked.
-- The report distinguishes database persistence from other forms of persistence.
-- Any existing persistence claim is supported by the actual write call and the identity/fields being stored.
-- Any absence claim is bounded to the exact supplied source set.
-- The conclusion is one of PRESENT, PARTIAL, NOT FOUND IN SUPPLIED FILES, or UNVERIFIED, with supporting evidence and remaining uncertainty.
+For each D1–D8, report:
 
-## 5. Cross-check and evidence discipline
+- Approved policy.
+- Current implementation and exact relevant symbols.
+- Evidence from direct tests.
+- Actual consumer evidence, if any.
+- Whether the behavior is implemented, intentionally deferred, partially evidenced, or unresolved.
+- Any genuine discrepancy and the evidence needed to accept that discrepancy as a defect.
 
-Perform a second pass after the initial audit:
-- Recheck every call-chain and persistence claim against the actual referenced file.
-- Check whether any supplied file contradicts the first-pass conclusion.
-- Check whether earlier statements in `reply.md` or `temp_report2.md` overstate what was inspected.
-- Correct false or overly broad claims rather than copying them forward.
-- Never infer that a test passed or failed from its name or from a historical report. Do not run tests.
-- Never invent a file, function, caller, schema, data source, database table, or deployment path.
-- Use precise terms: “not found in the supplied source set” is not interchangeable with “does not exist anywhere.”
-- Keep financial correctness, auditability, determinism, and point-in-time correctness intact.
+Do not label an intentionally deferred capability as a bug that must be implemented. Do not change alert names or schemas. Do not infer that an alert is consumed merely because it appears in a result schema.
 
-For every material conclusion, include:
-1. The conclusion.
-2. The exact evidence supporting it.
-3. Why that evidence satisfies the criterion.
-4. The scope limitation, if any.
-5. What conclusion remains impermissible if the evidence is insufficient.
+**Acceptance criterion:** Every D1–D8 has an evidence-backed status. Deferred functionality remains deferred unless an explicit approved policy says otherwise.
 
-## 6. Permitted changes and prohibited operations
+## 7. S7-T006 — Documentation alignment
 
-Permitted modifications:
-- Append a clearly titled final section to `reply.md`, for example:
-  `Prompt 1-C-B — Final Evidence Closure Report (S7-T001, S7-T002)`.
-- Update only the S7-T001 and S7-T002 entries in `tasksToDo.md`, but only if their audit acceptance criteria are demonstrably satisfied. A verified implementation gap does not automatically mean the audit task is incomplete: record the audit task status according to the task register's definitions, and separately record the actual architecture/implementation gap. If evidence remains insufficient, leave the affected task OPEN and state exactly what is missing.
+Only after S7-T003, S7-T004, and S7-T005 have been audited, update the documentation as justified by the evidence.
 
-Do not modify `stepsForStage7.md` in this prompt. Do not change source code, tests, schemas, migrations, configurations, or financial formulas. Do not create files other than the permitted report/status updates.
+### `reply.md`
 
-Absolutely prohibited:
-- Running tests, application code, scripts, migrations, database commands, or benchmarks.
-- Running Git commands or changing branches, commits, remotes, or repository state.
-- Any GitHub/Git CLI/API operation, push, pull, commit, or remote edit.
-- Claiming that tests were run.
-- Marking Stage 7 complete.
+Append a clearly titled report for Prompt 1-D. Include:
 
-## 7. Required final report format
+- Prompt ID and Task IDs.
+- Work type.
+- Exact files actually inspected.
+- Evidence-backed findings for T003, T004, and T005.
+- Acceptance criteria and PASS / NOT PASS / UNVERIFIED outcomes.
+- Exact file paths, symbols, test names, and line ranges when available.
+- Any missing files and the conclusions they prevent.
+- Owner decisions and contracts still required.
+- Files changed and reasons.
+- Explicit statement that no tests, application code, database commands, or Git commands were run.
 
-The appended section in `reply.md` must contain:
+Do not erase historical reports. Correct an earlier statement only when current evidence justifies the correction; document the correction rather than silently rewriting history.
 
-1. **Prompt ID / Task IDs / Work type**
-2. **Exact files supplied and actually inspected**
-3. **S7-T001 verdict** and evidence table:
-   - connection
-   - caller/call site
-   - upstream input
-   - downstream consumer
-   - caller classification
-   - evidence
-   - limitation
-4. **S7-T002 verdict** and evidence table:
-   - output object
-   - persistence mechanism checked
-   - exact write site if present
-   - stored fields/identity if present
-   - conclusion
-   - limitation
-5. **Second-pass verification:** what claims were rechecked and whether any were corrected.
-6. **Earlier report corrections:** quote or identify each materially overbroad claim and its corrected form.
-7. **Acceptance criteria:** PASS/NOT PASS per criterion, with evidence.
-8. **Task status changes:** previous status, new status, and reason for S7-T001/T002. Do not change unrelated task statuses.
-9. **Remaining blockers and exact owner decisions/files required.**
-10. **Files modified:** list only the files actually changed.
-11. **Tests and commands:** explicitly state “No tests or application/database commands were run by the agent.”
+### `stepsForStage7.md`
 
-Do not merely provide recommendations. Finish the audit to the maximum extent supported by the supplied evidence and produce the permitted report/status updates in the same execution. If evidence is still missing, make the exact gap explicit and leave the conclusion unverified rather than creating another speculative audit loop.
+Update only the roadmap statements and statuses directly supported by this audit. Preserve all established policies and the four-package order. Do not declare Stage 7 complete.
+
+### `tasksToDo.md`
+
+Update the statuses of S7-T003, S7-T004, S7-T005, and S7-T006 only when their acceptance criteria are actually satisfied.
+
+- A completed audit may be marked DONE even when it identifies an unresolved architectural or policy blocker, provided the audit itself meets its acceptance criteria.
+- If evidence is insufficient, leave the affected task OPEN and explain precisely what is missing.
+- Do not mark S7-T007, S7-T008, S7-T009, S7-T010, S7-T011, or S7-T012 DONE as part of this prompt.
+- Do not change unrelated task statuses.
+
+## 8. Final response format
+
+Return a concise summary and a detailed audit report in `reply.md`.
+
+Your final response must state:
+
+1. The outcome of each of S7-T003, S7-T004, S7-T005, and S7-T006.
+2. Which documentation files changed.
+3. Which conclusions remain unverified or blocked and the exact evidence/owner decision required.
+4. Confirmation that no code/tests were changed and no tests or commands were executed.
+5. The exact next recommended Task IDs based on the findings, without prematurely advancing to the final engine review.
+
+**Stage 7 must remain OPEN unless all actual exit criteria in `stepsForStage7.md` are independently satisfied.**
