@@ -21,6 +21,8 @@ https://github.com/lovelyroz/analyzer/blob/master/WORKFLOW_RULES.md
 https://github.com/lovelyroz/analyzer/blob/master/tasksToDo.md
 https://github.com/lovelyroz/analyzer/blob/master/STAGE7_MASTER_WORKING_PACKET.md
 
+https://github.com/lovelyroz/analyzer/blob/master/STAGE7_COMPLETED_CHECKLIST.md
+
 https://github.com/lovelyroz/analyzer/blob/master/STAGE7_Target4.md
 
 https://github.com/lovelyroz/analyzer/blob/master/05_Stage5_Forecast_Engine.md
