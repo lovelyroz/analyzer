@@ -1,5 +1,6 @@
 import copy
 import math
+from collections.abc import Mapping as _AbcMapping
 from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
@@ -121,12 +122,140 @@ _UNVERSIONED_GENESIS_NOTE = (
 )
 
 
+# ---------------------------------------------------------------------------
+# T4-2 — Deep immutability primitives (read behaviour preserved)
+# ---------------------------------------------------------------------------
+class FrozenDict(_AbcMapping):
+    """Read-only mapping; every nested value is recursively frozen.
+
+    Reads behave like a ``dict`` (indexing, iteration, ``len``, ``items`` and
+    equality with plain mappings). Any write raises ``TypeError``/``AttributeError``.
+    """
+
+    __slots__ = ("_data",)
+
+    def __init__(self, data=()):
+        object.__setattr__(
+            self,
+            "_data",
+            {key: freeze_parameter_value(item) for key, item in dict(data).items()},
+        )
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
+
+    def __repr__(self):
+        return f"FrozenDict({self._data!r})"
+
+    def __setattr__(self, name, value):
+        raise AttributeError("FrozenDict is immutable.")
+
+    def __delattr__(self, name):
+        raise AttributeError("FrozenDict is immutable.")
+
+    def __reduce__(self):
+        # Supports copy.copy / copy.deepcopy / pickle; the constructor re-freezes.
+        return (FrozenDict, (dict(self._data),))
+
+    __hash__ = None
+
+
+class FrozenList(tuple):
+    """Immutable stand-in for a ``list`` value (marker type so snapshots restore a ``list``).
+
+    Compares equal to a ``list`` with the same items, so existing read/compare
+    behaviour is preserved.
+    """
+
+    __slots__ = ()
+
+    def __new__(cls, items=()):
+        return super().__new__(cls, tuple(freeze_parameter_value(item) for item in items))
+
+    def __eq__(self, other):
+        if isinstance(other, list):
+            return tuple.__eq__(self, tuple(other))
+        return tuple.__eq__(self, other)
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        return result if result is NotImplemented else not result
+
+    __hash__ = tuple.__hash__
+
+    def __repr__(self):
+        return f"FrozenList({list(self)!r})"
+
+
+class FrozenSet(frozenset):
+    """Immutable stand-in for a ``set`` value (marker type so snapshots restore a ``set``)."""
+
+    __slots__ = ()
+
+    def __new__(cls, items=()):
+        return super().__new__(cls, (freeze_parameter_value(item) for item in items))
+
+
+def freeze_parameter_value(value: object) -> object:
+    """Return an independent, recursively immutable copy of ``value``.
+
+    dict/Mapping -> ``FrozenDict``; list -> ``FrozenList``; set -> ``FrozenSet``;
+    tuple/frozenset keep their type with frozen members. Scalars and any other
+    type are deep-copied (opaque custom objects cannot be proxied; parameter
+    values are expected to be scalars, strings and these containers).
+    """
+    if isinstance(value, _AbcMapping):
+        return FrozenDict(value)
+    if isinstance(value, (list, FrozenList)):
+        return FrozenList(value)
+    if isinstance(value, (set, FrozenSet)):
+        return FrozenSet(value)
+    if type(value) is tuple:
+        return tuple(freeze_parameter_value(item) for item in value)
+    if type(value) is frozenset:
+        return frozenset(freeze_parameter_value(item) for item in value)
+    return copy.deepcopy(value)
+
+
+def thaw_parameter_value(value: object) -> object:
+    """Return a fresh, plain mutable copy (dict/list/set) of a frozen value.
+
+    Used for audit snapshots so serialized output keeps its original shape.
+    """
+    if isinstance(value, _AbcMapping):
+        return {key: thaw_parameter_value(item) for key, item in value.items()}
+    if isinstance(value, FrozenList):
+        return [thaw_parameter_value(item) for item in value]
+    if isinstance(value, FrozenSet):
+        return {thaw_parameter_value(item) for item in value}
+    if type(value) is tuple:
+        return tuple(thaw_parameter_value(item) for item in value)
+    if type(value) is frozenset:
+        return frozenset(thaw_parameter_value(item) for item in value)
+    return copy.deepcopy(value)
+
+
+class ParameterRegistryInvalidError(ValueError):
+    """A ``ParameterRegistry`` was constructed with an invalid version collection."""
+
+
 @dataclass(frozen=True)
 class ParameterRecord:
     parameter_name: str
     parameter_value: object
     effective_from: Optional[datetime]
     description: str
+
+    def __post_init__(self) -> None:
+        # T4-2: ``frozen=True`` only protects the attribute binding; freeze the
+        # value itself recursively and detach it from the caller's object.
+        object.__setattr__(self, "parameter_value", freeze_parameter_value(self.parameter_value))
 
 
 @dataclass(frozen=True)
@@ -135,6 +264,10 @@ class ParameterSetVersion:
     version_key: str
     effective_from: Optional[datetime]
     records: Tuple[ParameterRecord, ...]
+
+    def __post_init__(self) -> None:
+        # Normalise any sequence to a tuple so a caller's list cannot mutate the set later.
+        object.__setattr__(self, "records", tuple(self.records))
 
 
 def _rec(name: str, value: object, description: str) -> ParameterRecord:
@@ -216,6 +349,24 @@ def live_genesis_parameter_set() -> ParameterSetVersion:
 @dataclass(frozen=True)
 class ParameterRegistry:
     versions: Tuple[ParameterSetVersion, ...] = (GENESIS_VERSION,)
+
+    def __post_init__(self) -> None:
+        # T4-1: exact-key resolution is only meaningful when keys are unique.
+        versions = tuple(self.versions)
+        seen = set()
+        duplicated = set()
+        for version in versions:
+            key = version.version_key
+            if key in seen:
+                duplicated.add(key)
+            seen.add(key)
+        if duplicated:
+            raise ParameterRegistryInvalidError(
+                "Duplicate version_key in ParameterRegistry: "
+                + ", ".join(repr(key) for key in sorted(duplicated, key=repr))
+                + "; version keys must be unique."
+            )
+        object.__setattr__(self, "versions", versions)
 
 
 DEFAULT_REGISTRY = ParameterRegistry()
@@ -371,8 +522,12 @@ class ConsumedParameters:
     contract_version: str
 
     def snapshot(self) -> Dict[str, object]:
-        """Fresh deep copy of every recorded value; mutating it cannot alter this object."""
-        return copy.deepcopy(dict(self.values))
+        """Fresh plain (dict/list) deep copy of every recorded value.
+
+        Mutating it cannot alter this object; nested frozen values are thawed so
+        the audit payload keeps its original, serializable shape.
+        """
+        return {name: thaw_parameter_value(value) for name, value in self.values.items()}
 
 
 def consume_parameter_set(version: ParameterSetVersion) -> ConsumedParameters:
@@ -387,7 +542,7 @@ def consume_parameter_set(version: ParameterSetVersion) -> ConsumedParameters:
             raise ParameterSetInvalidError(
                 f"Duplicate parameter {record.parameter_name!r} in version {version.version_key!r}."
             )
-        values[record.parameter_name] = copy.deepcopy(record.parameter_value)
+        values[record.parameter_name] = freeze_parameter_value(record.parameter_value)
 
     consumed: list = []
     groups: Dict[str, Mapping[str, object]] = {}
