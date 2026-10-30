@@ -383,3 +383,14 @@ The following decisions remain OPEN / BLOCKED pending formal project owner direc
 #### 5. Conclusion
 Technical implementation for T4-1 through T4-3 is fully verified by user test evidence. Full closure of Target 4 remains conditional upon resolving owner decisions R5 through R9.
 ====================================================================
+
+### ### گزارش تأیید تست Target 4
+
+- **Task:** بررسی اصلاحات فنی Parameter Registry
+- **فرمان اجراشده:** `pytest src/tests/test_stage7_valuation.py -k "t4_1 or t4_2 or t4_3" -q`
+- **نتیجه:** `15 passed, 90 deselected`
+- **وضعیت:** PASS
+
+اصلاحات مربوط به یکتایی `version_key`، تغییرناپذیری عمیق داده‌ها، استقلال Snapshot و انتخاب تاریخ‌محور پارامترها در تست‌های هدفمند تأیید شدند.
+
+**نتیجه:** نقص‌های فنی بررسی‌شده در Target 4 برطرف شده‌اند. نیازی به اصلاح مجدد کد نیست.
