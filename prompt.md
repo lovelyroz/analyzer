@@ -1,88 +1,94 @@
-# Stage 7 — Target 4: Parameter Registry Technical Remediation
+# Target 4 — Documentation Update After T4-1 to T4-3 Verification
 
 
-This is a financial-data application. Financial correctness, deterministic behavior, auditability, compatibility, and preservation of existing financial invariants are mandatory.
 
-## 1. Work classification
+## Task type
+**DOCS ONLY.** Do not modify source code, tests, configuration, or application behavior. Do not execute tests or Git commands.
 
-**CODE-CHANGING — Modify implementation and tests.**
+## Required files
 
-Do not run tests, application code, database commands, or Git commands. The user will execute all tests locally.
-
-Do not repeat the previous Target 4 audit. The findings and required scope are already documented in `STAGE7_Target4.md`.
-
-## 2. Required files
-
-Examine only these explicitly supplied files:
+Read only these explicitly provided files:
 
 1. `STAGE7_Target4.md`
-2. `src/valuation/parameters.py`
-3. `src/valuation/engine.py`
+2. `temp_report2.md`
+3. `src/valuation/parameters.py`
 4. `src/tests/test_stage7_valuation.py`
+5. `WORKFLOW_RULES.md`
+6. `stepsForStage7.md`
+7. `tasksToDo.md`
 
-If another file is essential to verify compatibility with existing consumers, do not inspect it automatically. Report its exact path and why it is required before proceeding with the affected change.
+If any additional file is necessary, identify its exact path and explain why; do not inspect it without authorization.
 
-## 3. Implementation tasks
+## Verified evidence
 
-### T4-1 — Enforce unique version keys
+The current GitHub version of `src/valuation/parameters.py` has SHA:
 
-- Ensure `ParameterRegistry` rejects duplicate `version_key` values during construction.
-- Preserve deterministic exact-key resolution.
-- Provide a clear and appropriate validation error.
-- Add tests proving that duplicate keys are rejected and unique keys continue to resolve correctly.
+`d3b8d50ba26544417d13c261bc85c0c810cc2887`
 
-### T4-2 — Enforce deep immutability
+The implementation now includes:
 
-- Correct the incomplete immutability of nested parameter values.
-- Protect mutable nested structures such as dictionaries and lists recursively.
-- Apply the protection consistently to parameter records and consumed parameter values where applicable.
-- Preserve existing public interfaces and expected read behavior wherever possible.
-- Do not silently alter parameter meaning, serialization expectations, or valuation calculations.
-- Add tests proving that nested mutation cannot alter stored parameter state or consumed values.
+- T4-1: `ParameterRegistry.__post_init__` validates unique `version_key` values and raises `ParameterRegistryInvalidError` for duplicates.
+- T4-2: `ParameterRecord.__post_init__` recursively freezes parameter values using `freeze_parameter_value`.
+- `ParameterSetVersion.__post_init__` normalizes records to a tuple.
+- `consume_parameter_set` freezes consumed parameter values.
+- Snapshot behavior must be described according to the actual implementation, not assumptions.
 
-If compatibility with existing consumers cannot be established from the supplied files, stop the affected implementation and identify the exact additional files needed. Do not guess.
+The user executed:
 
-### T4-3 — Preserve and test existing resolver behavior
+`pytest src/tests/test_stage7_valuation.py -k "t4_1 or t4_2 or t4_3" -q`
 
-Ensure the changes do not regress:
+Actual result supplied by the user:
 
-- Date-based parameter resolution.
-- Resolution with different tuple orderings.
-- Rejection of ambiguous effective dates.
-- Legacy Genesis behavior.
-- Timestamp governance and cutoff conflict handling.
-- Snapshot independence.
+`15 passed, 90 deselected in 3.15s`
 
-Add or adjust targeted tests only where existing coverage is insufficient.
+This result applies only to the selected tests in that command. Do not describe the entire test file or project suite as passed.
 
-Do not change timestamp semantics or resolver policies as part of these corrections.
+## Required work
 
-## 4. Strict boundaries
+### T4-DOC-1 — Correct the technical defect status
 
-- Do not invent historical parameter values or effective dates.
-- Do not change or approve Genesis financial parameters.
-- Do not decide R5, R6, R7, R8, or R9/D7 on behalf of the owner.
-- Do not implement database persistence or external Registry storage.
-- Do not change PIT benchmark provenance responsibilities.
-- Do not activate deferred financial rules or industry mappings.
-- Do not modify valuation formulas or unrelated modules.
-- Do not weaken, delete, or bypass existing tests.
-- Do not refactor unrelated code.
-- Do not modify `stepsForStage7.md`, `tasksToDo.md`, `temp_report2.md`, or other documentation.
+Update `STAGE7_Target4.md` so that the two previously confirmed defects are no longer described as unresolved.
 
-## 5. Required deliverables
+Record their implementation and test evidence separately:
 
-Report:
+- Duplicate `version_key` rejection.
+- Deep immutability of nested parameter values.
 
-1. Files changed and the reason for each change.
-2. T4-1 implementation details.
-3. T4-2 implementation details.
-4. T4-3 tests added or adjusted, with exact test names.
-5. Compatibility considerations.
-6. Any unresolved issue or additional required file.
-7. Exact local test commands for the user.
-8. Any remaining Target 4 blockers, especially owner decisions R5–R9.
+### T4-DOC-2 — Correct the test coverage section
 
-Do not claim tests passed. Tests must be marked **NOT RUN — USER EXECUTION REQUIRED**.
+Record the 15 successful targeted tests and the exact command supplied above.
 
-Do not mark Target 4 complete. This task addresses only the confirmed technical defects and their regression coverage.
+Do not claim that unexecuted tests passed.
+
+### T4-DOC-3 — Preserve unresolved owner decisions
+
+Do not close, infer, or decide R5, R6, R7, R8, or R9/D7.
+
+Keep their existing status and rationale unless the provided evidence directly justifies a factual correction.
+
+In particular:
+
+- Technical immutability does not establish historical parameter records.
+- Duplicate-key validation does not establish historical PIT correctness.
+- In-code registry implementation does not constitute owner approval of the storage architecture.
+- No benchmark provenance or financial policy may be invented.
+
+### T4-DOC-4 — Append an evidence report
+
+Append a concise dated report to `temp_report2.md` recording:
+
+- The code SHA above.
+- The two verified implementation changes.
+- The exact user-provided test command and result.
+- The limits of that test evidence.
+- The unresolved decisions R5–R9.
+- The conclusion that technical T4-1/T4-3 work is supported by the supplied evidence, while full Target 4 closure remains conditional on unresolved owner decisions.
+
+## Strict restrictions
+
+- Only modify `STAGE7_Target4.md` and `temp_report2.md`.
+- Do not modify `tasksToDo.md`, `stepsForStage7.md`, `WORKFLOW_RULES.md`, source files, or tests.
+- Do not run tests, Git commands, or other programs.
+- Do not invent dates, financial values, approvals, historical records, or provenance.
+- Preserve the distinction between technical completion and owner approval.
+- Report exact file changes and summarize the evidence used.
