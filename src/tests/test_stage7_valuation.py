@@ -2000,3 +2000,361 @@ def test_d9_cutoff_governed_selection_is_deterministic_on_repeat():
                 parameter_as_of=datetime(2025, 6, 1),
                 data_cutoff_datetime=datetime(2026, 1, 1),
             )
+
+
+# ---------------------------------------------------------------------------
+# Stage 7 — Target 4 technical remediation (T4-1, T4-2, T4-3).
+# Synthetic versions are labelled TEST/* and never registered in
+# DEFAULT_REGISTRY. No historical dates or financial values are invented; the
+# synthetic dates only exercise resolver mechanics.
+# ---------------------------------------------------------------------------
+def _t4_nested_value():
+    return {"K": {"x": [1, 2, {"deep": [3]}], "t": (4, 5)}, "L": [6]}
+
+
+def _t4_nested_version(key="TEST/NESTED", effective_from=datetime(2026, 1, 1), source=None):
+    source = _t4_nested_value() if source is None else source
+    return _p35_version(key, effective_from, overrides={"INDUSTRY_TARGET_PE": source})
+
+
+# --- T4-1: unique version keys ----------------------------------------------
+def test_t4_1_duplicate_version_key_is_rejected_at_construction():
+    from src.valuation.parameters import ParameterRegistry, ParameterSetVersion
+
+    def version(key, year):
+        return ParameterSetVersion("STAGE7_V1", key, datetime(year, 1, 1), ())
+
+    # Same key, different effective dates (the case that used to be hidden).
+    with pytest.raises(ValueError, match="Duplicate version_key") as excinfo:
+        ParameterRegistry(versions=(version("TEST/V1", 2025), version("TEST/V1", 2026)))
+    assert "TEST/V1" in str(excinfo.value)
+    # Same key, identical dates.
+    with pytest.raises(ValueError, match="Duplicate version_key"):
+        ParameterRegistry(versions=(version("TEST/V1", 2025), version("TEST/V1", 2025)))
+    # Non-adjacent duplicate among unique keys; all offending keys are reported deterministically.
+    with pytest.raises(ValueError, match="Duplicate version_key") as excinfo:
+        ParameterRegistry(
+            versions=(
+                version("TEST/B", 2025), version("TEST/A", 2025), version("TEST/B", 2026),
+                version("TEST/C", 2026), version("TEST/A", 2027),
+            )
+        )
+    assert str(excinfo.value).index("'TEST/A'") < str(excinfo.value).index("'TEST/B'")
+    assert "TEST/C" not in str(excinfo.value)
+    # Undated duplicate of the genesis key is rejected too.
+    from src.valuation.parameters import GENESIS_VERSION, live_genesis_parameter_set
+
+    with pytest.raises(ValueError, match="Duplicate version_key"):
+        ParameterRegistry(versions=(GENESIS_VERSION, live_genesis_parameter_set()))
+
+
+def test_t4_1_unique_version_keys_still_resolve_exactly():
+    from src.valuation.parameters import (
+        DEFAULT_REGISTRY,
+        ParameterRegistry,
+        resolve_parameter_set,
+        resolve_parameter_set_as_of,
+    )
+
+    registry = _p33_synthetic_registry()
+    assert resolve_parameter_set("TEST/V1", registry).effective_from == datetime(2025, 1, 1)
+    assert resolve_parameter_set("TEST/V2", registry).effective_from == datetime(2026, 1, 1)
+    with pytest.raises(KeyError):
+        resolve_parameter_set("TEST/V3", registry)
+    # Exact match only: keys differing in case are distinct, not duplicates.
+    case_registry = ParameterRegistry(
+        versions=(
+            _p35_version("TEST/V1", datetime(2025, 1, 1)),
+            _p35_version("test/v1", datetime(2026, 1, 1)),
+        )
+    )
+    assert resolve_parameter_set("TEST/V1", case_registry).effective_from == datetime(2025, 1, 1)
+    assert resolve_parameter_set("test/v1", case_registry).effective_from == datetime(2026, 1, 1)
+    # Default and empty registries remain constructible.
+    assert [v.version_key for v in DEFAULT_REGISTRY.versions] == ["STAGE7_V1/GENESIS"]
+    assert ParameterRegistry(versions=()).versions == ()
+    assert resolve_parameter_set_as_of(datetime(2025, 6, 1), registry).version_key == "TEST/V1"
+
+
+def test_t4_1_registry_versions_are_normalised_to_a_tuple_and_detached_from_caller_list():
+    from src.valuation.parameters import ParameterRegistry
+
+    v1 = _p35_version("TEST/V1", datetime(2025, 1, 1))
+    v2 = _p35_version("TEST/V2", datetime(2026, 1, 1))
+    caller_list = [v1]
+    registry = ParameterRegistry(versions=caller_list)
+    assert isinstance(registry.versions, tuple)
+    # Appending a duplicate key to the caller's list afterwards cannot corrupt the registry.
+    caller_list.append(_p35_version("TEST/V1", datetime(2027, 1, 1)))
+    assert registry.versions == (v1,)
+    assert ParameterRegistry(versions=[v1, v2]).versions == (v1, v2)
+
+
+# --- T4-2: deep immutability --------------------------------------------------
+def test_t4_2_parameter_record_nested_values_are_deeply_immutable_and_detached():
+    from src.valuation.parameters import ParameterRecord
+
+    source = _t4_nested_value()
+    record = ParameterRecord("TEST.NESTED", source, None, "nested")
+    # Detached from the caller's object in both directions.
+    source["K"]["x"].append(99)
+    source["L"][0] = -1
+    source["NEW"] = 1
+    assert record.parameter_value == _t4_nested_value()
+    value = record.parameter_value
+    with pytest.raises(TypeError):
+        value["LEAK"] = 1
+    with pytest.raises(TypeError):
+        value["K"]["LEAK"] = 1
+    with pytest.raises(TypeError):
+        value["K"]["x"][0] = 9
+    with pytest.raises(TypeError):
+        value["K"]["x"][2]["deep"][0] = 9
+    with pytest.raises((AttributeError, TypeError)):
+        value["K"]["x"].append(1)
+    with pytest.raises((AttributeError, TypeError)):
+        value["L"].extend([1])
+    with pytest.raises((AttributeError, TypeError)):
+        value["K"].update({"z": 1})
+    with pytest.raises(TypeError):
+        del value["L"]
+    assert record.parameter_value == _t4_nested_value()
+
+
+def test_t4_2_read_behaviour_of_frozen_values_matches_plain_containers():
+    from src.valuation.parameters import ParameterRecord
+
+    record = ParameterRecord("TEST.NESTED", _t4_nested_value(), None, "nested")
+    value = record.parameter_value
+    assert value == _t4_nested_value()
+    assert _t4_nested_value() == value
+    assert value["K"]["x"] == [1, 2, {"deep": [3]}]
+    assert [1, 2, {"deep": [3]}] == value["K"]["x"]
+    assert value["K"]["t"] == (4, 5)
+    assert value["K"]["x"][2]["deep"][0] == 3
+    assert sorted(value) == ["K", "L"]
+    assert len(value["K"]["x"]) == 3
+    assert dict(value["K"]).keys() == {"x", "t"}
+    # Scalars, strings and tuples keep their exact type and value.
+    scalar = ParameterRecord("TEST.S", 0.25, None, "scalar")
+    text = ParameterRecord("TEST.T", "STAGE7_V1", None, "text")
+    pair = ParameterRecord("TEST.P", ("A", "B"), None, "tuple")
+    assert scalar.parameter_value == 0.25 and type(scalar.parameter_value) is float
+    assert text.parameter_value == "STAGE7_V1"
+    assert pair.parameter_value == ("A", "B") and type(pair.parameter_value) is tuple
+
+
+def test_t4_2_genesis_records_are_deeply_immutable_and_do_not_alias_module_constants():
+    from src.valuation import parameters as params
+
+    by_name = {r.parameter_name: r.parameter_value for r in params.GENESIS_VERSION.records}
+    assert by_name["INDUSTRY_TARGET_PE"] == {}
+    with pytest.raises(TypeError):
+        by_name["INDUSTRY_TARGET_PE"]["LEAK"] = 1.0
+    assert params.INDUSTRY_TARGET_PE == {}
+    live = {r.parameter_name: r.parameter_value for r in params.live_genesis_parameter_set().records}
+    with pytest.raises(TypeError):
+        live["INDUSTRY_TARGET_PE"]["LEAK"] = 1.0
+    assert params.INDUSTRY_TARGET_PE == {}
+    assert by_name["PROBABILITY_EVIDENCE_FAMILIES"] == params.PROBABILITY_EVIDENCE_FAMILIES
+    assert len(params.GENESIS_VERSION.records) == 38
+
+
+def test_t4_2_parameter_set_version_records_cannot_be_replaced_through_caller_list():
+    from src.valuation.parameters import ParameterRecord, ParameterSetVersion
+
+    records = [ParameterRecord("TEST.A", 1.0, None, "a")]
+    version = ParameterSetVersion("STAGE7_V1", "TEST/LIST", datetime(2026, 1, 1), records)
+    assert isinstance(version.records, tuple)
+    records.append(ParameterRecord("TEST.B", 2.0, None, "b"))
+    assert [r.parameter_name for r in version.records] == ["TEST.A"]
+
+
+def test_t4_2_consumed_values_nested_mutation_is_blocked_and_detached():
+    import dataclasses
+
+    from src.valuation.parameters import consume_parameter_set
+
+    source = _t4_nested_value()
+    families = ["FUNDAMENTAL_DIRECTION", "FORECAST_DIRECTION"]
+    version = _p35_version(
+        "TEST/NESTED", datetime(2026, 1, 1),
+        overrides={"INDUSTRY_TARGET_PE": source, "PROBABILITY_EVIDENCE_FAMILIES": families},
+    )
+    consumed = consume_parameter_set(version)
+    # Later mutation of the caller's objects reaches neither the version nor the consumed values.
+    source["K"]["x"].append(99)
+    families.append("INJECTED")
+    expected = _t4_nested_value()
+    assert consumed.values["INDUSTRY_TARGET_PE"] == expected
+    assert {r.parameter_name: r.parameter_value for r in version.records}["INDUSTRY_TARGET_PE"] == expected
+    assert consumed.probability_evidence_families == ("FUNDAMENTAL_DIRECTION", "FORECAST_DIRECTION")
+    assert list(consumed.values["PROBABILITY_EVIDENCE_FAMILIES"]) == [
+        "FUNDAMENTAL_DIRECTION", "FORECAST_DIRECTION",
+    ]
+    # Writes at every nesting level are rejected.
+    with pytest.raises(TypeError):
+        consumed.values["TOP"] = 1
+    with pytest.raises(TypeError):
+        consumed.values["INDUSTRY_TARGET_PE"]["LEAK"] = 1.0
+    with pytest.raises(TypeError):
+        consumed.values["INDUSTRY_TARGET_PE"]["K"]["LEAK"] = 1.0
+    with pytest.raises(TypeError):
+        consumed.values["INDUSTRY_TARGET_PE"]["K"]["x"][0] = 9
+    with pytest.raises((AttributeError, TypeError)):
+        consumed.values["INDUSTRY_TARGET_PE"]["K"]["x"].append(9)
+    with pytest.raises((AttributeError, TypeError)):
+        consumed.values["PROBABILITY_EVIDENCE_FAMILIES"].append("INJECTED")
+    with pytest.raises(TypeError):
+        consumed.scenario_weights["bear"] = 1.0
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        consumed.values = {}
+    assert consumed.values["INDUSTRY_TARGET_PE"] == expected
+    assert consumed.snapshot()["INDUSTRY_TARGET_PE"] == expected
+
+
+def test_t4_2_snapshot_is_plain_serializable_and_independent_of_consumed_state():
+    import json
+
+    from src.valuation.parameters import consume_parameter_set, live_genesis_parameter_set
+
+    consumed = consume_parameter_set(_t4_nested_version())
+    snapshot = consumed.snapshot()
+    nested = snapshot["INDUSTRY_TARGET_PE"]
+    # Plain, mutable, JSON-compatible containers (shape of the audit payload preserved).
+    assert type(nested) is dict and type(nested["K"]) is dict
+    assert type(nested["K"]["x"]) is list and type(nested["K"]["x"][2]) is dict
+    assert type(nested["K"]["t"]) is tuple
+    assert nested == _t4_nested_value()
+    json.dumps(snapshot, sort_keys=True)
+    # Mutating the snapshot at any depth cannot alter the consumed values or later snapshots.
+    nested["LEAK"] = 1.0
+    nested["K"]["x"].append("LEAK")
+    nested["K"]["x"][2]["deep"].append("LEAK")
+    snapshot["SCENARIO_WEIGHTS.bear"] = 99.0
+    assert consumed.values["INDUSTRY_TARGET_PE"] == _t4_nested_value()
+    again = consumed.snapshot()
+    assert again["INDUSTRY_TARGET_PE"] == _t4_nested_value()
+    assert again["SCENARIO_WEIGHTS.bear"] == 0.20
+    assert again is not consumed.snapshot()
+    # Genesis snapshot is unchanged in content.
+    assert consume_parameter_set(live_genesis_parameter_set()).snapshot() == _p33_snapshot()
+
+
+def test_t4_2_frozen_values_survive_deepcopy_and_stay_immutable():
+    import copy
+
+    from src.valuation.parameters import ParameterRecord
+
+    record = ParameterRecord("TEST.NESTED", _t4_nested_value(), None, "nested")
+    clone = copy.deepcopy(record)
+    assert clone == record
+    assert clone.parameter_value is not record.parameter_value
+    with pytest.raises(TypeError):
+        clone.parameter_value["K"]["x"][0] = 9
+    version = _t4_nested_version()
+    version_clone = copy.deepcopy(version)
+    assert version_clone == version
+
+
+def test_t4_2_engine_snapshot_with_nested_value_is_plain_independent_and_calculation_unchanged():
+    cutoff = datetime(2026, 6, 1)
+    baseline = _p35_call(
+        parameter_registry=_p35_registry(_p35_version("TEST/BASE", datetime(2026, 1, 1))),
+        data_cutoff_datetime=cutoff,
+    )
+    registry = _p35_registry(_t4_nested_version())
+    result = _p35_call(parameter_registry=registry, data_cutoff_datetime=cutoff)
+    snapshot = result.metadata["parameter_snapshot"]
+    assert snapshot["INDUSTRY_TARGET_PE"] == _t4_nested_value()
+    assert type(snapshot["INDUSTRY_TARGET_PE"]) is dict
+    assert "INDUSTRY_TARGET_PE" in result.metadata["parameter_consumption"]["recorded_not_consumed_names"]
+    # A recorded-but-unconsumed nested value does not alter the valuation.
+    assert result.valuation_status == baseline.valuation_status
+    assert result.expected_fair_value == baseline.expected_fair_value
+    assert result.valuation_confidence == baseline.valuation_confidence
+    # Mutating the returned audit payload cannot affect a later run or the registry.
+    snapshot["INDUSTRY_TARGET_PE"]["K"]["x"].append("LEAK")
+    snapshot["INDUSTRY_TARGET_PE"]["LEAK"] = 1.0
+    again = _p35_call(parameter_registry=registry, data_cutoff_datetime=cutoff)
+    assert again.metadata["parameter_snapshot"]["INDUSTRY_TARGET_PE"] == _t4_nested_value()
+
+
+# --- T4-3: resolver regression coverage -------------------------------------
+def test_t4_3_as_of_resolution_is_independent_of_tuple_order_for_every_permutation():
+    import itertools
+
+    from src.valuation.parameters import ParameterRegistry, resolve_parameter_set_as_of
+
+    old = _p35_version("TEST/OLD", datetime(2025, 1, 1))
+    mid = _p35_version("TEST/MID", datetime(2025, 6, 1))
+    new = _p35_version("TEST/NEW", datetime(2026, 1, 1))
+    undated = _p35_version("TEST/UNDATED", None)
+    expectations = {
+        datetime(2025, 3, 1): "TEST/OLD",
+        datetime(2025, 6, 1): "TEST/MID",
+        datetime(2025, 12, 31): "TEST/MID",
+        datetime(2026, 1, 1): "TEST/NEW",
+        datetime(2030, 1, 1): "TEST/NEW",
+    }
+    for ordering in itertools.permutations((old, mid, new, undated)):
+        registry = ParameterRegistry(versions=ordering)
+        for as_of, key in expectations.items():
+            assert resolve_parameter_set_as_of(as_of, registry).version_key == key
+        with pytest.raises(LookupError):
+            resolve_parameter_set_as_of(datetime(2024, 1, 1), registry)
+
+
+def test_t4_3_distinct_keys_with_identical_effective_dates_remain_ambiguous_in_every_order():
+    import itertools
+
+    from src.valuation.parameters import ParameterRegistry, resolve_parameter_set_as_of
+
+    older = _p35_version("TEST/OLDER", datetime(2024, 1, 1))
+    tie_a = _p35_version("TEST/TIE_A", datetime(2025, 1, 1))
+    tie_b = _p35_version("TEST/TIE_B", datetime(2025, 1, 1))
+    # Construction succeeds (keys are unique); ambiguity is still raised at resolution.
+    for ordering in itertools.permutations((older, tie_a, tie_b)):
+        registry = ParameterRegistry(versions=ordering)
+        with pytest.raises(LookupError, match="Ambiguous"):
+            resolve_parameter_set_as_of(datetime(2025, 6, 1), registry)
+        # Before the tied date the unambiguous older version is selected.
+        assert resolve_parameter_set_as_of(datetime(2024, 6, 1), registry).version_key == "TEST/OLDER"
+
+
+def test_t4_3_legacy_genesis_path_is_unchanged_by_immutability_and_uniqueness_changes():
+    result = _p35_call()
+    selection = result.metadata["parameter_selection"]
+    assert selection["mode"] == "FIXED_GENESIS_LEGACY"
+    assert selection["point_in_time_selection_applied"] is False
+    assert selection["module_constants_modified_since_import"] is False
+    assert result.metadata["parameter_set_version"] == "STAGE7_V1/GENESIS"
+    assert result.metadata["parameter_snapshot"] == _p33_snapshot()
+    assert type(result.metadata["parameter_snapshot"]["INDUSTRY_TARGET_PE"]) is dict
+    # The undated genesis set still never stands in for history.
+    with pytest.raises(LookupError, match="R8"):
+        _p35_call(parameter_as_of=datetime(2026, 1, 1))
+
+
+def test_t4_3_timestamp_governance_unchanged_with_deeply_immutable_versions():
+    registry = _p35_registry(
+        _t4_nested_version("TEST/V1", datetime(2025, 1, 1)),
+        _t4_nested_version("TEST/V2", datetime(2026, 1, 1)),
+    )
+    early = _p35_call(
+        parameter_registry=registry, data_cutoff_datetime=datetime(2025, 6, 1), valuation_date=datetime(2026, 6, 1)
+    )
+    assert early.metadata["parameter_set_version"] == "TEST/V1"
+    assert early.metadata["parameter_selection"]["as_of_source"] == "EFFECTIVE_DATA_CUTOFF"
+    with pytest.raises(ValueError, match="conflicts with the effective data cutoff"):
+        _p35_call(
+            parameter_registry=registry,
+            parameter_as_of=datetime(2025, 6, 1),
+            data_cutoff_datetime=datetime(2026, 1, 1),
+        )
+    with pytest.raises(LookupError, match="as-of instant"):
+        _p35_call(
+            parameter_registry=registry,
+            forecast_result=_d9_forecast_without_cutoff(),
+            valuation_date=datetime(2025, 6, 1),
+        )
