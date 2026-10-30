@@ -1,189 +1,130 @@
-# Prompt S7-PARAM-05 — Objective 4: Finalize Parameter Versioning Policy and Resolve Technical Gaps
+# Final Consolidated Audit — Stage 7 Target 4
 
-You are working on the financial-data application repository:
+You are performing the **final and only remaining consolidated code audit for Stage 7 Target 4** in the `analyzer` project.
 
-`lovelyroz/analyzer`
+Read and follow `WORKFLOW_RULES.md`.
 
-This is a financial application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants take priority over implementation speed.
+## Strict execution boundaries
 
-## 1. Objective
+- REPORT ONLY.
+- Do not modify, create, or delete any file.
+- Do not run tests or execute test commands.
+- Do not commit or modify Git state.
+- Do not start follow-up investigations or request another audit.
+- Inspect only the explicitly listed files unless a narrowly necessary reference is required to establish a finding. If so, identify it and explain why.
 
-Continue Stage 7 Objective 4 using `STAGE7_Target4.md` as the primary working document.
+## Files provided
 
-The previous prompt S7-PARAM-04 completed the broad audit of parameter versioning, historical evidence requirements, registry storage, and outstanding blockers.
+1. `src/valuation/parameters.py`
+2. `src/valuation/engine.py`
+3. `src/tests/test_stage7_valuation.py`
+4. `STAGE7_Target4.md`
+5. `stepsForStage7.md`
+6. `WORKFLOW_RULES.md`
 
-Do NOT repeat that broad audit.
+## Audit objectives
 
-Your task is to validate the critical conclusions from S7-PARAM-04, resolve technical questions that can be answered from existing evidence, and produce a precise implementation-ready policy for Objective 4.
+Perform one consolidated audit covering **all unresolved technical and documentation issues within Target 4**.
 
-## 2. Work classification
+### 1. ParameterRegistry uniqueness and deterministic resolution
 
-**REPORT-ONLY / AUDIT / POLICY ANALYSIS / DOCUMENTATION**
+Determine whether duplicate `version_key` values in `ParameterRegistry.versions` can cause:
 
-- No production-code changes.
-- No test-code changes.
-- Do not execute tests, programs, database commands, or Git commands.
-- The user performs all testing locally.
-- Do not invent parameter values, effective dates, historical versions, financial policies, or approval evidence.
+- Incorrect or ambiguous exact-key resolution.
+- Silent selection of the wrong parameter-set version.
+- Loss of deterministic behavior or auditability.
+- Any inconsistency between exact-key and date-based resolution.
 
-## 3. Required files
+Give a clear verdict on whether constructor-level validation rejecting duplicate `version_key` values is technically required.
 
-You may inspect only these explicitly provided files:
+Do not assume that `effective_from` values must be strictly increasing in tuple order. Assess the actual resolver behavior and identify the precise conditions that create ambiguity.
 
-### Primary documents
-- `STAGE7_Target4.md`
-- `WORKFLOW_RULES.md`
-- `stepsForStage7.md`
-- `tasksToDo.md`
-- `temp_report2.md`
-- `reply.md`
-- `07_Stage7_Valuation.md`
+### 2. Deep immutability
 
-### Source files
-- `src/valuation/parameters.py`
-- `src/valuation/engine.py`
-- `src/valuation/models.py`
+Audit the actual immutability guarantees of:
 
-### Tests
-- `src/tests/test_stage7_valuation.py`
+- `ParameterRecord.parameter_value`
+- `ParameterSetVersion`
+- `ConsumedParameters.values`
+- Nested dictionaries and other mutable values
+- `ConsumedParameters.snapshot()`
 
-If another file is essential, do not inspect it automatically. Report its exact path and explain why it is necessary.
+Determine whether mutable nested values can be changed after construction or consumption, and whether this can alter the effective parameter state or undermine reproducibility.
 
-## 4. Required tasks
+Distinguish clearly between:
+- Defensive copying
+- Shallow immutability
+- Deep immutability
 
-### T1 — Verify critical claims from S7-PARAM-04
+Recommend the minimum technically sound correction, if one is required.
 
-Recheck the following claims against the actual source code and tests:
+### 3. Historical parameter selection and timestamp governance
 
-1. Whether `frozen=True` provides sufficient immutability for parameter records and complete parameter-set versions.
-2. Whether nested mutable parameter values can still be modified after construction or consumption.
-3. Whether `data_cutoff_datetime` alone activates historical parameter selection, or whether `parameter_registry` / `parameter_as_of` is also required.
-4. Whether the Legacy path can use current Genesis values without claiming historical validity.
-5. Whether the parameter-selection and consumption metadata accurately identify the values actually used.
+Inspect `_resolve_parameter_governing_timestamp` and the parameter-selection path.
 
-For every conclusion, provide exact file paths, line references, and the relevant behavior.
+Determine precisely:
 
-Do not accept a report statement merely because it appears in an earlier report.
+- When `data_cutoff_datetime` governs parameter selection.
+- Whether the legacy path remains active when both `registry` and `parameter_as_of` are absent.
+- Whether `valuation_date` is used as an implicit fallback.
+- How conflicting explicit timestamps are handled.
+- Whether the implementation matches the claims in `STAGE7_Target4.md`.
 
-### T2 — Define the technically correct V1 parameter-versioning policy
+Identify any misleading or incomplete documentation statements.
 
-Based on verified source behavior, propose a precise policy covering:
+### 4. Parameter registry and resolution invariants
 
-- Immutability of existing versions and records.
-- Whether deep immutability is required and how it can be guaranteed.
-- Conditions requiring a new parameter-set version.
-- Meaning and assignment of `effective_from`.
-- Timezone and timestamp normalization requirements.
-- Handling of duplicate or ambiguous effective dates.
-- Behavior when no valid dated version exists.
-- Explicit separation between Genesis/Legacy use and historical PIT selection.
-- Traceability of model version, parameter-set version, and consumed parameter snapshot.
+Check the consistency of:
+- Genesis/default parameter-set behavior.
+- Version identity and exact-key lookup.
+- Effective-date resolution.
+- Ambiguity rejection.
+- Parameter consumption and snapshot behavior.
 
-Clearly distinguish:
+Report only concrete correctness or auditability issues supported by the inspected code.
 
-A. Rules already implemented and verified.
+### 5. Tests and coverage assessment
 
-B. Technical changes that are necessary but not yet implemented.
+Inspect the relevant tests in `src/tests/test_stage7_valuation.py`.
 
-C. Decisions requiring explicit project-owner approval.
+Identify which of the above invariants are actually tested and which are not.
 
-Do not modify code.
+Do not execute tests. Do not claim that unexecuted tests pass.
 
-### T3 — Resolve the registry storage question
+Where coverage is missing, specify the exact test scenario that should be added. Do not write the tests.
 
-Evaluate the existing in-code registry against the actual V1 requirements.
+### 6. Target 4 documentation consistency
 
-Compare only these two options:
+Compare the code findings with the claims and conclusions recorded in `STAGE7_Target4.md` and the applicable Target 4 requirements in `stepsForStage7.md`.
 
-- Option A: Keep the registry in source code.
-- Option B: Introduce persistent external storage.
+Identify:
+- Duplicate or repeated sections.
+- Contradictory or outdated conclusions.
+- Claims that need qualification.
+- Confirmed completed items.
+- Remaining genuine blockers or required decisions.
 
-Evaluate auditability, reproducibility, historical version preservation, deployment consistency, and operational complexity.
+Do not edit the documents.
 
-Make a clear technical recommendation for V1.
+## Required final report
 
-Do not treat the absence of an existing database table as proof that persistent storage is unnecessary.
+Provide one consolidated report with these sections:
 
-If the decision depends on an unresolved product or operational requirement, identify that requirement explicitly.
+1. **Executive verdict:** Is Target 4 technically complete, incomplete, or blocked?
+2. **Confirmed defects:** Only code-backed defects, with file and function/class references.
+3. **Required code corrections:** Minimum necessary changes, ranked by importance.
+4. **Test gaps:** Exact missing test scenarios.
+5. **Documentation corrections:** Exact statements or sections requiring correction.
+6. **Decisions requiring user approval:** Only decisions that cannot be resolved from technical evidence.
+7. **Final closure checklist:** A finite checklist of all remaining Target 4 actions.
 
-### T4 — Finalize parameter coverage decisions
+For every finding, classify it as:
+- CONFIRMED DEFECT
+- TEST GAP
+- DOCUMENTATION ISSUE
+- DESIGN DECISION
+- NO ISSUE
 
-Using the verified registry and source code, classify:
+Clearly distinguish proven defects from recommendations and optional hardening.
 
-1. Registered and consumed parameters.
-2. Registered but unused parameters.
-3. Financial/model rules outside the registry.
-4. Values that require financial approval.
-5. Items that are model-version constants rather than runtime parameters, if the evidence supports that distinction.
-
-For every item requiring a decision, specify the exact decision needed.
-
-Do not add or remove parameters and do not change financial formulas.
-
-### T5 — Produce the Objective 4 decision and blocker register
-
-Create a consolidated register containing:
-
-- Requirement / issue ID.
-- Current verified status.
-- Evidence.
-- Recommended technical policy.
-- Whether implementation is possible now.
-- Required owner decision or external evidence.
-- Exact acceptance criteria.
-
-Explicitly distinguish:
-
-- Technically complete.
-- Technically incomplete but implementable.
-- Blocked by missing historical evidence.
-- Blocked by project-owner approval.
-- Separate PIT dependency, especially benchmark P/E provenance.
-
-Do not mark Objective 4 complete while critical historical or approval requirements remain unresolved.
-
-### T6 — Documentation updates
-
-Update the following documents without deleting historical reports:
-
-1. Append the complete S7-PARAM-05 report to `temp_report2.md`.
-2. Replace the interim content of `reply.md` with a concise execution summary for this prompt.
-3. Update `STAGE7_Target4.md` with verified findings, finalized recommendations, and remaining decisions.
-4. Update `tasksToDo.md` only where the new evidence justifies a status or acceptance-criteria correction.
-5. Do not modify `stepsForStage7.md` unless a genuine roadmap inconsistency is proven. Explain any proposed change instead of silently changing the roadmap.
-
-Keep previous report history intact.
-
-## 5. Restrictions
-
-- Do not fabricate historical parameter values or effective dates.
-- Do not assign an effective date to Genesis.
-- Do not assume that current constants have received financial approval.
-- Do not silently convert technical recommendations into owner-approved policy.
-- Do not claim full PIT correctness based only on parameter version selection.
-- Do not change formulas, thresholds, industry mappings, or model behavior.
-- Do not create database models or persistence mechanisms.
-- Do not execute tests or other commands.
-- Do not expand the audit to unrelated Stage 7 objectives.
-
-## 6. Required report format
-
-For each task T1–T6, report:
-
-- Task ID and title.
-- Exact files inspected.
-- Findings and evidence, including line references.
-- Conclusion.
-- Remaining uncertainty or required decision.
-
-At the end, provide:
-
-1. Final recommended V1 parameter-versioning policy.
-2. Registry storage recommendation.
-3. Consolidated blocker register.
-4. Exact owner decisions still required.
-5. Exact files changed and reasons.
-6. Confirmation that no code or tests were changed or executed.
-7. Recommended next prompt, if Objective 4 still has implementable work remaining.
-
-Do not describe an item as complete unless its acceptance criteria are supported by verifiable evidence.
+**Important:** This is the final consolidated audit. Do not recommend another audit, another investigation prompt, or a sequence of additional reviews. Your report must be sufficient for the project owner to decide all remaining Target 4 corrections and close this objective.
