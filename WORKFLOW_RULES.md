@@ -1,4 +1,5 @@
 # This file should be checked regularly so that the commands are not forgotten.
+# The workflow is as follows: ChatGPT handles the oversight and prompt generation. The user then passes the generated prompt to the agent. The agent’s work report is relayed back to ChatGPT, which is responsible for the verification process. All testing is conducted by the user in a local environment.
 
 # temporary rules for Stage 7:
     Primary reference documents moving forward:
@@ -6,6 +7,7 @@
     - tasksToDo.md: Active tasks and their current status only.
     - temp_report2.md: History of reports and key evidence.
     - reply.md: Interim report on the execution of the current prompt.
+    - STAGE7_MASTER_WORKING_PACKET.md : Remaining Jobs Checklist.
 
 # Follow the steps below to generate each new prompt
 ## Make each prompt in 2 blocks. One for Agent and one for User
