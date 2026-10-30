@@ -1,230 +1,149 @@
-# Prompt 1-D — Stage 7 Evidence Audit and Documentation Alignment
-
-**Task IDs:** S7-T003, S7-T004, S7-T005, S7-T006  
-**Work type:** AUDIT + DOCS ONLY  
-**Code changes:** NOT AUTHORIZED  
-**Test changes:** NOT AUTHORIZED  
-**Test execution:** PROHIBITED
-
-## 1. Mission
-
-Continue Stage 7 remediation for the financial-data application in the local project folder `analyzer`.
-
-Read and follow `WORKFLOW_RULES.md`, `tasksToDo.md`, and `stepsForStage7.md` before beginning. Use `tasksToDo.md` as the task-status register and `stepsForStage7.md` as the authoritative Stage 7 roadmap.
-
-Complete the three remaining evidence audits:
-
-- **S7-T003:** D9 and actual consumption of versioned valuation parameters.
-- **S7-T004:** Point-in-Time (PIT), provenance, and input contracts.
-- **S7-T005:** Alert and decision contracts D1–D8.
-
-Then perform **S7-T006**, aligning `reply.md` and `stepsForStage7.md` only to conclusions supported by the completed audits.
-
-This is an evidence-gathering and documentation task. Do not implement fixes or redesign the valuation engine.
-
-## 2. Exact required files
-
-The following files must be provided to you. Inspect only these files and any additional files explicitly listed below. Do not assume that you can inspect the rest of the repository.
+# Prompt S7-PARAM-04 — Complete Dated and Versioned Parameter Policy
 
-### Workflow and prior evidence
+## بخش اول — دستورالعمل ایجنت (Agent Instructions)
 
-- `WORKFLOW_RULES.md`
-- `tasksToDo.md`
-- `stepsForStage7.md`
-- `reply.md`
-- `temp_report2.md`
-- `PROJECT_HANDOFF_INSTRUCTIONS.md`
+You are working on the financial-data project `analyzer`.
 
-### Specifications
+Your task is to complete the remaining work for Stage 7 Objective 4:
 
-- `05_Stage5_Forecast_Engine.md`
-- `07_Stage7_Valuation.md`
-- `08_Stage8_Market_Engine.md`
-- `09_Stage9_Decision_Dashboard.md`
-- `00_a_Master_Architecture.md`
+**Determine and establish the policy, requirements, and implementation readiness for dated and versioned valuation parameters.**
 
-### Stage 7 valuation package
+This is a financial application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants take priority over implementation speed.
 
-- `src/valuation/__init__.py`
-- `src/valuation/engine.py`
-- `src/valuation/models.py`
-- `src/valuation/parameters.py`
-- `src/valuation/schema.py`
-- `src/valuation/service.py`
+### 1. Scope and restrictions
 
-### Forecast, scoring, market, decision, and PIT interfaces
+Work exclusively on Stage 7 Objective 4.
 
-- `src/forecast/schema.py`
-- `src/forecast/service.py`
-- `src/forecast/repo.py`
-- `src/scoring/engine.py`
-- `src/market/engine.py`
-- `src/market/schema.py`
-- `src/market/parameters.py`
-- `src/market/service.py`
-- `src/ingestion/market/queries.py`
-- `src/core/point_in_time.py`
-- `src/core/jalali.py`
-- `src/core/database.py`
-- `src/decision/engine.py`
-- `src/decision/rules.py`
-- `src/decision/schema.py`
-- `src/decision/service.py`
+Do not start or expand work on Objectives 1–3 or 5–18.
 
-### Directly relevant tests
+Do not:
+- Invent historical parameter values or effective dates.
+- Treat the current Genesis values as historically valid.
+- Assume that the current parameter values have been formally approved.
+- Introduce database persistence without architectural evidence.
+- Change financial formulas, thresholds, weights, or parameter values.
+- Modify production code or tests in this task.
+- Run tests, application commands, database commands, or Git commands.
+- Repeat audits already completed unless new evidence requires it.
 
-- `src/tests/test_stage7_valuation.py`
-- `src/tests/test_stage9_decision.py`
-- `src/tests/test_stage789_service_interface.py`
-- `src/tests/test_stage5_forecast.py`
-- `src/tests/test_stage8_market.py`
-- `src/tests/test_stage8_market_service.py`
-- `src/tests/test_stage8_market_parameters.py`
-- `src/tests/test_market_history_query.py`
+This prompt is **AUDIT + DECISION ANALYSIS + DOCUMENTATION ONLY**. No code changes are authorized.
 
-If a listed file is unavailable, report its exact path and the specific acceptance criterion that cannot be verified. Do not silently omit it. If another file is necessary, name that exact path and explain why it is required; do not claim conclusions that depend on an unprovided file.
+### 2. Required tasks
 
-## 3. Mandatory restrictions
+#### T1 — Verify the current parameter-versioning implementation
 
-1. Do not run tests, application code, scripts, database commands, Git commands, or shell commands.
-2. Do not use GitHub, GitHub CLI, remote APIs, commits, branches, pushes, or pulls.
-3. Do not modify production code or test code.
-4. Only the following documentation files may be changed:
-   - `reply.md`
-   - `stepsForStage7.md`
-   - `tasksToDo.md`
-5. Do not rewrite `src/valuation/engine.py`; it is reserved for S7-T011, the final technical task.
-6. Do not invent financial formulas, alert thresholds, industry mappings, data sources, parameter values, effective dates, historical observations, or missing callers.
-7. Do not treat a report's assertion as proof when the current source or tests can verify the claim.
-8. Do not treat a report date, cutoff date, or model-version label alone as proof of PIT correctness.
-9. Do not recompute Stage 5 EPS in Stage 7.
-10. Preserve the existing Jalali date conventions and established financial contracts.
-11. A missing item in the supplied file set is not proof that it is absent from the entire repository or from external deployment code.
+Inspect the supplied source and reports and establish the exact current state of:
 
-## 4. S7-T003 — D9 and versioned parameter consumption
+- ParameterRecord
+- ParameterSetVersion
+- ParameterRegistry
+- Genesis version and its records
+- Exact-key version resolution
+- Date-based version resolution
+- Parameter consumption and validation
+- Legacy parameter-consumption behavior
+- Relationship between `data_cutoff_datetime`, `parameter_as_of`, and `parameter_registry`
 
-Inspect the current implementation and tests to determine:
+For every conclusion, provide file and line-level evidence.
 
-- How valuation parameters are represented and versioned.
-- How parameter selection is performed when an as-of Jalali date is supplied.
-- What happens when no parameter version can be validly selected.
-- Whether the selected parameter values actually influence the valuation calculation, or are merely attached to metadata.
-- Whether metadata, model-version identifiers, and effective-date fields correspond to the parameters actually consumed by the calculation.
-- Whether the tests exercise the real selection and consumption path, including the absence of a valid historical version.
+Distinguish implemented mechanisms from policies that have not been approved.
 
-### Required evidence
+#### T2 — Establish the required versioning policy
 
-For each material conclusion, cite exact file paths, function/class names, relevant line ranges when available, and the associated test name or assertion.
+Analyze and provide a precise recommendation for:
 
-Distinguish:
+- Whether existing parameter versions must be immutable.
+- When a new version must be created.
+- How effective dates should be assigned.
+- How overlapping or ambiguous effective dates should be handled.
+- Whether historical calculations must fail when no valid dated version exists.
+- Whether Genesis can ever be used for historical calculations.
+- How the selected parameter version should be recorded in valuation output and audit metadata.
 
-- Proven by current implementation.
-- Proven by an existing test.
-- Not demonstrated by the supplied code or tests.
-- Requires an explicit owner decision or an approved financial contract.
+Separate technical recommendations from decisions requiring explicit owner approval.
 
-Do not infer that Genesis/default parameters are valid for historical dates unless an explicit, approved contract supports that behavior. Do not invent an effective date or historical version.
+Do not silently treat recommendations as approved policy.
 
-**Acceptance criterion:** The parameter-selection path, actual parameter consumption, invalid/missing-version behavior, and test coverage are reported with evidence. Do not mark D9 resolved merely because a version identifier exists.
+#### T3 — Determine parameter coverage
 
-## 5. S7-T004 — PIT, provenance, and input contracts
+Review the parameter registry and the values used by the valuation engine.
 
-Trace the available evidence for the following inputs and interfaces:
+Produce a complete classification of:
 
-- Stage 5 forecast and its provenance/reference information.
-- Valuation market price and its Jalali as-of selection.
-- Historical benchmark inputs and their timestamps/provenance.
-- Stage 8 market signals and their actual source path.
-- The as-of date and its propagation across relevant service boundaries.
-- Any other input consumed by valuation that materially affects PIT correctness.
+1. Parameters registered and consumed.
+2. Parameters registered but not consumed.
+3. Financial rules or constants consumed outside the registry.
+4. Values that are not yet formally approved or whose financial definition is unresolved.
 
-For each input, distinguish the date of the underlying observation or report from evidence that the information was actually available by the requested analysis date.
+For each item, state whether it must be versioned, whether further financial approval is needed, and the evidence supporting that conclusion.
 
-Determine whether the available source and tests prove:
+Do not expand this into a general review of valuation formulas. The purpose is only to determine versioning coverage.
 
-1. The identity of the data being consumed.
-2. The observation/report date, where applicable.
-3. The availability/publication time, where required for PIT.
-4. The as-of filtering rule.
-5. The provenance linking the input to its source.
-6. The behavior when the required temporal evidence is absent.
+#### T4 — Determine historical-data requirements
 
-Do not assume that an as-of query alone establishes full PIT correctness. Do not classify metadata references as proof that the corresponding data were actually used.
+Establish exactly what evidence is required to create valid dated parameter versions.
 
-**Acceptance criterion:** Provide an input-by-input evidence matrix with the actual contract, evidence, unresolved temporal/provenance gaps, and the exact missing file or owner decision needed to close each gap. Where the code cannot establish PIT correctness, report that limitation explicitly rather than inventing a remedy.
+Address:
 
-## 6. S7-T005 — Alert and decision contracts D1–D8
+- Actual historical parameter values.
+- Actual effective dates.
+- Source and approval evidence for each historical version.
+- Whether the current values have a verifiable effective date.
+- Whether historical versions can be reconstructed from existing project records.
 
-Compare the current source and direct tests against the approved policies in `stepsForStage7.md` and `07_Stage7_Valuation.md`.
+Also distinguish parameter-version history from the temporal provenance of benchmark P/E observations.
 
-Assess each decision separately:
+Do not invent or reconstruct unsupported historical values.
 
-- **D1 — `ASSESSMENT_FLIP_RISK`:** no new alert without a valid criterion for changes in assumptions/status.
-- **D2 — `HIGH_MULTIPLE_DEPENDENCE`:** the current criterion is not approved as valid; keep the alert disabled pending validation.
-- **D3 — `HIGH_EPS_DEPENDENCE`:** no new alert without a valid criterion; preserve Stage 5 EPS.
-- **D4 — `MARGIN_ASSUMPTION_RISK`:** outside V1 until a valid, dated input exists.
-- **D5 — `HIGH_IMPACT_HIGH_UNCERTAINTY`:** preserve `review_priority`; do not create an additional alert without an independent valid criterion.
-- **D6 — Industry-specific models:** preserve existing EPS and TARGET_PE drivers; do not invent industry formulas or mappings.
-- **D7 — PIT:** evaluate actual temporal evidence for every relevant input; a cutoff alone is insufficient.
-- **D8 — Alert contract:** verify actual names, structures, producers, consumers, and tests before concluding that an alert is operationally supported.
+#### T5 — Determine registry storage requirements
 
-For each D1–D8, report:
+Evaluate whether the existing in-code registry is sufficient for the application's current architecture or whether persistent external storage is demonstrably required.
 
-- Approved policy.
-- Current implementation and exact relevant symbols.
-- Evidence from direct tests.
-- Actual consumer evidence, if any.
-- Whether the behavior is implemented, intentionally deferred, partially evidenced, or unresolved.
-- Any genuine discrepancy and the evidence needed to accept that discrepancy as a defect.
+Base the conclusion on actual source usage and architecture evidence.
 
-Do not label an intentionally deferred capability as a bug that must be implemented. Do not change alert names or schemas. Do not infer that an alert is consumed merely because it appears in a result schema.
+If the available files are insufficient, identify the exact additional file required and explain why. Do not explore other files without permission.
 
-**Acceptance criterion:** Every D1–D8 has an evidence-backed status. Deferred functionality remains deferred unless an explicit approved policy says otherwise.
+#### T6 — Produce a final completion and blocker register
 
-## 7. S7-T006 — Documentation alignment
+Create a concise, actionable table containing:
 
-Only after S7-T003, S7-T004, and S7-T005 have been audited, update the documentation as justified by the evidence.
+- Requirement
+- Current status: DONE / OPEN / BLOCKED
+- Evidence
+- Remaining action
+- Responsible party: engineering / project owner / data provider
+- Exact information or approval required
 
-### `reply.md`
+Separate items that can be completed through engineering work from items that cannot be completed without genuine historical data or owner approval.
 
-Append a clearly titled report for Prompt 1-D. Include:
+### 3. Documentation updates
 
-- Prompt ID and Task IDs.
-- Work type.
-- Exact files actually inspected.
-- Evidence-backed findings for T003, T004, and T005.
-- Acceptance criteria and PASS / NOT PASS / UNVERIFIED outcomes.
-- Exact file paths, symbols, test names, and line ranges when available.
-- Any missing files and the conclusions they prevent.
-- Owner decisions and contracts still required.
-- Files changed and reasons.
-- Explicit statement that no tests, application code, database commands, or Git commands were run.
+Append the complete report to `temp_report2.md`. Do not overwrite or remove previous reports.
 
-Do not erase historical reports. Correct an earlier statement only when current evidence justifies the correction; document the correction rather than silently rewriting history.
+Update `reply.md` with the interim report for this prompt.
 
-### `stepsForStage7.md`
+Update `tasksToDo.md` only if the evidence justifies a status or acceptance-criteria change for the relevant active task, particularly S7-T007.
 
-Update only the roadmap statements and statuses directly supported by this audit. Preserve all established policies and the four-package order. Do not declare Stage 7 complete.
+Update `stepsForStage7.md` only if a genuine new decision or verified finding changes the Objective 4 roadmap or completion criteria.
 
-### `tasksToDo.md`
+Do not modify `STAGE7_MASTER_WORKING_PACKET.md` unless a demonstrated inconsistency with the current authoritative roadmap must be corrected. Explain any such change.
 
-Update the statuses of S7-T003, S7-T004, S7-T005, and S7-T006 only when their acceptance criteria are actually satisfied.
+### 4. Evidence and reporting requirements
 
-- A completed audit may be marked DONE even when it identifies an unresolved architectural or policy blocker, provided the audit itself meets its acceptance criteria.
-- If evidence is insufficient, leave the affected task OPEN and explain precisely what is missing.
-- Do not mark S7-T007, S7-T008, S7-T009, S7-T010, S7-T011, or S7-T012 DONE as part of this prompt.
-- Do not change unrelated task statuses.
+For each task T1–T6, report:
 
-## 8. Final response format
+- Files examined.
+- Exact findings and supporting file/line references.
+- What is already implemented.
+- What remains incomplete.
+- Which conclusions are recommendations rather than approved decisions.
+- Which items are blocked and the exact missing evidence or approval.
 
-Return a concise summary and a detailed audit report in `reply.md`.
+Do not report an item as DONE merely because a mechanism exists or an audit was performed.
 
-Your final response must state:
+Do not claim that historical PIT correctness has been established without valid historical parameter versions and supporting evidence.
 
-1. The outcome of each of S7-T003, S7-T004, S7-T005, and S7-T006.
-2. Which documentation files changed.
-3. Which conclusions remain unverified or blocked and the exact evidence/owner decision required.
-4. Confirmation that no code/tests were changed and no tests or commands were executed.
-5. The exact next recommended Task IDs based on the findings, without prematurely advancing to the final engine review.
+Do not claim tests passed. No tests are to be run in this task.
 
-**Stage 7 must remain OPEN unless all actual exit criteria in `stepsForStage7.md` are independently satisfied.**
+Stop after completing the audit and documentation updates. Do not begin implementation.
+
