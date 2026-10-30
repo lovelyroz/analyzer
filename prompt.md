@@ -1,130 +1,156 @@
-# Final Consolidated Audit — Stage 7 Target 4
+# Stage 7 — Target 4: Parameter Registry Audit and Closure Planning
 
-You are performing the **final and only remaining consolidated code audit for Stage 7 Target 4** in the `analyzer` project.
+You are auditing Target 4 of the Stage 7 remediation in the `lovelyroz/analyzer` repository.
 
-Read and follow `WORKFLOW_RULES.md`.
+This is a financial-data application. Financial correctness, auditability, deterministic behavior, Point-in-Time correctness, and preservation of existing financial invariants take priority over implementation speed or superficial test success.
 
-## Strict execution boundaries
+## 1. Work classification
 
-- REPORT ONLY.
-- Do not modify, create, or delete any file.
-- Do not run tests or execute test commands.
-- Do not commit or modify Git state.
-- Do not start follow-up investigations or request another audit.
-- Inspect only the explicitly listed files unless a narrowly necessary reference is required to establish a finding. If so, identify it and explain why.
+**REPORT-ONLY — NO CODE OR DOCUMENTATION CHANGES.**
 
-## Files provided
+Do not modify, create, delete, or reformat any repository file.
 
-1. `src/valuation/parameters.py`
-2. `src/valuation/engine.py`
-3. `src/tests/test_stage7_valuation.py`
+Do not run tests, application code, database commands, or Git commands. The user runs all tests locally.
+
+## 2. Required files
+
+Examine only these explicitly supplied files:
+
+1. `WORKFLOW_RULES.md`
+2. `stepsForStage7.md`
+3. `tasksToDo.md`
 4. `STAGE7_Target4.md`
-5. `stepsForStage7.md`
-6. `WORKFLOW_RULES.md`
+5. `temp_report2.md`
+6. `src/valuation/parameters.py`
+7. `src/valuation/engine.py`
+8. `src/tests/test_stage7_valuation.py`
 
-## Audit objectives
+Do not inspect other files. If additional evidence is essential, identify the exact file and explain why it is required. Do not infer its contents.
 
-Perform one consolidated audit covering **all unresolved technical and documentation issues within Target 4**.
+## 3. Tasks
 
-### 1. ParameterRegistry uniqueness and deterministic resolution
+### T4-A — Verify the two reported technical defects
 
-Determine whether duplicate `version_key` values in `ParameterRegistry.versions` can cause:
+Examine the implementation and tests for:
 
-- Incorrect or ambiguous exact-key resolution.
-- Silent selection of the wrong parameter-set version.
-- Loss of deterministic behavior or auditability.
-- Any inconsistency between exact-key and date-based resolution.
+- Duplicate `version_key` acceptance in `ParameterRegistry`.
+- Incomplete deep immutability of nested parameter values and consumed parameter values.
 
-Give a clear verdict on whether constructor-level validation rejecting duplicate `version_key` values is technically required.
+For each finding, provide:
 
-Do not assume that `effective_from` values must be strictly increasing in tuple order. Assess the actual resolver behavior and identify the precise conditions that create ambiguity.
+- Exact file and relevant class/function.
+- Specific code evidence and execution path.
+- Whether the defect is confirmed, partially confirmed, or not confirmed.
+- A minimal, safe correction proposal.
+- Compatibility risks for existing callers and calculations.
+- Whether the correction can be made without an owner-level financial or architectural decision.
 
-### 2. Deep immutability
+Do not assume that `frozen=True` or `MappingProxyType` guarantees recursive immutability.
 
-Audit the actual immutability guarantees of:
+Consider nested dictionaries, lists, and other mutable values. Do not propose a solution that silently changes the public data contract or breaks existing consumers.
 
-- `ParameterRecord.parameter_value`
-- `ParameterSetVersion`
-- `ConsumedParameters.values`
-- Nested dictionaries and other mutable values
-- `ConsumedParameters.snapshot()`
+### T4-B — Verify resolver and timestamp behavior
 
-Determine whether mutable nested values can be changed after construction or consumption, and whether this can alter the effective parameter state or undermine reproducibility.
+Verify the documented behavior against the actual implementation:
 
-Distinguish clearly between:
-- Defensive copying
-- Shallow immutability
-- Deep immutability
+- Exact `version_key` resolution.
+- Date-based version resolution.
+- Behavior when multiple versions have the same `effective_from`.
+- Whether tuple ordering affects resolution.
+- Legacy Genesis selection.
+- Conditions under which `data_cutoff_datetime` governs parameter selection.
+- Behavior when `parameter_as_of` conflicts with the cutoff.
+- Whether `valuation_date` is used as an automatic fallback.
+- Snapshot independence.
 
-Recommend the minimum technically sound correction, if one is required.
+For every conclusion, cite the exact code and existing test evidence. Distinguish implementation evidence from test evidence.
 
-### 3. Historical parameter selection and timestamp governance
+### T4-C — Evaluate test coverage
 
-Inspect `_resolve_parameter_governing_timestamp` and the parameter-selection path.
+Map each required behavior to existing tests:
 
-Determine precisely:
+- Duplicate key rejection.
+- Nested mutation prevention.
+- Date-based resolution under different tuple orderings.
+- Rejection of ambiguous effective dates.
+- Legacy behavior.
+- Timestamp governance and cutoff conflict.
+- Snapshot independence.
 
-- When `data_cutoff_datetime` governs parameter selection.
-- Whether the legacy path remains active when both `registry` and `parameter_as_of` are absent.
-- Whether `valuation_date` is used as an implicit fallback.
-- How conflicting explicit timestamps are handled.
-- Whether the implementation matches the claims in `STAGE7_Target4.md`.
+Classify each as:
 
-Identify any misleading or incomplete documentation statements.
+- COVERED
+- PARTIALLY COVERED
+- NOT COVERED
+- NOT APPLICABLE
 
-### 4. Parameter registry and resolution invariants
+Do not claim a test passes or fails because you are not running tests.
 
-Check the consistency of:
-- Genesis/default parameter-set behavior.
-- Version identity and exact-key lookup.
-- Effective-date resolution.
-- Ambiguity rejection.
-- Parameter consumption and snapshot behavior.
+For missing tests, specify the exact scenario and expected assertion.
 
-Report only concrete correctness or auditability issues supported by the inspected code.
+### T4-D — Separate technical corrections from owner decisions
 
-### 5. Tests and coverage assessment
+Evaluate R5–R9 in `STAGE7_Target4.md` separately:
 
-Inspect the relevant tests in `src/tests/test_stage7_valuation.py`.
+- R5: Formal approval of the 33 consumed Genesis parameters.
+- R6: Need for historical reconstruction/backtesting.
+- R7: In-code Registry versus persistent external storage.
+- R8: Versioning of confidence weights, driver uncertainty, and rounding rules.
+- R9/D7: Responsibility for PIT benchmark P/E provenance.
 
-Identify which of the above invariants are actually tested and which are not.
+For each item, report:
 
-Do not execute tests. Do not claim that unexecuted tests pass.
+1. What the current code and documents establish.
+2. What remains unknown or unapproved.
+3. The concrete decision required from the project owner.
+4. Whether this decision blocks the two technical corrections in T4-A.
+5. Whether the item should remain OPEN or BLOCKED.
 
-Where coverage is missing, specify the exact test scenario that should be added. Do not write the tests.
+Never make these decisions on behalf of the project owner. Do not invent historical parameter values, effective dates, approvals, financial rules, or provenance.
 
-### 6. Target 4 documentation consistency
+### T4-E — Recommend the exact closure sequence
 
-Compare the code findings with the claims and conclusions recorded in `STAGE7_Target4.md` and the applicable Target 4 requirements in `stepsForStage7.md`.
+Provide a minimal ordered plan separating:
 
-Identify:
-- Duplicate or repeated sections.
-- Contradictory or outdated conclusions.
-- Claims that need qualification.
-- Confirmed completed items.
-- Remaining genuine blockers or required decisions.
+1. Technical corrections that can safely proceed without owner approval.
+2. Owner decisions that must be obtained first.
+3. Tests that must be added.
+4. Documentation corrections required after implementation.
+5. Evidence required before Target 4 can be declared complete.
 
-Do not edit the documents.
+Explicitly state whether Target 4 can be closed independently or remains dependent on any Stage 7 task or decision.
 
-## Required final report
+## 4. Evidence and reporting requirements
 
-Provide one consolidated report with these sections:
+- Every confirmed defect must have specific code evidence.
+- Every claim of existing test coverage must identify the test name.
+- Do not treat documentation statements as proof of implementation.
+- Do not treat implementation presence as proof of financial approval.
+- Do not treat unit tests as proof of end-to-end integration.
+- Do not classify an unexecuted test as PASS.
+- Separate confirmed facts, technical recommendations, and owner decisions.
+- If evidence is insufficient, state exactly what is missing.
 
-1. **Executive verdict:** Is Target 4 technically complete, incomplete, or blocked?
-2. **Confirmed defects:** Only code-backed defects, with file and function/class references.
-3. **Required code corrections:** Minimum necessary changes, ranked by importance.
-4. **Test gaps:** Exact missing test scenarios.
-5. **Documentation corrections:** Exact statements or sections requiring correction.
-6. **Decisions requiring user approval:** Only decisions that cannot be resolved from technical evidence.
-7. **Final closure checklist:** A finite checklist of all remaining Target 4 actions.
+## 5. Required report format
 
-For every finding, classify it as:
-- CONFIRMED DEFECT
-- TEST GAP
-- DOCUMENTATION ISSUE
-- DESIGN DECISION
-- NO ISSUE
+Return a concise report using these headings:
 
-Clearly distinguish proven defects from recommendations and optional hardening.
+1. **T4-A — Technical Defect Verification**
+2. **T4-B — Resolver and Timestamp Verification**
+3. **T4-C — Test Coverage Matrix**
+4. **T4-D — Owner Decisions R5–R9**
+5. **T4-E — Recommended Closure Sequence**
+6. **Required Additional Files (if any)**
+7. **Final Target 4 Status**
 
-**Important:** This is the final consolidated audit. Do not recommend another audit, another investigation prompt, or a sequence of additional reviews. Your report must be sufficient for the project owner to decide all remaining Target 4 corrections and close this objective.
+For every task, provide a clear conclusion and supporting evidence.
+
+Do not modify repository files. Do not run tests. Do not mark any Task as DONE based solely on this audit.
+
+The final status must be one of:
+
+- READY FOR IMPLEMENTATION
+- PARTIALLY BLOCKED
+- BLOCKED
+
+Explain the status using evidence, not assumptions.
