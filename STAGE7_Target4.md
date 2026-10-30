@@ -337,3 +337,54 @@ Primary documents:
 3. `STAGE7_Target4.md`: Updated with verified findings, recommendations, and blocker register.
 4. `tasksToDo.md`: Updated active task status for S7-T007.
 5. `stepsForStage7.md`: Preserved without modification (no roadmap inconsistency). ======================================
+دو ابهام مطرح‌شده بر اساس ممیزی کدها در `src/valuation/parameters.py`، `src/valuation/engine.py`، اسناد کاری `STAGE7_Target4.md` و تست‌های مربوطه در `src/tests/test_stage7_valuation.py` به شرح زیر بررسی و شفاف‌سازی می‌شوند:
+
+---
+### S7-PARAM-05 — Corrective Follow-up (REPORT-ONLY)
+### **۱. بررسی عدم تغییرپذیری عمیق (Deep Immutability)**
+
+**سوال**: آیا تمام مقادیر تودرتوی `ParameterRecord` و `ConsumedParameters` واقعاً در برابر تغییر محافظت شده‌اند؟ اگر نه، دقیقاً چه نوع مقداری هنوز قابل تغییر است؟
+
+#### **یافته‌ها و شواهد کد**:
+
+1. **در ساختار `ParameterRecord` (`src/valuation/parameters.py:93`)**:
+   - دکوراتور `@dataclass(frozen=True)` غیرقابل‌تغییر بودن سطحی (Shallow Immutability) را تضمین می‌کند و مانع از اختصاص مجدد ویژگی‌ها (مانند `record.parameter_value = new_val`) می‌شود (`dataclasses.FrozenInstanceError`).
+   - اما فیلد `parameter_value` نوع داده عام (`object`) را نگهداری می‌کند. اگر مقدار ذخیره‌شده درون `parameter_value` یک ساختار داده متغیر (Mutable Collection) مانند `dict` باشد (مانند رکورد `INDUSTRY_TARGET_PE` که یک `dict` است)، محتوای داخلی آن توسط `frozen=True` قفل **نمی‌شود**.
+   - **شاهد**: اگرچه تابع `_rec()` با `copy.deepcopy(value)` مقدار را کپی می‌کند تا از الیاس شدن با ثوابت سراسری جلوگیری کند، اما شیء درون `record.parameter_value` کماکان یک `dict` پایتونی تغییرپذیر است و تغییر مستقیم عناصر آن (`record.parameter_value["KEY"] = val`) بدون بروز خطا انجام پذیر است.
+
+2. **در ساختار `ConsumedParameters` (`src/valuation/parameters.py:103`)**:
+   - گروه پارامترهای اصلی (`scenario_weights`، `valuation_thresholds` و ...) و خود دیکشنری جامع `values` با استفاده از `MappingProxyType` پوشانده شده‌اند (`MappingProxyType(values)`).
+   - `MappingProxyType` مانع افزودن، حذف یا تغییر کلیدهای سطح اول می‌شود (تلاش برای دستکاری مستقیم مانند `consumed.scenario_weights["bear"] = 1.0` منجر به `TypeError` می‌شود که در تست `test_p35_isolation_from_global_mutation_and_snapshot_aliasing` بررسی شده است).
+   - فیلد `probability_evidence_families` نیز به `tuple` تبدیل شده که غیرقابل تغییر است.
+   - **نوع مقدار قابل تغییر**: اگر یکی از پارامترهای ثبت‌شده درون `consumed.values` خود یک دیکشنری متغیر باشد (مانند `consumed.values["INDUSTRY_TARGET_PE"]`)، فراخوانی آن مقدار ارجاع به همان دیکشنری متغیر داخلی را برمی‌گرداند و می‌توان کلیدهای داخلی آن را ویرایش کرد (`consumed.values["INDUSTRY_TARGET_PE"]["LEAK"] = 1.0`).
+
+3. **حفاظت در خروجی `snapshot()`**:
+   - متد `consumed.snapshot()` با اجرای `copy.deepcopy(dict(self.values))` یک نسخه کاملاً مستقل ارائه می‌دهد. دستکاری snapshot خروجی تاثیری بر شیء `ConsumedParameters` یا ثوابت ماژول ندارد.
+
+#### **نتیجه‌گیری**:
+غیرقابل‌تغییر بودن عمیق (Deep Immutability) به صورت ۱۰۰٪ کامل برقرار نیست. **دقیقاً مقادیر از نوع دیکشنری‌های متغیر (Mutable Dictionaries)** مانند `INDUSTRY_TARGET_PE` در صورت دسترسی مستقیم به لایه‌های داخلی آنها (چه از طریق `ParameterRecord.parameter_value` و چه از طریق `consumed.values["INDUSTRY_TARGET_PE"]`) هنوز قابل دستکاری هستند، زیرا در لایه‌های تودرتو به ساختار غیرقابل‌تغییر (مانند `MappingProxyType` عمقی یا `FrozenDict`) تبدیل نشده‌اند.
+
+---
+
+### **۲. شفاف‌سازی وضعیت R1 (R1 Status Discrepancy)**
+
+**سوال**: چرا در T2 کنترل یکنواختی `effective_from` و یکتایی `version_key` هنوز لازم دانسته شده، ولی در T5 وضعیت R1 برابر DONE است؟ وضعیت واقعی را مشخص کن.
+
+#### **یافته‌ها و شواهد کد**:
+
+1. **دلیل ثبت وضعیت `DONE` برای R1 در T5 (`STAGE7_Target4.md`)**:
+   - نیازمندی R1 مربوط به **«زیرساخت نسخه گذاری پارامترها»** است.
+   - تمام اجزای کلیدی زیرساخت شامل کلاس‌های داده (`ParameterRecord`, `ParameterSetVersion`, `ParameterRegistry`)، مکانیسم جستجوی کلید دقیق (`resolve_parameter_set`)، جستجوی تاریخ‌محور (`resolve_parameter_set_as_of`)، مدیریت نسخه Genesis بدون تاریخ، و افشای متاداده‌ها در `src/valuation/parameters.py` پیاده‌سازی شده و تمامی تست‌های یکپارچگی (مانند `test_p33_*` و `test_d9_*`) با موفقیت پاس می‌شوند.
+   - از نظر **امکانات و کارکرد اصلی زیرساختی (Functional Infrastructure)**، R1 کامل است و به همین دلیل در جدول T5 وضعیت آن `DONE` علامت خورده است.
+
+2. **دلیل مطرح شدن الزامات اعتبارسنجی در T2**:
+   - تکلیف T2 ناظر بر **«تدوین سیاست دقیق نسخه گذاری V1 برای محیط تولید (Production Hardening)»** بوده است.
+   - ممیزی نشان داد که کلاس `ParameterRegistry` در زمان تعریف نسخه جدید (`__init__`) دو چک اعتبارسنجی را در زمان ساخت انجام نمی‌دهد:
+     - **یکتایی `version_key`**: اگر دو نسخه با کلید یکسان ثبت شوند، `resolve_parameter_set` اولین نسخه را برمی‌گرداند. (هرچند در جستجوی تاریخ‌محور `resolve_parameter_set_as_of` وجود تاریخ‌های همزمان با خطای `LookupError("Ambiguous...")` مسدود می‌شود، اما ساختار ثبت در زمان اختصاص کلیدها اعتبارسنجی پیش‌فرض ندارد).
+     - **کنترل یکنواختی و ترتیب صعودی `effective_from` در زمان ساخت**: مرتب‌سازی تاریخ‌ها در زمان جستجو (`max(candidates, ...)`) انجام می‌شود، اما در زمان مقداردهی اولیه `ParameterRegistry` ترتیب تاریخ‌ها چک نمی‌شود.
+
+#### **وضعیت واقعی (Actual Status)**:
+- **از نظر کارکرد و امکانات زیرساختی (Functional Infrastructure)**: **`DONE`** (زیرساخت انتخاب، جستجوی تاریخ‌محور و ایزوله‌سازی کاملاً عملیاتی و معتبر است).
+- **از نظر اعتبارسنجی زمان ساخت (Constructor Validation / Defense-in-Depth)**: نیازمند یک اضافه کردن اعتبارسنجی ساده در متد `__post_init__` کلاس `ParameterRegistry` جهت سخت‌سازی در برابر خطاهای احتمالی توسعه‌دهنده است.
+
+بنابراین تناقضی وجود ندارد؛ وضعیت `DONE` در T5 نشان‌دهنده **تکمیل زیرساخت کارکردی** است و پیشنهادات T2 نشان‌دهنده **مقاوم‌سازی اعتبارسنجی زمان ساخت** برای سیاست نهایی V1 می‌باشد.
