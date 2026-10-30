@@ -1,149 +1,189 @@
-# Prompt S7-PARAM-04 — Complete Dated and Versioned Parameter Policy
+# Prompt S7-PARAM-05 — Objective 4: Finalize Parameter Versioning Policy and Resolve Technical Gaps
 
-## بخش اول — دستورالعمل ایجنت (Agent Instructions)
+You are working on the financial-data application repository:
 
-You are working on the financial-data project `analyzer`.
-
-Your task is to complete the remaining work for Stage 7 Objective 4:
-
-**Determine and establish the policy, requirements, and implementation readiness for dated and versioned valuation parameters.**
+`lovelyroz/analyzer`
 
 This is a financial application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants take priority over implementation speed.
 
-### 1. Scope and restrictions
+## 1. Objective
 
-Work exclusively on Stage 7 Objective 4.
+Continue Stage 7 Objective 4 using `STAGE7_Target4.md` as the primary working document.
 
-Do not start or expand work on Objectives 1–3 or 5–18.
+The previous prompt S7-PARAM-04 completed the broad audit of parameter versioning, historical evidence requirements, registry storage, and outstanding blockers.
 
-Do not:
-- Invent historical parameter values or effective dates.
-- Treat the current Genesis values as historically valid.
-- Assume that the current parameter values have been formally approved.
-- Introduce database persistence without architectural evidence.
-- Change financial formulas, thresholds, weights, or parameter values.
-- Modify production code or tests in this task.
-- Run tests, application commands, database commands, or Git commands.
-- Repeat audits already completed unless new evidence requires it.
+Do NOT repeat that broad audit.
 
-This prompt is **AUDIT + DECISION ANALYSIS + DOCUMENTATION ONLY**. No code changes are authorized.
+Your task is to validate the critical conclusions from S7-PARAM-04, resolve technical questions that can be answered from existing evidence, and produce a precise implementation-ready policy for Objective 4.
 
-### 2. Required tasks
+## 2. Work classification
 
-#### T1 — Verify the current parameter-versioning implementation
+**REPORT-ONLY / AUDIT / POLICY ANALYSIS / DOCUMENTATION**
 
-Inspect the supplied source and reports and establish the exact current state of:
+- No production-code changes.
+- No test-code changes.
+- Do not execute tests, programs, database commands, or Git commands.
+- The user performs all testing locally.
+- Do not invent parameter values, effective dates, historical versions, financial policies, or approval evidence.
 
-- ParameterRecord
-- ParameterSetVersion
-- ParameterRegistry
-- Genesis version and its records
-- Exact-key version resolution
-- Date-based version resolution
-- Parameter consumption and validation
-- Legacy parameter-consumption behavior
-- Relationship between `data_cutoff_datetime`, `parameter_as_of`, and `parameter_registry`
+## 3. Required files
 
-For every conclusion, provide file and line-level evidence.
+You may inspect only these explicitly provided files:
 
-Distinguish implemented mechanisms from policies that have not been approved.
+### Primary documents
+- `STAGE7_Target4.md`
+- `WORKFLOW_RULES.md`
+- `stepsForStage7.md`
+- `tasksToDo.md`
+- `temp_report2.md`
+- `reply.md`
+- `07_Stage7_Valuation.md`
 
-#### T2 — Establish the required versioning policy
+### Source files
+- `src/valuation/parameters.py`
+- `src/valuation/engine.py`
+- `src/valuation/models.py`
 
-Analyze and provide a precise recommendation for:
+### Tests
+- `src/tests/test_stage7_valuation.py`
 
-- Whether existing parameter versions must be immutable.
-- When a new version must be created.
-- How effective dates should be assigned.
-- How overlapping or ambiguous effective dates should be handled.
-- Whether historical calculations must fail when no valid dated version exists.
-- Whether Genesis can ever be used for historical calculations.
-- How the selected parameter version should be recorded in valuation output and audit metadata.
+If another file is essential, do not inspect it automatically. Report its exact path and explain why it is necessary.
 
-Separate technical recommendations from decisions requiring explicit owner approval.
+## 4. Required tasks
 
-Do not silently treat recommendations as approved policy.
+### T1 — Verify critical claims from S7-PARAM-04
 
-#### T3 — Determine parameter coverage
+Recheck the following claims against the actual source code and tests:
 
-Review the parameter registry and the values used by the valuation engine.
+1. Whether `frozen=True` provides sufficient immutability for parameter records and complete parameter-set versions.
+2. Whether nested mutable parameter values can still be modified after construction or consumption.
+3. Whether `data_cutoff_datetime` alone activates historical parameter selection, or whether `parameter_registry` / `parameter_as_of` is also required.
+4. Whether the Legacy path can use current Genesis values without claiming historical validity.
+5. Whether the parameter-selection and consumption metadata accurately identify the values actually used.
 
-Produce a complete classification of:
+For every conclusion, provide exact file paths, line references, and the relevant behavior.
 
-1. Parameters registered and consumed.
-2. Parameters registered but not consumed.
-3. Financial rules or constants consumed outside the registry.
-4. Values that are not yet formally approved or whose financial definition is unresolved.
+Do not accept a report statement merely because it appears in an earlier report.
 
-For each item, state whether it must be versioned, whether further financial approval is needed, and the evidence supporting that conclusion.
+### T2 — Define the technically correct V1 parameter-versioning policy
 
-Do not expand this into a general review of valuation formulas. The purpose is only to determine versioning coverage.
+Based on verified source behavior, propose a precise policy covering:
 
-#### T4 — Determine historical-data requirements
+- Immutability of existing versions and records.
+- Whether deep immutability is required and how it can be guaranteed.
+- Conditions requiring a new parameter-set version.
+- Meaning and assignment of `effective_from`.
+- Timezone and timestamp normalization requirements.
+- Handling of duplicate or ambiguous effective dates.
+- Behavior when no valid dated version exists.
+- Explicit separation between Genesis/Legacy use and historical PIT selection.
+- Traceability of model version, parameter-set version, and consumed parameter snapshot.
 
-Establish exactly what evidence is required to create valid dated parameter versions.
+Clearly distinguish:
 
-Address:
+A. Rules already implemented and verified.
 
-- Actual historical parameter values.
-- Actual effective dates.
-- Source and approval evidence for each historical version.
-- Whether the current values have a verifiable effective date.
-- Whether historical versions can be reconstructed from existing project records.
+B. Technical changes that are necessary but not yet implemented.
 
-Also distinguish parameter-version history from the temporal provenance of benchmark P/E observations.
+C. Decisions requiring explicit project-owner approval.
 
-Do not invent or reconstruct unsupported historical values.
+Do not modify code.
 
-#### T5 — Determine registry storage requirements
+### T3 — Resolve the registry storage question
 
-Evaluate whether the existing in-code registry is sufficient for the application's current architecture or whether persistent external storage is demonstrably required.
+Evaluate the existing in-code registry against the actual V1 requirements.
 
-Base the conclusion on actual source usage and architecture evidence.
+Compare only these two options:
 
-If the available files are insufficient, identify the exact additional file required and explain why. Do not explore other files without permission.
+- Option A: Keep the registry in source code.
+- Option B: Introduce persistent external storage.
 
-#### T6 — Produce a final completion and blocker register
+Evaluate auditability, reproducibility, historical version preservation, deployment consistency, and operational complexity.
 
-Create a concise, actionable table containing:
+Make a clear technical recommendation for V1.
 
-- Requirement
-- Current status: DONE / OPEN / BLOCKED
-- Evidence
-- Remaining action
-- Responsible party: engineering / project owner / data provider
-- Exact information or approval required
+Do not treat the absence of an existing database table as proof that persistent storage is unnecessary.
 
-Separate items that can be completed through engineering work from items that cannot be completed without genuine historical data or owner approval.
+If the decision depends on an unresolved product or operational requirement, identify that requirement explicitly.
 
-### 3. Documentation updates
+### T4 — Finalize parameter coverage decisions
 
-Append the complete report to `temp_report2.md`. Do not overwrite or remove previous reports.
+Using the verified registry and source code, classify:
 
-Update `reply.md` with the interim report for this prompt.
+1. Registered and consumed parameters.
+2. Registered but unused parameters.
+3. Financial/model rules outside the registry.
+4. Values that require financial approval.
+5. Items that are model-version constants rather than runtime parameters, if the evidence supports that distinction.
 
-Update `tasksToDo.md` only if the evidence justifies a status or acceptance-criteria change for the relevant active task, particularly S7-T007.
+For every item requiring a decision, specify the exact decision needed.
 
-Update `stepsForStage7.md` only if a genuine new decision or verified finding changes the Objective 4 roadmap or completion criteria.
+Do not add or remove parameters and do not change financial formulas.
 
-Do not modify `STAGE7_MASTER_WORKING_PACKET.md` unless a demonstrated inconsistency with the current authoritative roadmap must be corrected. Explain any such change.
+### T5 — Produce the Objective 4 decision and blocker register
 
-### 4. Evidence and reporting requirements
+Create a consolidated register containing:
+
+- Requirement / issue ID.
+- Current verified status.
+- Evidence.
+- Recommended technical policy.
+- Whether implementation is possible now.
+- Required owner decision or external evidence.
+- Exact acceptance criteria.
+
+Explicitly distinguish:
+
+- Technically complete.
+- Technically incomplete but implementable.
+- Blocked by missing historical evidence.
+- Blocked by project-owner approval.
+- Separate PIT dependency, especially benchmark P/E provenance.
+
+Do not mark Objective 4 complete while critical historical or approval requirements remain unresolved.
+
+### T6 — Documentation updates
+
+Update the following documents without deleting historical reports:
+
+1. Append the complete S7-PARAM-05 report to `temp_report2.md`.
+2. Replace the interim content of `reply.md` with a concise execution summary for this prompt.
+3. Update `STAGE7_Target4.md` with verified findings, finalized recommendations, and remaining decisions.
+4. Update `tasksToDo.md` only where the new evidence justifies a status or acceptance-criteria correction.
+5. Do not modify `stepsForStage7.md` unless a genuine roadmap inconsistency is proven. Explain any proposed change instead of silently changing the roadmap.
+
+Keep previous report history intact.
+
+## 5. Restrictions
+
+- Do not fabricate historical parameter values or effective dates.
+- Do not assign an effective date to Genesis.
+- Do not assume that current constants have received financial approval.
+- Do not silently convert technical recommendations into owner-approved policy.
+- Do not claim full PIT correctness based only on parameter version selection.
+- Do not change formulas, thresholds, industry mappings, or model behavior.
+- Do not create database models or persistence mechanisms.
+- Do not execute tests or other commands.
+- Do not expand the audit to unrelated Stage 7 objectives.
+
+## 6. Required report format
 
 For each task T1–T6, report:
 
-- Files examined.
-- Exact findings and supporting file/line references.
-- What is already implemented.
-- What remains incomplete.
-- Which conclusions are recommendations rather than approved decisions.
-- Which items are blocked and the exact missing evidence or approval.
+- Task ID and title.
+- Exact files inspected.
+- Findings and evidence, including line references.
+- Conclusion.
+- Remaining uncertainty or required decision.
 
-Do not report an item as DONE merely because a mechanism exists or an audit was performed.
+At the end, provide:
 
-Do not claim that historical PIT correctness has been established without valid historical parameter versions and supporting evidence.
+1. Final recommended V1 parameter-versioning policy.
+2. Registry storage recommendation.
+3. Consolidated blocker register.
+4. Exact owner decisions still required.
+5. Exact files changed and reasons.
+6. Confirmation that no code or tests were changed or executed.
+7. Recommended next prompt, if Objective 4 still has implementable work remaining.
 
-Do not claim tests passed. No tests are to be run in this task.
-
-Stop after completing the audit and documentation updates. Do not begin implementation.
-
+Do not describe an item as complete unless its acceptance criteria are supported by verifiable evidence.
