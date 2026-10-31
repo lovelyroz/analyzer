@@ -411,3 +411,34 @@ No formulas, numerical parameters, financial thresholds, or active code were mod
 - No production callers, data sources, financial formulas, dates, parameter values, or provenance were invented.
 - Full PIT and E2E were not claimed.
 - Unrelated documentation and Task packages (especially 053–057 execution) were not modified beyond required status references.
+
+---
+
+# Correction Report — Status Correction for Tasks 029–031 (R7 / R8 recorded)
+
+**Work classification:** Documentation-only. No code, tests, migrations, or workflows changed. No tests run. No Git operations. Forecast Persistence Tasks 053–057 and historical reports not modified or rewritten.
+
+**Files changed:**
+- `STAGE7_MASTER_WORKING_PACKET.md` (Task 030, C-04, C-10, Tasks 050/051, F3 030 description, F6 note, revision line)
+- `07_Stage7_Valuation.md` (D6 V1 annotation after Section 44; R7/R8 records in Section 47 annotation)
+- `reply.md` (this correction appended)
+
+**Status changes:**
+
+| Task | ID | Before | After | Reason |
+|------|-----|--------|-------|--------|
+| 030 | S7-T008 | DONE | **PARTIAL** | For V1, sector-specific drivers/formulas (incl. Bank/Holding) are deferred: validated financial definitions and evidence are unavailable. EPS and TARGET_PE retained. D6 is not fully resolved. |
+| 050 | S7-T022 (R7) | OPEN | DONE (decision scope only) | Architectural decision recorded; does not resolve R5 or any evidence-dependent item. |
+| 051 | S7-T023 (R8) | OPEN | DONE (decision scope only) | Decision recorded; does not approve any numerical parameter value. |
+
+**Unchanged:** 029 S7-T007 PARTIAL; 031 S7-T009 DONE (audit completion only); 032 S7-T010 BLOCKED; 033 S7-T011 BLOCKED; 034 S7-T012 OPEN; 048 S7-T020 (R5) OPEN; 049 S7-T021 (R6) BLOCKED; 052 S7-T024 (R9/D7) BLOCKED.
+
+**Decisions recorded:**
+- **R7:** The V1 parameter registry is maintained in code under Git version control, not in the application database.
+- **R8:** All output-affecting parameters (weights, thresholds, rounding/precision rules) must belong to an immutable model version; any material change requires a new model version.
+
+**Unresolved items:** D6 sector-specific drivers/formulas (deferred; definitions and evidence missing); R5 numerical Genesis approval; historical parameter vintages with evidence-backed `effective_from`; provenance/runtime validation for historical Forward P/E and full PIT; production entrypoint/Session ownership (E2E); OA1 implementation (S7-T013–T018); Forecast persistence remediation (053–057, incl. 053-10).
+
+**Note on the earlier Task 029–031 report above:** it is preserved as historical record. Its Task 030 "DONE" status and its note that R7/R8 were OPEN are superseded by this correction.
+
+**Confirmations:** No code, tests, migrations, or workflows were changed. No tests were run by the agent. No evidence, dates, parameter values, or provenance were invented.

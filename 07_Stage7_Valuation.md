@@ -1267,7 +1267,7 @@ P/NAV تحلیل Valuation است و متعلق به Stage 7 است، نه Forec
 >
 > و هیچ شاخه‌گیری بر اساس `industry_code` وجود ندارد (این فیلد فقط در metadata بازنویسی می‌شود). `nav_per_share` نیز فقط در metadata به‌صورت `nav_per_share_received` ثبت می‌شود و در هیچ فرمولی مصرف نمی‌شود. تابع `calculate_nav_fair_value` در `src/valuation/models.py` صرفاً یک export متصل‌نشده است.
 >
-> در نتیجه `valuation_driver_ranking` برای یک شرکت غیرمالی، یک Bank و یک Holding یکسان است. **تصمیم D6 (نگاشت industry و فرمول‌های sector-specific) هنوز حل‌نشده است.**
+> در نتیجه `valuation_driver_ranking` برای یک شرکت غیرمالی، یک Bank و یک Holding یکسان است. **تصمیم D6 (نگاشت industry و فرمول‌های sector-specific) هنوز حل‌نشده است.** برای V1، Driverها و فرمول‌های sector-specific (از جمله فرمول‌های مخصوص Bank/Holding) deferred هستند، چون تعاریف مالی معتبر و شواهد پشتیبان در دسترس نیست؛ فقط دو Driver موجود `EPS` و `TARGET_PE` حفظ می‌شوند. D6 به‌طور کامل حل‌نشده است.
 
 ---
 
@@ -1324,6 +1324,12 @@ Impact × Uncertainty
 > A code-level Parameter Registry **does exist** in `src/valuation/parameters.py` (classes `ParameterRegistry`, `ParameterSetVersion`, functions `resolve_parameter_set`, `resolve_parameter_set_as_of`, `select_parameter_set_for_valuation`). Genesis snapshot is built programmatically from live module constants; `effective_from` on genesis is `None`; undated genesis is **never** selected for historical as-of queries; missing dated versions raise `LookupError` (fail-closed). Thresholds remain the live constants mirrored into registry records.
 >
 > **Architectural decisions now resolved (S7-T007 / D9 policy):** V1 parameter registry is version-controlled in code (no DB-backed analytical parameter registry); parameter versions require genuine evidence-backed `effective_from` before historical participation; never invent or backdate `effective_from`; undated Genesis must not be selected as a historical version; missing historical versions fail closed (no silent substitution of today); historical backtests may only use authentic vintages and authentic PIT input evidence; all output-affecting parameters must be tied to an immutable model version; numerical Genesis values are **not** owner-approved merely by existing in source.
+>
+> **R7 decision (recorded 2026-10-31):** the V1 parameter registry is maintained in code under Git version control, not in the application database.
+>
+> **R8 decision (recorded 2026-10-31):** all output-affecting parameters — including weights, thresholds, and rounding/precision rules — must belong to an immutable model version; any material change requires a new model version.
+>
+> These two records are architectural decisions only. They do not approve numerical Genesis values (R5 / S7-T020 remains open) and do not supply historical vintages or PIT evidence.
 >
 > **Still unavailable / unresolved:** authentic historical parameter vintages with evidence-backed effective dates; owner approval of numerical Genesis values (R5 / S7-T020); full source-level provenance and runtime validation for historical Forward P/E observations (implementation under OA1 tasks). Full PIT must not be claimed from observation dates alone.
 
