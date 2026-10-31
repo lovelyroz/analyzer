@@ -442,3 +442,59 @@ No formulas, numerical parameters, financial thresholds, or active code were mod
 **Note on the earlier Task 029–031 report above:** it is preserved as historical record. Its Task 030 "DONE" status and its note that R7/R8 were OPEN are superseded by this correction.
 
 **Confirmations:** No code, tests, migrations, or workflows were changed. No tests were run by the agent. No evidence, dates, parameter values, or provenance were invented.
+
+---
+
+# Task 049 · S7-T021 — R6 Decision Resolution Report
+
+**Work classification:** Documentation-only. No Python source, tests, database models, migrations, or runtime behavior were modified. No tests were run. No Git operations were performed. Forecast persistence Tasks 053–057 were not touched. Files inspected: only `PROMPT.md`, `WORKFLOW_RULES.md`, `STAGE7_MASTER_WORKING_PACKET.md`, `07_Stage7_Valuation.md`, `reply.md`.
+
+## 1. 049 · S7-T021 — R6 — **DONE** (decision/documentation scope only)
+
+**Exact decision recorded (from PROMPT.md §2):**
+- Historical Backtesting is **not a mandatory V1 product capability**; it is deferred from V1 scope. No requirement to reconstruct historical parameter versions solely to enable a V1 Backtesting feature is introduced. This is a scope decision, not permission to use current parameters in historical calculations.
+- Point-in-Time, historical as-of, and temporal-provenance requirements remain mandatory and are not weakened: genuine historical parameter version with evidence-backed effective date; input data with sufficient temporal provenance for the historical cutoff; observation dates alone are not proof of publication/availability; no substitution of current parameters; no fabricated, backdated, or inferred vintages; fail closed or explicitly report that the historical result cannot be established; no historical-correctness or full-PIT claim without evidence.
+- No numeric Genesis parameter value is approved by this decision.
+
+**Evidence:** `STAGE7_MASTER_WORKING_PACKET.md`, Task 049 line now `[x]` with the decision text; `07_Stage7_Valuation.md`, R6 record added beside R7/R8. `[x]` applies only to the scope "determine and document whether historical Backtesting is required".
+
+## 2. 029 · S7-T007 — Dependency status — **PARTIAL** (unchanged)
+Task 029 line and F3 description untouched. Still unresolved per existing text: genuine historical vintages with evidence-based `effective_from`, numeric Genesis approval (R5), runtime provenance validation for historical Forward P/E. R6 does not close it.
+
+## 3. 048 · S7-T020 — R5 status — **NOT DONE** (remains OPEN, `[ ]`)
+Task 048 line untouched. The R6 record in both files states explicitly that no Genesis numeric value is approved and that values existing in source are not evidence of calibration or owner approval.
+
+## 4. 050 · S7-T022 — R7 status — **DONE** (architecture decision only: V1 registry in code under Git, not in the application DB)
+Task 050 line untouched.
+
+## 5. 051 · S7-T023 — R8 status — **DONE** (immutable model version for all output-affecting parameters)
+Task 051 line untouched.
+
+## 6. 052 · S7-T024 — R9/D7 status — **BLOCKED** (unchanged)
+Task 052 line untouched. The temporal-provenance contract and required evidence are still not supplied.
+
+## Files changed and sections updated
+- `STAGE7_MASTER_WORKING_PACKET.md`
+  - Header line "آخرین بازنگری": appended the R6 documentation note.
+  - Section B, Package 2 — **049 · S7-T021**: `[!]` → `[x]`; unresolved wording replaced by the approved decision, PIT-retention statement, and explicit non-closure of 029 / R5 / R9-D7.
+  - Section C — **C-10**: removed "R6 BLOCKED / awaiting owner decision" wording; now states R6 is DONE for decision scope, R5 OPEN, R9/D7 BLOCKED, 029 PARTIAL.
+- `07_Stage7_Valuation.md`
+  - Section 47 "V1 Implementation Status" annotation: added **R6 decision (recorded 2026-10-31)** after the R8 record; "These two records…" changed to "These three records…" and extended with non-closure of S7-T007 and R9/D7.
+- `reply.md`: this report appended (earlier content not modified).
+
+**Files not changed:** `PROMPT.md`, `WORKFLOW_RULES.md`.
+
+## Inconsistencies found and resolution
+1. Master Packet Task 049 and C-10 described R6 as BLOCKED awaiting an owner decision → updated as above.
+2. `07_Stage7_Valuation.md` lists "Backtestable" among design qualities (around lines 580, 804, 1815, 2249), which could be read as a V1 requirement → resolved with one clarifying sentence in the R6 record (design-readiness quality, not a V1 deliverable, not a PIT exemption). The individual lines were not edited.
+3. Checked and left unchanged as consistent: Section 56 (all historical valuation/backtests must be PIT), Section 57 (restatement rule), the S7-T007 annotation ("historical backtests may only use authentic vintages and authentic PIT input evidence"), and Master Packet F3-029 / F6 text. No existing financial or PIT requirement was weakened.
+
+## Unresolved issues / missing evidence
+- The R6 decision source is the text of PROMPT.md; no separate owner-decision document was supplied.
+- Still unavailable: authentic historical parameter vintages with evidence-backed effective dates; owner approval of numeric Genesis values (R5); the Benchmark P/E temporal-provenance contract (R9/D7); runtime provenance validation for historical Forward P/E. Historical vintages, Backtesting, and runtime PIT are **not** implemented or verified by this task.
+- Pre-existing: `reply.md` contains mixed line endings (some CRLF lines in older sections); not altered.
+
+## Final confirmations
+- No code or tests were modified. No tests were run. No GitHub/Git operations.
+- Stage 7 is **not** declared complete; this task resolves R6 only.
+- Remaining blockers: R5 (048), 029 PARTIAL, R9/D7 (052), 032/033 BLOCKED, 034 OPEN, OA1 implementation (022–027), Forecast persistence remediation (053–057).
