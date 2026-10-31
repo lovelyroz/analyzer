@@ -78,6 +78,8 @@
 
 ### بستهٔ 3 — انطباق Stage 5 با ممنوعیت persistence خروجی (تصمیم قطعی مالک)
 
+### F2-A. شرح و معیار پذیرش Taskهای Forecast persistence remediation
+
 - [ ] **053 · S7-T025 — هم‌ترازی مستندات Stage 5 با منع persistence خروجی:** قراردادهای قدیمی Stage 5، به‌ویژه بخش‌های 24 (Forecast Versioning)، 26 (ذخیرهٔ اطلاعات برای ارزیابی)، 28 (Forecast Record) و 29 (Auditability)، با تصمیم مالک و R-05 بازنویسی شوند. نگهداری تاریخچهٔ خروجی در DB ممنوع است؛ اطلاعات تاریخی/طراحی قبلی فقط با برچسب تاریخی یا superseded حفظ شود. قرارداد باید روشن کند Forecast در runtime تولید/مصرف می‌شود و ذخیرهٔ انتخابی خروجی فقط از مسیر UI و خارج از DB برنامه است. هیچ فرمول یا رفتار مالی جدیدی اختراع نشود.
 - [ ] **054 · S7-T026 — حذف write path تولیدی Forecast persistence:** مسیر تولیدی Stage 5 نباید ForecastRecordRepository.save() یا هر write مشابه برای ذخیرهٔ Forecast/سناریوها را فراخوانی کند؛ اجرای Forecast باید بدون persistence DB انجام شود و خروجی runtime را برای مصرف‌کنندگان downstream برگرداند. پیش‌فرض و API نباید امکان ذخیرهٔ ناخواسته/اتفاقی خروجی را فراهم کنند. ابتدا call siteهای production و وابستگی‌های Stage 6/7 بررسی شوند تا انتقال runtime output حفظ شود. تغییرات فقط در scope تأییدشده و بدون تغییر فرمول Forecast.
 - [ ] **055 · S7-T027 — حذف schema persistence خروجی Forecast با migration ایمن:** مدل‌ها و جدول‌های مخصوص ذخیرهٔ خروجی Forecast (ForecastVersion/forecast_versions و پل وابستهٔ ForecastInputRefModel/forecast_input_refs) از schema فعال برنامه خارج شوند. migrationهای تاریخی موجود بازنویسی یا حذف نشوند؛ یک migration forward و قابل اجرا برای حذف امن جداول منسوخ طراحی شود. قبل از حذف، وابستگی FK، نصب‌های موجود، ترتیب downgrade/upgrade و هر دادهٔ کاربر که ممکن است نیازمند تصمیم نگهداری/انتقال باشد بررسی شود. هیچ جدول ورودی خام یا دادهٔ منبع حذف نشود.
