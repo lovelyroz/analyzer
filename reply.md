@@ -64,3 +64,52 @@
 - `src/tests/test_stage7_valuation.py` (and related valuation tests)
 
 User runs tests; documentation completion does not complete implementation.
+
+
+## گزارش نهایی — Stage 7 Documentation Consistency Correction (AMENDMENT-OA1)
+
+### فایل‌های تغییرکرده
+| فایل | بخش‌های اصلاح‌شده |
+|------|-------------------|
+| `07_Stage7_Valuation.md` | §33 Relative Valuation؛ §55 Industry Divergence Alert؛ §63 Auditability؛ §69 Output Contract؛ §70 Dashboard؛ §86 Final Principles؛ §88 Final Status |
+| `tasksToDo.md` | S7-T013 (وابستگی، شرح، معیار پذیرش، محدودیت) |
+| `temp_report2.md` | گزارش تصحیح مستنداتی در انتها append شد |
+
+`stepsForStage7.md`، `STAGE7_MASTER_WORKING_PACKET.md` و `STAGE7_COMPLETED_CHECKLIST.md` از قبل با OA1 و وضعیت OPEN سازگار بودند و نیازی به ویرایش نداشتند. `reply.md` در مجموعهٔ کاری موجود نبود.
+
+### حل هر یک از چهار مسئلهٔ شناسایی‌شده
+
+**1. ارجاعات فعال Industry P/E**  
+- §33: مبنای نسبی فقط same-company historical Forward P/E؛ Industry فقط legacy/informational.  
+- §55: SUPERSEDED/INACTIVE برای relative assessment؛ توکن‌های legacy حفظ و صریحاً از cheap/expensive جدا شدند.  
+- §63: مسیر audit به same-company historical به‌روز شد.  
+- §69: فیلدهای `industry_*` به‌عنوان LEGACY/INFORMATIONAL نگه داشته شدند (سازگاری قرارداد) و ممنوعیت استفادهٔ فعال برای Target/relative قید شد.  
+- §70 و §86: Industry از نمای حداقل و اصول فعال حذف/علامت‌گذاری شد.
+
+**2. وابستگی S7-T013**  
+دیگر «ندارد» نیست. بخش‌های مستقلاً قابل اقدام (مصرف سری caller، تفکیک خروجی، حذف industry از relative) از بخش‌های وابسته به S7-T007/D7/D9 (provenance زمانی کامل، full PIT) جدا شدند. اختراع منبع/قرارداد ممنوع است.
+
+**3. اصطلاحات PIT**  
+- Design/architecture: PASS where supported.  
+- Runtime PIT implementation/verification: OPEN/BLOCKED تا شواهد provenance.  
+- ادعای full PIT صرفاً از تاریخ جلالی ممنوع است (§88).
+
+**4. Ready for implementation / Ready for Stage 8**  
+§88 بازنویسی شد تا این عبارات به‌عنوان اثبات تکمیل کد OA1، runtime PIT یا بسته شدن Stage 7 قابل تفسیر نباشند. Stage 7 همچنان **OPEN** است.
+
+### وضعیت باقی‌مانده
+- S7-T007–T011: **BLOCKED**  
+- S7-T012: **OPEN**  
+- S7-T013–S7-T019: **OPEN** (docs alone ≠ done)  
+- Stage 7: **OPEN**  
+- Analytical-output persistence: ممنوع (OA1.7)  
+- تعارض Forecast persistence: OPEN تحت S7-T019 (بدون حذف/تغییر مدل در این task)
+
+### تأیید محدوده
+- هیچ کد پایتون یا سورس دیگری تغییر نکرد.  
+- هیچ تست ساخته، تغییر یا اجرا نشد.  
+- هیچ مدل/اسکیما/DB تغییر نکرد.  
+- هیچ Task پیاده‌سازی یا audit به‌خاطر ویرایش docs به DONE تبدیل نشد.  
+- هیچ threshold، formula، منبع داده یا قاعدهٔ مالی جدیدی اختراع نشد.
+
+---

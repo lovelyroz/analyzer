@@ -973,7 +973,9 @@ Valuation Assessment از سه لایه تشکیل می‌شود:
 
 # 33. Relative Valuation
 
-مقایسه‌هایی مانند:
+**Active policy (AMENDMENT-OA1.1):** The primary cheap/expensive relative assessment compares Current Forward P/E only to the **same company’s historical Forward P/E** series (and supported statistics such as median where valid observations exist). Industry peers or Industry Forward/TTM P/E are **not** used for this assessment.
+
+Comparisons performed for valuation context:
 
 ```text
 Current Forward P/E
@@ -982,14 +984,14 @@ Target Forward P/E
 
 Current Forward P/E
 vs
-Historical Median P/E
+Same-company historical Forward P/E (primary relative basis)
 
 Current Forward P/E
 vs
-Industry Median Forward P/E
+Historical Median P/E (company-own TTM/contextual; not primary cheap/expensive measure)
 ```
 
-انجام می‌شوند.
+Industry Median Forward P/E may appear only as **legacy/informational metadata** for contract compatibility. It is **not** an active input to cheap/expensive assessment or Target P/E selection (see OA1.4 and SUPERSEDED sections 10–13).
 
 ---
 
@@ -1539,26 +1541,28 @@ HISTORICAL_VALUATION_DIVERGENCE
 
 # 55. Industry Divergence Alert
 
-اگر Forward P/E شرکت فاصله قابل توجهی با Industry Forward P/E داشته باشد:
+> **SUPERSEDED / INACTIVE for relative assessment (AMENDMENT-OA1.4).**  
+> Industry Forward P/E is removed from active cheap/expensive assessment and from the Target P/E hierarchy. Divergence against industry medians is **not** part of the primary relative valuation path.  
+> Text below is retained for historical audit trail and for describing **legacy/informational** engine tokens that may still be emitted for contract compatibility. These tokens must **not** be treated as active cheap/expensive signals or as justification for Target P/E selection under OA1.
+
+اگر Forward P/E شرکت فاصله قابل توجهی با Industry Forward P/E داشته باشد (مسیر legacy):
 
 ```text
 INDUSTRY_VALUATION_DIVERGENCE
 ```
 
-ایجاد می‌شود.
+در سیاست فعال V1 پس از OA1، این مقایسه مبنای ارزانی/گرانی نیست.
 
-علت Divergence باید قابل بررسی باشد.
-
-> **V1 emitted vocabulary (D8 decision):** The specification adopts the current engine tokens; production output is unchanged.
+> **V1 emitted vocabulary (D8 decision; legacy/informational post-OA1):** The specification adopts the current engine tokens; production output is unchanged until S7-T017 removes active dependence.
 >
 > | Direction | Emitted alert token | Meaning |
 > |---|---|---|
-> | Above | `WATCH:FORWARD_PE_ABOVE_INDUSTRY` | Base Forward P/E is above the industry Forward P/E median. |
-> | Below | `WATCH:FORWARD_PE_BELOW_INDUSTRY` | Base Forward P/E is below the industry Forward P/E median. |
+> | Above | `WATCH:FORWARD_PE_ABOVE_INDUSTRY` | Base Forward P/E is above the industry Forward P/E median (legacy/informational). |
+> | Below | `WATCH:FORWARD_PE_BELOW_INDUSTRY` | Base Forward P/E is below the industry Forward P/E median (legacy/informational). |
 >
-> The above/below distinction is preserved. Trigger behavior remains the existing engine behavior; this documentation does not ratify its numeric threshold.
+> The above/below distinction is preserved. Trigger behavior remains the existing engine behavior; this documentation does not ratify its numeric threshold. Under OA1 these tokens are **not** inputs to relative cheap/expensive assessment.
 >
-> The separate flag `INSUFFICIENT_PEER_DATA` reports that valid Forward P/E peer count is below `MIN_INDUSTRY_PEERS = 8`, when Forward peer values exist. `INDUSTRY_BENCHMARK_INSUFFICIENT` is emitted only when no usable target benchmark is available (`target_source` equals `INSUFFICIENT_DATA`). These conditions are not equivalent: a fallback historical or industry-TTM benchmark can be available even when the Forward peer count is below eight. Both flags may appear together or independently. Neither flag is a severity-prefixed alert.
+> The separate flag `INSUFFICIENT_PEER_DATA` reports that valid Forward P/E peer count is below `MIN_INDUSTRY_PEERS = 8`, when Forward peer values exist. `INDUSTRY_BENCHMARK_INSUFFICIENT` is emitted only when no usable target benchmark is available (`target_source` equals `INSUFFICIENT_DATA`). These conditions are not equivalent. Neither flag is a severity-prefixed alert. After OA1, industry peer count no longer governs Target P/E or cheap/expensive assessment.
 
 ---
 
@@ -1686,13 +1690,13 @@ valuation_data_quality
 
 هر Fair Value باید قابل Trace باشد.
 
-مثلاً:
+مثلاً (active policy after AMENDMENT-OA1):
 
 ```text
 Fair Value
 → Target P/E
-→ Benchmark
-→ Industry / Historical Data
+→ Benchmark (same-company historical context; industry path SUPERSEDED for Target selection)
+→ Company-own historical Forward / TTM observations with provenance
 
 Fair Value
 → Forecast EPS
@@ -1702,6 +1706,8 @@ Fair Value
 → ReportVersion
 → Publication Date
 ```
+
+Industry series fields, if present in outputs, are legacy/informational metadata only and must not be treated as the active Target or cheap/expensive benchmark.
 
 ---
 
@@ -1822,15 +1828,20 @@ bull_forward_pe
 
 historical_ttm_pe
 historical_median_pe
+# same-company historical Forward P/E series / statistics (primary relative basis per OA1.1)
+# — exact field names for the historical Forward series remain subject to schema contract;
+#   they must carry provenance and must not be precomputed independent DB records (OA1.2/OA1.3)
 
-industry_forward_pe
-industry_ttm_pe
-industry_peer_count
+industry_forward_pe          # LEGACY / INFORMATIONAL metadata only (OA1.4)
+industry_ttm_pe              # LEGACY / INFORMATIONAL metadata only (OA1.4)
+industry_peer_count          # LEGACY / INFORMATIONAL metadata only (OA1.4)
+# Industry fields may remain for contract compatibility. They MUST NOT be used as the
+# active basis for cheap/expensive assessment or for Target P/E selection under OA1.
 
 target_pe_bear
 target_pe_base
 target_pe_bull
-target_pe_source
+target_pe_source             # must reflect same-company historical context after OA1; not INDUSTRY_*
 
 fair_price_bear
 fair_price_base
@@ -1892,8 +1903,8 @@ Expected Upside
 Base Forward P/E
 Target P/E
 
-Historical Median P/E
-Industry P/E
+Same-company historical Forward P/E (primary relative basis)
+Historical Median P/E (company-own contextual)
 
 Forecast Reliability
 Valuation Confidence
@@ -1904,7 +1915,7 @@ Top Valuation Drivers
 Critical Alerts
 ```
 
-جزئیات بیشتر باید Drill-Down باشند.
+Industry P/E (if shown) is **legacy/informational only** and must not be presented as the active cheap/expensive or Target benchmark (OA1.4). جزئیات بیشتر باید Drill-Down باشند.
 
 ---
 
@@ -2211,9 +2222,8 @@ Stage 7 باید همیشه این اصول را حفظ کند:
 ```text
 Forward-looking
 Scenario-based
-Point-in-Time
-Industry-relative
-Historically contextualized
+Point-in-Time (design; full runtime proof requires temporal provenance — OA1 / D7)
+Historically contextualized (same-company historical Forward P/E as primary relative basis)
 Reliability-aware
 Risk-aware
 Explainable
@@ -2222,6 +2232,8 @@ Versioned
 Modular
 Backtestable
 ```
+
+Industry-relative comparison for cheap/expensive and Target P/E is **SUPERSEDED by OA1.4** and is not an active architectural principle.
 
 ---
 
@@ -2257,10 +2269,9 @@ Backtestable
 
 **Stage 7 — Valuation Engine: LOCKED** (architecture), with **AMENDMENT-OA1** binding for active P/E / complete-input / persistence policy.
 
-Architecture:
-PASS
+**Architecture status (design review):**
 
-Point-in-Time:
+Architecture:
 PASS
 
 Scenario Framework:
@@ -2269,11 +2280,8 @@ PASS
 Forward P/E Framework:
 PASS
 
-Historical Benchmarking (same-company):
+Historical Benchmarking (same-company design):
 PASS (design); Industry benchmarking path **SUPERSEDED by OA1.4**
-
-Point-in-Time (runtime claim):
-PASS (design intent); full runtime PIT proof remains subject to provenance evidence (OA1 / D7)
 
 Probability Framework:
 PASS
@@ -2282,16 +2290,16 @@ Risk / Confidence Separation:
 PASS
 
 Sensitivity Engine:
-PASS
+PASS (within implemented V1 scope; deferred alerts remain deferred)
 
 Alert Engine:
-PASS
+PASS (within implemented V1 vocabulary; OA1-related alert paths pending S7-T013–T017)
 
 Double-Counting Control:
 PASS
 
 Auditability:
-PASS
+PASS (design)
 
 Versioning:
 PASS
@@ -2299,8 +2307,14 @@ PASS
 Modular Upgradeability:
 PASS
 
-Ready for implementation:
-YES
+**Point-in-Time status (must not be conflated):**
 
-Ready for Stage 8:
-YES
+- Architecture / design review for PIT intent: PASS where supported by the locked design.
+- Runtime PIT implementation and verification: **OPEN / BLOCKED** until actual temporal provenance evidence (publication/availability, per-observation dates, complete-input selection under OA1.5) exists and is exercised. Full PIT must **never** be claimed based solely on Jalali observation dates.
+- See OA1.2, OA1.5, OA1.6 and unresolved D7.
+
+**Implementation and Stage readiness (clarification):**
+
+- **Ready for implementation:** Architecture and OA1 policy are documented and locked for design purposes. This does **not** mean OA1 policies (S7-T013–S7-T018), runtime PIT, or analytical-output persistence rules are implemented in code. Implementation tasks remain OPEN until code and user-run test evidence exist.
+- **Ready for Stage 8:** Stage 8 may proceed on the existing Stage 7 contract boundary. This does **not** prove that OA1 implementation, runtime PIT, Stage 7 completion, or E2E production path has been achieved. Stage 7 itself remains **OPEN**.
+- Analytical-output persistence remains prohibited (OA1.7). Existing Forecast persistence models must not be deleted or modified by documentation work; conflict is tracked under S7-T019.

@@ -4622,3 +4622,88 @@ Required focus files (for a future CODE prompt; not modified here):
 - Focused tests under `src/tests/test_stage7_valuation.py` (and any valuation-specific test modules)
 
 Do not treat documentation completion as implementation completion. User runs tests; agent does not.
+
+
+===========================================================
+# Stage 7 — Documentation Consistency Correction (AMENDMENT-OA1)
+
+**Date:** 2026-10-31  
+**Prompt type:** DOCS-ONLY (documentation edits only; no source-code, test, database, or test-execution changes)
+
+## Purpose
+
+Correct remaining inconsistencies after OA1 documentation so that all primary Stage 7 documents tell one coherent story: OA1 policies are documented and binding; Industry P/E is not active for cheap/expensive or Target P/E; S7-T013–S7-T019 remain OPEN; Stage 7 remains OPEN; runtime PIT is not claimed without provenance; Ready-for-implementation / Ready-for-Stage-8 statements cannot be read as proof of OA1 code completion.
+
+## Files changed
+
+| File | Sections / items corrected |
+|------|----------------------------|
+| `07_Stage7_Valuation.md` | §33 Relative Valuation; §55 Industry Divergence Alert; §63 Auditability; §69 Output Contract; §70 Dashboard Minimum View; §86 Final Architectural Principles; §88 Final Status |
+| `tasksToDo.md` | S7-T013 dependency and acceptance language |
+| `temp_report2.md` | This correction report appended |
+
+No changes required to `stepsForStage7.md`, `STAGE7_MASTER_WORKING_PACKET.md`, or `STAGE7_COMPLETED_CHECKLIST.md` beyond the consistency already present after the prior OA1 documentation pass (they already state Stage 7 OPEN, T013–T019 OPEN, and docs ≠ done). `reply.md` was not present in the working set.
+
+## Issue resolution summary
+
+### 1. Remaining active Industry P/E references
+
+- **§33:** Primary relative comparison rewritten to same-company historical Forward P/E only; Industry Median listed only as legacy/informational metadata.
+- **§55:** Marked SUPERSEDED/INACTIVE for relative assessment; legacy engine tokens retained for contract compatibility and explicitly barred from cheap/expensive use under OA1.
+- **§63:** Audit trail example updated to same-company historical context; industry path noted as SUPERSEDED for Target selection.
+- **§69 Output Contract:** `industry_forward_pe`, `industry_ttm_pe`, `industry_peer_count` retained as LEGACY/INFORMATIONAL fields with explicit rule that they must not drive relative assessment or Target P/E selection; note added for same-company historical Forward series.
+- **§70 Dashboard:** Industry P/E removed from minimum active view; same-company historical Forward P/E elevated; Industry (if shown) marked legacy/informational.
+- **§86:** “Industry-relative” removed from active principles; replaced with same-company historical contextualization and PIT design note.
+
+Legacy fields were **not** deleted, to preserve contract compatibility.
+
+### 2. S7-T013 dependencies
+
+- Dependency line no longer states “ندارد”.
+- Independently actionable parts listed: consume caller-supplied same-company historical Forward series (with company/period identity), separate Current vs historical series/median outputs, remove industry dependence for relative assessment, record provenance to the extent the caller supplies it.
+- Dependent parts listed: raw source with publication/availability, latest-complete selection under full temporal cutoff, and any claim of full PIT — these depend on S7-T007 / D7 / D9 and must not be claimed complete without those contracts.
+- Acceptance and limits updated: no invented data sources or provenance contracts; fail-closed or explicit limitation when provenance is incomplete.
+
+### 3. PIT status terminology
+
+- Design/architecture PIT intent: PASS where the locked design supports it.
+- Runtime PIT implementation and verification: OPEN/BLOCKED until temporal provenance evidence exists.
+- Explicit rule: full PIT must never be claimed from Jalali observation dates alone.
+- Applied in §88 Final Status and aligned with existing language in roadmap/checklist.
+
+### 4. Ready for implementation / Ready for Stage 8
+
+- §88 rewritten so “Ready for implementation” means architecture + OA1 policy are documented for design purposes only; it does **not** mean OA1 code (S7-T013–T018), runtime PIT, or Stage 7 completion.
+- “Ready for Stage 8” means Stage 8 may use the existing contract boundary; it does **not** prove OA1 implementation, runtime PIT, Stage 7 completion, or E2E production path.
+- Stage 7 remains OPEN; analytical-output persistence remains prohibited; Forecast persistence conflict remains under S7-T019 without model deletion/modification in this task.
+
+### 5. Cross-document consistency
+
+- OA1 policies documented and binding.
+- S7-T013–S7-T018 OPEN until code + user-run tests.
+- S7-T019 OPEN until Forecast persistence audit.
+- Stage 7 OPEN.
+- Analytical-output persistence prohibited.
+- Existing Forecast persistence models untouched by this task.
+
+## Remaining OPEN / BLOCKED items (unchanged by this docs pass)
+
+- S7-T007 – S7-T011: BLOCKED (as previously recorded).
+- S7-T012: OPEN.
+- S7-T013 – S7-T019: OPEN (implementation / audit; docs alone ≠ done).
+- Stage 7: OPEN.
+- Runtime PIT / D7 provenance: OPEN/BLOCKED until evidence.
+- Forecast persistence vs OA1.7 conflict: OPEN under S7-T019.
+
+## Scope confirmation
+
+- **No Python or other source-code changes.**
+- **No database/model/schema changes.**
+- **No test creation, modification, or execution.**
+- **No changes outside the listed documentation files.**
+- **No implementation or audit task marked DONE** solely because documentation was corrected.
+- **No invented thresholds, formulas, provenance, data sources, or financial rules.**
+
+## Recommended next step
+
+Proceed with a CODE prompt for S7-T013 (and optionally S7-T017) only after the dependency split above is accepted; do not treat partial implementation as full PIT or as completion of S7-T007 prerequisites.
