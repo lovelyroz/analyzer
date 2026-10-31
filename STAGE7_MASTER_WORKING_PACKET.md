@@ -21,7 +21,7 @@
 - [x] **003 · S7-DOC-003 — اصلاح وابستگی T013:** بخش‌های مستقل قابل اقدام از وابستگی‌های provenance/PIT در S7-T013 جدا شده‌اند؛ full PIT بدون شواهد مجاز نیست.
 - [x] **004 · S7-DOC-004 — اصلاح وضعیت PIT و Ready claims:** تمایز design/architecture PASS از runtime PIT OPEN/BLOCKED و نیز معنای محدود Ready for implementation / Ready for Stage 8 در مستندات ثبت شده است.
 - [x] **005 · S7-DOC-005 — ثبت تعارض Forecast persistence:** تعارض احتمالی مدل‌ها/قراردادهای persistence Forecast با OA1.7 ثبت شده؛ هیچ مدل یا کد persistence در این مرحله تغییر نکرده است.
-- [ ] **006 · S7-DOC-006 — تکمیل آخرین اصلاح سازگاری مستندات Industry:** بخش‌های 48، 49 و 74 از `07_Stage7_Valuation.md` باید صریحاً با OA1 هماهنگ شوند: آستانهٔ industry divergence به‌عنوان legacy/inactive برای ارزندگی؛ توکن‌های Industry در بخش 49 خارج از واژگان فعال؛ و snapshot بخش 74 با برچسب تاریخی/SUPERSEDED. سپس سازگاری با بخش‌های 55، 69 و 88 دوباره بررسی و گزارش شود. حفظ اطلاعات تاریخی الزامی است؛ threshold یا رفتار مالی جدید اختراع نشود.
+- [x] **006 · S7-DOC-006 — تکمیل آخرین اصلاح سازگاری مستندات Industry:** بخش‌های 48، 49 و 74 از `07_Stage7_Valuation.md` با OA1 هماهنگ شدند: آستانهٔ industry divergence صریحاً legacy/inactive و خارج از مسیر فعال ارزندگی معرفی شد؛ توکن‌های Industry در بخش 49 از واژگان فعال جدا و در گروه Legacy/Informational قرار گرفتند؛ و snapshot بخش 74 با برچسب HISTORICAL/SUPERSEDED مشخص شد. سازگاری بخش‌های 55، 69 و 88 نیز دوباره بررسی و تأیید شد. اطلاعات تاریخی حفظ شد؛ threshold یا رفتار مالی جدیدی اختراع نشد. شواهد: محتوای فعلی `07_Stage7_Valuation.md`، بخش‌های 48، 49، 55، 69، 74 و 88؛ SHA محتوا: `1237e63ab880cd6a4745eceba3764e66baa46a42`.
 
 ### A2. ممیزی‌های فنی و معماری انجام‌شده
 
