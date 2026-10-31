@@ -1,345 +1,241 @@
-# Task 053 — Complete Stage 5 Documentation Alignment
+# Stage 7 — Resolve Decision Contracts and Complete Production-Path Audit
 
-## Main Task ID
-**053 · S7-T025**
+## Work Classification
 
-## Work Type
-DOCUMENTATION ONLY — NO CODE CHANGES.
+**Documentation updates + repository architecture audit only.**
 
-## Mandatory Numbering and Reporting Rule
+**NO Python code changes.**  
+**NO model, schema, migration, database, or test changes.**  
+**DO NOT execute tests.**  
+**DO NOT run application code.**  
+**DO NOT perform Git operations, commits, pushes, pulls, or branch changes.**
 
-This task contains exactly **9 separately numbered operations**.
+The user runs all tests locally. This task is limited to examining source, documenting approved architectural decisions, and recording verifiable findings.
 
-You MUST use the exact operation IDs below in your work and final report:
+Repository: `lovelyroz/analyzer`  
+Default branch: `master`
 
-- 053-01
-- 053-02
-- 053-03
-- 053-04
-- 053-05
-- 053-06
-- 053-07
-- 053-08
-- 053-09
+## 1. Required Files
 
-Do not merge these IDs, omit any ID, renumber them, or report the work only under the main Task ID.
+Read these files before making any change:
 
-For EVERY operation, explicitly report:
+### Stage 7 governing documents
+- `STAGE7_MASTER_WORKING_PACKET.md`
+- `WORKFLOW_RULES.md`
+- `07_Stage7_Valuation.md`
+- `reply.md`
 
-1. Operation ID and title.
-2. Status: DONE / PARTIAL / BLOCKED / NOT DONE.
-3. Exact document section(s) examined.
-4. Exact section(s) changed, if applicable.
-5. Evidence of the change or reason no change was necessary.
-6. Any unresolved issue.
+### Database and ingestion
+- `src/core/database.py`
+- `src/ingestion/service.py`
+- `src/ingestion/market/queries.py`
 
-A single general statement such as "Stage 5 documentation was aligned" is NOT an acceptable report.
+### Stage 2–5
+- `src/kpi/engine.py`
+- `src/kpi/schema.py`
+- `src/trend/engine.py`
+- `src/trend/schema.py`
+- `src/scoring/engine.py`
+- `src/scoring/schema.py`
+- `src/forecast/service.py`
+- `src/forecast/queries.py`
+- `src/forecast/schema.py`
 
-All nine IDs must appear in the final report, even if an operation required no modification.
+### Stage 7–9
+- `src/market/service.py`
+- `src/market/engine.py`
+- `src/market/schema.py`
+- `src/valuation/parameters.py`
+- `src/valuation/engine.py`
+- `src/valuation/service.py`
+- `src/valuation/schema.py`
+- `src/decision/service.py`
+- `src/decision/engine.py`
+- `src/decision/schema.py`
 
-## Required Files
+### Relevant tests — inspect only; do not execute
+- `src/tests/test_stage789_service_interface.py`
+- `src/tests/test_stage9_decision.py`
 
-Use only these supplied files:
+You may identify additional files only when a direct import, call reference, application startup declaration, or entrypoint reference demonstrates that the file is necessary. For every additional file, report its exact path and why it was required.
 
-1. `WORKFLOW_RULES.md`
-2. `STAGE7_MASTER_WORKING_PACKET.md`
-3. `05_Stage5_Forecast_Engine.md`
-4. `07_Stage7_Valuation.md`
-5. `reply.md`
+For the production-entrypoint audit, inspect the repository root and `src/` for actual application startup files, CLI commands, web handlers, scheduled jobs, or other production callers. Do not conduct unrelated repository-wide exploration.
 
-Do not inspect other repository files.
+## 2. Task 029 — S7-T007: D9/PIT and Dated Parameters
 
-If another file is essential, report its exact path and explain why it is required. Do not access it without authorization.
+Document the following approved architectural decisions:
 
-## Authoritative Owner Decision
+1. Stage 7 V1 parameter registry is version-controlled in code. Do not introduce a database-backed analytical parameter registry.
+2. Parameter versions must have genuine, evidence-backed effective dates before they can participate in historical as-of selection.
+3. Never invent or backdate `effective_from`.
+4. The undated Genesis snapshot must not be selected as a historical version.
+5. Missing historical parameter versions must fail closed. Never silently substitute today's parameters.
+6. Historical backtests may only use authentic parameter vintages and authentic point-in-time input evidence. Do not fabricate historical versions.
+7. All output-affecting parameters, including weights, thresholds, sensitivity rules, and rounding/precision rules, must be tied to an immutable model version. A material change requires a new model version.
+8. Do not approve the numerical Genesis values merely because they currently exist in source code. Their financial calibration remains unresolved until supported by valid evidence.
 
-The owner has explicitly decided:
+### Historical Forward P/E provenance contract
 
-- The application database stores only inputs and source data.
-- No computational or analytical output may be persisted in the application database.
-- This includes Forecast outputs, Forecast versions, Bear/Base/Bull scenarios, valuation results, decision results, analytical history, and output-dependent provenance records.
-- Forecasts are generated and consumed at runtime.
-- If the user wants to retain an output, this must happen through the UI's explicit save functionality, outside the application's database tables.
-- Provenance, auditability, or versioning requirements do not authorize database persistence of analytical outputs.
-- This policy applies to all analytical stages, including Stage 5.
+Document the minimum conceptual requirements for every observation:
 
-The binding architectural rule is R-05 in `STAGE7_MASTER_WORKING_PACKET.md`.
+- Same-company identity.
+- Jalali observation date.
+- Relevant financial period identity.
+- Underlying financial and market source references.
+- Source/version/revision identity where applicable.
+- Actual publication or availability timestamp, when required to establish what was knowable at the analysis cutoff.
+- A traceable relationship between the historical EPS and market-price observations used to derive the P/E.
 
-The relevant Stage 7 policy is also documented in OA1.3 of `07_Stage7_Valuation.md`.
+The caller/provider supplies source provenance. Stage 7 must validate the supplied evidence and reject or fail closed when required provenance is absent or invalid.
 
-Do not weaken, reinterpret, or contradict this decision.
+A Jalali observation date alone does not prove publication/availability timing. Do not claim full PIT without that evidence.
 
----
+### Task status
 
-## Operation 053-01 — Full Document Conflict Inventory
+Do not mark S7-T007 DONE merely because the policy is documented. Distinguish:
+- Architectural decisions now resolved.
+- Historical parameter vintages still unavailable.
+- Source-level provenance and runtime validation still requiring implementation/evidence.
 
-Review the ENTIRE `05_Stage5_Forecast_Engine.md`, not only the sections named in this prompt.
+Use PARTIAL or BLOCKED as appropriate and explain why.
 
-Identify every active statement that could imply or require:
+## 3. Task 030 — S7-T008: Alert and Input Contracts
 
-- Database persistence of Forecast outputs.
-- Persistent Forecast version history.
-- Storage of Bear/Base/Bull output records.
-- Database-based Forecast revision trends.
-- Forecast Record entities or tables.
-- Persistent output-dependent provenance.
-- Storage of analytical evaluation results.
-- Retention of historical analytical outputs.
+Document these decisions:
 
-Classify each finding as one of:
+1. D1–D5 remain deferred and inactive in V1. Do not invent triggers, formulas, thresholds, severity levels, or missing-data behavior.
+2. D6 remains limited to the currently documented EPS and TARGET_PE drivers. Do not invent sector-specific formulas or industry mappings.
+3. D7 requires actual temporal provenance. No full PIT claim may be made from observation dates alone.
+4. D8 uses the currently documented engine alert vocabulary as the canonical V1 vocabulary. Do not invent aliases or new alert tokens.
+5. OA1.5 and OA1.6 remain required active behaviors and must be implemented under their existing execution tasks (S7-T015 and S7-T016). Do not treat documentation of these requirements as implementation.
+6. A missing eligible market price remains fail-closed.
+7. A selected older market-price observation must be reported with its actual Jalali date; it must not be silently represented as the analysis-date price.
 
-A. Direct conflict with R-05 — must be corrected.
+Inspect the relevant specification sections and actual engine/service output. Identify any real mismatch between the approved contract and implementation. Do not change code.
 
-B. Historical statement — may remain only with an explicit HISTORICAL / SUPERSEDED label.
+### Task status
 
-C. Valid input/source-data or configuration persistence — must be preserved.
+S7-T008 may be marked DONE only if its decision/contract scope is fully documented and the audit finds no unresolved contract-definition work inside this Task. OA1.5/OA1.6 implementation remains in their separate Tasks.
 
-D. Runtime-only output or metadata — may remain if clearly described as runtime data, not database persistence.
+If any contract or consumer behavior remains unverified, retain PARTIAL/BLOCKED and explain the exact missing evidence.
 
-Do not change valid input persistence or configuration contracts merely because they contain words such as "store", "record", or "save".
+## 4. Task 031 — S7-T009: Actual Production Path and Stage 9 Architecture
 
-**Deliverable:** A complete conflict inventory in the report, including section numbers and disposition.
+Perform a bounded, source-based audit.
 
-## Operation 053-02 — Correct Section 24: Forecast Versioning
+Establish whether a real production execution path connects:
 
-Review and reconcile section 24.
+- Stage 1 source/input data
+- Stage 2 KPI calculation
+- Stage 3 fundamental scoring
+- Stage 4 trend evidence
+- Stage 5 Forecast generation
+- Stage 7 Valuation
+- Stage 8 market analysis
+- Stage 9 Decision
 
-The active contract must NOT require:
+Trace actual callers, not merely exported functions or package imports.
 
-- Persistent Forecast versions.
-- Retaining previous Forecast outputs in database records.
-- Database-based Version History.
-- Revision trends derived from persisted Forecast records.
+Specifically establish:
 
-Clarify that the active architecture supports runtime Forecast generation and consumption, but does not retain historical Forecast outputs in the application database.
+1. The actual application entrypoint, if one exists.
+2. The real caller of `generate_and_persist_forecast`, if any.
+3. The real producer/caller of `FundamentalScoringEngine.calculate_score`.
+4. The real producer/caller of `MarketEngine` / `analyze_market_as_of_jalali`.
+5. Whether `calculate_decision_as_of_jalali` has a production caller.
+6. Who creates and owns the SQLAlchemy Session.
+7. Whether one Session is passed through the relevant services.
+8. How company identity, financial period identity, and Jalali as-of date are selected and propagated.
+9. Whether Stage 5, Stage 3, and Stage 8 results are actually produced by upstream production services or merely supplied by an external caller.
+10. How the Stage 9 runtime result is returned to its actual consumer.
+11. Whether any code attempts to persist Stage 9 analytical output. Such persistence is prohibited by owner rule R-05.
 
-Do not invent an alternative history store, cache, or persistence mechanism.
+### Important distinction
 
-Preserve the former versioning design only as explicitly labeled HISTORICAL / SUPERSEDED material where useful.
+The existence of `src/decision/service.py` does not prove a complete production path.
 
-## Operation 053-03 — Correct Section 26: Forecast Reliability Separation
+The existence of `src/tests/test_stage789_service_interface.py` does not prove an end-to-end production path. Inspect its fixtures and helpers to identify which upstream results are constructed or supplied by the test.
 
-Review and reconcile section 26.
+Do not describe a test-created `CompanyForecastResult`, `FundamentalScoreResult`, or `MarketSignalResult` as a real production-generated result.
 
-The active contract must distinguish:
+### If no full production path exists
 
-- Runtime Forecast output from actual financial results.
-- Forecast Quality from Forecast Reliability.
-- Stage 5 responsibilities from Stage 6 responsibilities.
+Do not create an orchestrator, entrypoint, service, or test.
 
-Stage 5 may return runtime information required for downstream evaluation.
+Instead, document:
 
-It must not persist Forecast outputs or analytical evaluation records in the application database.
+- The exact existing service boundaries.
+- The missing production caller or orchestration boundary.
+- The missing Session ownership/lifecycle decision, if applicable.
+- Which stage outputs currently need to be supplied externally.
+- The exact architectural work required before a real E2E test can exist.
+- Why a mock-based test cannot close this gap.
 
-Preserve the conceptual Stage 5 → Stage 6 evaluation flow.
+Task 031's acceptance permits a completed audit that conclusively records the architecture gap and the exact decisions/work required. Do not confuse completion of the audit with completion of the production path.
 
-Do not introduce a new persistence requirement for actuals, errors, reliability, or calibration outputs.
+## 5. Master Packet Updates
 
-## Operation 053-04 — Correct Section 28: Forecast Record
+Update `STAGE7_MASTER_WORKING_PACKET.md` only where required to record the decisions and verified findings above.
 
-Review and reconcile section 28.
+At minimum:
 
-The existing fields may remain as a runtime output structure where appropriate, including:
+- Update Task 029 and Task 030 descriptions/statuses to distinguish resolved policy from remaining implementation/evidence.
+- Update Task 031 based on the completed production-path audit.
+- Update dashboard entries C-03, C-04, and C-05.
+- Update R5–R9/D7 Task references only where the decisions above genuinely resolve their acceptance criteria.
+- Keep numerical Genesis approval unresolved.
+- Keep Task 032 blocked if a real production path is not established.
+- Keep Task 033 blocked until its dependencies are satisfied.
+- Keep Task 034 open.
+- Preserve all existing Task numbers and permanent IDs.
+- Do not mark implementation or E2E tasks DONE based on documentation.
 
-- company_id
-- financial_period
-- forecast_horizon
-- forecast_timestamp
-- data_cutoff_datetime
-- model_version
-- scenario
-- revenue
-- operating_profit
-- operating_margin
-- net_profit
-- eps
-- roe
-- forecast_method
-- data_quality
-- assumptions
+Do not modify unrelated Task packages, particularly Forecast persistence remediation Tasks 053–057.
 
-However:
+## 6. Stage 7 Specification Updates
 
-- Do not describe this structure as a database record or persisted entity.
-- Do not imply that these fields are written to database tables.
-- Clearly identify it as a runtime Forecast result/output contract.
-- Preserve relevant financial output fields and metadata.
-- Do not invent or alter financial formulas.
+Update `07_Stage7_Valuation.md` only where its current statements conflict with verified facts or the decisions above.
 
-For Bank/Holding outputs, preserve the relevant specialized runtime output fields without introducing persistence.
+In particular, inspect the existing D9 statements that claim the parameter registry/version-selection mechanism does not exist. The current source contains a Parameter Registry and effective-date selection mechanism. Correct stale descriptions without claiming that historical parameter data or full PIT is now available.
 
-## Operation 053-05 — Correct Section 29: Auditability and Provenance
+Update D7/D8 wording only to reflect the decisions above. Preserve historical notes with clear HISTORICAL/SUPERSEDED labels where needed.
 
-Review and reconcile section 29.
+Do not modify formulas, numerical parameters, financial thresholds, or active code.
 
-Preserve traceability requirements without persisting analytical outputs.
+## 7. Reporting
 
-The active documentation must distinguish:
+Append a detailed report to `reply.md`. Do not overwrite its existing Task 053 report.
 
-1. Raw source data and input records, which remain governed by their existing source/input persistence contracts.
-2. Runtime Forecast outputs and their runtime provenance.
-3. Output-dependent provenance records, which must not be persisted in the application database.
+The report must include:
 
-The runtime result must retain sufficient information to identify relevant inputs and financial facts where available.
-
-Do not claim that runtime traceability automatically proves full Point-in-Time correctness.
-
-Do not remove valid source-data or input provenance requirements.
-
-## Operation 053-06 — Reconcile Sections 27, 32, 33 and 34
-
-Review and reconcile all four sections.
-
-### Section 27 — Data Quality
-Clarify that Forecast method and data-quality metadata may be returned as runtime output information. Do not imply that analytical results must be stored in the database.
-
-Preserve the rule that missing data must not be interpreted as zero.
-
-### Section 32 — Stress-Test Results
-Review the Forecast Versioning test claim.
-
-If it describes a former persistence/version-history behavior, clearly mark that specific behavior/test claim as HISTORICAL / SUPERSEDED.
-
-Do not falsely claim that an old persistence test proves compliance with the new architecture.
-
-Do not delete unrelated valid stress-test results or invent new test results.
-
-### Section 33 — Final Stage 5 Logic
-Replace the active `Versioned Forecast` persistence implication with the correct runtime output architecture.
-
-Preserve Bear/Base/Bull runtime outputs and downstream Stage 6 consumption.
-
-### Section 34 — Final Architectural Contract
-Remove the active requirement to preserve Forecast versions.
-
-Preserve all valid Forecast responsibilities, financial invariants, and runtime output requirements.
-
-Clearly distinguish historical design from the active contract.
-
-## Operation 053-07 — Global Consistency Review
-
-Re-review the entire Stage 5 document after the edits.
-
-Search for remaining statements that conflict with R-05, including wording that indirectly implies persistence.
-
-Check at least:
-
-- Sections 1–23.
-- Sections 24–34.
-- Sections 35 onward.
-- Summary, diagrams, status declarations, and architectural contracts.
-
-For every occurrence, decide whether it concerns:
-
-- Input/source data.
-- Configuration or model parameters.
-- Runtime output.
-- Analytical output persistence.
-- Historical/superseded design.
-
-Preserve valid input and configuration persistence.
-
-Correct every active analytical-output persistence requirement.
-
-Do not blindly replace every occurrence of words such as "save", "record", "store", "version", or "history".
-
-## Operation 053-08 — Historical Context and Architectural Boundary
-
-Ensure the revised document clearly presents:
-
-### Active architecture
-- Database: inputs and source data only.
-- Stage 5: generates Forecast outputs at runtime.
-- Downstream stages: consume runtime outputs.
-- UI: may explicitly save selected outputs outside the application's database tables.
-- No analytical output or output-dependent provenance is persisted in the application database.
-
-### Historical architecture
-Former Forecast persistence, database versioning, Forecast Record storage, and stored output history must be explicitly marked:
-
-`HISTORICAL / SUPERSEDED`
-
-Do not silently erase useful historical information.
-
-Do not present superseded behavior as an active requirement.
-
-Do not introduce any new storage architecture.
-
-## Operation 053-09 — Final Verification and Reporting
-
-Before finishing:
-
-1. Review the complete diff of `05_Stage5_Forecast_Engine.md`.
-2. Verify all nine operation IDs have been addressed.
-3. Verify that the active document is consistent with R-05.
-4. Verify no valid input/source-data contract was accidentally removed.
-5. Verify no new financial formula or behavior was introduced.
-6. Verify no unsupported Point-in-Time or auditability guarantee was added.
-7. Verify only authorized files were modified.
-
-Append the final report to `reply.md` with this exact title:
-
-**Task 053 — Complete Stage 5 Documentation Alignment**
-
-The report MUST contain a separate subsection for every operation:
-
-- 053-01
-- 053-02
-- 053-03
-- 053-04
-- 053-05
-- 053-06
-- 053-07
-- 053-08
-- 053-09
-
-Each subsection must contain its status and evidence.
-
-Also include:
-
-- Main Task ID: 053 · S7-T025.
-- Work type: Documentation-only.
-- Exact sections changed.
-- Exact sections reviewed but not changed, with reasons.
-- All remaining conflicts, if any.
-- Confirmation of files changed.
-- Confirmation that no code, models, migrations, or tests were changed.
+- Work classification and explicit confirmation of no code changes.
+- Exact files examined.
+- Exact additional files examined and reasons.
+- For every relevant finding, exact file path, function/class, and line references.
+- Actual call graph, if one exists.
+- Session ownership and lifecycle evidence.
+- Production caller evidence or a documented search result showing the missing caller.
+- Clear distinction between real production calls and test-only calls.
+- Decisions recorded for Tasks 029 and 030.
+- Status for each of:
+  - 029 · S7-T007
+  - 030 · S7-T008
+  - 031 · S7-T009
+- Any affected R5–R9/D7 Task statuses, with reasons.
+- Exact documentation files and sections changed.
+- Remaining blockers and their dependencies.
 - Confirmation that no tests were executed.
-- A concise diff summary.
-- Exact Git commands for local diff review.
+- Confirmation that no code, models, migrations, or tests were changed.
 
-Do not mark Task 053 complete in `STAGE7_MASTER_WORKING_PACKET.md`.
+Use the exact permanent Task IDs. Do not omit or rename any requested Task.
 
----
+## 8. Final Restrictions
 
-## Strict Scope Restrictions
-
-You may modify only:
-
-1. `05_Stage5_Forecast_Engine.md`
-2. `reply.md`
-
-You must NOT modify:
-
-- Python source code.
-- ORM models.
-- Database schema.
-- Migration files.
-- Tests.
-- `STAGE7_MASTER_WORKING_PACKET.md`.
-- `07_Stage7_Valuation.md`.
-- `WORKFLOW_RULES.md`.
-
-Do not run tests.
-
-Do not execute migrations.
-
-Do not use automated code or repository-wide formatting tools.
-
-Do not claim that implementation persistence has already been removed. This task changes documentation only. Implementation remediation is reserved for Tasks 054–057.
-
-## Completion Rule
-
-Task 053 may be reported as DONE only if all nine operations are DONE and the resulting document has no unresolved active conflict with R-05.
-
-If any operation is incomplete or blocked, report the main Task as PARTIAL or BLOCKED. Never report DONE merely because the document was edited.
+- Do not execute tests.
+- Do not modify Python source.
+- Do not modify ORM models or migrations.
+- Do not modify tests.
+- Do not invent production callers, data sources, financial formulas, dates, parameter values, or provenance.
+- Do not claim full PIT or E2E without direct evidence.
+- Do not change unrelated documentation or Task packages.
+- If a required file is unavailable, report its exact path and stop short of conclusions that depend on it.

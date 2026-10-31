@@ -1319,11 +1319,13 @@ Impact × Uncertainty
 
 فرمول دقیق و Normalization باید Model Version Parameter باشد.
 
-> **V1 Implementation Status (factual annotation):**
+> **V1 Implementation Status (factual annotation — updated 2026-10-31 per S7-T007 decisions):**
 >
-> **چنین پارامتری در V1 وجود ندارد.** هیچ رکورد پارامتر versioned و هیچ مکانیزم selection در کد وجود ندارد (`effective_from` و `parameter_version` صفر ارجاع در کل `src`)؛ Thresholdها مقادیر ثابت در `src/valuation/parameters.py` هستند. در عمل، فرمول Review Priority همان پیاده‌سازی ثابت موتور است.
+> A code-level Parameter Registry **does exist** in `src/valuation/parameters.py` (classes `ParameterRegistry`, `ParameterSetVersion`, functions `resolve_parameter_set`, `resolve_parameter_set_as_of`, `select_parameter_set_for_valuation`). Genesis snapshot is built programmatically from live module constants; `effective_from` on genesis is `None`; undated genesis is **never** selected for historical as-of queries; missing dated versions raise `LookupError` (fail-closed). Thresholds remain the live constants mirrored into registry records.
 >
-> **تصمیم D9 (registry پارامتر و مکانیزم effective-version selection) هنوز حل‌نشده است** — این سند deferral به V2 را اعلام نمی‌کند، تنها ثبت می‌کند که مکانیزم مورد نیاز وجود ندارد.
+> **Architectural decisions now resolved (S7-T007 / D9 policy):** V1 parameter registry is version-controlled in code (no DB-backed analytical parameter registry); parameter versions require genuine evidence-backed `effective_from` before historical participation; never invent or backdate `effective_from`; undated Genesis must not be selected as a historical version; missing historical versions fail closed (no silent substitution of today); historical backtests may only use authentic vintages and authentic PIT input evidence; all output-affecting parameters must be tied to an immutable model version; numerical Genesis values are **not** owner-approved merely by existing in source.
+>
+> **Still unavailable / unresolved:** authentic historical parameter vintages with evidence-backed effective dates; owner approval of numerical Genesis values (R5 / S7-T020); full source-level provenance and runtime validation for historical Forward P/E observations (implementation under OA1 tasks). Full PIT must not be claimed from observation dates alone.
 
 هدف:
 
