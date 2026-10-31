@@ -137,6 +137,10 @@ def test_real_service_path_preserves_stage5_eps_and_market_provenance(db):
     assert observation["calendar"] == "JALALI"
     assert observation["as_of_jalali_date"] == AS_OF
     assert observation["source_jalali_date"] == (1405, 2, 10)
+    assert observation["date_alert"] == (
+        "WARNING:MARKET_PRICE_DATE_MISMATCH:SELECTED=1405-02-10:ANALYSIS=1405-02-11"
+    )
+    assert observation["date_alert"] in valuation.alerts
     assert observation["source"] == "CSV_PROVIDER"
     assert decision.company_id == company_id
     assert decision.period_id == PERIOD_ID

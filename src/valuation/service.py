@@ -58,7 +58,7 @@ def calculate_valuation_as_of_jalali(
         **valuation_options,
     )
     metadata = dict(result.metadata)
-    metadata["market_price_observation"] = {
+    market_observation = {
         "calendar": "JALALI",
         "as_of_jalali_date": as_of_jalali_date,
         "source_jalali_date": observation.source_jalali_date,
@@ -67,4 +67,15 @@ def calculate_valuation_as_of_jalali(
         "source": observation.source,
         "market_data_id": observation.market_data_id,
     }
-    return replace(result, metadata=metadata)
+    alerts = list(result.alerts)
+    if observation.source_jalali_date != as_of_jalali_date:
+        selected_date = "-".join(f"{part:02d}" for part in observation.source_jalali_date)
+        analysis_date = "-".join(f"{part:02d}" for part in as_of_jalali_date)
+        date_alert = (
+            "WARNING:MARKET_PRICE_DATE_MISMATCH:"
+            f"SELECTED={selected_date}:ANALYSIS={analysis_date}"
+        )
+        alerts.append(date_alert)
+        market_observation["date_alert"] = date_alert
+    metadata["market_price_observation"] = market_observation
+    return replace(result, metadata=metadata, alerts=sorted(set(alerts)))

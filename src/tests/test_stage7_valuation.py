@@ -59,7 +59,30 @@ def test_jalali_service_uses_selected_price_and_preserves_provenance(market_sess
         "price_basis": "ADJUSTED_CLOSE",
         "source": "CSV_PROVIDER",
         "market_data_id": 1,
+        "date_alert": "WARNING:MARKET_PRICE_DATE_MISMATCH:SELECTED=1405-02-10:ANALYSIS=1405-02-11",
     }
+    assert "WARNING:MARKET_PRICE_DATE_MISMATCH:SELECTED=1405-02-10:ANALYSIS=1405-02-11" in result.alerts
+
+
+def test_jalali_service_does_not_alert_for_same_day_price(market_session):
+    session, company_id = market_session
+    session.add(MarketDaily(
+        company_id=company_id,
+        jalali_year=1405,
+        jalali_month=2,
+        jalali_day=11,
+        close_price=Decimal("1000.00"),
+    ))
+    session.flush()
+
+    result = calculate_valuation_as_of_jalali(
+        session, company_id, 101, make_forecast(), (1405, 2, 11), historical_pe_values=[7.0]
+    )
+
+    observation = result.metadata["market_price_observation"]
+    assert observation["source_jalali_date"] == observation["as_of_jalali_date"]
+    assert "date_alert" not in observation
+    assert not any(alert.startswith("WARNING:MARKET_PRICE_DATE_MISMATCH:") for alert in result.alerts)
 
 
 def test_jalali_service_fails_closed_without_eligible_observation(market_session):
@@ -135,21 +158,22 @@ def test_valuation_engine_forward_pe_and_expected_fair_value():
     assert result.metadata["scenario_multiple_policy"]["policy_version"] == "STAGE7_V1_EVIDENCE_BACKED"
 
 
-def test_industry_forward_pe_requires_eight_valid_peers():
+def test_industry_forward_pe_never_selects_target_pe():
     engine = ValuationEngine()
     forecast = make_forecast()
     seven = [6.0] * 7
     result = engine.calculate_valuation(1, 101, "PETROCHEMICAL", 1000.0, forecast, historical_pe_values=[7.0], industry_forward_pe_values=seven)
     assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
-    assert result.target_pe_source != "INDUSTRY_FORWARD_PE"
+    assert result.scenarios["base"].target_pe == 7.0
 
     eight = [6.0] * 8
     result = engine.calculate_valuation(1, 101, "PETROCHEMICAL", 1000.0, forecast, industry_forward_pe_values=eight)
-    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
-    assert result.scenarios["base"].target_pe == 6.0
+    assert result.target_pe_source == "INSUFFICIENT_DATA"
+    assert result.scenarios["base"].target_pe is None
+    assert result.industry_forward_pe_median == 6.0
 
 
-def test_industry_ttm_is_fallback_after_historical_median():
+def test_industry_ttm_never_selects_target_pe():
     result = ValuationEngine().calculate_valuation(
         1,
         101,
@@ -159,8 +183,33 @@ def test_industry_ttm_is_fallback_after_historical_median():
         industry_forward_pe_values=[6.0] * 7,
         industry_ttm_pe_values=[5.0, 6.0, 7.0],
     )
-    assert result.target_pe_source == "INDUSTRY_TTM_PE"
-    assert result.scenarios["base"].target_pe == 6.0
+    assert result.target_pe_source == "INSUFFICIENT_DATA"
+    assert result.scenarios["base"].target_pe is None
+    assert result.industry_ttm_pe_median == 6.0
+
+
+def test_industry_inputs_cannot_change_target_or_relative_assessment():
+    engine = ValuationEngine()
+    common = dict(
+        company_id=1,
+        period_id=101,
+        industry_code="PETROCHEMICAL",
+        current_price=900.0,
+        forecast_result=make_forecast(90.0, 100.0, 110.0),
+        historical_pe_values=[6.0, 7.0, 8.0],
+    )
+    without_industry = engine.calculate_valuation(**common)
+    with_industry = engine.calculate_valuation(
+        **common,
+        industry_forward_pe_values=[4.0] * 12,
+        industry_ttm_pe_values=[20.0, 30.0],
+    )
+
+    assert with_industry.target_pe_source == without_industry.target_pe_source == "HISTORICAL_MEDIAN_PE"
+    assert with_industry.scenarios["base"].target_pe == without_industry.scenarios["base"].target_pe
+    assert with_industry.valuation_status == without_industry.valuation_status
+    assert with_industry.alerts == without_industry.alerts
+    assert not any("INDUSTRY" in alert for alert in with_industry.alerts)
 
 
 def test_negative_eps_does_not_create_fake_pe_or_fair_value():
@@ -463,8 +512,9 @@ def test_p2_alert_divergence_ratios_boundaries():
         make_forecast(90.0, 100.0, 110.0), historical_pe_values=[10.0],
         industry_forward_pe_values=[6.0] * 8,
     )
-    assert industry.target_pe_source == "INDUSTRY_FORWARD_PE"
-    assert any("FORWARD_PE_ABOVE_INDUSTRY" in a for a in industry.alerts)
+    assert industry.target_pe_source == "HISTORICAL_MEDIAN_PE"
+    assert not any("FORWARD_PE_ABOVE_INDUSTRY" in a for a in industry.alerts)
+    assert not any("FORWARD_PE_ABOVE_HISTORICAL" in a for a in industry.alerts)
     missing = engine.calculate_valuation(
         1, 101, "PETROCHEMICAL", 1000.0,
         make_forecast(-10.0, -5.0, 10.0), historical_pe_values=[6.0],
@@ -687,17 +737,17 @@ def test_p4_peer_count_below_minimum_falls_back():
     assert result.industry_peer_count == 7
     assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
     assert result.target_pe_source != "INDUSTRY_FORWARD_PE"
-    assert "INSUFFICIENT_PEER_DATA" in result.valuation_risk_flags
+    assert "INSUFFICIENT_PEER_DATA" not in result.valuation_risk_flags
 
 
-def test_p4_peer_count_at_minimum_selects_industry_forward():
+def test_p4_peer_count_at_minimum_is_informational_only():
     result = ValuationEngine().calculate_valuation(
         1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
         industry_forward_pe_values=[6.0] * 8,
     )
     assert result.industry_peer_count == 8
-    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
-    assert result.scenarios["base"].target_pe == 6.0
+    assert result.target_pe_source == "INSUFFICIENT_DATA"
+    assert result.scenarios["base"].target_pe is None
     assert result.industry_forward_pe_median == 6.0
 
 
@@ -710,9 +760,9 @@ def test_p4_peer_count_above_minimum_and_median_provenance():
     from statistics import median
 
     assert result.industry_peer_count == 10
-    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert result.target_pe_source == "INSUFFICIENT_DATA"
     assert result.industry_forward_pe_median == median(values)
-    assert result.scenarios["base"].target_pe == median(values)
+    assert result.scenarios["base"].target_pe is None
 
 
 def test_p4_peer_count_filters_invalid_values():
@@ -724,12 +774,12 @@ def test_p4_peer_count_filters_invalid_values():
         1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
         industry_forward_pe_values=polluted,
     )
-    # Only the 8 finite positive values count; NaN/inf/None/zero/negative
-    # are filtered before counting, median, and benchmark selection alike.
+    # Only the 8 finite positive values count in the informational industry
+    # count and median; these values do not select an active Target P/E.
     assert result.industry_peer_count == 8
-    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert result.target_pe_source == "INSUFFICIENT_DATA"
     assert result.industry_forward_pe_median == 6.0
-    assert math.isfinite(result.scenarios["base"].target_pe)
+    assert result.scenarios["base"].target_pe is None
 
 
 def test_p4_peer_count_empty_data_reports_zero_and_falls_back():
@@ -745,17 +795,15 @@ def test_p4_peer_count_empty_data_reports_zero_and_falls_back():
         assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
 
 
-def test_p4_benchmark_fallback_ignores_forward_count_for_ttm():
-    # TTM fallback must not consume forward P/E values: populations stay
-    # separate per spec section 12; the reported count is forward-only.
+def test_p4_industry_ttm_is_informational_only():
     result = ValuationEngine().calculate_valuation(
         1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
         industry_forward_pe_values=[6.0] * 7,
         industry_ttm_pe_values=[5.0, 6.0, 7.0],
     )
     assert result.industry_peer_count == 7
-    assert result.target_pe_source == "INDUSTRY_TTM_PE"
-    assert result.scenarios["base"].target_pe == 6.0
+    assert result.target_pe_source == "INSUFFICIENT_DATA"
+    assert result.scenarios["base"].target_pe is None
     assert result.industry_ttm_pe_median == 6.0
 
 
@@ -965,10 +1013,10 @@ def test_p5_undated_benchmark_series_carry_no_provenance():
     assert result.historical_median_pe == 7.0
     assert result.industry_forward_pe_median == 6.0
     assert result.industry_peer_count == 8
-    assert result.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert result.target_pe_source == "HISTORICAL_MEDIAN_PE"
     # A valuation date after the cutoff is accepted without rejection or
     # flag: cross-validation is absent by design in V1.
-    assert result.valuation_status == "FAIR"
+    assert result.valuation_status == "ATTRACTIVE"
 
 
 # P6 additions: production-path, adversarial and regression validation.
@@ -1066,7 +1114,7 @@ def test_p6_missing_benchmarks_yield_guarded_nulls():
     for scenario in result.scenarios.values():
         assert scenario.target_pe is None
         assert scenario.fair_value is None
-    assert "INDUSTRY_BENCHMARK_INSUFFICIENT" in result.valuation_risk_flags
+    assert "INDUSTRY_BENCHMARK_INSUFFICIENT" not in result.valuation_risk_flags
     assert any("INSUFFICIENT_BENCHMARK_DATA" in alert for alert in result.alerts)
     for value in (result.expected_fair_value, result.margin_of_safety_pct):
         assert value is None or math.isfinite(value)
@@ -1176,13 +1224,15 @@ def test_p6_regression_prior_behavior_preserved():
     assert base_case.industry_peer_count == 0
     assert abs(base_case.driver_impact["EPS"] - 50.0) < 1e-6
     assert abs(base_case.driver_impact["TARGET_PE"] - 50.0) < 1e-6
-    # Benchmark hierarchy regression: TTM fallback order intact.
+    # Industry TTM observations remain informational and cannot supply Target P/E.
     ttm = engine.calculate_valuation(
         1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
         industry_forward_pe_values=[6.0] * 7,
         industry_ttm_pe_values=[5.0, 6.0, 7.0],
     )
-    assert ttm.target_pe_source == "INDUSTRY_TTM_PE"
+    assert ttm.target_pe_source == "INSUFFICIENT_DATA"
+    assert ttm.scenarios["base"].target_pe is None
+    assert ttm.industry_ttm_pe_median == 6.0
     assert ttm.industry_peer_count == 7
 
 
@@ -1213,19 +1263,14 @@ def test_p10_expensive_base_upside_parameterized_outputs_unchanged():
     assert golden.model_version == "STAGE7_V1"
     representation = dataclasses.asdict(golden)
     representation.pop("calculation_timestamp")
-    # Final P35: the two additive provenance keys are removed before hashing so
-    # the ORIGINAL pinned digest is retained unchanged (proof the financial
-    # outputs and the 38-key snapshot are byte-identical to the P33 baseline).
+    # Exclude additive run-specific audit metadata when pinning the stable output.
     representation["metadata"].pop("parameter_selection")
     representation["metadata"].pop("parameter_consumption")
     digest = hashlib.sha256(
         json.dumps(representation, sort_keys=True, default=str).encode()
     ).hexdigest()
-    # P33 re-baselined digest: the only output change is the additive parameter
-    # audit metadata (parameter_set_version + 38-key parameter_snapshot); all
-    # financial outputs above verified unchanged, and the pre-P33 digest
-    # reproduces byte-for-byte with those two keys removed.
-    assert digest == "7b5fb909153ec0517b4c945688a8c661a56921191602021748ff43652df33f33"
+    # P35 adds a legacy-industry informational marker to metadata.
+    assert digest == "3477c39db4a82b9b20ed6dbc45f971e4294fd8fbe8be26aca8d952b24ec07d2c"
     # Boundary pair bracketing the parameterized cutoff: expected upside
     # <= -10 with base upside on each side of 0.0.
     expensive = engine.calculate_valuation(
@@ -1681,7 +1726,7 @@ def test_p35_selected_set_governs_peers_alerts_and_scenario_weights():
     )
     default = _p35_call(**kwargs)
     assert default.target_pe_source == "HISTORICAL_MEDIAN_PE"
-    assert "INSUFFICIENT_PEER_DATA" in default.valuation_risk_flags
+    assert "INSUFFICIENT_PEER_DATA" not in default.valuation_risk_flags
     assert "LOW_FORECAST_RELIABILITY" not in default.valuation_risk_flags
     v2 = _p35_version(
         "TEST/V2", dt(2026, 1, 1),
@@ -1692,12 +1737,12 @@ def test_p35_selected_set_governs_peers_alerts_and_scenario_weights():
         },
     )
     selected = _p35_call(parameter_registry=_p35_registry(v2), data_cutoff_datetime=dt(2026, 6, 1), **kwargs)
-    assert selected.target_pe_source == "INDUSTRY_FORWARD_PE"
+    assert selected.target_pe_source == "HISTORICAL_MEDIAN_PE"
     assert "INSUFFICIENT_PEER_DATA" not in selected.valuation_risk_flags
     assert "LOW_FORECAST_RELIABILITY" in selected.valuation_risk_flags
     assert [round(selected.scenarios[n].probability, 9) for n in ("bear", "base", "bull")] == [0.5, 0.3, 0.2]
-    assert selected.expected_fair_value == round(0.5 * 1500.0 + 0.3 * 1800.0 + 0.2 * 2100.0, 2)
-    assert selected.metadata["benchmark_peer_minimum"] == 3
+    assert selected.expected_fair_value == round(0.5 * 1050.0 + 0.3 * 1260.0 + 0.2 * 1470.0, 2)
+    assert selected.metadata["industry_benchmark_fields_are_legacy_informational"] is True
     assert selected.metadata["parameter_snapshot"]["MIN_INDUSTRY_PEERS"] == 3
 
 

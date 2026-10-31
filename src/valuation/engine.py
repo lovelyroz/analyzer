@@ -104,11 +104,7 @@ class ValuationEngine:
         industry_forward_median = median_valid(forward_values)
         industry_ttm_median = median_valid(ttm_values)
         target_pe_base, target_source = self._select_target_pe(
-            industry_forward_median,
             historical_median,
-            industry_ttm_median,
-            valid_forward_count,
-            params.min_industry_peers,
         )
 
         probability_confidence = _finite_or_none(probability_confidence)
@@ -190,12 +186,8 @@ class ValuationEngine:
         reliability = _finite_or_none(forecast_reliability_score)
         if reliability is not None and reliability < params.alert_thresholds["low_forecast_reliability"]:
             flags.append("LOW_FORECAST_RELIABILITY")
-        if forward_values and valid_forward_count < params.min_industry_peers:
-            flags.append("INSUFFICIENT_PEER_DATA")
         if scenario_dispersion is not None and scenario_dispersion > params.risk_thresholds["high_scenario_dispersion"]:
             flags.append("HIGH_SCENARIO_DISPERSION")
-        if target_source == "INSUFFICIENT_DATA":
-            flags.append("INDUSTRY_BENCHMARK_INSUFFICIENT")
 
         confidence = self._valuation_confidence(
             forecast_reliability_score=reliability,
@@ -219,7 +211,6 @@ class ValuationEngine:
             reliability=reliability,
             dispersion=scenario_dispersion,
             historical_median=historical_median,
-            industry_forward_median=industry_forward_median,
             driver_ranking=driver_ranking,
             params=params,
         )
@@ -288,6 +279,7 @@ class ValuationEngine:
             contract_version=params.contract_version,
             metadata={
                 "industry_code": industry_code,
+                "industry_benchmark_fields_are_legacy_informational": True,
                 "expected_upside": expected_upside,
                 "scenario_dispersion": scenario_dispersion,
                 "scenario_dependency": {
@@ -295,7 +287,7 @@ class ValuationEngine:
                     "score": scenario_dispersion,
                     "separate_from_probability": True,
                 },
-                "benchmark_peer_minimum": params.min_industry_peers,
+                "legacy_industry_peer_minimum": params.min_industry_peers,
                 "scenario_probability_sum": sum(probabilities.values()),
                 "probability_adjustments_applied": {},
                 "probability_evidence": probability_meta,
@@ -388,18 +380,10 @@ class ValuationEngine:
 
     @staticmethod
     def _select_target_pe(
-        industry_forward: Optional[float],
         historical: Optional[float],
-        industry_ttm: Optional[float],
-        forward_peer_count: int,
-        min_industry_peers: float,
     ) -> tuple[Optional[float], str]:
-        if industry_forward is not None and forward_peer_count >= min_industry_peers:
-            return industry_forward, "INDUSTRY_FORWARD_PE"
         if historical is not None:
             return historical, "HISTORICAL_MEDIAN_PE"
-        if industry_ttm is not None:
-            return industry_ttm, "INDUSTRY_TTM_PE"
         return None, "INSUFFICIENT_DATA"
 
     @staticmethod
@@ -642,7 +626,6 @@ class ValuationEngine:
         reliability: Optional[float],
         dispersion: Optional[float],
         historical_median: Optional[float],
-        industry_forward_median: Optional[float],
         driver_ranking: List[str],
         params: ConsumedParameters,
     ) -> List[str]:
@@ -665,11 +648,6 @@ class ValuationEngine:
                 alerts.append("WATCH:FORWARD_PE_ABOVE_HISTORICAL")
             elif historical_median / base.forward_pe >= alert_thresholds["historical_divergence_ratio"]:
                 alerts.append("WATCH:FORWARD_PE_BELOW_HISTORICAL")
-        if industry_forward_median is not None and base.forward_pe is not None and industry_forward_median > 0:
-            if base.forward_pe / industry_forward_median >= alert_thresholds["industry_divergence_ratio"]:
-                alerts.append("WATCH:FORWARD_PE_ABOVE_INDUSTRY")
-            elif industry_forward_median / base.forward_pe >= alert_thresholds["industry_divergence_ratio"]:
-                alerts.append("WATCH:FORWARD_PE_BELOW_INDUSTRY")
         if driver_ranking:
             alerts.append(f"INFO:TOP_DRIVER:{driver_ranking[0]}")
         return sorted(set(alerts))
