@@ -1,6 +1,6 @@
 # Stage 7 — چک‌لیست جامع کارهای انجام‌شده و باقی‌مانده
 
-این فایل مرجع پیگیری اجرایی Stage 7 است. هر مورد باید شناسهٔ ثابت داشته باشد و وضعیت آن فقط با شاهد قابل بررسی تغییر کند. سابقهٔ تفصیلی و شواهد در `temp_report2.md` و گزارش اجرای prompt جاری در `reply.md` نگهداری می‌شوند.
+این فایل **تنها مرجع اجرایی Stage 7** است. وضعیت Taskها، ترتیب اجرا، وابستگی‌ها، تصمیم‌های لازم و معیارهای پایان فقط در همین فایل تعیین می‌شوند. اسناد و گزارش‌های دیگر صرفاً شواهد تاریخی/تکمیلی‌اند و هیچ مرجعیت مستقلی برای تعیین وضعیت ندارند.
 
 آخرین بازنگری: 2026-10-31 — تکمیل Audit Forecast persistence و ثبت Taskهای remediation مطابق تصمیم مالک؛ اصلاح وضعیت 030 · S7-T008 از DONE به PARTIAL و ثبت تصمیم‌های R7/R8 (فقط مستندات)؛ ثبت تصمیم R6 در 049 · S7-T021 (فقط مستندات)
 
@@ -19,7 +19,7 @@
 ### A1. تصمیم‌ها و مستندات سیاست مالک
 
 - [x] **001 · S7-DOC-001 — ثبت AMENDMENT-OA1:** سیاست‌های مالک دربارهٔ same-company historical Forward P/E، حذف Industry P/E از ارزندگی و Target P/E، محاسبهٔ مشتق P/E از دادهٔ خام با provenance، latest-complete input، هشدار تاریخ قیمت بازار و ممنوعیت persistence تحلیلی در `07_Stage7_Valuation.md` ثبت شده‌اند.
-- [x] **002 · S7-DOC-002 — هم‌ترازی نقشه و Task Register:** محتوای معتبر هر دو سند تاریخی در `STAGE7_MASTER_WORKING_PACKET.md` تجمیع و بررسی شد؛ بخش F صریحاً ادغام `tasksToDo.md` را ثبت می‌کند و نقشه، قواعد، یافته‌ها، بسته‌های اجرایی و معیارهای پایان `stepsForStage7.md` در بخش‌های A تا F پوشش داده شده‌اند. `WORKFLOW_RULES.md` نیز اکنون فقط Master Packet و `reply.md` را به‌عنوان مراجع جاری Stage 7 معرفی می‌کند؛ دو سند قدیمی بازنشسته‌اند و نسخه‌های تاریخی آن‌ها با شواهد Git قابل بازیابی است. جزئیات و SHAها در یادداشت «002 Closure Evidence» انتهای این فایل ثبت شده‌اند.
+- [x] **002 · S7-DOC-002 — هم‌ترازی نقشه و Task Register:** محتوای معتبر هر دو سند تاریخی در `STAGE7_MASTER_WORKING_PACKET.md` تجمیع و بررسی شد؛ بخش F صریحاً ادغام `tasksToDo.md` را ثبت می‌کند و نقشه، قواعد، یافته‌ها، بسته‌های اجرایی و معیارهای پایان `stepsForStage7.md` در بخش‌های A تا F پوشش داده شده‌اند. `WORKFLOW_RULES.md` اکنون Master Packet را تنها مرجع معتبر وضعیت و برنامه معرفی می‌کند؛ دو سند قدیمی بازنشسته‌اند و نسخه‌های تاریخی آن‌ها با Git history قابل بازیابی‌اند. جزئیات و SHAها در یادداشت «002 Closure Evidence» انتهای این فایل ثبت شده‌اند.
 - [x] **003 · S7-DOC-003 — اصلاح وابستگی T013:** بخش‌های مستقل قابل اقدام از وابستگی‌های provenance/PIT در S7-T013 جدا شده‌اند؛ full PIT بدون شواهد مجاز نیست.
 - [x] **004 · S7-DOC-004 — اصلاح وضعیت PIT و Ready claims:** تمایز design/architecture PASS از runtime PIT OPEN/BLOCKED و نیز معنای محدود Ready for implementation / Ready for Stage 8 در مستندات ثبت شده است.
 - [x] **005 · S7-DOC-005 — ثبت تعارض Forecast persistence:** تعارض احتمالی مدل‌ها/قراردادهای persistence Forecast با OA1.7 ثبت شده؛ هیچ مدل یا کد persistence در این مرحله تغییر نکرده است.
@@ -36,7 +36,7 @@
 - [x] **013 · S7-AUD-007 — ممیزی قرارداد هشدارها و مصرف‌کنندگان:** قرارداد هشدارها و مصرف‌کنندگان موجود بررسی شده‌اند؛ رفتارهای deferred بدون مصوبه فعال نشده‌اند.
 - [x] **014 · S7-AUD-008 — ممیزی سناریوهای مالی و invariants:** تطبیق کد/مشخصات/تست‌های V1 پیش از OA1 از نظر ورودی/خروجی، نسخه‌بندی، کیفیت داده، ارز، تعداد سهام، restatement، جلوگیری از دوباره‌شماری، EPS منفی/تغییر علامت، دادهٔ ناکافی و مصرف پارامترها در گزارش‌های قبلی ثبت شده است.
 - [x] **015 · S7-AUD-009 — تفکیک نوع شواهد تست:** مشخص شده است که unit/mock و service integration test، اثبات E2E واقعی نیستند؛ مسیر واقعی تا Stage 9 همچنان اثبات‌نشده است.
-- [x] **016 · S7-AUD-010 — Audit تعارض Forecast persistence با OA1.7:** ممیزی تکمیل شد. طبق تصمیم صریح مالک، هیچ خروجی محاسباتی/تحلیلی، از جمله Forecastهای Stage 5 و نسخه‌ها/سناریوهای آن‌ها، نباید در DB برنامه ذخیره شود؛ DB فقط برای ورودی‌ها و داده‌های منبع است. مسیرهای مدل، جدول، repository، write path، migration و ارجاعات کد با جست‌وجوی محلی ثبت‌شده در reply.md شناسایی شدند. تعارض اجرایی قطعی است؛ remediation در **053 تا 057 · S7-T025 تا S7-T029** باز می‌ماند. شواهد: گزارش reply.md؛ اجرای کاربر: 19 passed, 313 deselected برای تست‌های رفتار persistence فعلی؛ این نتیجه فقط رفتار موجود را اثبات می‌کند، نه انطباق با OA1.7.
+- [x] **016 · S7-AUD-010 — Audit تعارض Forecast persistence با OA1.7:** ممیزی تکمیل شد. طبق تصمیم صریح مالک، هیچ خروجی محاسباتی/تحلیلی، از جمله Forecastهای Stage 5 و نسخه‌ها/سناریوهای آن‌ها، نباید در DB برنامه ذخیره شود؛ DB فقط برای ورودی‌ها و داده‌های منبع است. مسیرهای مدل، جدول، repository، write path، migration و ارجاعات کد در ممیزی محلی شناسایی شدند. تعارض اجرایی قطعی است؛ remediation در **053 تا 057 · S7-T025 تا S7-T029** باز می‌ماند. شواهد ممیزی در همین Task خلاصه شده‌اند؛ اجرای کاربر: 19 passed, 313 deselected برای تست‌های رفتار persistence فعلی. این نتیجه فقط رفتار موجود را اثبات می‌کند، نه انطباق با OA1.7.
 
 ### A3. تست‌های اجراشده توسط کاربر
 
@@ -57,7 +57,7 @@
 - [ ] **025 · S7-T016 — Market-price observation date alert:** آخرین قیمت واجد شرایط در یا قبل از تاریخ تحلیل جلالی؛ گزارش تاریخ واقعی و هشدار در صورت اختلاف؛ fail-closed در نبود قیمت معتبر.
 - [ ] **026 · S7-T017 — حذف Industry P/E از مسیر فعال:** Industry Forward/TTM P/E نباید در cheap/expensive assessment یا hierarchy فعال Target P/E استفاده شوند.
 - [ ] **027 · S7-T018 — رد precomputed P/E بدون provenance:** مسیر ورودی سری عددی P/E بدون دادهٔ زیربنایی و provenance باید رد یا fail-closed شود.
-- [x] **028 · S7-T019 — Audit Forecast persistence:** ممیزی report-only تکمیل شد. محل‌های اصلی: src/models/forecast.py (ForecastVersion و ForecastInputRefModel)، جداول forecast_versions و forecast_input_refs، src/forecast/repo.py (ForecastRecordRepository.save() و read/history methods)، src/forecast/service.py (generate_and_persist_forecast() با persist=True پیش‌فرض و ذخیرهٔ سه سناریو)، و src/migrations/runner.py (ساخت جداول در migration 7). reply.md همچنین call siteها و ارجاعات تستی را ثبت می‌کند. ForecastInputRefModel به رکورد خروجی وابسته است و جدول مستقل ورودی خام نیست. نتیجه: persistence فعلی خروجی Forecast با OA1.7 و تصمیم مالک تعارض قطعی دارد. گزینهٔ remediation به Taskهای 053 تا 057 · S7-T025 تا S7-T029 منتقل شد. در این Task هیچ کد/مدلی تغییر نکرد.
+- [x] **028 · S7-T019 — Audit Forecast persistence:** ممیزی report-only تکمیل شد. محل‌های اصلی: src/models/forecast.py (ForecastVersion و ForecastInputRefModel)، جداول forecast_versions و forecast_input_refs، src/forecast/repo.py (ForecastRecordRepository.save() و read/history methods)، src/forecast/service.py (generate_and_persist_forecast() با persist=True پیش‌فرض و ذخیرهٔ سه سناریو)، و src/migrations/runner.py (ساخت جداول در migration 7). ممیزی، call siteها و ارجاعات تستی را نیز بررسی کرده است. ForecastInputRefModel به رکورد خروجی وابسته است و جدول مستقل ورودی خام نیست. نتیجه: persistence فعلی خروجی Forecast با OA1.7 و تصمیم مالک تعارض قطعی دارد. گزینهٔ remediation به Taskهای 053 تا 057 · S7-T025 تا S7-T029 منتقل شد. در این Task هیچ کد/مدلی تغییر نکرد.
 
 ### بستهٔ 1 — قراردادها و موانع باز
 
@@ -256,7 +256,7 @@
 
 ### F5. کنترل پیش از ساخت Prompt و جلوگیری از دوباره‌کاری
 
-- پیش از هر Prompt، WORKFLOW_RULES.md، همین Master Packet و بخش مرتبط temp_report2.md بررسی شوند.
+- پیش از هر Prompt، WORKFLOW_RULES.md و همین Master Packet بررسی شوند؛ فایل‌های فنی لازم برای همان Task نیز باید صریحاً در فهرست فایل‌های Agent بیایند. temp_report2.md فقط در صورت نیاز به سابقهٔ تاریخی و بدون اتکا برای تعیین وضعیت قابل مراجعه است.
 - شواهد قبلی برای جلوگیری از اجرای دوبارهٔ کار تکمیل‌شده بررسی شوند؛ Task فقط با شاهد جدید، تغییر سورس یا رگرسیون مشخص بازگشایی شود.
 - هر Prompt باید به یک یا چند Task فعال همین Master Packet متصل باشد. اگر Task تازه‌ای لازم شد، ابتدا همین Master Packet با دلیل، وابستگی و معیار پذیرش به‌روز شود و سپس Prompt نوشته شود.
 - مستندسازی تصمیم مالک از پیاده‌سازی جداست؛ به‌روزرسانی docs هیچ Task اجرایی را DONE نمی‌کند.
@@ -293,7 +293,7 @@
 ## ثبت وضعیت PARTIAL برای Task 053 · S7-T025 — 2026-10-31
 
 - **وضعیت:** PARTIAL؛ اصلاحات Stage 5 انجام شده، اما هم‌ترازی اسناد سیاستی در سطح Stage 7 هنوز کامل نیست.
-- **شواهد انجام‌شده:** `05_Stage5_Forecast_Engine.md`؛ بخش‌های 24، 26، 27، 28، 29، 32، 33 و 34 اصلاح شده‌اند؛ گزارش ۹ عملیات در `reply.md` ثبت شده است.
+- **شواهد انجام‌شده:** `05_Stage5_Forecast_Engine.md`؛ بخش‌های 24، 26، 27، 28، 29، 32، 33 و 34 اصلاح شده‌اند؛ جزئیات تغییرات Stage 5 در خود سند Stage 5 قابل بررسی است؛ وضعیت Task فقط طبق Master Packet تعیین می‌شود.
 - **مورد باقی‌مانده:** در `07_Stage7_Valuation.md`، متن OA1.7 هنوز می‌گوید سند Stage 5 همچنان Forecast Versioning و Forecast Record را به‌عنوان تعارض مستنداتی فعال توصیف می‌کند. این ادعا با نسخهٔ فعلی Stage 5 سازگار نیست و باید اصلاح و دوباره بررسی شود. این مورد به عملیات **053-10** اضافه می‌شود.
 - **محدودهٔ انجام‌شده:** فقط مستندات Stage 5 تغییر کرده‌اند؛ هیچ کد، مدل، migration یا تستی تغییر نکرده و تستی اجرا نشده است.
 - **ادامه کار:** عملیات **053-10** برای اصلاح ارجاع OA1.7 باز است؛ Taskهای اجرایی **054 تا 057 · S7-T026 تا S7-T029** نیز همچنان OPEN هستند. تکمیل مستندات به معنی رفع persistence در کد یا بسته‌شدن R-05 نیست.
@@ -313,7 +313,7 @@
 
 | Taskها | نتیجهٔ بازبینی | دلیل |
 |---|---|---|
-| 001 و 003 تا 006 · S7-DOC-001 و S7-DOC-003 تا S7-DOC-006 | [x] حفظ شد | سیاست OA1 و اصلاحات Industry در سند فعلی قابل مشاهده‌اند؛ تفکیک PIT و Ready claims نیز در سند Stage 7 فعلی وجود دارد؛ تعارض persistence ثبت شده است. |\n| 002 · S7-DOC-002 | [x] DONE | بازبینی مجدد نسخه‌های تاریخی هر دو فایل و تطبیق محتوای آن‌ها با Master Packet انجام شد؛ `WORKFLOW_RULES.md` نیز مراجع جاری را به Master Packet و `reply.md` محدود کرده است. شواهد دقیق در یادداشت «002 Closure Evidence» انتهای فایل ثبت شده است. |
+| 001 و 003 تا 006 · S7-DOC-001 و S7-DOC-003 تا S7-DOC-006 | [x] حفظ شد | سیاست OA1 و اصلاحات Industry در سند فعلی قابل مشاهده‌اند؛ تفکیک PIT و Ready claims نیز در سند Stage 7 فعلی وجود دارد؛ تعارض persistence ثبت شده است. |\n| 002 · S7-DOC-002 | [x] DONE | بازبینی مجدد نسخه‌های تاریخی هر دو فایل و تطبیق محتوای آن‌ها با Master Packet انجام شد؛ `WORKFLOW_RULES.md` نیز Master Packet را تنها مرجع وضعیت و برنامه معرفی می‌کند. شواهد دقیق در یادداشت «002 Closure Evidence» انتهای فایل ثبت شده است. |
 | 007 تا 016 · S7-AUD-001 تا S7-AUD-010 | [x] حفظ شد | خروجی مورد انتظار این Taskها ممیزی و ثبت یافته‌ها بوده است. اثبات‌نشدن E2E، PIT یا وجود تعارض، یافتهٔ ممیزی است نه کار ناقص ممیزی؛ اصلاح/تصمیم‌های بعدی در Taskهای مستقل باز یا BLOCKED ثبت شده‌اند. |
 | 017 · S7-TEST-001 | [x] حفظ شد | فرمان متمرکز توسط کاربر اجرا شده و نتیجهٔ 857 passed ثبت شده است؛ دامنهٔ این Task اجرای همان مجموعه بوده است. |
 | 018 · S7-TEST-002 | [x] حفظ شد | اجرای مجموعهٔ کامل ثبت شده است: 1898 passed و 2 skipped. بررسی علت Skipها عمداً در Task مستقل 019 · S7-TEST-003 باز مانده و مانع بسته‌شدن Task اجرای تست نیست. |
@@ -343,7 +343,7 @@ A strict re-verification was completed after the repository's workflow rules wer
 
 - The historical `tasksToDo.md` explicitly defined the relationship between the roadmap and Task Register, task status semantics, active task packages, dependencies, acceptance criteria and prompt reporting. The current Master Packet consolidates these responsibilities; section F explicitly identifies itself as merged from `tasksToDo.md`, while sections A/B/C hold the active register and status dashboard and sections D/E hold governing rules and exit criteria.
 - The historical `stepsForStage7.md` contained the Stage 7 OPEN declaration, non-negotiable rules, AMENDMENT-OA1 policies, findings, remaining execution packages and exit criteria. These subjects are represented in the current Master Packet's rules, findings/task register, Rule Register and exit criteria. No historical OPEN implementation work was treated as completed merely by documentation consolidation.
-- Current `WORKFLOW_RULES.md` blob at verification: `15de94a5da80169d5af67ce2c80fa86c6791c631`. It identifies `STAGE7_MASTER_WORKING_PACKET.md` as the remaining-jobs checklist and `reply.md` as the interim prompt report; neither retired file is designated as an active reference.
+- Current `WORKFLOW_RULES.md` identifies `STAGE7_MASTER_WORKING_PACKET.md` as the sole authoritative Stage 7 task/status reference. The concise `temp_report2.md` is historical and non-authoritative; the temporary conversation-report workflow has been retired.
 - The retired historical files remain recoverable at the parent commit identified above. They were not recreated.
 
 ### Closure decision
