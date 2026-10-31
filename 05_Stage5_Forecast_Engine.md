@@ -624,38 +624,18 @@ Bull
 
 # 24. Forecast Versioning
 
-هیچ Forecast قبلی نباید Overwrite شود.
+> **HISTORICAL / SUPERSEDED (by R-05 / Owner Decision / AMENDMENT-OA1.7)**  
+> The former design required that no previous Forecast be overwritten and that every Forecast version be retained so that a Version History (and derived indicators such as Earnings Revision Trend) could be maintained inside the application database. That persistence model is **no longer active architecture**.
 
-مثال:
+**Active architecture (R-05):**
 
-```text
-August
-EPS = 1100
+- Stage 5 generates Forecast outputs **at runtime**.
+- Forecast outputs (including Bear / Base / Bull scenarios) are **consumed at runtime** by downstream stages.
+- The application database stores **only inputs and source data**. No Forecast output, Forecast version, scenario record, or output-dependent provenance may be persisted in application database tables.
+- If a user wishes to retain a specific Forecast output, retention occurs solely through the UI’s explicit save functionality, **outside** the application’s database tables.
+- No alternative history store, cache, or persistence mechanism is introduced by this specification.
 
-September
-EPS = 1180
-
-October
-EPS = 1270
-```
-
-هر سه نسخه باید حفظ شوند.
-
-از Version History می‌توان شاخصی مانند:
-
-```text
-Earnings Revision Trend
-```
-
-استخراج کرد.
-
-مثلاً:
-
-```text
-1100 → 1180 → 1270
-```
-
-نشانه Revision مثبت است.
+Former illustrative sequence (August EPS = 1100 → September = 1180 → October = 1270) remains useful only as an example of successive runtime Forecasts; it does **not** authorize database version history or stored revision trends.
 
 ---
 
@@ -699,14 +679,16 @@ Forecast Reliability
 
 را تعیین نمی‌کند.
 
-Stage 5 فقط اطلاعات لازم برای ارزیابی Forecast را ذخیره می‌کند.
+Stage 5 may return **runtime** information required for downstream evaluation (for example, the Forecast outputs themselves, the forecast method used, and data-quality metadata). This information is produced and consumed at runtime.
 
-Stage 6 انجام می‌دهد:
+Stage 5 does **not** persist Forecast outputs or analytical evaluation records in the application database (R-05).
+
+Stage 6 performs the evaluation flow:
 
 ```text
-Forecast
+Runtime Forecast
    ↓
-Actual
+Actual (source / input data)
    ↓
 Error
    ↓
@@ -717,7 +699,7 @@ Reliability
 Calibration
 ```
 
-بنابراین Forecast Quality و Forecast Reliability دو مفهوم جدا هستند.
+Forecast Quality (characteristics of the runtime Forecast produced by Stage 5) and Forecast Reliability (the evaluated reliability produced by Stage 6) remain two distinct concepts. No new persistence requirement is introduced for actuals, errors, reliability scores, or calibration outputs.
 
 ---
 
@@ -739,22 +721,15 @@ INSUFFICIENT_DATA
 
 تفسیر شود.
 
-روش Forecast مورد استفاده نیز باید ثبت شود.
-
-مثلاً:
-
-```text
-Baseline
-Seasonal
-Trend Adjusted
-Driver Based
-```
+The Forecast method used and data-quality metadata may be returned as **runtime output** information (for example: Baseline, Seasonal, Trend Adjusted, Driver Based). This does **not** imply that analytical results must be stored in the application database.
 
 ---
 
-# 28. Forecast Record
+# 28. Forecast Record (Runtime Output Contract)
 
-هر Forecast باید حداقل شامل موارد زیر باشد:
+> **Clarification:** The structure below is a **runtime Forecast result / output contract**. It is **not** a database record or persisted entity. Under R-05, these fields are produced and consumed at runtime; they are not written to application database tables.
+
+هر Forecast runtime output باید حداقل شامل موارد زیر باشد:
 
 ```text
 company_id
@@ -777,29 +752,35 @@ data_quality
 assumptions
 ```
 
-برای مدل‌های تخصصی Bank/Holding، خروجی‌های تخصصی مربوطه نیز ذخیره می‌شوند.
+برای مدل‌های تخصصی Bank/Holding، خروجی‌های تخصصی مربوطه نیز به‌صورت runtime output حفظ می‌شوند (بدون persistence در DB برنامه).
 
 ---
 
-# 29. Auditability
+# 29. Auditability and Provenance
 
-هر Forecast باید قابل ردیابی باشد:
+Traceability requirements are preserved without persisting analytical outputs.
+
+The active documentation distinguishes:
+
+1. **Raw source data and input records** — governed by their existing source/input persistence contracts (Stage 1 and related input contracts). These remain persistable.
+2. **Runtime Forecast outputs and their runtime provenance** — available while the Forecast result exists in memory / runtime; sufficient to identify the relevant inputs, financial facts, model version, and cutoff where those data are supplied to Stage 5.
+3. **Output-dependent provenance records** — must **not** be persisted in the application database (R-05). Linking provenance permanently to a stored Forecast version/row is prohibited.
+
+A runtime Forecast result should retain enough information to identify the inputs and financial facts used where available, for example:
 
 ```text
-Forecast
+Runtime Forecast
    ↓
 Model Version
    ↓
-Inputs
+Inputs (references / facts available at runtime)
    ↓
 Financial Facts
    ↓
-Report Version
-   ↓
-Publication Date
+Report Version / Publication Date (from source data)
 ```
 
-بنابراین باید بتوان مشخص کرد Forecast با چه داده‌ای و در چه تاریخی ساخته شده است.
+Runtime traceability does **not** by itself prove full Point-in-Time correctness; full PIT claims require the temporal evidence defined by the applicable input contracts.
 
 ---
 
@@ -861,14 +842,16 @@ Stage 5 با سناریوهای زیر تست شده و PASS شده است:
 10. Missing Driver
 11. Insufficient Seasonality
 12. Bear / Base / Bull Ordering
-13. Forecast Versioning
+13. Forecast Versioning — **HISTORICAL / SUPERSEDED** (former persistence / version-history behavior; not an active acceptance criterion under R-05)
 14. Point-in-Time Cutoff
 15. Bank Forecast
 16. Holding Forecast
 
-نتایج همه تست‌ها:
+نتایج تست‌های فعال (به‌جز مورد 13 که به‌عنوان HISTORICAL / SUPERSEDED علامت‌گذاری شده):
 
 **PASS**
+
+The former Forecast Versioning stress-test claim described persistence and retention of version history. That behavior is superseded by R-05; the historical test result is retained only for audit trail and must not be read as proof of compliance with the active no-persistence architecture.
 
 ---
 
@@ -899,11 +882,13 @@ Stage 5 با سناریوهای زیر تست شده و PASS شده است:
             Bear    Base    Bull
                      │
                      ▼
-             Versioned Forecast
+          Runtime Forecast Output
                      │
                      ▼
                   Stage 6
 ```
+
+(Active path produces Bear / Base / Bull as **runtime outputs** consumed by Stage 6. No database versioning or persistent Forecast store is part of the active architecture.)
 
 ---
 
@@ -919,13 +904,16 @@ Stage 5 باید:
 * Forecast را به‌صورت زنجیره‌ای و سازگار تولید کند.
 * برای 5 صنعت غیرمالی یک Core مشترک داشته باشد.
 * برای Bank/Holding Core تخصصی داشته باشد.
-* Bear/Base/Bull تولید کند.
-* Forecast Versionها را حفظ کند.
+* Bear/Base/Bull را به‌صورت **runtime outputs** تولید کند.
 * Point-in-Time را رعایت کند.
 * Missing Data را با Zero اشتباه نگیرد.
 * از Low Base و Sign Change محافظت کند.
 * Share Count و Corporate Actions را در EPS لحاظ کند.
-* روش Forecast و کیفیت داده را ثبت کند.
+* روش Forecast و کیفیت داده را به‌صورت runtime metadata بازگرداند.
+
+**Active architecture (R-05):** The application database stores only inputs and source data. Stage 5 generates Forecast outputs at runtime; downstream stages consume those runtime outputs. Optional user retention of a selected output occurs only via UI save functionality outside application database tables. No analytical Forecast output or output-dependent provenance is persisted in the application database.
+
+> **HISTORICAL / SUPERSEDED:** The former requirement to “preserve Forecast versions” / maintain Version History inside the application database is no longer part of the active contract.
 
 Stage 5 نباید:
 
@@ -935,7 +923,7 @@ Stage 5 نباید:
 * Reliability نهایی تعیین کند.
 * برای هر صنعت یک Forecast Engine مستقل بسازد.
 * بدون داده معتبر مقدار فرضی تولید کند.
-* Forecast قبلی را overwrite کند.
+* خروجی تحلیلی Forecast را در دیتابیس برنامه persist کند.
 * از اطلاعات آینده استفاده کند.
 
 ---
