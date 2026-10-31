@@ -1375,7 +1375,7 @@ Alerts فقط Risk/Review Alert هستند.
 >   medium_bear_downside       = -15.0
 > ```
 >
-> این **رفتار پیاده‌سازی** است، نه سیاست تأییدشده توسط مشخصات. بخش‌های ۴۱ تا ۵۳ هیچ مقدار تریگری را تعیین نمی‌کنند. آیا این اعداد در مشخصات تأیید (ratify) شوند یا به‌عنوان «مقادیر انتخاب‌شده توسط موتور بدون پشتوانه مشخصاتی» حاشیه‌نویسی شوند، خود یک تصمیم باز است (D9) — این سند هیچ عددی را تأیید یا تغییر نمی‌دهد. آزمون‌های boundary، رفتار فعلی را pin می‌کنند، نه انطباق با مشخصات را.
+> این **رفتار پیاده‌سازی** است، نه سیاست تأییدشده توسط مشخصات. بخش‌های ۴۱ تا ۵۳ هیچ مقدار تریگری را تعیین نمی‌کنند. وضعیت تأیید آستانه‌های مربوط به مسیرهای فعال همچنان موضوع تصمیم D9 است؛ اما `industry_divergence_ratio` به‌دلیل OA1.4 از مسیر فعال ارزانی/گرانی خارج و صرفاً یک مقدار legacy/inactive است، بنابراین نباید به‌عنوان آستانهٔ فعال یا مبنای تصمیم ارزندگی ratify شود. این سند هیچ عددی را تأیید یا تغییر نمی‌دهد. آزمون‌های boundary، رفتار فعلی را pin می‌کنند، نه انطباق با مشخصات را.
 
 ---
 
@@ -1393,12 +1393,17 @@ WATCH:VALUATION_ABOVE_TARGET_PE
 WATCH:VALUATION_BELOW_TARGET_PE
 WATCH:FORWARD_PE_ABOVE_HISTORICAL
 WATCH:FORWARD_PE_BELOW_HISTORICAL
-WATCH:FORWARD_PE_ABOVE_INDUSTRY   # LEGACY / INFORMATIONAL — inactive for OA1 relative assessment
-WATCH:FORWARD_PE_BELOW_INDUSTRY   # LEGACY / INFORMATIONAL — inactive for OA1 relative assessment
 INFO:TOP_DRIVER:<driver>
 ```
 
-The target and historical directional pairs describe active review context as applicable. The Industry directional pair is retained only as LEGACY / INFORMATIONAL vocabulary for historical implementation and contract audit; it is not part of the active post-OA1 cheap/expensive vocabulary and must not be used as an active relative-valuation signal. `INSUFFICIENT_BENCHMARK_DATA` reports that no usable benchmark was selected; it is distinct from a low peer count. `TOP_DRIVER` is an informational driver note. These tokens describe review context and are not Buy/Sell signals.
+**Legacy / informational tokens (excluded from the active post-OA1 vocabulary):**
+
+```text
+WATCH:FORWARD_PE_ABOVE_INDUSTRY
+WATCH:FORWARD_PE_BELOW_INDUSTRY
+```
+
+The target and historical directional pairs describe active review context as applicable. The Industry directional pair above is retained only as LEGACY / INFORMATIONAL vocabulary for historical implementation and contract audit; it is not part of the active post-OA1 cheap/expensive vocabulary and must not be used as an active relative-valuation signal. `INSUFFICIENT_BENCHMARK_DATA` reports that no usable benchmark was selected; it is distinct from a low peer count. `TOP_DRIVER` is an informational driver note. These tokens describe review context and are not Buy/Sell signals.
 
 **`valuation_risk_flags` channel (strings):**
 
