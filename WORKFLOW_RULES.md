@@ -6,6 +6,7 @@
 
     - reply.md: Interim report on the execution of the current prompt.
     - STAGE7_MASTER_WORKING_PACKET.md : Remaining Jobs Checklist.
+    - In the STAGE7_MASTER_WORKING_PACKET.md file, each task must include a checkbox and a number.
     
 
 # Follow the steps below to generate each new prompt
