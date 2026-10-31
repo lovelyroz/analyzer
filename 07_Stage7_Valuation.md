@@ -1331,9 +1331,9 @@ Impact × Uncertainty
 >
 > **R6 decision (recorded 2026-10-31):** historical Backtesting is **not** a mandatory V1 product capability and is deferred from V1 scope; no requirement to reconstruct historical parameter versions solely to enable a V1 Backtesting feature is introduced. This is a scope decision only, not permission to use current parameters in historical calculations. All Point-in-Time, historical as-of, and temporal-provenance requirements remain fully in force: any historical as-of valuation or PIT correctness claim requires a genuine historical parameter version with evidence-backed effective date and input data with sufficient temporal provenance to establish availability at the historical cutoff; observation dates alone are not proof of publication or availability time; current parameters must not substitute for missing historical versions; historical parameter vintages must not be fabricated, backdated, or inferred; if the required version or provenance is unavailable, the operation must fail closed or explicitly report that the historical result cannot be established. The "Backtestable" labels elsewhere in this specification describe design-readiness qualities (a future capability), not a V1 deliverable and not a Point-in-Time exemption.
 >
-> These three records are architectural/scope decisions only. They do not approve numerical Genesis values (R5 / S7-T020 remains open), do not supply historical vintages or PIT evidence, do not close S7-T007 (PARTIAL), and do not resolve R9/D7 / S7-T024 (BLOCKED).
+> These records are architectural/scope decisions only. The formal R5 decision (S7-T020, recorded 2026-11-01) is **not to approve** the current numeric Genesis set as financially calibrated or validated; the values remain provisional/unapproved for technical execution and testing. These records do not supply historical vintages or PIT evidence, do not close S7-T007 (PARTIAL), and do not unblock S7-T024.
 >
-> **Still unavailable / unresolved:** authentic historical parameter vintages with evidence-backed effective dates; owner approval of numerical Genesis values (R5 / S7-T020); full source-level provenance and runtime validation for historical Forward P/E observations (implementation under OA1 tasks). Full PIT must not be claimed from observation dates alone.
+> **Still unavailable / unresolved:** authentic historical parameter vintages with evidence-backed effective dates; financial calibration/validation of Genesis (formally not approved under R5 / S7-T020); full source-level provenance and runtime validation for historical Forward P/E observations (implementation under OA1 tasks). Full PIT must not be claimed from observation dates alone.
 
 هدف:
 
@@ -2225,11 +2225,11 @@ PASS.
 >
 > بنابراین Stage 7 در V1 **اصل publication/version provenance و انتخاب date-safe بنچمارک را اجرا نمی‌کند**. این یک محدودیت ثبت‌شده است، نه یک تأیید correctness.
 >
-> **تصمیم D7 (provenance هر مشاهده در برابر تأیید caller در برابر محدودیت ثبت‌شده) هنوز حل‌نشده است** — این سند مسئولیت caller را به‌عنوان سیاست تأییدشده معرفی نمی‌کند؛ تنها ثبت می‌کند که خود Stage 7 آن را اجرا نمی‌کند.
+> **D7 / S7-T024 responsibility contract:** The Caller supplies benchmark observations and source-backed provenance, company identity, Jalali observation date, financial-period identity, traceable source references, and source/version/revision identifiers where available. Any historical PIT claim also requires publication/availability timestamp evidence and sufficient linkage between the relevant EPS and market-price observations. Stage 7 validates presence and internal consistency of required provenance and company/period identity, rejects or fails closed on missing, contradictory, or insufficient provenance, never infers publication/availability time from observation date alone, and rejects unproven precomputed historical P/E series. This is a contract only: the current `calculate_valuation` boundary accepts benchmark arrays as plain floats and does not validate their company, period, or publication provenance; no actual external temporal evidence was supplied. The responsibility boundary is recorded, but implementation and PIT evidence remain absent, so S7-T024 and full PIT remain BLOCKED.
 
 گزارشی که بعد از Valuation Date منتشر شده نباید وارد Historical Valuation شود.
 
-~~PASS.~~ → **وضعیت: در V1 صدق نمی‌کند — مرز Stage 7 این قانون را اجرا نمی‌کند (D7 حل‌نشده).**
+~~PASS.~~ -> **V1 status: not implemented.** The D7 responsibility contract is recorded above; runtime enforcement and supporting temporal evidence remain absent, so no PIT correctness claim is established.
 
 ---
 

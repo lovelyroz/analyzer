@@ -1,152 +1,232 @@
-# Agent Block — Task 049 · S7-T021 · R6 Decision Resolution
+# Stage 7 — Package 1: Close Open Decisions and Contracts
 
-You are working on the `analyzer` project, a financial-data application.
+## Agent Instructions
 
-This is a **DOCUMENTATION-ONLY task**. Do not modify application code, tests, database models, migrations, or runtime behavior.
+You are working on the financial-data application repository:
 
-## 1. Required files
+`lovelyroz/analyzer`
 
-You must receive and inspect these exact files:
+This is a financial application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of financial invariants take priority over convenience or implementation speed.
 
-1. `WORKFLOW_RULES.md`
-2. `STAGE7_MASTER_WORKING_PACKET.md`
-3. `07_Stage7_Valuation.md`
-4. `reply.md`
+### 1. Work classification
 
-Do not inspect any other repository files unless you first report the exact filename and explain why it is necessary. Do not assume that an unprovided file has been inspected.
+**This is a documentation and contract-audit task.**
 
-`WORKFLOW_RULES.md` defines the workflow.  
-`STAGE7_MASTER_WORKING_PACKET.md` is the authoritative Stage 7 task register.  
-`07_Stage7_Valuation.md` is the valuation specification.  
-`reply.md` is the interim report for this execution.
-
-## 2. Task 1 — Resolve R6 decision
-
-**049 · S7-T021 — R6: Determine the requirement for historical parameter versions and Backtesting**
-
-Record and apply the following technical decision:
-
-### 2.1 Historical Backtesting scope
-
-Historical Backtesting is **not a mandatory V1 product capability**.
-
-It is deferred from V1 scope. Do not introduce a requirement to reconstruct historical parameter versions solely to enable a V1 Backtesting feature.
-
-This is a scope decision, not permission to use current parameters in historical calculations.
-
-### 2.2 Point-in-Time requirements remain mandatory
-
-The deferral of Backtesting must NOT weaken any existing Point-in-Time, historical as-of, or temporal-provenance requirements.
-
-Whenever the application performs a historical as-of valuation or makes a Point-in-Time correctness claim:
-
-- It must use a genuine historical parameter version whose effective date is supported by valid evidence.
-- It must use input data with sufficient temporal provenance to establish that the data was available at the relevant historical cutoff.
-- Observation dates alone must not be treated as proof of publication or availability time.
-- It must not substitute current parameters for missing historical parameter versions.
-- It must not fabricate, backdate, or infer historical parameter vintages.
-- If the required historical parameter version or temporal provenance is unavailable, the operation must fail closed or explicitly report that the historical result cannot be established.
-
-No historical correctness or full PIT claim may be made without the necessary evidence.
-
-### 2.3 No implicit approval of Genesis parameters
-
-This decision does not approve any numeric Genesis parameter values.
-
-R5 / Task 048 / S7-T020 remains OPEN until the Genesis parameter values receive a separate explicit decision supported by the required evidence.
-
-The existence of parameter values in source code is not evidence of financial calibration or owner approval.
-
-## 3. Task 2 — Preserve dependencies and existing decisions
-
-Review the relevant entries in `STAGE7_MASTER_WORKING_PACKET.md` and ensure the R6 decision is consistent with the existing decisions:
-
-- **029 · S7-T007:** remains PARTIAL. The architectural policy is documented, but genuine historical parameter vintages, numeric Genesis approval, and runtime temporal-provenance validation remain unresolved.
-- **048 · S7-T020 / R5:** remains OPEN. Do not approve Genesis numeric values.
-- **050 · S7-T022 / R7:** remains DONE for the architecture decision that the V1 Parameter Registry is maintained in code under Git, not in the application database.
-- **051 · S7-T023 / R8:** remains DONE for the immutable model-version rule covering all output-affecting parameters.
-- **052 · S7-T024 / R9-D7:** remains BLOCKED until the temporal provenance contract and required evidence are resolved.
-
-Do not change the status or scope of these Tasks merely because R6 has been decided.
-
-In particular, do not mark Task 029 as DONE.
-
-## 4. Task 3 — Update authoritative documentation
-
-Update `STAGE7_MASTER_WORKING_PACKET.md`:
-
-1. Replace the unresolved R6 decision wording under **049 · S7-T021** with the approved decision.
-2. Mark Task 049 as `[x]` / DONE only for its actual scope: determining and documenting whether historical Backtesting is required.
-3. Explain that Backtesting is deferred from V1, while historical as-of and PIT requirements remain subject to genuine historical parameter versions and temporal provenance.
-4. Explicitly state that this decision does not close Task 029, approve R5, or resolve R9/D7.
-5. Update any relevant task-status summary or dependency reference in the Master Packet so it does not continue to describe R6 as awaiting an owner decision.
-6. Preserve all unrelated task statuses, numbering, identifiers, and historical evidence.
-
-Review `07_Stage7_Valuation.md` for relevant references to Backtesting, historical parameters, and PIT. If an inconsistency with the approved R6 decision exists, correct only that inconsistency. Do not weaken existing financial or PIT requirements.
-
-Do not make unnecessary edits to the specification.
-
-## 5. Task 4 — Record the execution report
-
-Append a concise, evidence-based report to `reply.md`.
-
-The report must include:
-
-- **049 · S7-T021 — R6**, with its final status.
-- The exact decision recorded.
-- Files changed.
-- Relevant sections/headings updated in each file.
-- Confirmation that R5 remains OPEN.
-- Confirmation that 029 remains PARTIAL.
-- Confirmation that R7 and R8 remain DONE within their documented architectural scope.
-- Confirmation that R9/D7 remains BLOCKED.
-- Any inconsistency found and how it was resolved.
-- Any unresolved issue or missing evidence.
-
-Do not claim that historical parameter vintages, Backtesting, or runtime PIT have been implemented or verified.
-
-## 6. Strict scope restrictions
-
-This task is documentation-only.
-
-- Do not modify Python source code.
-- Do not modify tests.
-- Do not modify database models or migrations.
-- Do not create historical parameter versions.
-- Do not approve or alter Genesis numeric parameters.
-- Do not implement Backtesting.
-- Do not change runtime PIT behavior.
-- Do not modify Forecast persistence Tasks **053–057**.
-- Do not change unrelated Task statuses.
+- No production code changes.
+- No test code changes.
 - Do not run tests.
-- Do not claim that tests passed.
-- Do not perform GitHub operations, commits, pushes, or branch changes.
+- Do not modify formulas, thresholds, financial parameters, or runtime behavior.
+- Do not invent missing financial definitions, dates, provenance, calibration evidence, or data sources.
+- Do not create additional report files.
+- The only authoritative Stage 7 status document is `STAGE7_MASTER_WORKING_PACKET.md`.
 
-If a required conclusion cannot be supported by the supplied files, report the exact missing evidence instead of guessing.
+At the end, provide exact test commands only if you identify a specific future implementation that requires testing. Do not execute them.
 
-## 7. Required final report format
+### 2. Required files
 
-Return the results using these exact task identifiers:
+The following files are explicitly provided and are the permitted inspection scope:
 
-1. **049 · S7-T021 — R6**
-2. **029 · S7-T007 — Dependency status**
-3. **048 · S7-T020 — R5 status**
-4. **050 · S7-T022 — R7 status**
-5. **051 · S7-T023 — R8 status**
-6. **052 · S7-T024 — R9/D7 status**
+1. `STAGE7_MASTER_WORKING_PACKET.md`
+2. `WORKFLOW_RULES.md`
+3. `07_Stage7_Valuation.md`
+4. `src/valuation/parameters.py`
+5. `src/valuation/engine.py`
+6. `src/valuation/schema.py`
+7. `src/valuation/models.py`
 
-For every item, state one of:
+Inspect only these files.
 
-`DONE`, `PARTIAL`, `NOT DONE`, or `BLOCKED`
+If another file is genuinely necessary, do not search for it independently. Report its exact path and explain why it is required. Wait for it to be provided.
 
-Provide concrete documentation evidence for each status.
+### 3. Authoritative rules
 
-Finish with:
+- `STAGE7_MASTER_WORKING_PACKET.md` is the sole authority for Stage 7 task status, decisions, dependencies, execution order, and exit criteria.
+- `WORKFLOW_RULES.md` governs the workflow.
+- `07_Stage7_Valuation.md` is the Stage 7 specification and must be checked for consistency with the Master Packet.
+- Existing code values are not proof of financial approval.
+- An audit finding does not automatically complete the corresponding implementation task.
+- `BLOCKED` must never be reported as `DONE`.
+- Do not repeat or reopen decisions already completed in Tasks 049, 050, and 051.
 
-- Files changed
-- Files not changed
-- Confirmation that no code or tests were modified
-- Confirmation that no tests were run
-- Any remaining blockers
+### 4. Tasks
 
-Do not declare Stage 7 complete. This task resolves R6 only.
+#### Task 1 — 029 · S7-T007: Parameter versioning, D9 and PIT contract
+
+Audit the current documentation and the supplied parameter/valuation implementation.
+
+Verify the following rules:
+
+1. Parameter Registry is maintained in code and version-controlled through Git, not stored in the application database.
+2. Historical parameter versions require evidence-backed `effective_from` dates.
+3. Inventing or backdating effective dates is prohibited.
+4. Undated Genesis must never be selected as a historical parameter version.
+5. Missing historical versions must fail closed; current parameters must not silently substitute for historical versions.
+6. Every parameter that materially affects the valuation output must belong to an immutable model version.
+7. A material parameter change requires a new model version.
+8. Numeric Genesis values are not financially approved merely because they exist in the source code.
+
+Inspect the supplied implementation to establish what is actually enforced and what is only documented.
+
+Explicitly distinguish:
+- Implemented mechanism
+- Documented policy
+- Missing historical evidence
+- Missing runtime enforcement
+- Items that cannot be proven from the supplied files
+
+**Decision to record:** Current Genesis numeric values remain unapproved for financial use. They may remain available for technical execution and testing, but must be explicitly labelled provisional/unapproved. No calibration or historical validity claim is permitted.
+
+Do not change any numeric values or parameter implementation.
+
+Acceptance:
+- The Master Packet accurately distinguishes the implemented registry mechanism from missing historical vintages and runtime PIT evidence.
+- No historical validity is claimed without evidence.
+- Task 029 remains PARTIAL unless all of its original acceptance conditions are genuinely satisfied.
+
+#### Task 2 — 030 · S7-T008: Alert and input contracts
+
+Audit the alert and input contract decisions against the supplied specification and implementation.
+
+Preserve these decisions:
+
+1. D1–D5 remain deferred/inactive in V1. Do not invent triggers, formulas, thresholds, severities, or missing-data behavior.
+2. D6 remains limited to the existing EPS and TARGET_PE drivers in V1.
+3. Sector-specific drivers and formulas, including Bank and Holding formulas, remain deferred until valid financial definitions and supporting evidence exist.
+4. D6 must not be described as fully resolved.
+5. D7 requires actual temporal provenance. Observation date alone does not prove publication or availability.
+6. D8 uses the existing canonical V1 alert vocabulary.
+7. OA1.5 and OA1.6 are active implementation requirements, not merely documentation requirements. Their implementation belongs to the later OA1 implementation package.
+8. Missing eligible market price must fail closed.
+9. If an older eligible market price is used, its actual Jalali observation date must be reported.
+
+Check whether the current documentation contradicts these rules or incorrectly presents deferred behavior as implemented.
+
+Do not activate deferred behavior or change the alert engine.
+
+Acceptance:
+- The specification and Master Packet consistently describe the current V1 contract.
+- D6 remains explicitly unresolved/deferred.
+- OA1.5/OA1.6 are not marked implemented merely because their requirements are documented.
+- Task 030 remains PARTIAL while D6 is unresolved.
+
+#### Task 3 — 048 · S7-T020: Formal Genesis approval decision (R5)
+
+Review the Genesis parameter definitions and the available evidence in the supplied files.
+
+The decision is:
+
+**Do not approve the current numeric Genesis parameter set as financially calibrated or validated.**
+
+Reasons:
+- Presence in source code is not financial validation.
+- No calibration study, validated backtest, or sufficient source-backed calibration evidence is supplied.
+- The values may remain provisional for technical execution and testing.
+- No claim of financial approval, historical validity, or calibration quality is permitted.
+
+Record this decision clearly in the Master Packet.
+
+Do not modify the numeric parameters.
+
+Do not invent a calibration study or claim that one exists.
+
+Acceptance:
+- Task 048 records the explicit non-approval decision and its rationale.
+- The decision does not falsely imply that the parameter values have been recalibrated.
+- Task 029 remains PARTIAL because historical vintages and runtime PIT evidence are separate requirements.
+
+#### Task 4 — 052 · S7-T024: Temporal provenance contract for Benchmark P/E (R9/D7)
+
+Formalize the technical responsibility boundary as follows:
+
+**Caller responsibilities**
+- Supply the benchmark observations and their source-backed provenance.
+- Supply company identity.
+- Supply Jalali observation date.
+- Supply financial-period identity.
+- Supply traceable source references and source/version/revision identifiers where available.
+- Supply publication/availability timestamp evidence whenever historical point-in-time validity is claimed.
+- Supply sufficient linkage between the relevant EPS and market-price observations.
+
+**Stage 7 responsibilities**
+- Validate that required provenance fields are present and internally consistent.
+- Validate that the benchmark belongs to the correct company and financial period.
+- Reject or fail closed when required provenance is missing, contradictory, or insufficient.
+- Never infer publication or availability time from observation date alone.
+- Never silently accept an unproven precomputed historical P/E series as valid PIT evidence.
+
+Important:
+This responsibility split defines the contract. It does not establish that real historical provenance data currently exists or that runtime validation is already implemented.
+
+Audit the supplied files to determine:
+- Which parts of this contract are already documented.
+- Which parts are actually enforced in code.
+- Which parts are missing.
+- Which evidence is unavailable.
+
+Acceptance:
+- The Caller/Stage 7 responsibility boundary is unambiguous.
+- No full PIT capability is claimed without actual temporal evidence and runtime validation.
+- Task 052 remains BLOCKED if required external evidence or implementation is still absent.
+- Task 029 remains PARTIAL as appropriate.
+
+### 5. Documentation updates
+
+After completing the audit:
+
+1. Update `STAGE7_MASTER_WORKING_PACKET.md` as the sole authoritative status document.
+2. Update `07_Stage7_Valuation.md` only where necessary to make its contracts consistent with the decisions above.
+3. Do not create a new report file.
+4. Do not change unrelated sections.
+5. Preserve historical information where useful, but clearly label superseded or inactive rules.
+6. Do not change the status of unrelated tasks.
+7. Do not mark any task DONE solely because its decision has been documented.
+
+The Master Packet must retain the exact task numbers and IDs:
+
+- 029 · S7-T007
+- 030 · S7-T008
+- 048 · S7-T020
+- 052 · S7-T024
+
+### 6. Required final report
+
+Provide a separate report for each task:
+
+**029 · S7-T007**
+- Status: DONE / PARTIAL / NOT DONE / BLOCKED
+- Findings
+- Evidence from supplied files
+- Documentation changes
+- Remaining blockers
+
+**030 · S7-T008**
+- Status: DONE / PARTIAL / NOT DONE / BLOCKED
+- Findings
+- Evidence from supplied files
+- Documentation changes
+- Remaining blockers
+
+**048 · S7-T020**
+- Status: DONE / PARTIAL / NOT DONE / BLOCKED
+- Decision recorded
+- Evidence and rationale
+- Documentation changes
+
+**052 · S7-T024**
+- Status: DONE / PARTIAL / NOT DONE / BLOCKED
+- Caller responsibilities
+- Stage 7 responsibilities
+- Actual implementation evidence
+- Missing evidence and blockers
+
+Also report:
+
+1. Exact files changed.
+2. Exact files inspected.
+3. Confirmation that no production code or tests were changed.
+4. Confirmation that no tests were executed.
+5. Any additional files required, with exact paths and reasons.
+6. Any remaining contradictions between the Master Packet and Stage 7 specification.
+7. The updated Master Packet task statuses.
+
+Do not claim that Package 1 or Stage 7 is complete unless the relevant acceptance criteria are actually satisfied.
