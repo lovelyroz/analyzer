@@ -1,115 +1,128 @@
-## Final Report — Stage 7 Owner-Approved Policies (DOCS-ONLY)
+(analyzer) PS D:\winprojects\analyzer> rg -n "ForecastRecordRepository|ForecastVersion|ForecastInputRefModel|generate_and_persist_forecast|forecast_versions|forecast_input_refs" src
+src\valuation\engine.py
+71:        forecast_input_refs: Optional[Sequence[ForecastInputRef]] = None,
+131:            forecast_input_refs = tuple(forecast_input_refs or ()) + normalized_embedded_refs
+133:            forecast_input_refs=forecast_input_refs,
+355:        forecast_input_refs: Optional[Sequence[ForecastInputRef]],
+370:        if not forecast_input_refs:
+372:        for ref in forecast_input_refs:
 
-### 1. Exact files changed
-- `07_Stage7_Valuation.md`
-- `stepsForStage7.md`
-- `tasksToDo.md`
-- `STAGE7_MASTER_WORKING_PACKET.md`
-- `STAGE7_COMPLETED_CHECKLIST.md`
-- `temp_report2.md` (append only)
+src\forecast\__init__.py
+12:from src.forecast.service import generate_and_persist_forecast
+20:    "generate_and_persist_forecast",
 
-### 2. Summary of each document change
-| File | Change |
-|------|--------|
-| **07_Stage7_Valuation.md** | Added **AMENDMENT-OA1** (primary relative measure = same-company historical Forward P/E; Historical P/E derived; P/E not independent input; industry P/E removed from cheap/expensive & Target hierarchy; latest-complete input; market-price date alert; no analytical persistence + Forecast conflict note). Marked sections 10–13 and related non-negotiable rules as **SUPERSEDED**. Updated architecture note, §7 market price, §8–9 historical P/E, §87–88. |
-| **stepsForStage7.md** | Status still OPEN; non-negotiable rules include OA1; findings updated; new **package 0** for OA1 implementation; end criteria include OA1; industry benchmark work replaced. |
-| **tasksToDo.md** | Added **S7-T013–S7-T019** (OPEN). T007–T012 retained with OA1-aware notes; no reuse of retired IDs; docs vs implementation separated. |
-| **STAGE7_MASTER_WORKING_PACKET.md** | Work order starts with package 0 (OA1 implementation); task status lists T013–T019 OPEN; Stage 7 OPEN. |
-| **STAGE7_COMPLETED_CHECKLIST.md** | Owner decisions documented as checked; implementation/verification of OA1 left unchecked. |
-| **temp_report2.md** | Appended durable section: *Stage 7 — Owner-Approved P/E, Complete-Input and Persistence Policies*. |
+src\models\forecast.py
+26:class ForecastVersion(Base):
+34:    __tablename__ = "forecast_versions"
+84:class ForecastInputRefModel(Base):
+92:    __tablename__ = "forecast_input_refs"
+97:        ForeignKey("forecast_versions.forecast_version_id", ondelete="CASCADE"),
 
-### 3. Owner decisions recorded
-- **A** Same-company historical Forward P/E only for cheap/expensive.
-- **B** Historical P/E from underlying data; complete-input fallback + missing-input reporting.
-- **C** P/E derived at runtime with full provenance; no precomputed P/E as DB analytical records.
-- **D** Industry P/E removed from cheap/expensive and Target P/E hierarchy.
-- **E** Latest complete valid input set; fail closed if none.
-- **F** Latest market price on/before Jalali analysis date + date alert if different.
-- **G** No analytical-output persistence; Stage 9 may use caller `previous_decision` only.
+src\tests\test_stage1_database_integrity.py
+37:    assert {"forecast_versions", "forecast_input_refs"}.issubset(tables)
 
-### 4. Superseded policies
-- Industry Valuation / Industry Forward & TTM P/E / industry-first Target P/E hierarchy (former §10–13).
-- Industry peer comparison as basis for cheap/expensive or Target P/E (former non-negotiable 5–6).
-- Any active roadmap/task language treating industry P/E as the valuation benchmark.
+src\forecast\service.py
+10:        -> ForecastRecordRepository
+11:        -> persistent ForecastVersion / ForecastInputRef
+41:from src.forecast.repo import ForecastRecordRepository
+294:def generate_and_persist_forecast(
+408:        repository = ForecastRecordRepository(session)
 
-### 5. New / revised Task IDs and statuses
-| ID | Status | Role |
-|----|--------|------|
-| S7-T013 | OPEN | Same-company hist. Forward P/E relative assessment |
-| S7-T014 | OPEN | Historical P/E from raw inputs + provenance |
-| S7-T015 | OPEN | Latest complete input + incomplete-newer alerts |
-| S7-T016 | OPEN | Market-price observation date alert |
-| S7-T017 | OPEN | Remove industry P/E from active relative/Target paths |
-| S7-T018 | OPEN | Reject precomputed P/E without provenance |
-| S7-T019 | OPEN | Audit Forecast persistence vs OA1.7 (no code change) |
-| S7-T007–T011 | BLOCKED | Unchanged blockers; OA1 context noted |
-| S7-T012 | OPEN | Final Stage 7 criteria confirmation |
+src\migrations\runner.py
+25:from src.models.forecast import ForecastInputRefModel, ForecastVersion  # noqa: F401
+149:        Base.metadata.tables["forecast_versions"],
+150:        Base.metadata.tables["forecast_input_refs"],
 
-### 6. Unresolved implementation issues
-- **Forecast persistence conflict:** Stage 5 versioning/record language and any existing Forecast persistence models vs OA1.7 — tracked as **S7-T019**; models not modified.
-- OA1 policies documented only; **not implemented** in code.
-- D9 historical parameters, full PIT provenance evidence, E2E path remain open/BLOCKED as before.
+src\forecast\schema.py
+227:class ForecastVersionExistsError(ValueError):
+273:class ForecastVersionStore:
+295:                    raise ForecastVersionExistsError(
 
-### 7–9. Confirmations
-- **No source code or tests were changed.**
-- **No tests were executed.**
-- **Stage 7 remains OPEN.**
+src\forecast\repo.py
+8:``ForecastVersionStore``. Both implement the same versioning contract — a new
+27:    ForecastVersionExistsError,
+30:from src.models.forecast import ForecastInputRefModel, ForecastVersion
+45:class ForecastRecordRepository:
+75:                raise ForecastVersionExistsError(
+82:        row = ForecastVersion(
+108:            self.session.add(ForecastInputRefModel(
+126:            select(ForecastVersion)
+128:            .order_by(ForecastVersion.version_number.asc())
+170:            select(ForecastVersion)
+171:            .where(ForecastVersion.data_cutoff_datetime <= cutoff)
+180:            select(func.count()).select_from(ForecastVersion)
+187:    def _to_record(self, row: ForecastVersion) -> ForecastRecord:
+196:                select(ForecastInputRefModel)
+197:                .where(ForecastInputRefModel.forecast_version_id == row.forecast_version_id)
+198:                .order_by(ForecastInputRefModel.input_ref_id.asc())
+231:                    scenario: str) -> Optional[ForecastVersion]:
+233:            select(ForecastVersion)
+235:            .order_by(ForecastVersion.version_number.desc())
+239:                     scenario: str, version: int) -> Optional[ForecastVersion]:
+241:            select(ForecastVersion)
+244:                ForecastVersion.version_number == version,
+248:    def _records_equal(self, row: ForecastVersion, record: ForecastRecord) -> bool:
+284:        ForecastVersion.company_id == company_id,
+285:        ForecastVersion.forecast_period_id == forecast_period_id,
+286:        ForecastVersion.forecast_horizon == horizon,
+287:        ForecastVersion.scenario == scenario.upper(),
 
-### 10. Recommended next implementation task
-**S7-T013** (optionally combined with **S7-T017**): implement same-company historical Forward P/E as the sole relative cheap/expensive measure and remove industry P/E from the active relative assessment / Target hierarchy.
+src\tests\test_stage7_valuation.py
+1350:    with_refs = engine.calculate_valuation(**_p32_kwargs(forecast_input_refs=refs))
+1362:            **_p32_kwargs(forecast_input_refs=[_p32_ref(datetime(2026, 3, 1))])
+1369:        **_p32_kwargs(forecast_input_refs=[_p32_ref(datetime(2026, 1, 1))])
+1378:        engine.calculate_valuation(**_p32_kwargs(forecast_input_refs=[_p32_ref(None)]))
+1383:    result = engine.calculate_valuation(**_p32_kwargs(forecast_input_refs=None))
+1458:            **_p32_kwargs(forecast_result=forecast, forecast_input_refs=[])
 
-**Focus files for a future CODE prompt (not touched here):**
-- `src/valuation/engine.py` (final technical Stage 7 task remains last overall — S7-T011)
-- Other `src/valuation/` modules as required by evidence (`models.py`, `parameters.py`, `schema.py`)
-- `src/tests/test_stage7_valuation.py` (and related valuation tests)
+src\forecast\engine.py
+744:        declared = context.get("input_refs") or context.get("forecast_input_refs") or []
 
-User runs tests; documentation completion does not complete implementation.
+src\tests\test_stage6_production_pipeline.py
+549:        "ForecastRecordRepository",
+550:        "forecast_versions",
 
+src\tests\test_stage5_forecast.py
+13:    ForecastVersionExistsError,
+14:    ForecastVersionStore,
+347:    store = ForecastVersionStore()
+367:    store = ForecastVersionStore()
+381:    store = ForecastVersionStore()
+432:    store = ForecastVersionStore()
+439:    store = ForecastVersionStore()
+443:    with pytest.raises(ForecastVersionExistsError):
+458:    store = ForecastVersionStore()
+465:    store2 = ForecastVersionStore()
+472:    store3 = ForecastVersionStore()
+478:    store = ForecastVersionStore()
+517:    store = ForecastVersionStore()
+552:    store = ForecastVersionStore()
+558:    store = ForecastVersionStore()
+569:    store = ForecastVersionStore()
+996:from src.forecast.repo import ForecastRecordRepository  # noqa: E402
+1006:    yield ForecastRecordRepository(session)
+1109:    with pytest.raises(ForecastVersionExistsError):
+1130:    with pytest.raises(ForecastVersionExistsError):
+1230:#     ForecastRecord -> ForecastRecordRepository (spec sections 9, 15-16,
+1236:    generate_and_persist_forecast,
+1551:    forecast = generate_and_persist_forecast(
+1567:    forecast = generate_and_persist_forecast(
+1576:    persisted = ForecastRecordRepository(production_db).latest(
+1592:    forecast = generate_and_persist_forecast(
+1606:    forecast = generate_and_persist_forecast(
+1619:    generate_and_persist_forecast(
+1622:    repository = ForecastRecordRepository(production_db)
+1634:    forecast = generate_and_persist_forecast(
+1637:    reloaded = ForecastRecordRepository(production_db).latest(
+1655:    forecast = generate_and_persist_forecast(
+1658:    reloaded = ForecastRecordRepository(production_db).latest(
+1681:    repository = ForecastRecordRepository(production_db)
+1682:    generate_and_persist_forecast(
+1687:    generate_and_persist_forecast(
+1703:    forecast = generate_and_persist_forecast(
+1711:    reloaded = ForecastRecordRepository(empty_share_db).latest(
+1727:            return generate_and_persist_forecast(
+3953:    forecast = generate_and_persist_forecast(
+4094:    forecast = generate_and_persist_forecast(
+4409:    forecast = generate_and_persist_forecast(
 
-## گزارش نهایی — Stage 7 Documentation Consistency Correction (AMENDMENT-OA1)
-
-### فایل‌های تغییرکرده
-| فایل | بخش‌های اصلاح‌شده |
-|------|-------------------|
-| `07_Stage7_Valuation.md` | §33 Relative Valuation؛ §55 Industry Divergence Alert؛ §63 Auditability؛ §69 Output Contract؛ §70 Dashboard؛ §86 Final Principles؛ §88 Final Status |
-| `tasksToDo.md` | S7-T013 (وابستگی، شرح، معیار پذیرش، محدودیت) |
-| `temp_report2.md` | گزارش تصحیح مستنداتی در انتها append شد |
-
-`stepsForStage7.md`، `STAGE7_MASTER_WORKING_PACKET.md` و `STAGE7_COMPLETED_CHECKLIST.md` از قبل با OA1 و وضعیت OPEN سازگار بودند و نیازی به ویرایش نداشتند. `reply.md` در مجموعهٔ کاری موجود نبود.
-
-### حل هر یک از چهار مسئلهٔ شناسایی‌شده
-
-**1. ارجاعات فعال Industry P/E**  
-- §33: مبنای نسبی فقط same-company historical Forward P/E؛ Industry فقط legacy/informational.  
-- §55: SUPERSEDED/INACTIVE برای relative assessment؛ توکن‌های legacy حفظ و صریحاً از cheap/expensive جدا شدند.  
-- §63: مسیر audit به same-company historical به‌روز شد.  
-- §69: فیلدهای `industry_*` به‌عنوان LEGACY/INFORMATIONAL نگه داشته شدند (سازگاری قرارداد) و ممنوعیت استفادهٔ فعال برای Target/relative قید شد.  
-- §70 و §86: Industry از نمای حداقل و اصول فعال حذف/علامت‌گذاری شد.
-
-**2. وابستگی S7-T013**  
-دیگر «ندارد» نیست. بخش‌های مستقلاً قابل اقدام (مصرف سری caller، تفکیک خروجی، حذف industry از relative) از بخش‌های وابسته به S7-T007/D7/D9 (provenance زمانی کامل، full PIT) جدا شدند. اختراع منبع/قرارداد ممنوع است.
-
-**3. اصطلاحات PIT**  
-- Design/architecture: PASS where supported.  
-- Runtime PIT implementation/verification: OPEN/BLOCKED تا شواهد provenance.  
-- ادعای full PIT صرفاً از تاریخ جلالی ممنوع است (§88).
-
-**4. Ready for implementation / Ready for Stage 8**  
-§88 بازنویسی شد تا این عبارات به‌عنوان اثبات تکمیل کد OA1، runtime PIT یا بسته شدن Stage 7 قابل تفسیر نباشند. Stage 7 همچنان **OPEN** است.
-
-### وضعیت باقی‌مانده
-- S7-T007–T011: **BLOCKED**  
-- S7-T012: **OPEN**  
-- S7-T013–S7-T019: **OPEN** (docs alone ≠ done)  
-- Stage 7: **OPEN**  
-- Analytical-output persistence: ممنوع (OA1.7)  
-- تعارض Forecast persistence: OPEN تحت S7-T019 (بدون حذف/تغییر مدل در این task)
-
-### تأیید محدوده
-- هیچ کد پایتون یا سورس دیگری تغییر نکرد.  
-- هیچ تست ساخته، تغییر یا اجرا نشد.  
-- هیچ مدل/اسکیما/DB تغییر نکرد.  
-- هیچ Task پیاده‌سازی یا audit به‌خاطر ویرایش docs به DONE تبدیل نشد.  
-- هیچ threshold، formula، منبع داده یا قاعدهٔ مالی جدیدی اختراع نشد.
-
----
