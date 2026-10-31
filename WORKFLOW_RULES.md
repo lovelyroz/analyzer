@@ -3,14 +3,15 @@
 
 # temporary rules for Stage 7:
     Primary reference documents moving forward:
-    - stepsForStage7.md: Roadmap and final criteria.
-    - tasksToDo.md: Active tasks and their current status only.
-    - temp_report2.md: History of reports and key evidence.
+
     - reply.md: Interim report on the execution of the current prompt.
     - STAGE7_MASTER_WORKING_PACKET.md : Remaining Jobs Checklist.
+    
 
 # Follow the steps below to generate each new prompt
 ## Make each prompt in 2 blocks. One for Agent and one for User
+## Each task in each prompt must have a number
+## Each prompt must receive the report of each task with the number of that task from the agent.
 
 ## Prompt specifications for the agent:
 ### The number of tasks should not be too many and should not be too few, unless the end of the prompt is sub-prompt.
