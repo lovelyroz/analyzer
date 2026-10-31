@@ -1,67 +1,66 @@
-گزارش اجرای دستورالعمل **PROMPT.md (مرحله ۷ — ثبت سیاست‌های مالی مصوب مالک و تطبیق مستندات)** به شرح زیر است.
+## Final Report — Stage 7 Owner-Approved Policies (DOCS-ONLY)
 
-همان‌طور که در دستورالعمل مشخص شده است، این کار **صرفاً در سطح مستندات (DOCS-ONLY)** انجام شده و هیچ‌گونه تغییری در کدهای سورس، تست‌ها، پایگاه داده یا دیتابیس اعمال نشده و هیچ تستی اجرا نگردیده است.
+### 1. Exact files changed
+- `07_Stage7_Valuation.md`
+- `stepsForStage7.md`
+- `tasksToDo.md`
+- `STAGE7_MASTER_WORKING_PACKET.md`
+- `STAGE7_COMPLETED_CHECKLIST.md`
+- `temp_report2.md` (append only)
 
----
+### 2. Summary of each document change
+| File | Change |
+|------|--------|
+| **07_Stage7_Valuation.md** | Added **AMENDMENT-OA1** (primary relative measure = same-company historical Forward P/E; Historical P/E derived; P/E not independent input; industry P/E removed from cheap/expensive & Target hierarchy; latest-complete input; market-price date alert; no analytical persistence + Forecast conflict note). Marked sections 10–13 and related non-negotiable rules as **SUPERSEDED**. Updated architecture note, §7 market price, §8–9 historical P/E, §87–88. |
+| **stepsForStage7.md** | Status still OPEN; non-negotiable rules include OA1; findings updated; new **package 0** for OA1 implementation; end criteria include OA1; industry benchmark work replaced. |
+| **tasksToDo.md** | Added **S7-T013–S7-T019** (OPEN). T007–T012 retained with OA1-aware notes; no reuse of retired IDs; docs vs implementation separated. |
+| **STAGE7_MASTER_WORKING_PACKET.md** | Work order starts with package 0 (OA1 implementation); task status lists T013–T019 OPEN; Stage 7 OPEN. |
+| **STAGE7_COMPLETED_CHECKLIST.md** | Owner decisions documented as checked; implementation/verification of OA1 left unchecked. |
+| **temp_report2.md** | Appended durable section: *Stage 7 — Owner-Approved P/E, Complete-Input and Persistence Policies*. |
 
-### ۱. دقیق فایل‌های تغییریافته
+### 3. Owner decisions recorded
+- **A** Same-company historical Forward P/E only for cheap/expensive.
+- **B** Historical P/E from underlying data; complete-input fallback + missing-input reporting.
+- **C** P/E derived at runtime with full provenance; no precomputed P/E as DB analytical records.
+- **D** Industry P/E removed from cheap/expensive and Target P/E hierarchy.
+- **E** Latest complete valid input set; fail closed if none.
+- **F** Latest market price on/before Jalali analysis date + date alert if different.
+- **G** No analytical-output persistence; Stage 9 may use caller `previous_decision` only.
 
-مستندات زیر طبق تصمیمات مالک به‌روزرسانی و هماهنگ شدند:
+### 4. Superseded policies
+- Industry Valuation / Industry Forward & TTM P/E / industry-first Target P/E hierarchy (former §10–13).
+- Industry peer comparison as basis for cheap/expensive or Target P/E (former non-negotiable 5–6).
+- Any active roadmap/task language treating industry P/E as the valuation benchmark.
 
-1. `07_Stage7_Valuation.md` (به‌روزرسانی مشخصات قفل‌شده نسخه ۱ و الحاقیه سیاست‌های جدید مالک)
-2. `stepsForStage7.md` (نقشه راه اجرایی و وضعیت مرحله ۷)
-3. `tasksToDo.md` (ثبت و بازنگری تسک‌های ثبت‌شده)
-4. `STAGE7_MASTER_WORKING_PACKET.md` (بسته کاری جامع وترتیب تسک‌ها)
-5. `STAGE7_COMPLETED_CHECKLIST.md` (چک‌لیست کارهای انجام‌شده و وضعیت اقلام)
-6. `temp_report2.md` (ثبت سابقه و تصمیمات دائمی مالک)
+### 5. New / revised Task IDs and statuses
+| ID | Status | Role |
+|----|--------|------|
+| S7-T013 | OPEN | Same-company hist. Forward P/E relative assessment |
+| S7-T014 | OPEN | Historical P/E from raw inputs + provenance |
+| S7-T015 | OPEN | Latest complete input + incomplete-newer alerts |
+| S7-T016 | OPEN | Market-price observation date alert |
+| S7-T017 | OPEN | Remove industry P/E from active relative/Target paths |
+| S7-T018 | OPEN | Reject precomputed P/E without provenance |
+| S7-T019 | OPEN | Audit Forecast persistence vs OA1.7 (no code change) |
+| S7-T007–T011 | BLOCKED | Unchanged blockers; OA1 context noted |
+| S7-T012 | OPEN | Final Stage 7 criteria confirmation |
 
----
+### 6. Unresolved implementation issues
+- **Forecast persistence conflict:** Stage 5 versioning/record language and any existing Forecast persistence models vs OA1.7 — tracked as **S7-T019**; models not modified.
+- OA1 policies documented only; **not implemented** in code.
+- D9 historical parameters, full PIT provenance evidence, E2E path remain open/BLOCKED as before.
 
-### ۲. خلاصه تغییرات هر سند
+### 7–9. Confirmations
+- **No source code or tests were changed.**
+- **No tests were executed.**
+- **Stage 7 remains OPEN.**
 
-* **سند `07_Stage7_Valuation.md`:** الحاقیه مصوب مالک اضافه شد. تأکید شد که P/E پیش‌رو (Forward P/E) به عنوان معیار اصلی ارزندگی صرفاً با **تاریخچهٔ همان شرکت** مقایسه می‌شود. معیارهای صنعت به طور کامل از ارزیابی ارزندگی حذف شدند. قانون انتخاب کامل‌ترین مجموعه داده‌های ورودی، محاسبهٔ دینامیک P/E از داده‌های خام، هشدار تاریخ قیمت بازار، و ممنوعیت ذخیره‌سازی نتایج تحلیلی در پایگاه داده درج شد.
-* **سندند `stepsForStage7.md`:** نقشه راه بازنگری شد تا بر روی تاریخچهٔ شرکت متمرکز باشد، الزامات قیمت بازار و داده‌های کامل را لحاظ کند و تعارض ماندگار persistence را ثبت نماید. وضعیت مرحله ۷ همچنان **OPEN** باقی ماند.
-* **سند `tasksToDo.md`:** تسک‌های مربوط به استفاده از P/E صنعت حذف یا مسدود شدند و تسک‌های جدید برای محاسبات تاریخی، اعتبارسنجی منشأ داده‌ها، مدیریت مجموعه‌های کامل داده و ممیزی مدل‌های ذخیره‌سازی Forecast تعریف شدند.
-* **اسناد `STAGE7_MASTER_WORKING_PACKET.md` و `STAGE7_COMPLETED_CHECKLIST.md`:** با وظایف و ساختار جدید هماهنگ شدند و تایید شد که هیچ تسک پیاده‌سازی‌شده‌ای به ناحق تکمیل اعلام نشده است.
-* **سند `temp_report2.md`:** بخش جدید با عنوان `Stage 7 — Owner-Approved P/E, Complete-Input and Persistence Policies` برای ثبت دائمی تصمیمات مالک افزوده شد.
+### 10. Recommended next implementation task
+**S7-T013** (optionally combined with **S7-T017**): implement same-company historical Forward P/E as the sole relative cheap/expensive measure and remove industry P/E from the active relative assessment / Target hierarchy.
 
----
+**Focus files for a future CODE prompt (not touched here):**
+- `src/valuation/engine.py` (final technical Stage 7 task remains last overall — S7-T011)
+- Other `src/valuation/` modules as required by evidence (`models.py`, `parameters.py`, `schema.py`)
+- `src/tests/test_stage7_valuation.py` (and related valuation tests)
 
-### ۳. تصمیمات مصوب مالک (Owner Decisions Recorded)
-
-1. **معیار اصلی ارزندگی (Forward P/E):** ارزیابی ارزان یا گران بودن سهم صرفاً بر اساس مقایسهٔ **Forward P/E شرکت با تاریخچهٔ Forward P/E همان شرکت** انجام می‌شود. معیارهای صنعت به‌کل حذف شدند.
-2. **محاسبهٔ تاریخی P/E:** باید از داده‌های مالی و بازار پایه و زیربنایی شرکت محاسبه شود و به عنوان ورودی از‌پیش‌محاسبه‌شده پذیرفته نمی‌شود.
-3. **سیاست انتخاب کامل‌ترین مجموعه داده (Latest Complete Input Set):** موتور ارزیابی حق ندارد به صورت خودکار جدیدترین رکوردهای ناقص را ملاک قرار دهد. در صورت نقص داده‌های جدید، سیستم باید از آخرین مجموعه دادهٔ کامل قبلی استفاده کرده، هشدار صادر کند و فیلدهای مفقوده را لیست نماید.
-4. **تاریخ قیمت بازار و هشدار:** استفاده از آخرین قیمت موجود در یا قبل از تاریخ جلالی، همراه با هشدار صریح در صورت مغایرت تاریخ قیمت با تاریخ تحلیل.
-5. **ممنوعیت ذخیره‌سازی نتایج تحلیلی (Analytical Output Persistence Prohibition):** هیچ‌گونه خروجی تحلیلی یا تاریخچهٔ تصمیمی (شامل Forecastها، Valuationها، مقادیر P/E، ارزش‌های ذاتی، ارزیابی‌ها و تصمیم‌ها) نباید در پایگاه داده ذخیره شود.
-
----
-
-### ۴. سیاست‌های منسوخ‌شده (Superseded Policies)
-
-* استفاده از **Forward P/E صنعت** و **TTM P/E صنعت** به عنوان معیار ارزندگی یا بخشی از سلسله‌مراتب جایگزین (Fallback Hierarchy) به‌طور رسمی منسوخ و از ساختار فعال خارج شد. ارجاعات تاریخی به این سیاست با برچسب منسوخ‌شونده مشخص شدند تا پتانسیل سردرگمی از بین برود.
-
----
-
-### ۵. وضعیت تسک‌ها (Task Register Status)
-
-تسک‌های ثبت‌شده در `tasksToDo.md` به شرح زیر بازنگری شدند:
-
-* **S7-T007 تا S7-T011:** همچنان در وضعیت **BLOCKED** باقی ماندند تا زمانی که شواهد اجرایی و تصمیمات زیرساختی فراهم شوند.
-* **S7-T012:** در وضعیت **OPEN** قرار دارد.
-* **وضعیت کلی مرحله ۷:** **OPEN** (مرحله ۷ تکمیل‌نشده و باز است).
-
----
-
-### ۶. مسائل پیاده‌سازی حل‌نشده (به‌ویژه تعارض ذخیره‌سازی Forecast)
-
-* **تعارض مدل‌های ذخیره‌سازی Forecast:** طبق دستورالعمل جدید مالک، هیچ خروجی تحلیلی نباید در دیتابیس ذخیره شود. با این حال، مدل‌های ذخیره‌سازی موجود در کدهای مرتبط با Forecast (مانند Forecast persistence models) با این سیاست جدید در تعارض ظاهری هستند. این مورد به عنوان یک مسئلهٔ حل‌نشده ثبت شد تا در ممیزی کنترل‌شده و با مجوز مالک اصلاح شود (در این مرحله کدهای موجود بدون تغییر حفظ شدند).
-
----
-
-### ۷ تا ۱۰. تأییدیه‌ها و گام بعدی
-
-* **تأییدیه تغییرات:** تأیید می‌شود که هیچ سورس‌کدی یا فایل تستی تغییر نکرده است.
-* **تأییدیه عدم اجرای تست:** تأیید می‌شود که هیچ تستی اجرا نشده است.
-* **وضعیت مرحله ۷:** مرحله ۷ همچنان **OPEN** است.
-* **پیشنهاد گام اجرایی بعدی:** پس از تأیید نهایی این مستندات توسط مالک، گام بعدی تعیین‌تکلیف نحوهٔ انطباق مدل‌های persistence (مطابق سیاست عدم ذخیره‌سازی خروجی‌های تحلیلی) و پیاده‌سازی منطق محاسبهٔ تاریخی Forward P/E بر اساس داده‌های خام سورس در تسک `S7-T007` خواهد بود. نیازمند فایل‌های سورس `src/valuation/engine.py` و تست‌های متناظر.
+User runs tests; documentation completion does not complete implementation.

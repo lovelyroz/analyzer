@@ -4543,3 +4543,82 @@ The Prompt 1-A through 1-D reports describe audits and documentation alignment; 
 
 **Current Stage 7 status: OPEN.** Completed audits should not be repeated absent new source changes, contradictory evidence, or a specific regression. Remaining work is limited to the active tasks in `tasksToDo.md` and the current roadmap in `stepsForStage7.md`.
 
+
+
+===========================================================
+# Stage 7 — Owner-Approved P/E, Complete-Input and Persistence Policies
+
+**Date:** 2026-10-31  
+**Prompt type:** DOCS-ONLY (documentation changes authorized; no source-code, test, database, migration, or test-execution changes)
+
+## 1. Owner-approved decisions recorded
+
+The following explicit owner decisions were recorded as binding active policy in `07_Stage7_Valuation.md` under **AMENDMENT-OA1**:
+
+| ID | Decision |
+|----|----------|
+| A | Primary relative cheap/expensive assessment uses **only same-company historical Forward P/E**. Industry peers/P/E are not the basis. |
+| B | Historical P/E is calculated from the company’s own underlying financial and market data; not accepted as precomputed numeric input without provenance. Latest complete valid input set; incomplete newer data → earlier complete set + date identification + missing-input list. |
+| C | P/E is a derived runtime calculation, not an independent DB input. Full provenance (company, period, source, publication/availability, market-price date, forecast version, cutoff, Jalali context). Financial period date ≠ publication/availability date. No precomputed P/E persisted as independent analytical records. |
+| D | Industry Forward P/E and Industry TTM P/E **removed** from cheap/expensive assessment and from Target P/E fallback hierarchy. Old industry benchmark fallback is not approved V1 active policy. |
+| E | Latest complete and valid input set selection; no mixing incompatible companies/periods/forecast versions; fail closed if no complete set. |
+| F | Market price: latest available observation on or before Jalali analysis date; report actual price date; alert if differs from analysis date; fail-closed if none. Not claimed as full PIT proof. |
+| G | **All analytical outputs are temporary runtime results; no analytical output or decision history may be persisted.** Includes Forecast, Valuation, calculated P/E, fair values, assessments, decisions. Stage 9 may receive `previous_decision` from caller for hysteresis; must not persist its own history. |
+
+## 2. Superseded policies explicitly identified
+
+- Former sections **10–13** of `07_Stage7_Valuation.md` (Industry Valuation, Industry Forward P/E, Industry TTM P/E, Benchmark Hierarchy with Industry first) marked **SUPERSEDED by AMENDMENT-OA1.4**.
+- Non-negotiable rules 5–6 (industry peer comparison / min peer count for valuation) marked superseded for cheap/expensive and Target P/E hierarchy.
+- Architecture diagram note updated: Industry Valuation path is not active for relative assessment.
+- Prior roadmap/task language that treated industry P/E as an active valuation benchmark is replaced by same-company historical Forward P/E work.
+
+Historical text was **not** silently erased; it remains for audit trail with clear SUPERSEDED markers.
+
+## 3. Implementation tasks remaining (all OPEN; docs ≠ done)
+
+| Task ID | Focus | Status |
+|---------|--------|--------|
+| S7-T013 | Same-company historical Forward P/E as sole relative cheap/expensive basis | OPEN |
+| S7-T014 | Historical P/E from raw inputs + provenance | OPEN |
+| S7-T015 | Latest complete input set + incomplete-newer-data alerts | OPEN |
+| S7-T016 | Market-price observation date alert | OPEN |
+| S7-T017 | Remove/reject Industry P/E from relative assessment and active Target hierarchy | OPEN |
+| S7-T018 | Reject unsupported precomputed P/E inputs | OPEN |
+| S7-T019 | Audit existing Forecast persistence models vs OA1.7 (no code change in this task) | OPEN |
+
+S7-T007–T011 remain BLOCKED as before (with notes updated for OA1 context). S7-T012 remains OPEN. Final technical task remains `src/valuation/engine.py` (S7-T011) after the above.
+
+## 4. Forecast persistence conflict
+
+Stage 5 locked specification documents Forecast Versioning, Forecast Record, and preservation of prior Forecast versions (`05_Stage5_Forecast_Engine.md`). Existing Forecast persistence models (if present in code) **must not** be silently declared compliant with OA1.7.
+
+This is recorded as an **explicit unresolved implementation/documentation issue** requiring a separate controlled audit (S7-T019) and owner-authorized remediation. **This documentation-only prompt did not delete or modify those models.**
+
+## 5. Scope confirmation for this prompt
+
+- **Files changed (documentation only):**
+  - `07_Stage7_Valuation.md` — AMENDMENT-OA1; SUPERSEDED markers on industry sections; market-price and historical P/E notes; non-negotiable rules and final status notes.
+  - `stepsForStage7.md` — roadmap updated for OA1 policies; package 0 for implementation; Stage 7 remains OPEN.
+  - `tasksToDo.md` — S7-T013–S7-T019 added (OPEN); industry-as-active-benchmark language removed from active work; T007–T012 retained with OA1-aware notes.
+  - `STAGE7_MASTER_WORKING_PACKET.md` — order and status reflect OA1 and new tasks.
+  - `STAGE7_COMPLETED_CHECKLIST.md` — owner decisions documented as checked; implementation/verification items unchecked.
+  - `temp_report2.md` — this durable decision section appended.
+
+- **No source-code files changed.**
+- **No test files changed.**
+- **No database models, schemas, repositories, or migrations changed.**
+- **No tests executed.**
+- **No Git commands executed.**
+- **Stage 7 remains OPEN.**
+
+## 6. Recommended next implementation task
+
+**S7-T013** (or a combined prompt covering S7-T013 + S7-T017): implement same-company historical Forward P/E as the sole relative cheap/expensive measure and remove industry P/E from the active relative assessment / Target hierarchy path.
+
+Required focus files (for a future CODE prompt; not modified here):
+
+- `src/valuation/engine.py`
+- Related valuation modules under `src/valuation/` (e.g. `models.py`, `parameters.py`, `schema.py` as needed by evidence)
+- Focused tests under `src/tests/test_stage7_valuation.py` (and any valuation-specific test modules)
+
+Do not treat documentation completion as implementation completion. User runs tests; agent does not.

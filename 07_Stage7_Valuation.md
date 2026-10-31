@@ -6,6 +6,133 @@
 
 DESIGNED → REVIEWED → STRESS TESTED → AUDITED → **LOCKED**
 
+**Owner-Approved Amendment (2026-10-31):** See section **AMENDMENT-OA1** below. This amendment supersedes the industry-peer cheap/expensive assessment and the industry P/E fallback hierarchy for Target P/E. It does not unlock or re-open the V1 architecture; it records binding owner policy changes that implementation and later documentation must follow. Implementation of these policies is **not** complete merely because this document was updated.
+
+---
+
+# AMENDMENT-OA1 — Owner-Approved P/E, Complete-Input, Market-Price and Persistence Policies
+
+**Authority:** Explicit project-owner decisions. Binding for V1 active policy.
+
+**Effective for active policy:** Immediate for documentation and for all future implementation work. Historical sections that conflict remain in the document for audit trail and are marked **SUPERSEDED**.
+
+## OA1.1 Primary relative valuation measure (cheap / expensive)
+
+The primary question remains whether the share is cheap or expensive relative to its Forward P/E.
+
+**Active rule:** The cheap/expensive relative assessment must be made **only against the same company’s own historical Forward P/E**.
+
+- Compare current Forward P/E to the company’s own historical Forward P/E series (and supported statistics such as median where valid observations exist).
+- Do **not** use industry peers or industry P/E (Forward or TTM) as the basis for deciding whether this company is cheap or expensive.
+- Outputs must distinguish:
+  - Current Forward P/E
+  - Same-company historical Forward P/E series
+  - Historical comparison statistic(s) (e.g. median) where supported
+  - Resulting relative valuation assessment
+  - Dates and provenance of the observations used
+
+No new assessment thresholds or financial formulas are introduced by this amendment. Existing status labels and any numeric thresholds remain model parameters subject to separate owner approval; this amendment does not invent or ratify thresholds.
+
+## OA1.2 Historical P/E is a derived calculation
+
+Historical P/E must be calculated from the company’s own underlying financial and market data.
+
+- It must **not** be accepted as a precomputed numeric input without underlying source data and provenance.
+- Calculation uses the latest complete and valid input set available under the applicable date/cutoff rules (see OA1.5).
+- If newer input data are incomplete: use the latest earlier complete and valid set; identify the actual date of data used; report that newer data are incomplete; list exact missing inputs.
+- If no complete valid set exists: do not fabricate a P/E; report why calculation is unavailable and identify missing inputs.
+- Historical P/E is reported separately from Forward P/E. It is **not** the primary cheap/expensive comparison measure (that is same-company historical Forward P/E per OA1.1).
+
+Financial period date and publication/availability date are different concepts and must not be conflated.
+
+## OA1.3 P/E is derived, not an independent input
+
+Every P/E value is a runtime derived calculation from underlying observations. It must not be supplied as an unexplained numeric sequence or accepted as a standalone database input.
+
+Required traceability for underlying observations (as applicable):
+
+- Company identity
+- Financial period or observation date
+- Source identity
+- Publication date/time
+- Availability date/time or other evidence required by the approved temporal contract
+- Market-price observation date and source
+- Relevant forecast version and its input references (for Forward P/E)
+- Analysis cutoff and Jalali date context
+
+Do not claim full Point-in-Time correctness unless the required temporal evidence exists.
+
+**Database rule:** No precomputed P/E values or analytical outputs may be persisted as independent database records. Raw source data may be persisted under existing source-data contracts. P/E is calculated at runtime.
+
+## OA1.4 Industry P/E removed from cheap/expensive assessment and Target P/E hierarchy
+
+**Superseded:** Previous V1 policy that used Industry Forward P/E Median as the primary Target P/E benchmark, Industry TTM P/E as fallback, and industry comparison for cheap/expensive assessment (former sections 10–13 and related hierarchy text).
+
+**Active rule:**
+
+- Industry Forward P/E and Industry TTM P/E are **removed** from the cheap/expensive assessment.
+- Industry Forward P/E and Industry TTM P/E are **removed** from the Target P/E base/fallback hierarchy.
+- Do not preserve old industry-benchmark fallback behavior as approved V1 policy.
+
+Target P/E Base for active policy relies on same-company historical context consistent with OA1.1 and OA1.2. Exact Target P/E construction parameters remain subject to model-parameter rules already in the specification; this amendment does not invent new multiples or spreads.
+
+Sections 10, 11, 12, and 13 below are retained for historical context and are marked SUPERSEDED by this amendment.
+
+## OA1.5 Latest complete and valid input set
+
+The engine must not automatically use the newest individual records if they do not form a complete and valid input set.
+
+For each calculation:
+
+1. Select the latest complete and valid input set that satisfies company identity, period, source, cutoff, and temporal validity requirements for that calculation.
+2. If newer data are incomplete: use the latest earlier complete and valid set; perform the calculation on that set; identify the actual date/version of the selected inputs; warn that newer inputs are incomplete; list the exact missing inputs required to complete the newer set.
+3. If no complete valid set exists: fail closed and explain the missing requirements.
+
+Do not mix observations from different companies, incompatible periods, or incompatible forecast versions merely to create an apparently complete set.
+
+Completeness is defined per calculation from its actual input contract; no universal completeness checklist is invented here.
+
+## OA1.6 Market price — latest available observation and explicit alert
+
+- Use the latest available market-price observation on or before the Jalali analysis date.
+- Do not silently present an older market price as if it belonged to the analysis date.
+- Report the actual Jalali date of the selected market-price observation.
+- If the selected price date differs from the analysis date, emit a clear alert identifying both dates.
+- If no eligible price exists, preserve fail-closed behavior unless a separate owner decision authorizes a change.
+
+This is transparent latest-available-data behavior; it is not proof of complete PIT correctness.
+
+## OA1.7 Analytical output persistence is prohibited
+
+**Owner decision:** All analytical outputs are temporary runtime results. No analytical output or decision history may be persisted in the database.
+
+Includes, without limitation:
+
+- Forecast outputs
+- Valuation outputs
+- Calculated P/E values
+- Fair values and valuation assessments
+- Decision outputs
+- Decision history
+
+Stage 9 may receive `previous_decision` from its caller when available for runtime logic such as hysteresis. Stage 9 must not create or persist its own decision history.
+
+Do not add database models, tables, repositories, or persistence mechanisms for analytical outputs.
+
+**Unresolved conflict (implementation/documentation):** Stage 5 locked specification documents Forecast Versioning, Forecast Record, and preservation of prior Forecast versions (see `05_Stage5_Forecast_Engine.md` sections on Forecast Versioning and Forecast Record). Existing Forecast persistence models, if present in the codebase, must **not** be silently declared compliant with OA1.7. This conflict is recorded as an explicit unresolved implementation/documentation issue requiring a separate controlled audit and owner-authorized remediation. This documentation-only task does not delete or modify those models.
+
+## OA1.8 What this amendment does not change
+
+- Forward P/E remains the primary valuation axis formula (Price ÷ Forecast EPS).
+- Bear / Base / Bull scenario structure.
+- Invalid / negative / zero EPS rules (no artificial P/E).
+- Separation of Valuation Status, Risk, and Confidence.
+- Alerts are not Buy/Sell signals.
+- Fundamental Score and Trend must not directly scale Target P/E.
+- Forecast Reliability must not mathematically rescale Forward P/E or Fair Value.
+- Scenario Probability sums to 100%.
+- No invention of thresholds, formulas, sector mappings, or dated parameter values.
+
 ---
 
 # 1. Purpose
@@ -53,13 +180,12 @@ Stage 7
 VALUATION ENGINE
       │
       ├── Forward P/E
-      ├── Historical Valuation
-      ├── Industry Valuation
-      ├── Target P/E
+      ├── Historical Valuation (same-company; see AMENDMENT-OA1)
+      ├── Target P/E (industry hierarchy SUPERSEDED by OA1.4)
       ├── Scenario Fair Value
       ├── Scenario Probability
       ├── Expected Fair Value
-      ├── Valuation Assessment
+      ├── Valuation Assessment (cheap/expensive vs same-company hist. Fwd P/E)
       ├── Valuation Risk
       ├── Valuation Confidence
       └── Sensitivity / Alerts
@@ -68,6 +194,8 @@ VALUATION ENGINE
 Stage 9
 Decision Engine
 ```
+
+> **Note (AMENDMENT-OA1):** Industry Valuation is no longer an active cheap/expensive or Target P/E benchmark path. Same-company historical Forward P/E is the sole relative basis for cheap/expensive assessment.
 
 Stage 8 — Market Engine یک مسیر مستقل دارد و Fundamental/Valuation و Market تا Stage 9 با یکدیگر ادغام نمی‌شوند.
 
@@ -199,6 +327,8 @@ market_price_date
 
 Valuation باید بتواند مشخص کند دقیقاً از چه قیمت بازار استفاده شده است.
 
+**Active policy (AMENDMENT-OA1.6):** Use the latest available market-price observation on or before the Jalali analysis date. Report the actual Jalali date of the selected observation. If that date differs from the analysis date, emit a clear alert identifying both dates. Do not silently present an older price as if it belonged to the analysis date. Absence of an eligible price remains fail-closed unless a separate owner decision changes that behavior. This is not a claim of complete PIT correctness.
+
 ---
 
 # 8. Historical P/E
@@ -217,6 +347,8 @@ Point-in-Time TTM EPS
 در هر تاریخ تاریخی فقط داده‌هایی مجاز هستند که تا همان تاریخ واقعاً منتشر و در دسترس بوده‌اند.
 
 بنابراین استفاده از اطلاعات گزارش‌های آینده ممنوع است.
+
+**Active policy (AMENDMENT-OA1.2 / OA1.3):** Historical P/E is a **derived** calculation from the company’s own underlying financial and market observations. It must not be accepted as a precomputed numeric input. Financial period date and publication/availability date must not be conflated. Selection of inputs follows the latest-complete-and-valid-set rule (OA1.5). Historical P/E is reported separately from Forward P/E and is **not** the primary cheap/expensive comparison measure (primary relative measure is same-company historical **Forward** P/E per OA1.1).
 
 ---
 
@@ -240,9 +372,15 @@ Current vs Historical Median
 
 Median بر Mean اولویت دارد.
 
+**Active policy (AMENDMENT-OA1.1):** For the **cheap/expensive** relative assessment, the comparison basis is the same company’s historical **Forward** P/E series (and supported statistics such as median where valid). Historical TTM P/E series remains available as contextual/historical valuation information but is not the primary cheap/expensive measure. Series must be built from derived calculations with provenance; precomputed sequences without underlying data are not accepted.
+
 ---
 
 # 10. Industry Valuation
+
+> **SUPERSEDED by AMENDMENT-OA1 (OA1.4).**  
+> Industry peer comparison is **not** part of the active cheap/expensive assessment or Target P/E hierarchy.  
+> Text below is retained only for historical audit trail of the pre-amendment V1 design.
 
 مقایسه شرکت با شرکت‌های **هم‌صنعت** انجام می‌شود.
 
@@ -262,6 +400,9 @@ INDUSTRY_BENCHMARK_INSUFFICIENT
 
 # 11. Industry Forward P/E
 
+> **SUPERSEDED by AMENDMENT-OA1 (OA1.4).**  
+> Industry Forward P/E is removed from active Target P/E hierarchy and from cheap/expensive assessment.
+
 Benchmark اصلی صنعت در صورت وجود داده معتبر:
 
 ```text
@@ -280,6 +421,9 @@ Industry Forward P/E Median
 
 # 12. Industry TTM P/E
 
+> **SUPERSEDED by AMENDMENT-OA1 (OA1.4).**  
+> Industry TTM P/E is removed from active Target P/E fallback hierarchy and from cheap/expensive assessment.
+
 اگر Industry Forward P/E قابل محاسبه نباشد، Industry TTM P/E می‌تواند به‌عنوان Fallback استفاده شود.
 
 Forward P/E و TTM P/E نباید در یک Population مخلوط شوند.
@@ -296,6 +440,11 @@ Forward P/E و TTM P/E نباید در یک Population مخلوط شوند.
 ---
 
 # 13. Benchmark Hierarchy
+
+> **SUPERSEDED by AMENDMENT-OA1 (OA1.4).**  
+> Active Target P/E hierarchy no longer uses Industry Forward P/E or Industry TTM P/E.  
+> Cheap/expensive relative assessment uses same-company historical Forward P/E only (OA1.1).  
+> Historical Median P/E remains relevant as company-own context, not as an industry fallback.
 
 Target P/E Base باید از این سلسله‌مراتب استفاده کند:
 
@@ -2083,11 +2232,11 @@ Backtestable
 1. Forward P/E محور اصلی Valuation است.
 2. Bear/Base/Bull مستقل محاسبه می‌شوند.
 3. Negative/Zero EPS نباید P/E مصنوعی ایجاد کند.
-4. Historical Valuation باید Point-in-Time باشد.
-5. Industry comparison فقط با Peerهای هم‌صنعت انجام می‌شود.
-6. حداقل Industry Peer Count برابر 8 است.
-7. Median بر Mean اولویت دارد.
-8. Forward و TTM benchmark نباید مخلوط شوند.
+4. Historical Valuation باید Point-in-Time باشد (subject to available temporal evidence; full PIT is not claimed without publication/availability evidence — AMENDMENT-OA1).
+5. **SUPERSEDED by AMENDMENT-OA1.4:** Industry comparison for cheap/expensive and Target P/E hierarchy is removed. Active relative cheap/expensive assessment uses **same-company historical Forward P/E only**.
+6. **SUPERSEDED by AMENDMENT-OA1.4:** Industry Peer Count minimum no longer governs Target P/E or cheap/expensive assessment.
+7. Median بر Mean اولویت دارد (for same-company historical series statistics where used).
+8. Forward و TTM must not be mixed in a single population (still valid if any dual series are retained for context).
 9. Fundamental Score مستقیماً Target P/E را Scale نمی‌کند.
 10. Trend مستقیماً Target P/E را Scale نمی‌کند.
 11. Forecast Reliability مستقیماً P/E یا Fair Value را ضرب نمی‌کند.
@@ -2096,16 +2245,17 @@ Backtestable
 14. Expected Fair Value جای Scenario Range را نمی‌گیرد.
 15. Valuation Status، Risk و Confidence مستقل هستند.
 16. Alerts توصیه Buy/Sell نیستند.
-17. Point-in-Time و Versioning اجباری هستند.
+17. Point-in-Time و Versioning اجباری هستند (within available evidence; see OA1).
 18. Old Model Versions overwrite نمی‌شوند.
 19. تغییر منطق داخلی Stage تا حد ممکن نباید Contract Stage را بشکند.
 20. تمام Thresholdهای قابل Calibration باید Model Version Parameters باشند.
+21. **AMENDMENT-OA1:** P/E is derived at runtime; no precomputed P/E or analytical outputs may be persisted as independent DB records. Latest-complete-input selection and market-price date alert are required. Analytical-output persistence is prohibited (Forecast persistence models remain an unresolved conflict pending separate audit).
 
 ---
 
 # 88. Final Status
 
-**Stage 7 — Valuation Engine: LOCKED**
+**Stage 7 — Valuation Engine: LOCKED** (architecture), with **AMENDMENT-OA1** binding for active P/E / complete-input / persistence policy.
 
 Architecture:
 PASS
@@ -2119,8 +2269,11 @@ PASS
 Forward P/E Framework:
 PASS
 
-Historical / Industry Benchmarking:
-PASS
+Historical Benchmarking (same-company):
+PASS (design); Industry benchmarking path **SUPERSEDED by OA1.4**
+
+Point-in-Time (runtime claim):
+PASS (design intent); full runtime PIT proof remains subject to provenance evidence (OA1 / D7)
 
 Probability Framework:
 PASS
