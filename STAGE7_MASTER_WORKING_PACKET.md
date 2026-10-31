@@ -19,7 +19,7 @@
 ### A1. تصمیم‌ها و مستندات سیاست مالک
 
 - [x] **001 · S7-DOC-001 — ثبت AMENDMENT-OA1:** سیاست‌های مالک دربارهٔ same-company historical Forward P/E، حذف Industry P/E از ارزندگی و Target P/E، محاسبهٔ مشتق P/E از دادهٔ خام با provenance، latest-complete input، هشدار تاریخ قیمت بازار و ممنوعیت persistence تحلیلی در `07_Stage7_Valuation.md` ثبت شده‌اند.
-- [~] **002 · S7-DOC-002 — هم‌ترازی نقشه و Task Register:** گزارش Master می‌گوید `stepsForStage7.md` و `tasksToDo.md` با OA1 به‌روزرسانی شده‌اند؛ اما هر دو فایل در شاخهٔ فعلی master قابل بازیابی نیستند (GitHub 404). تا وقتی محتوای معتبر آن‌ها بازیابی یا انتقال/جایگزینی کاملشان در Master Packet با شواهد ثبت نشود، تکمیل این Task قابل تأیید قطعی نیست.
+- [x] **002 · S7-DOC-002 — هم‌ترازی نقشه و Task Register:** محتوای معتبر هر دو سند تاریخی در `STAGE7_MASTER_WORKING_PACKET.md` تجمیع و بررسی شد؛ بخش F صریحاً ادغام `tasksToDo.md` را ثبت می‌کند و نقشه، قواعد، یافته‌ها، بسته‌های اجرایی و معیارهای پایان `stepsForStage7.md` در بخش‌های A تا F پوشش داده شده‌اند. `WORKFLOW_RULES.md` نیز اکنون فقط Master Packet و `reply.md` را به‌عنوان مراجع جاری Stage 7 معرفی می‌کند؛ دو سند قدیمی بازنشسته‌اند و نسخه‌های تاریخی آن‌ها با شواهد Git قابل بازیابی است. جزئیات و SHAها در یادداشت «002 Closure Evidence» انتهای این فایل ثبت شده‌اند.
 - [x] **003 · S7-DOC-003 — اصلاح وابستگی T013:** بخش‌های مستقل قابل اقدام از وابستگی‌های provenance/PIT در S7-T013 جدا شده‌اند؛ full PIT بدون شواهد مجاز نیست.
 - [x] **004 · S7-DOC-004 — اصلاح وضعیت PIT و Ready claims:** تمایز design/architecture PASS از runtime PIT OPEN/BLOCKED و نیز معنای محدود Ready for implementation / Ready for Stage 8 در مستندات ثبت شده است.
 - [x] **005 · S7-DOC-005 — ثبت تعارض Forecast persistence:** تعارض احتمالی مدل‌ها/قراردادهای persistence Forecast با OA1.7 ثبت شده؛ هیچ مدل یا کد persistence در این مرحله تغییر نکرده است.
@@ -312,7 +312,7 @@
 
 | Taskها | نتیجهٔ بازبینی | دلیل |
 |---|---|---|
-| 001 و 003 تا 006 · S7-DOC-001 و S7-DOC-003 تا S7-DOC-006 | [x] حفظ شد | سیاست OA1 و اصلاحات Industry در سند فعلی قابل مشاهده‌اند؛ تفکیک PIT و Ready claims نیز در سند Stage 7 فعلی وجود دارد؛ تعارض persistence ثبت شده است. |\n| 002 · S7-DOC-002 | [~] به PARTIAL تنزل یافت | دو فایل صریحاً نام‌برده‌شده در شرح Task (`stepsForStage7.md` و `tasksToDo.md`) در شاخهٔ فعلی پیدا نشدند؛ انتقال کامل محتوای آن‌ها یا بازنشستگی مستندشان اثبات نشده است. |
+| 001 و 003 تا 006 · S7-DOC-001 و S7-DOC-003 تا S7-DOC-006 | [x] حفظ شد | سیاست OA1 و اصلاحات Industry در سند فعلی قابل مشاهده‌اند؛ تفکیک PIT و Ready claims نیز در سند Stage 7 فعلی وجود دارد؛ تعارض persistence ثبت شده است. |\n| 002 · S7-DOC-002 | [x] DONE | بازبینی مجدد نسخه‌های تاریخی هر دو فایل و تطبیق محتوای آن‌ها با Master Packet انجام شد؛ `WORKFLOW_RULES.md` نیز مراجع جاری را به Master Packet و `reply.md` محدود کرده است. شواهد دقیق در یادداشت «002 Closure Evidence» انتهای فایل ثبت شده است. |
 | 007 تا 016 · S7-AUD-001 تا S7-AUD-010 | [x] حفظ شد | خروجی مورد انتظار این Taskها ممیزی و ثبت یافته‌ها بوده است. اثبات‌نشدن E2E، PIT یا وجود تعارض، یافتهٔ ممیزی است نه کار ناقص ممیزی؛ اصلاح/تصمیم‌های بعدی در Taskهای مستقل باز یا BLOCKED ثبت شده‌اند. |
 | 017 · S7-TEST-001 | [x] حفظ شد | فرمان متمرکز توسط کاربر اجرا شده و نتیجهٔ 857 passed ثبت شده است؛ دامنهٔ این Task اجرای همان مجموعه بوده است. |
 | 018 · S7-TEST-002 | [x] حفظ شد | اجرای مجموعهٔ کامل ثبت شده است: 1898 passed و 2 skipped. بررسی علت Skipها عمداً در Task مستقل 019 · S7-TEST-003 باز مانده و مانع بسته‌شدن Task اجرای تست نیست. |
@@ -324,3 +324,29 @@
 
 **عملیات باقی‌مانده برای بستن Task 053 · S7-T025**
 - [ ] **053-10 — Reconcile OA1.7 cross-document statement:** متن بخش OA1.7 در `07_Stage7_Valuation.md` را با نسخهٔ فعلی `05_Stage5_Forecast_Engine.md` تطبیق دهید. ادعای منسوخِ باقی‌ماندن تعارض مستنداتی Stage 5 باید اصلاح شود، در حالی که تعارض اجرایی مدل‌ها/write path/schema تا انجام Taskهای 054–057 همچنان صریحاً باز بماند. فقط پس از بازخوانی هر دو سند و تأیید سازگاری، 053 قابل تبدیل به [x] است.
+
+
+## 002 Closure Evidence — S7-DOC-002
+
+**Final status: [x] DONE**
+
+A strict re-verification was completed after the repository's workflow rules were updated.
+
+### Historical source evidence
+
+- Deletion commit: `869eb741db31a6e47719554d2075d01720289345` (message: `removed files`; parent: `9cfca6dc11d8f0112da8936a4199c6ebe54f1795`).
+- Historical `stepsForStage7.md`: blob `28e119ef53cd904a98b7faedf83ac7777255307a`.
+- Historical `tasksToDo.md`: blob `fd5fc24df399b10551a23aa189d3cad40f49b99d`.
+
+### Consolidation verification
+
+- The historical `tasksToDo.md` explicitly defined the relationship between the roadmap and Task Register, task status semantics, active task packages, dependencies, acceptance criteria and prompt reporting. The current Master Packet consolidates these responsibilities; section F explicitly identifies itself as merged from `tasksToDo.md`, while sections A/B/C hold the active register and status dashboard and sections D/E hold governing rules and exit criteria.
+- The historical `stepsForStage7.md` contained the Stage 7 OPEN declaration, non-negotiable rules, AMENDMENT-OA1 policies, findings, remaining execution packages and exit criteria. These subjects are represented in the current Master Packet's rules, findings/task register, Rule Register and exit criteria. No historical OPEN implementation work was treated as completed merely by documentation consolidation.
+- Current `WORKFLOW_RULES.md` blob at verification: `15de94a5da80169d5af67ce2c80fa86c6791c631`. It identifies `STAGE7_MASTER_WORKING_PACKET.md` as the remaining-jobs checklist and `reply.md` as the interim prompt report; neither retired file is designated as an active reference.
+- The retired historical files remain recoverable at the parent commit identified above. They were not recreated.
+
+### Closure decision
+
+The acceptance condition for Task 002 is satisfied: both historical documents' active planning/register content is consolidated into the Master Packet, and the current workflow rules establish the replacement documents. The absence of the old paths on the current branch is intentional retirement, not missing work.
+
+This closure applies only to **002 · S7-DOC-002**. It does not close any implementation, PIT, E2E, Forecast-persistence remediation, or Stage 7 exit task.
