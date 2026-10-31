@@ -3,13 +3,12 @@
 # Technical decision: Selecting the safest and most appropriate solution, given the application's architecture and financial objectives—this is ChatGPT's responsibility.
 # Verifiable execution—modifying code, updating documentation, and reviewing tests—must be supported by concrete evidence; a task should not be declared complete simply because a decision has been made.
 
-# temporary rules for Stage 7:
-    Primary reference documents moving forward:
-
-    - reply.md: Used solely for temporary conversation between the user and ChatGPT. Benchmark conversations do not involve any decision-making.
-    - STAGE7_MASTER_WORKING_PACKET.md : Remaining Jobs Checklist.
-    - In the STAGE7_MASTER_WORKING_PACKET.md file, each task must include a checkbox and a number.
-    
+# Stage 7 reference policy:
+    - STAGE7_MASTER_WORKING_PACKET.md is the sole authoritative source for task status, remaining work, execution order, dependencies, decisions, and exit criteria.
+    - Other reports and archives are historical/supporting material only. They must never be used to infer or change a task's current status.
+    - temp_report2.md is an optional concise historical archive, not an active planning or reporting document.
+    - The temporary conversation-report workflow is retired and must not be recreated.
+    - Every task in STAGE7_MASTER_WORKING_PACKET.md must include a checkbox and a stable number/ID.
 
 # Follow the steps below to generate each new prompt
 ## Make each prompt in 2 blocks. One for Agent and one for User
