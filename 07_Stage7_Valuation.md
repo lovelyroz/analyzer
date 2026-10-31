@@ -1364,7 +1364,7 @@ Alerts فقط Risk/Review Alert هستند.
 >   low_forecast_reliability   = 40.0
 >   benchmark_divergence_ratio = 1.50
 >   historical_divergence_ratio = 1.50
->   industry_divergence_ratio  = 1.50
+>   industry_divergence_ratio  = 1.50  # LEGACY / INACTIVE for active cheap-expensive assessment under OA1.4
 >   high_dependence_share      = 0.60   (استفاده‌نشده — D2)
 >
 > RISK_THRESHOLDS:
@@ -1381,7 +1381,7 @@ Alerts فقط Risk/Review Alert هستند.
 
 # 49. V1 Alert and Flag Vocabulary
 
-This section freezes the concrete vocabulary currently emitted by the V1 valuation engine. Where earlier sections use generic divergence labels, the concrete above/below tokens below are the emitted names; directional pairs remain separate.
+This section records the concrete vocabulary found in the V1 implementation for audit and contract-history purposes. It is not a declaration that every listed token belongs to the active post-OA1 vocabulary. Where earlier sections use generic divergence labels, the concrete above/below tokens below are the emitted names; directional pairs remain separate.
 
 **`alerts` channel (severity-prefixed strings):**
 
@@ -1393,12 +1393,12 @@ WATCH:VALUATION_ABOVE_TARGET_PE
 WATCH:VALUATION_BELOW_TARGET_PE
 WATCH:FORWARD_PE_ABOVE_HISTORICAL
 WATCH:FORWARD_PE_BELOW_HISTORICAL
-WATCH:FORWARD_PE_ABOVE_INDUSTRY
-WATCH:FORWARD_PE_BELOW_INDUSTRY
+WATCH:FORWARD_PE_ABOVE_INDUSTRY   # LEGACY / INFORMATIONAL — inactive for OA1 relative assessment
+WATCH:FORWARD_PE_BELOW_INDUSTRY   # LEGACY / INFORMATIONAL — inactive for OA1 relative assessment
 INFO:TOP_DRIVER:<driver>
 ```
 
-The three pairs of directional tokens report whether base Forward P/E is above or below target P/E, historical median P/E, or industry Forward P/E, respectively. `INSUFFICIENT_BENCHMARK_DATA` reports that no usable benchmark was selected; it is distinct from a low peer count. `TOP_DRIVER` is an informational driver note. These tokens describe review context and are not Buy/Sell signals.
+The target and historical directional pairs describe active review context as applicable. The Industry directional pair is retained only as LEGACY / INFORMATIONAL vocabulary for historical implementation and contract audit; it is not part of the active post-OA1 cheap/expensive vocabulary and must not be used as an active relative-valuation signal. `INSUFFICIENT_BENCHMARK_DATA` reports that no usable benchmark was selected; it is distinct from a low peer count. `TOP_DRIVER` is an informational driver note. These tokens describe review context and are not Buy/Sell signals.
 
 **`valuation_risk_flags` channel (strings):**
 
@@ -1996,6 +1996,9 @@ PASS.
 ---
 
 # 74. Stress Test — Insufficient Industry Peers
+
+> **HISTORICAL / SUPERSEDED by AMENDMENT-OA1.4 — NOT an active V1 valuation rule.**  
+> This stress-test snapshot documents the pre-OA1 industry-peer Target P/E fallback design and its historical implementation evidence only. Industry peer count and Industry P/E no longer determine active cheap/expensive assessment or Target P/E selection. The historical result below is retained for audit traceability; it must not be read as a current acceptance criterion or active fallback policy.
 
 ```text
 Valid Peers < 8
