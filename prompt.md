@@ -1,172 +1,165 @@
-# Technical Maintenance — Timestamp and openpyxl
-## Repository: `analyzer`
+# Task 060 — Fzar Monthly Sales PDF Extraction Audit
 
-### GLOBAL RESTRICTIONS
+**Task type:** REPORT-ONLY — no code changes, no test changes.
 
-This is a code-changing implementation task.
+## Objective
 
-You must follow these rules:
+Diagnose why the real Fzar monthly sales report does not satisfy the existing extraction test, despite the expected Persian terms being present in the original company PDF.
 
-1. Inspect only the files explicitly listed below. Do not perform repository-wide exploration.
-2. Do not run tests, start test loops, or claim that tests passed. The user will execute all tests locally.
-3. Do not perform Git operations, database operations, commits, pushes, or changes to remote state.
-4. **`WORKFLOW_RULES.md` is exclusively controlled by ChatGPT. You must not edit, delete, rename, move, reformat, or otherwise modify it.**
-5. **Do not edit `STAGE7_MASTER_WORKING_PACKET.md`.** Only ChatGPT may update its task statuses.
-6. Do not modify unrelated files or broaden the scope silently.
-7. Preserve all existing financial calculations, business logic, public interfaces, and data contracts.
+The original PDF is `pdf/Fzar.pdf`. Its manually prepared Markdown conversion is `pdf/Fzar.md`.
 
-### Explicit file scope
+Treat `pdf/Fzar.md` as the primary content source.
 
-**Files permitted to change:**
+## Strict file scope
 
-- `src/ingestion/codal/ingestion.py`
-- `src/kpi/universal.py`
-- `src/kpi/conditional.py`
-- `src/kpi/industry.py`
-- `src/trend/engine.py`
-- `src/tests/test_stage1_rules.py`
-- `src/tests/test_stage2_kpis.py`
-- `src/tests/test_stage4_trend.py`
-- `src/tests/test_ingestion_fx.py`
+Read only these files:
 
-**Read-only reference files:**
+1. `pdf/Fzar.md` — primary source content.
+2. `pdf/Fzar.pdf` — only if necessary to verify a suspected Markdown conversion defect.
+3. `src/tests/test_codal_extraction.py`
+4. `src/tests/test_codal_pdf_extraction.py`
+5. `src/ingestion/codal/pdf_extract.py`
+6. `src/ingestion/codal/adapter.py`
+7. `src/ingestion/codal/parser.py`
+8. `src/ingestion/codal/numbers.py`
+9. `codal_19_pdf_validation_plan.md`
+10. `matrix.md`
 
-- `src/models/audit.py`
-- `requirements.txt`
-- `.github/workflows/tests.yml`
-- `WORKFLOW_RULES.md`
-- `STAGE7_MASTER_WORKING_PACKET.md`
+Do NOT read or convert the other 19 PDF files. Do not scan the `pdf/` directory contents. Do not perform repository-wide exploration.
 
-If another file is essential, do not inspect or modify it without authorization. Report its exact path and explain why it is needed.
+If another file is essential, report its exact path and why it is needed. Stop and request authorization before reading it.
 
----
+## Ownership and execution restrictions
 
-## Task 1 — 058 · S7-REMED-001
-### Replace deprecated timestamps while preserving naive UTC
+- Do not modify source code, tests, configuration, or documentation.
+- Do not run tests.
+- Do not install dependencies.
+- Do not perform Git operations.
+- `WORKFLOW_RULES.md` is exclusively owned by ChatGPT. Do not modify, rename, move, reformat, or indirectly change it.
+- `STAGE7_MASTER_WORKING_PACKET.md` is read-only. Do not modify it.
+- Do not edit `reply.md` or any report file.
 
-The audit identified 24 uses of `datetime.utcnow()` in the following files:
+## Corrected Strict File Scope
 
-- `src/ingestion/codal/ingestion.py` — 1 occurrence
-- `src/kpi/universal.py` — 11 occurrences
-- `src/kpi/conditional.py` — 1 occurrence
-- `src/kpi/industry.py` — 9 occurrences
-- `src/trend/engine.py` — 1 occurrence
-- `src/tests/test_stage1_rules.py` — 1 occurrence
-- `src/tests/test_stage2_kpis.py` — 1 occurrence
-- `src/tests/test_stage4_trend.py` — 1 occurrence
+Read only the following files:
 
-#### 1.1 Inspect before changing
+1. `pdf/Fzar.md` — primary source for the actual report content.
+2. `pdf/Fzar.pdf` — only if necessary to verify a suspected Markdown conversion defect.
+3. `src/tests/test_codal_extraction.py`
+4. `src/tests/test_codal_pdf_extraction.py`
+5. `src/ingestion/codal/pdf_extract.py`
+6. `src/ingestion/codal/adapter.py`
+7. `src/ingestion/codal/parser.py`
+8. `src/ingestion/codal/numbers.py`
 
-Inspect the existing timestamp construction, imports, and test clock mechanisms in the permitted files.
+The following previously listed paths are removed from scope because they were not found at the specified locations:
 
-Determine whether a shared helper already exists in an appropriate architectural layer. Do not introduce a dependency on `src/models/audit.py` into higher-level application modules merely to reuse its helper.
+- `codal_19_pdf_validation_plan.md`
+- `matrix.md`
 
-If no suitable shared helper is available within the authorized files, prefer a direct standard-library implementation that preserves the existing contract, such as:
+Do not search the repository for alternative copies or similarly named files.
 
-`datetime.now(timezone.utc).replace(tzinfo=None)`
+Do not read any of the other 19 PDFs.
 
-Use the appropriate imports and adapt the expression to each file's existing structure.
+If another file is essential to establish the extraction failure, report its exact path and explain why it is necessary. Stop and request authorization before accessing it.
 
-Do not create a new shared helper in an unapproved file.
+All other restrictions and audit requirements in the original prompt remain unchanged.
 
-#### 1.2 Required implementation
+## Required investigation
 
-- Replace all 24 identified `datetime.utcnow()` occurrences.
-- Preserve the existing **naive UTC** output contract.
-- Ensure timestamps represent UTC, not local machine time.
-- Repair the Trend freeze-clock test to work with the replacement clock API.
-- Add or strengthen regression tests for the naive UTC contract in the relevant Audit, KPI, and Trend paths.
-- Keep timestamps deterministic in tests wherever a controlled clock is currently used.
+### 1. Establish the actual Fzar report structure
 
-#### 1.3 Strict invariants
+Using `pdf/Fzar.md`, identify:
 
-- Do not convert outputs to timezone-aware datetimes.
-- Do not change database timestamp contracts or serialization behavior.
-- Do not change KPI formulas, financial calculations, or Trend behavior.
-- Do not suppress or filter deprecation warnings as a substitute for fixing the calls.
-- Do not change unrelated date/calendar logic. The project's financial date logic remains Jalali.
+- Actual report title and report type.
+- Reporting period.
+- Table headings and column meanings.
+- Product/item names and units.
+- Quantity, sales, and monetary value columns.
+- Whether the tables contain merged, multi-line, or split cells.
+- Whether the Markdown conversion appears to have damaged row/column relationships.
 
-#### 1.4 Acceptance criteria
+Confirm the presence and context of these known terms:
 
-This task can be reported DONE only when:
+`تراورتن`، `کانسنگ`، `طلا`، `فروش`، `تن`
 
-1. All 24 targeted `datetime.utcnow()` occurrences have been replaced.
-2. No targeted occurrence remains in the listed files.
-3. Produced timestamps remain naive UTC.
-4. Regression tests explicitly protect the naive UTC contract.
-5. Trend's controlled-clock test remains deterministic and valid.
-6. No financial calculation or unrelated behavior was changed.
+Do not assume that the presence of these terms means the extraction test is correct. Determine where they occur and what they represent.
 
----
+### 2. Audit the existing test
 
-## Task 2 — 059 · S7-REMED-002
-### Make openpyxl a clearly enforced required dependency in the XLSX test
+Inspect `test_real_codal_monthly_activity_pdf` and its helper functions.
 
-The project declares `openpyxl` in `requirements.txt`, and `.github/workflows/tests.yml` installs project requirements. However, `src/tests/test_ingestion_fx.py` currently uses `pytest.importorskip("openpyxl")`, which can silently skip an XLSX test when the required dependency is missing.
+Determine:
 
-#### 2.1 Required implementation
+- Which PDF path the test actually selects.
+- Whether the selected path can resolve to the local `pdf/Fzar.pdf`.
+- Whether the test metadata matches the actual Fzar report.
+- Whether its expected item-name assertions are appropriate.
+- Whether the test is testing a general monthly report contract or one specific company/report layout.
 
-Modify only:
+### 3. Trace the extraction pipeline
 
-`src/tests/test_ingestion_fx.py`
+Follow the relevant implementation:
 
-Replace the optional-skip behavior with an explicit required-dependency behavior.
+PDF text/table extraction → extracted rows/cells → adapter → `RawLineInput`.
 
-The XLSX test must not silently skip when `openpyxl` is unavailable. Missing `openpyxl` must produce a clear dependency/import failure.
+Determine precisely where the actual Fzar product names, units, quantities, and sales values could be lost or misclassified.
 
-Keep the real XLSX test and its existing assertions. Do not delete, weaken, bypass, or replace the test with a superficial import-only test.
+Examine:
 
-#### 2.2 Read-only dependency verification
+- Persian RTL cell ordering.
+- Header detection.
+- Product-name cell selection.
+- Numeric-cell extraction.
+- Multi-line and merged-cell handling.
+- Fallback extraction behavior.
 
-Use `requirements.txt` and `.github/workflows/tests.yml` only to verify the existing dependency declaration and CI installation behavior.
+Distinguish a PDF text/layout limitation from an implementation defect or a test-fixture/metadata problem.
 
-Do not change either file unless you first report a concrete inconsistency and obtain separate authorization.
+### 4. Separate the test concerns
 
-Do not install packages or change the user's environment.
+Decide whether the current test should be:
 
-#### 2.3 Acceptance criteria
+- A generic monthly-activity extraction test using a genuinely representative fixture.
+- A dedicated Fzar-specific regression test.
+- Both, with independent assertions and purposes.
 
-1. With project requirements installed, the real XLSX test executes rather than skips.
-2. Without `openpyxl`, the test produces a clear failure rather than a skip.
-3. The XLSX test and its meaningful assertions remain intact.
-4. No unrelated ingestion or financial logic is changed.
+Do not recommend replacing the real Fzar file with a similar report as a substitute for validating Fzar itself.
 
----
+### 5. Final decision
 
-## Final report requirements
+Provide a concise evidence-based decision table:
 
-Report each task separately using the exact identifiers and titles:
+| Question | Finding | Evidence |
+|---|---|---|
+| Is the Markdown conversion adequate? | | |
+| Does test path selection reach Fzar? | | |
+| Does test metadata match Fzar? | | |
+| Are expected item-name assertions valid? | | |
+| Is there an extraction implementation defect? | | |
+| Is a separate Fzar regression test needed? | | |
 
-- `058 · S7-REMED-001`
-- `059 · S7-REMED-002`
+Choose and justify one implementation direction:
 
-For each task provide:
+A. Correct fixture/path selection only.
 
-1. **Status:** DONE, PARTIAL, NOT DONE, or BLOCKED.
-2. Exact files changed.
-3. Exact changes made.
-4. Before/after explanation of timestamp construction and the preserved naive UTC contract.
-5. Confirmation of how many targeted `datetime.utcnow()` occurrences remain (the expected count is zero).
-6. Explanation of the Trend freeze-clock test adjustment.
-7. Explanation of how the XLSX test now handles a missing `openpyxl` dependency.
-8. Confirmation that financial formulas, business logic, database contracts, and unrelated files were not changed.
-9. Any additional file required, with exact path and reason.
-10. Exact recommended local test commands, explaining what each command covers.
+B. Separate generic monthly extraction testing from Fzar-specific regression testing.
 
-### Recommended test commands for the user
+C. Fix an identified extraction implementation defect.
 
-Provide commands covering at least:
+D. Fzar requires a distinct extraction capability.
 
-`pytest src/tests/test_stage1_rules.py src/tests/test_stage2_kpis.py src/tests/test_stage4_trend.py -q`
+If evidence supports more than one, explain the order in which they should be addressed.
 
-`pytest src/tests/test_ingestion_fx.py -q`
+## Final report
 
-Also recommend the full suite after the focused tests pass:
+Provide:
 
-`pytest src/tests -q`
+1. Confirmed facts about the Fzar report.
+2. Exact failure mechanism, if identifiable.
+3. Evidence from the specified source files.
+4. Recommended implementation scope and exact files likely to change.
+5. Any additional file access required, with justification.
+6. A precise proposed test strategy.
 
-Do not execute these commands yourself.
-
-Do not edit `WORKFLOW_RULES.md` or `STAGE7_MASTER_WORKING_PACKET.md` under any circumstances.
-
-The work is not complete merely because code was edited. Report implementation evidence separately from test evidence; the user will provide the actual test results.
+This is an audit only. Do not implement the recommendation.
