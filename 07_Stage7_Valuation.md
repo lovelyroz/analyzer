@@ -119,7 +119,9 @@ Stage 9 may receive `previous_decision` from its caller when available for runti
 
 Do not add database models, tables, repositories, or persistence mechanisms for analytical outputs.
 
-**Unresolved conflict (implementation/documentation):** Stage 5 locked specification documents Forecast Versioning, Forecast Record, and preservation of prior Forecast versions (see `05_Stage5_Forecast_Engine.md` sections on Forecast Versioning and Forecast Record). Existing Forecast persistence models, if present in the codebase, must **not** be silently declared compliant with OA1.7. This conflict is recorded as an explicit unresolved implementation/documentation issue requiring a separate controlled audit and owner-authorized remediation. This documentation-only task does not delete or modify those models.
+**Documentation alignment:** The active Stage 5 contract in `05_Stage5_Forecast_Engine.md` is aligned with OA1.7: Forecast outputs are generated and consumed at runtime, and analytical outputs are not persisted in application database tables. The former Forecast-version history design is explicitly marked historical/superseded.
+
+**Implementation conflict remains open:** Existing Forecast persistence models, tables, repositories, write paths, or migrations must **not** be silently declared compliant with OA1.7. Their remediation remains tracked separately under S7-T026–S7-T029 (Tasks 054–057). This documentation correction does not delete or modify those implementation components and does not close their remediation tasks.
 
 ## OA1.8 What this amendment does not change
 

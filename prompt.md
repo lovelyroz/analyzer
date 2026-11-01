@@ -1,137 +1,69 @@
-# Stage 7 — Master Packet Update After Supplementary Audit
+# Task 053-10 — Reconcile Stale OA1.7 Documentation
 
-## نوع کار
-DOCS-ONLY — فقط به‌روزرسانی `STAGE7_MASTER_WORKING_PACKET.md`.
+**Work type:** DOCS-ONLY  
+**Code changes:** Not permitted  
+**Test execution:** Not permitted  
+**Git operations:** Not permitted
 
-## فایل‌های موردنیاز
-1. `STAGE7_MASTER_WORKING_PACKET.md` — تنها فایل مجاز برای تغییر.
-2. `WORKFLOW_RULES.md` — فقط برای رعایت قواعد جاری پروژه؛ READ-ONLY.
-3. `reply.md` — منبع شواهد Supplementary Audit و نتیجهٔ اجرای تست PDF؛ READ-ONLY.
+## Objective
 
-هیچ فایل دیگری را بررسی یا تغییر نده.
-هیچ تست، برنامه، فرمان Git یا فرمان دیتابیس اجرا نکن.
+Close the remaining documentation operation `053-10` by correcting stale wording in the OA1.7 section of:
 
-## هدف
-ثبت نتایج گزارش زیر در Master Packet و تهیهٔ فهرست دقیق کارهای باقی‌مانده:
+`07_Stage7_Valuation.md`
 
-`Supplementary Audit — Pytest Warnings, Skip Causes & Timestamp Safety`
+The current OA1.7 wording incorrectly states or implies that the Stage 5 documentation conflict remains unresolved.
 
-## تغییرات الزامی
+That statement is stale. The authoritative Stage 5 documentation has already been corrected in:
 
-### 1. به‌روزرسانی Task 019 · S7-TEST-003
-وضعیت را از OPEN به DONE تغییر بده؛ زیرا ممیزی Supplementary Audit علت هر دو Skip را مشخص کرده است:
+`05_Stage5_Forecast_Engine.md`
 
-- CODAL Golden PDF: نمونهٔ مناسب در مسیرهای candidate تست موجود یا معرفی نشده بود؛ وجود پوشهٔ `pdf/` به‌تنهایی تست Golden PDF را فعال نمی‌کند.
-- openpyxl: بسته در interpreter اجرای تست محلی در دسترس نبوده و `pytest.importorskip()` آن را به Skip تبدیل کرده است؛ درحالی‌که dependency در `requirements.txt` وجود دارد و CI آن را نصب می‌کند.
+The corrected Stage 5 contract prohibits persistence of analytical outputs in the database.
 
-DONE شدن Task 019 فقط به معنی تعیین علت Skipهاست؛ به معنی اصلاح کد یا حذف Skip نیست.
+## Required inspection files
 
-در داشبورد C-11 نیز همین وضعیت جدید ثبت شود. remediation مربوط به openpyxl به Task مستقل منتقل شود.
+Read these files only:
 
-### 2. ثبت Supplementary Audit
-در Master Packet یک بخش با عنوان مناسب برای این ممیزی اضافه کن و موارد زیر را ثبت کن:
+1. `WORKFLOW_RULES.md` — workflow constraints.
+2. `STAGE7_MASTER_WORKING_PACKET.md` — authoritative task status and scope.
+3. `05_Stage5_Forecast_Engine.md` — corrected Stage 5 contract; READ-ONLY.
+4. `07_Stage7_Valuation.md` — target document; the only file permitted to change.
+5. `reply.md` — READ-ONLY, only if needed to verify the recorded history of Task 053.
 
-- 153 رخداد `DeprecationWarning` در خروجی pytest.
-- 24 محل `datetime.utcnow()` در سورس و تست‌ها.
-- تفکیک تعداد Warningها از تعداد محل‌های کد.
-- حفظ قرارداد فعلی `naive UTC`.
-- عدم توصیه به تبدیل مستقیم timestampها به `aware UTC`.
-- نیاز به regression test برای حفظ قرارداد زمانی در Audit، KPI و Trend.
-- علت Skip مربوط به openpyxl و نیاز به تبدیل آن به dependency اجباری در تست.
-- حفظ Skip مربوط به Golden PDF در محیط فاقد نمونهٔ واقعی مناسب؛ بدون انتخاب تصادفی PDF و بدون تضعیف معیار تست.
+All listed files must be available in the supplied local project folder.
 
-این بخش باید گزارش ممیزی را از کار اجرایی بعدی تفکیک کند.
+## Permitted change
 
-### 3. ثبت کارهای اجرایی جدید
-سه Task جدید با شماره‌های آزاد بعد از 057 ایجاد کن. پیش از انتخاب شماره و شناسه، کل Master Packet را بررسی کن تا هیچ شماره یا شناسه‌ای تکراری نباشد.
+- Edit only the OA1.7 wording in `07_Stage7_Valuation.md`.
+- Remove or correct the obsolete statement that the Stage 5 documentation conflict remains unresolved.
+- Make the OA1.7 wording consistent with the already-corrected Stage 5 contract.
+- Preserve all unrelated requirements, decisions, technical constraints, and task references.
+- Do not expand the task into implementation or redesign.
 
-**Task A — Timestamp Warning Remediation**
-- جایگزینی 24 محل `datetime.utcnow()` با روش سازگار با قرارداد فعلی naive UTC.
-- اصلاح تست freeze مربوط به Trend.
-- افزودن یا اصلاح regression test برای naive UTC.
-- عدم تغییر فرمول‌های مالی، محاسبات KPI یا رفتار Trend.
-- عدم filter یا مخفی‌کردن Warningها.
-- اگر نیاز به helper مشترک وجود دارد، ابتدا layering و محل مناسب آن باید با شواهد بررسی شود.
+## Restrictions
 
-**Task B — openpyxl Skip Remediation**
-- تبدیل dependency اجباری openpyxl از رفتار `importorskip` به شکست روشن در صورت نصب نبودن.
-- حفظ تست واقعی XLSX؛ حذف یا تضعیف تست ممنوع.
-- نصب dependency و اجرای تست بر عهدهٔ کاربر است، نه Agent.
+- Do not modify `05_Stage5_Forecast_Engine.md`.
+- Do not modify `STAGE7_MASTER_WORKING_PACKET.md`, `WORKFLOW_RULES.md`, or `reply.md`.
+- Do not modify source code, tests, configuration, or any other documentation.
+- Do not create additional files.
+- Do not run tests, scripts, linters, or other commands.
+- Do not perform Git operations of any kind.
+- Do not weaken or remove the database non-persistence requirement.
+- Do not mark Task 053 as complete. Its status must remain `[~]` until every operation, including `053-10`, has been independently reviewed and closed.
 
-**Task C — Fzar PDF Extraction Failure Audit**
-- نتیجهٔ اجرای واقعی کاربر برای `Fzar.pdf` ثبت شود.
-- تست از Skip خارج شده و حداقل 5 ردیف استخراج کرده، اما assertion مربوط به وجود واژه‌های مورد انتظار در `item_name` شکست خورده است.
-- علت دقیق هنوز مشخص نیست: استخراج متن/جدول یا نگاشت داده به `item_name`.
-- این Task در ابتدا REPORT-ONLY/AUDIT است؛ تا پیش از اثبات علت، هیچ اصلاح کد یا تغییر معیار تست مجاز نیست.
-- مناسب‌بودن فایل Fzar برای نمونهٔ Golden نیز باید از نظر محتوای واقعی گزارش بررسی شود؛ از روی نام فایل نتیجه‌گیری نکن.
+If the required correction cannot be made using the listed files, stop and report the missing information. Do not inspect unrelated files or expand the scope.
 
-برای هر Task جدید، شماره، شناسهٔ ثابت، وضعیت، وابستگی‌ها و معیار پذیرش را ثبت کن.
+## Completion report
 
-### 4. ثبت خروجی واقعی Fzar
-این فرمان و نتیجهٔ آن را در بخش شواهد تست ثبت کن:
+Report directly to the user. Do not write the report into `reply.md` or another repository file.
 
-```powershell
-$env:CODAL_SAMPLE_PDF = "D:\winprojects\analyzer\pdf\Fzar.pdf"
-pytest src/tests/test_codal_extraction.py::test_real_codal_monthly_activity_pdf -q -rs
-```
+Include:
 
-نتیجه:
-- 1 failed
-- تست از Skip خارج شد.
-- حداقل 5 raw line استخراج شد.
-- assertion خط 412 در `test_codal_extraction.py` شکست خورد؛ هیچ‌کدام از واژه‌های مورد انتظار در `item_name` نبودند.
+1. Whether `053-10` was completed.
+2. The exact OA1.7 statement or passage that was corrected.
+3. A concise description of the replacement wording.
+4. Confirmation that the replacement agrees with `05_Stage5_Forecast_Engine.md`.
+5. The exact path of the only modified file.
+6. Confirmation that no other files, code, tests, or configuration were changed.
+7. Confirmation that no tests or Git operations were run.
 
-این نتیجه را PASS یا مشکل حل‌شده ثبت نکن.
-
-### 5. حفظ وضعیت Taskهای قبلی
-صرفاً به دلیل تکمیل پنج بستهٔ ممیزی، Taskهای اجرایی را DONE نکن.
-
-وضعیت‌های زیر باید حفظ شوند، مگر اینکه شواهد تازه و صریح در `reply.md` خلاف آن را اثبات کند:
-
-- 022، 023، 024، 027: BLOCKED
-- 029: PARTIAL
-- 030: PARTIAL
-- 032: BLOCKED
-- 033: BLOCKED
-- 034: OPEN
-- 036: BLOCKED
-- 037: OPEN
-- 038: PARTIAL
-- 039: BLOCKED
-- 052: BLOCKED
-- 053: PARTIAL؛ عملیات 053-10 باز است.
-- 054 تا 057: OPEN
-
-همچنین:
-- 021 تا زمان اجرای تست‌های OA1 توسط کاربر OPEN بماند.
-- 044 تا ارائهٔ شواهد کامل تست‌های لازم توسط کاربر OPEN بماند.
-- 053-10، 054–057 و سایر موانع حیاتی در نقشهٔ کار باقی بمانند.
-
-### 6. نقشهٔ اجرایی
-در Master Packet یک خلاصهٔ اولویت‌بندی‌شده اضافه کن:
-
-1. تکمیل اصلاح مستنداتی 053-10.
-2. اجرای remediation مربوط به Forecast persistence در 054–057.
-3. اصلاح Timestamp Warningها.
-4. اصلاح Skip مربوط به openpyxl.
-5. ممیزی علت شکست Fzar و سپس، فقط در صورت اثبات نقص، تعریف اصلاح کد.
-6. تعیین تکلیف موانع OA1 و provenance تاریخی.
-7. تعیین تکلیف مسیر واقعی تولیدی تا Stage 9 و E2E.
-8. بازنگری نهایی engine پس از رفع یا تعیین تکلیف وابستگی‌ها.
-9. اجرای تست‌های هدفمند و full suite توسط کاربر و سپس بستن معیارهای پایان Stage 7.
-
-### 7. محدودیت‌های نهایی
-- وضعیت کلی Stage 7 همچنان OPEN بماند.
-- هیچ Task مسدودی صرفاً برای کوتاه‌شدن فهرست DONE نشود.
-- هیچ فرمول مالی، threshold یا قرارداد provenance جدیدی اختراع نشود.
-- `reply.md` و `WORKFLOW_RULES.md` تغییر نکنند.
-- فقط `STAGE7_MASTER_WORKING_PACKET.md` تغییر کند.
-- تاریخ آخرین بازنگری و خلاصهٔ تغییرات به‌روزرسانی شود.
-
-## خروجی مورد انتظار
-- نسخهٔ به‌روزشدهٔ Master Packet.
-- فهرست Taskهای تغییر وضعیت‌یافته و دلیل هر تغییر.
-- فهرست Taskهای جدید و وابستگی‌هایشان.
-- خلاصهٔ نقشهٔ کار باقی‌مانده.
-
-هیچ تستی اجرا نکن و هیچ ادعای اجرای تست نداشته باش.
+Do not claim completion if the correction was not actually made.
