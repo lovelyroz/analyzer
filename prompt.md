@@ -1,276 +1,262 @@
-# Package 5 — Regression, Audit & Stage 7 Closure
+# Supplementary Audit — Pytest Warnings, Skip Causes & Timestamp Safety
 
 ## بخش اول — دستورالعمل Agent
 
-### 1. نوع و محدودهٔ کار
+### 1. نوع مأموریت
 
-**Task Type:** REPORT-ONLY + TEST AUDIT + FINAL EXIT-CRITERIA REVIEW
+**REPORT-ONLY — NO CODE CHANGES**
 
-این مأموریت صرفاً شامل ممیزی کد، مستندات، تست‌ها و معیارهای خروج Stage 7 است.
+این مأموریت برای ممیزی Warningهای خروجی تست، تعیین تکلیف دو Skip و ارائهٔ برنامهٔ اصلاح است.
 
 - هیچ کدی را تغییر نده.
 - هیچ تستی را تغییر نده.
 - هیچ مستندی را تغییر نده.
-- هیچ تست یا فرمانی را اجرا نکن.
-- هیچ فایل یا گزارشی را در GitHub یا مخزن ثبت نکن.
-- گزارش نهایی را مستقیماً به کاربر تحویل بده.
+- هیچ تست یا فرمانی اجرا نکن.
+- هیچ Git operation انجام نده.
+- هیچ فایلی را در GitHub یا مخزن ثبت نکن.
+- گزارش را مستقیماً به کاربر تحویل بده.
 
-### 2. محل اجرا و فایل‌های ورودی — الزام قطعی
+### 2. محل اجرا و کنترل فایل‌ها
 
-کار را فقط روی نسخهٔ محلی پروژه با نام پوشهٔ `analyzer` انجام بده.
+کار فقط روی نسخهٔ محلی پروژه `analyzer` انجام شود.
 
-**GitHub منبع اجرای این مأموریت نیست.** فرض نکن به مخزن GitHub دسترسی داری و برای خواندن یا تغییر فایل‌ها از GitHub استفاده نکن.
+تمام فایل‌های زیر باید واقعاً در ZIP یا پوشهٔ کاری محلی Agent موجود باشند. پیش از شروع، وجود آن‌ها را بررسی کن.
 
-تمام فایل‌های فهرست‌شده در بخش «فهرست فایل‌های ورودی» باید پیش از شروع کار، واقعاً داخل ZIP یا پوشهٔ کاری محلی در اختیار تو باشند.
+فقط فایل‌های ارائه‌شده مجاز به بررسی هستند. اگر فایل دیگری ضروری بود، مسیر دقیق و دلیل نیاز را اعلام کن و متوقف شو.
 
-پیش از شروع:
+`PROMPT.md` و `prompt.md` خارج از scope هستند.
 
-1. وجود تک‌تک فایل‌های فهرست‌شده را بررسی کن.
-2. مسیر و وضعیت وجود فایل‌ها را گزارش کن.
-3. اگر حتی یک فایل ضروری موجود نبود، کار وابسته به آن فایل را انجام نده و کمبود را دقیقاً اعلام کن.
-4. اگر برای تکمیل مأموریت به فایلی خارج از فهرست نیاز داشتی، مسیر و دلیل ضرورت آن را اعلام کن و برای دریافت اجازه متوقف شو.
-5. بدون اجازه، فایل دیگری را جست‌وجو یا بررسی نکن.
+تمام فایل‌های ورودی READ-ONLY هستند.
 
-### 3. قواعد دسترسی و تغییر فایل‌ها
-
-- تمام فایل‌های ورودی صرفاً **READ-ONLY** هستند.
-- هیچ فایلی مجاز به تغییر نیست.
-- `PROMPT.md` و `prompt.md` خارج از محدوده هستند و نباید بررسی شوند.
-- هیچ Git commit، push، pull، branch یا remote operation انجام نده.
-- تست‌ها را حذف، تضعیف، skip یا برای سبز شدن مصنوعی اصلاح نکن.
-- وضعیت BLOCKED را با مستندسازی، توضیح یا تست غیرواقعی به DONE تبدیل نکن.
-- یک مسیر E2E مصنوعی برای اثبات اتصال مراحل ایجاد یا فرض نکن.
-
-### 4. فهرست فایل‌های ورودی
-
-تمام فایل‌های زیر باید در بستهٔ محلی Agent موجود باشند.
+### 3. فایل‌های مجاز برای بررسی
 
 **مستندات و تنظیمات**
 
 - `WORKFLOW_RULES.md`
 - `STAGE7_MASTER_WORKING_PACKET.md`
-- `07_Stage7_Valuation.md`
-- `05_Stage5_Forecast_Engine.md`
-- `.github/workflows/tests.yml`
 - `requirements.txt`
+- `.github/workflows/tests.yml`
 
-**کدهای مرتبط**
+**کد**
 
-- `src/valuation/engine.py`
-- `src/valuation/service.py`
-- `src/valuation/schema.py`
-- `src/valuation/models.py`
-- `src/valuation/parameters.py`
-- `src/forecast/service.py`
-- `src/forecast/schema.py`
-- `src/market/service.py`
-- `src/ingestion/market/queries.py`
-- `src/decision/service.py`
+- `src/ingestion/codal/ingestion.py`
+- `src/models/audit.py`
+- `src/kpi/universal.py`
+- `src/kpi/conditional.py`
+- `src/kpi/industry.py`
+- `src/kpi/schema.py`
+- `src/trend/engine.py`
+- `src/trend/schema.py`
 
-**تمام ۳۵ فایل تست**
+**تست‌ها**
 
-1. `src/tests/test_codal_acquisition.py`
-2. `src/tests/test_codal_digit_normalization.py`
-3. `src/tests/test_codal_extraction.py`
-4. `src/tests/test_codal_pdf_extraction.py`
-5. `src/tests/test_ingestion_fx.py`
-6. `src/tests/test_ingestion_ohlc.py`
-7. `src/tests/test_jalali_contract.py`
-8. `src/tests/test_market_history_query.py`
-9. `src/tests/test_stage1_database_architecture.py`
-10. `src/tests/test_stage1_database_integrity.py`
-11. `src/tests/test_stage1_rules.py`
-12. `src/tests/test_stage2_kpis.py`
-13. `src/tests/test_stage3_scoring.py`
-14. `src/tests/test_stage4_trend.py`
-15. `src/tests/test_stage5_forecast.py`
-16. `src/tests/test_stage6_artifact_boundary.py`
-17. `src/tests/test_stage6_artifact_identity.py`
-18. `src/tests/test_stage6_evaluation.py`
-19. `src/tests/test_stage6_evaluation_foundation.py`
-20. `src/tests/test_stage6_evaluation_metrics.py`
-21. `src/tests/test_stage6_p25_adversarial.py`
-22. `src/tests/test_stage6_p25_selection.py`
-23. `src/tests/test_stage6_p38_closure.py`
-24. `src/tests/test_stage6_p39_cutoff.py`
-25. `src/tests/test_stage6_p40_duplicates.py`
-26. `src/tests/test_stage6_p41_cutoff_identity.py`
-27. `src/tests/test_stage6_production_pipeline.py`
-28. `src/tests/test_stage6_reliability_governance.py`
-29. `src/tests/test_stage6_scenario_isolation.py`
-30. `src/tests/test_stage789_service_interface.py`
-31. `src/tests/test_stage7_valuation.py`
-32. `src/tests/test_stage8_market.py`
-33. `src/tests/test_stage8_market_parameters.py`
-34. `src/tests/test_stage8_market_service.py`
-35. `src/tests/test_stage9_decision.py`
+- `src/tests/test_stage1_rules.py`
+- `src/tests/test_stage2_kpis.py`
+- `src/tests/test_stage4_trend.py`
+- `src/tests/test_codal_extraction.py`
+- `src/tests/test_ingestion_fx.py`
+- `src/tests/test_codal_pdf_extraction.py`
 
-### 5. وظایف ممیزی
+**دادهٔ نمونه**
 
-#### Task 019 — S7-TEST-003: شناسایی دو تست Skip شده
+- تمام فایل‌های موجود در پوشهٔ محلی `pdf/`، فقط برای بررسی وجود و قابلیت استفاده به‌عنوان نمونهٔ PDF واقعی CODAL.
 
-علت دقیق دو تست Skip شده در اجرای قبلی مجموعهٔ کامل تست‌ها را بررسی کن.
+### 4. شواهد اجرای تست کاربر
 
-شواهد موردنیاز:
+این خروجی‌ها توسط کاربر اجرا شده‌اند و مبنای ممیزی هستند.
 
-- محل تعریف هر Skip در کد تست.
-- شرط یا دلیل ثبت‌شده برای Skip.
-- اینکه Skip دائمی است یا وابسته به محیط، تنظیمات یا پیش‌شرط خاص.
-- آیا Skip از نظر طراحی قابل قبول است یا پوشش تست ضروری را حذف کرده است؟
+تست هدفمند:
 
-**نکته:** توضیح موجود در سورس تست را با علت واقعی Skip شدن در اجرای محلی یکی فرض نکن. علت runtime فقط با خروجی واقعی pytest و گزینهٔ `-rs` قابل تأیید است. اگر خروجی اجرای جدید در اختیار تو نیست، این محدودیت را صریحاً گزارش کن.
-
-#### Task 021 — S7-TEST-005: ممیزی پوشش تست‌های OA1
-
-پوشش واقعی تست‌ها را در برابر الزامات OA1 بررسی کن.
-
-حداقل این موارد باید بررسی شوند:
-
-1. Historical Forward P/E بر اساس داده‌های خام همان شرکت.
-2. استفاده از مشاهدات مالی و بازار همراه با provenance معتبر.
-3. انتخاب آخرین مجموعهٔ کامل و معتبر اطلاعات مالی.
-4. انتخاب قیمت بازار بر اساس تاریخ جلالی و تولید هشدار تاریخ واقعی انتخاب‌شده.
-5. رد کردن P/E از پیش محاسبه‌شده در صورت فقدان provenance معتبر.
-6. مستقل بودن مسیر ارزش‌گذاری از Industry P/E.
-7. کنترل سازگاری هویت Forecast با شرکت و دورهٔ ارزش‌گذاری.
-8. محافظت در برابر Overflow و مقادیر عددی غیرمتناهی.
-
-برای هر الزام مشخص کن:
-
-- تست مرتبط کدام است؟
-- تست چه رفتاری را واقعاً اثبات می‌کند؟
-- چه چیزی را اثبات نمی‌کند؟
-- آیا تست مثبت و منفی کافی وجود دارد؟
-- آیا تست صرفاً interface-level است یا رفتار واقعی مسیر اجرایی را پوشش می‌دهد؟
-
-وضعیت‌های قبلی را بدون شواهد جدید تغییر نده:
-
-- Task 025 و 026 قبلاً DONE شده‌اند.
-- Task 022، 023، 024 و 027 همچنان BLOCKED هستند، مگر اینکه شواهد واقعی و قابل بررسی خلاف آن را ثابت کند.
-
-برای قراردادهای پیاده‌سازی‌نشده، تست صوری یا مصنوعی را به‌عنوان اثبات تکمیل معرفی نکن.
-
-#### Task 037 — S7-PLAN-003: برنامهٔ اجرای تست نهایی
-
-فرمان‌های دقیق لازم برای اجرای تست‌های هدفمند و سپس کل مجموعه را ارائه کن.
-
-فرمان پیشنهادی تست‌های هدفمند:
-
-```powershell
+```text
 pytest src/tests/test_market_history_query.py src/tests/test_stage789_service_interface.py src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -q -rs
+
+862 passed in 5.54s
 ```
 
-فرمان مجموعهٔ کامل:
+تست کامل:
 
-```powershell
+```text
 pytest src/tests -q -rs
+
+1903 passed, 2 skipped, 153 warnings in 235.08s
 ```
 
-این فرمان‌ها را فقط پیشنهاد بده؛ اجرا نکن.
+علت Skipها در خروجی واقعی:
 
-کاربر شخصاً تست‌ها را در محیط محلی خود اجرا می‌کند و خروجی واقعی را برای بررسی ارائه خواهد کرد.
+```text
+SKIPPED [1] src\tests\test_codal_extraction.py:398:
+real Codal sample PDF not available in CI
 
-#### Task 020 — S7-TEST-004: بررسی امکان E2E واقعی
+SKIPPED [1] src\tests\test_ingestion_fx.py:194:
+could not import 'openpyxl': No module named 'openpyxl'
+```
 
-مسیر واقعی اجرای برنامه را از شواهد موجود بررسی کن.
+در Warning Summary، تمام Warningهای گزارش‌شده از نوع `DeprecationWarning` مربوط به `datetime.utcnow()` هستند.
+
+محل‌های گزارش‌شده:
+
+- `src/ingestion/codal/ingestion.py:84`
+- `src/tests/test_stage1_rules.py:234`
+- `src/kpi/universal.py:12, 17, 22, 27, 33, 38, 43, 48, 53, 60, 71`
+- `src/kpi/conditional.py:33`
+- `src/kpi/industry.py:12–16, 23–25, 39`
+- `src/trend/engine.py:235`
+
+این فهرست را با سورس واقعی تطبیق بده و اگر محل دیگری در Warning Summary وجود دارد، آن را نیز ثبت کن.
+
+---
+
+### 5. Task W-001 — ممیزی کامل 153 Warning
+
+هدف، تعیین منشأ دقیق تمام Warningها و مشخص‌کردن اصلاح ایمن آن‌هاست.
+
+برای هر محل فراخوانی `datetime.utcnow()` مشخص کن:
+
+1. فایل و شماره خط.
+2. تابع و مسیر اجرایی‌ای که آن را فراخوانی می‌کند.
+3. نوع timestamp تولیدشده.
+4. آیا timestamp به DB، API، خروجی محاسباتی یا صرفاً metadata داخلی منتقل می‌شود؟
+5. آیا مصرف‌کنندگان آن naive UTC یا timezone-aware UTC انتظار دارند؟
+6. آیا تبدیل نوع timestamp می‌تواند روی مقایسه، serialization، persistence یا PIT اثر بگذارد؟
+7. چه تست‌هایی رفتار فعلی را تثبیت کرده‌اند؟
+
+**بررسی ویژهٔ timestampها**
+
+در `src/models/audit.py` تابع `_utc_now_naive()` وجود دارد که زمان UTC را به naive تبدیل می‌کند.
+
+بررسی کن:
+
+- آیا این تابع قرارداد موجود پروژه را نشان می‌دهد؟
+- آیا برای تمام موارد Warning مناسب است؟
+- آیا لایه‌های KPI و Trend قرارداد زمانی یکسانی دارند؟
+- آیا تبدیل به timezone-aware می‌تواند ناسازگاری با مدل‌های SQLAlchemy یا تست‌ها ایجاد کند؟
+- آیا بهتر است تابع مشترک و مشخصی برای تولید UTC timestamp ایجاد شود یا قراردادهای فعلی حفظ شوند؟
+
+هیچ جایگزینی را صرفاً به دلیل پیشنهاد Python انجام‌شده و صحیح فرض نکن.
+
+**خروجی مورد انتظار:**
+
+یک جدول کامل شامل تمام محل‌های Warning، نوع داده، مصرف‌کننده، ریسک تغییر و روش اصلاح پیشنهادی.
+
+همچنین مشخص کن آیا هر 153 Warning از همین call siteها ناشی شده‌اند یا خیر. تعداد Warningها را با تعداد call siteها اشتباه نگیر.
+
+### 6. Task W-002 — تعیین تکلیف Skip مربوط به CODAL PDF
+
+تست زیر Skip شده است:
+
+`src/tests/test_codal_extraction.py:398`
+
+شرط `_candidate_real_codal_paths()` و متغیر `CODAL_SAMPLE_PDF` را بررسی کن.
 
 موارد لازم:
 
-- آیا entrypoint واقعی برای اجرای زنجیرهٔ مراحل وجود دارد؟
-- مالک Session و چرخهٔ عمر آن مشخص است؟
-- اتصال واقعی Forecast، Fundamental، Market، Valuation و Decision اثبات شده است؟
-- آیا تست E2E موجود واقعاً از مسیر تولید استفاده می‌کند یا نتایج مراحل قبلی را مستقیماً به‌صورت fixture/helper می‌سازد؟
-- آیا می‌توان یک E2E واقعی و معتبر اجرا کرد؟
+- تست دقیقاً چه مسیرهایی را برای نمونهٔ PDF بررسی می‌کند؟
+- آیا پوشهٔ `pdf/` پروژه در این مسیرها قرار دارد؟
+- آیا نمونه‌های واقعی موجود در پروژه قابل استفاده‌اند؟
+- آیا کاربر باید متغیر محیطی `CODAL_SAMPLE_PDF` را تنظیم کند؟
+- آیا Skip فقط برای CI بدون نمونهٔ واقعی قابل قبول است؟
+- آیا امکان اجرای واقعی این تست در محیط محلی کاربر وجود دارد؟
 
-اگر مسیر تولید واقعی اثبات نشده است، Task 020 باید BLOCKED بماند.
+Skip را بدون بررسی نمونه‌های واقعی، قابل قبول اعلام نکن.
 
-وجود تستی که فقط interface سرویس‌ها را بررسی می‌کند، اثبات E2E واقعی نیست.
+### 7. Task W-003 — تعیین تکلیف Skip مربوط به openpyxl
 
-#### Task 034 — S7-T012: ممیزی معیارهای خروج Stage 7
+تست زیر Skip شده است:
 
-تمام معیارهای خروج 040 تا 047 در بخش Exit Criteria فایل `STAGE7_MASTER_WORKING_PACKET.md` را جداگانه بررسی کن.
+`src/tests/test_ingestion_fx.py:194`
 
-برای هر معیار ارائه بده:
+شرط `pytest.importorskip("openpyxl")` را بررسی کن.
 
-- وضعیت: PASS / BLOCKED / OPEN
-- شواهد دقیق از فایل، تابع، قرارداد یا تست
-- شکاف باقی‌مانده
-- Task مسئول رفع شکاف
-- اینکه آیا شواهد واقعاً معیار را اثبات می‌کنند یا صرفاً ادعای انجام کار هستند
+موارد لازم:
 
-موارد زیر را با دقت ویژه بررسی کن:
+- آیا `openpyxl` در `requirements.txt` وجود دارد؟
+- آیا GitHub Actions آن را از طریق requirements نصب می‌کند؟
+- آیا این وابستگی در پروژه mandatory است یا optional؟
+- چرا اجرای محلی کاربر نتوانسته آن را import کند؟
+- آیا استفاده از `importorskip` برای وابستگی‌ای که در requirements اجباری اعلام شده مناسب است؟
+- رفتار صحیح تست در نبود وابستگی چیست: Skip، Fail یا رفتار دیگری؟
 
-- ادعای PIT بدون provenance و شواهد زمانی معتبر پذیرفته نیست.
-- تاریخ مشاهده به‌تنهایی اثبات‌کنندهٔ زمان انتشار یا در دسترس بودن داده نیست.
-- نبود vintage تاریخی نباید با پارامترهای فعلی جبران یا جعل شود.
-- نبود منبع معتبر Historical P/E باید صریحاً ثبت شود.
-- کامل بودن ورودی‌های مالی باید واقعاً اثبات شده باشد.
-- اتصال E2E باید از مسیر واقعی تولید اثبات شود.
-- تصمیم عدم ذخیره‌سازی خروجی‌های تحلیلی در DB همچنان باید رعایت شود.
-- موارد Forecast Persistence و باقیماندهٔ OA1.7، به‌ویژه `053-10`، نباید نادیده گرفته شوند.
-- متن قدیمی و متناقض OA1.7 در `07_Stage7_Valuation.md` باید در گزارش مشخص شود.
+فرمان دقیق نصب یا بازسازی محیط را پیشنهاد بده، اما اجرا نکن.
 
-#### Task 039 — S7-PLAN-005: تعیین وضعیت نهایی Stage 7
+### اصلاح بخش W-002 — تعیین تکلیف Skip مربوط به CODAL PDF
 
-پس از بررسی تمام شواهد، دقیقاً یکی از وضعیت‌های زیر را برای Stage 7 انتخاب کن:
+**محدودیت مهم مصرف توکن:**
 
-**CLOSED**
+- فایل‌های PDF اصلی پروژه نباید داخل ZIP یا بستهٔ ورودی Agent قرار بگیرند.
+- Agent اجازه ندارد PDFها را بازخوانی، استخراج متن یا تحلیل محتوایی کند.
+- برای این Task، بررسی محتوای PDF ضروری نیست.
 
-فقط زمانی مجاز است که تمام معیارهای خروج حیاتی با شواهد واقعی برآورده شده باشند.
+Agent فقط باید:
 
-**OPEN — BLOCKED**
+1. تابع `_candidate_real_codal_paths()` در `src/tests/test_codal_extraction.py` را بررسی کند.
+2. مسیرهای جست‌وجوی نمونه PDF و متغیر محیطی `CODAL_SAMPLE_PDF` را مشخص کند.
+3. ساختار پوشهٔ `pdf/` و صرفاً نام فایل‌های موجود در آن را بررسی کند.
+4. تعیین کند آیا مسیر نمونه‌های موجود با مسیرهای مورد انتظار تست سازگار است یا خیر.
+5. فرمان یا تنظیم محیطی لازم برای فعال‌کردن تست را پیشنهاد دهد.
 
-وقتی تکمیل Stage 7 به علت فقدان قرارداد، مسیر تولید، داده، provenance یا شواهد ضروری ممکن نیست.
+اگر برای تشخیص مشکل واقعاً به محتوای PDF نیاز بود، Agent باید متوقف شود و نام فایل موردنیاز و دلیل ضرورت بررسی محتوای آن را اعلام کند.
 
-**OPEN — NOT COMPLETE**
+در آن صورت، ابتدا فایل منتخب به Markdown تبدیل می‌شود و فقط نسخهٔ Markdown در اختیار Agent قرار خواهد گرفت.
 
-وقتی کارهای ضروری هنوز انجام نشده‌اند، اما مانع خارجی یا وابستگی حل‌نشده‌ای وجود ندارد.
+**در این مأموریت هیچ PDF اصلی نباید به Agent تحویل داده شود.**
 
-در تعیین وضعیت نهایی، تمام این موارد را صریحاً تعیین تکلیف کن:
+### 8. Task W-004 — برنامهٔ اصلاح و Regression
 
-- Tasks 019، 020 و 021
-- Tasks 022 تا 027
-- Tasks 029 تا 034
-- Tasks 035 تا 039
-- Tasks 053 تا 057، به‌ویژه باقیماندهٔ OA1.7 یعنی `053-10`
+پس از ممیزی W-001 تا W-003، برنامهٔ اصلاح را ارائه بده.
 
-تفاوت بین «پیاده‌سازی انجام شده»، «تست موفق»، «ممیزی انجام شده» و «معیار خروج اثبات شده» را حفظ کن.
+برای هر اصلاح مشخص کن:
 
-### 6. قالب گزارش نهایی
+- فایل‌های دقیق مجاز برای تغییر در مرحلهٔ بعد.
+- رفتار فعلی که باید حفظ شود.
+- تست‌های رگرسیون لازم.
+- خطر احتمالی تغییر قرارداد زمانی.
+- فرمان‌های تست هدفمند.
+- فرمان تست کامل.
 
-گزارش را با ساختار زیر تحویل بده:
+در این مرحله هیچ اصلاحی انجام نده.
 
-1. **Input File Verification** — فهرست فایل‌های موجود و مفقود در بستهٔ محلی.
-2. **Task 019 — Skip Audit** — علت و شواهد دو Skip.
-3. **Task 021 — OA1 Test Coverage Matrix** — ماتریس پوشش الزامات و شکاف‌ها.
-4. **Task 037 — Final Test Commands** — فرمان‌های هدفمند و کامل.
-5. **Task 020 — E2E Audit** — نتیجهٔ بررسی مسیر واقعی تولید.
-6. **Task 034 — Exit Criteria Review** — وضعیت تک‌تک معیارهای 040 تا 047.
-7. **Task 039 — Final Stage 7 Disposition** — یکی از سه وضعیت مجاز همراه با دلیل.
-8. **Task Status Summary** — وضعیت نهایی پیشنهادی تمام Taskهای مرتبط.
-9. **Remaining Blockers** — فهرست دقیق موانع، وابستگی‌ها و مسئول هرکدام.
-10. **User Execution Handoff** — فرمان‌هایی که کاربر باید اجرا کند و خروجی‌هایی که باید تحویل دهد.
+**ممنوعیت‌های مهم:**
 
-گزارش باید مبتنی بر شواهد باشد. هرجا شواهد کافی نیست، صریحاً بنویس «اثبات نشده» یا «نیازمند خروجی اجرای کاربر».
+- Warningها را با `filterwarnings` یا غیرفعال‌کردن Warningها پنهان نکن.
+- تست‌ها را برای حذف Warning یا Skip ضعیف نکن.
+- تست واقعی را حذف نکن.
+- timestampها را بدون بررسی قرارداد مصرف‌کننده از naive به aware یا برعکس تبدیل نکن.
+- برای رفع Warningها هیچ فرمول مالی، پارامتر، آستانه یا رفتار محاسباتی را تغییر نده.
+- تعداد Warningها را صرفاً با کاهش خروجی گزارش‌شده کمتر اعلام نکن.
 
-**هیچ Task یا معیار خروجی را صرفاً برای بستن Stage 7 به DONE یا PASS تغییر نده.**
+### 9. قالب گزارش
 
----
+گزارش را دقیقاً با بخش‌های زیر تحویل بده:
+
+1. **Input File Verification**
+2. **W-001 — Complete Warning Inventory**
+3. **Timestamp Contract & Compatibility Analysis**
+4. **W-002 — CODAL PDF Skip Disposition**
+5. **W-003 — openpyxl Skip Disposition**
+6. **W-004 — Safe Remediation Plan**
+7. **Exact Files to Change in the Next Phase**
+8. **Required Regression Tests**
+9. **Recommended Test Commands**
+10. **Unresolved Risks and Dependencies**
+
+برای هر نتیجه، فایل و شماره خط را ذکر کن.
+
+اگر چیزی اثبات نشده است، صریحاً بنویس «اثبات نشده».
+
+هیچ Taskی را در Master Packet تغییر نده؛ گزارش را مستقیماً به کاربر تحویل بده.
 
 ## بخش دوم — دستور کار کاربر
 
 ### Task List
 
-- [ ] بررسی وجود تمام فایل‌های ورودی در بستهٔ محلی Agent.
-- [ ] ممیزی دو تست Skip شده و علت آن‌ها.
-- [ ] بررسی پوشش تست‌های OA1 و شکاف‌های باقی‌مانده.
-- [ ] بررسی مسیر واقعی E2E و چرخهٔ عمر Session.
-- [ ] بررسی جداگانهٔ معیارهای خروج 040 تا 047.
-- [ ] تعیین وضعیت نهایی Stage 7 و تمام Taskهای باقی‌مانده.
-- [ ] ارائهٔ فرمان‌های دقیق تست هدفمند و مجموعهٔ کامل.
+- [ ] ممیزی کامل 153 Warning و تعیین منشأ آن‌ها.
+- [ ] بررسی ایمنی قراردادهای UTC و timestampها.
+- [ ] تعیین تکلیف Skip مربوط به نمونهٔ PDF واقعی CODAL.
+- [ ] تعیین تکلیف Skip مربوط به `openpyxl`.
+- [ ] ارائهٔ برنامهٔ اصلاح کد و تست‌های Regression بدون اجرای تست توسط Agent.
 
 ### Expected Result
 
-یک گزارش ممیزی نهایی مبتنی بر شواهد واقعی، شامل وضعیت هر Task، علت موانع باقی‌مانده، وضعیت معیارهای خروج و فرمان‌های اجرای تست توسط کاربر.
+گزارش دقیق منشأ Warningها و Skipها، همراه با برنامهٔ اصلاح ایمن و فهرست فایل‌های لازم برای مرحلهٔ بعد.
 
-**این مأموریت هیچ تغییر کد یا مستندی ندارد و هیچ تستی توسط Agent اجرا نمی‌شود.**
+**این مأموریت REPORT-ONLY است و هیچ فایلی تغییر نمی‌کند.**
