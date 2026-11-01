@@ -233,3 +233,13 @@ pytest src/tests/test_stage6_production_pipeline.py src/tests/test_stage789_serv
 فایل‌های بررسی‌شده شامل تمام ۵۹ فایل فهرست‌شده در بخش ۳ `PROMPT.md` بودند: اسناد governance، فایل‌های Forecast، مدل‌ها و migration، مصرف‌کننده‌های Stage 6/7/9 و تست‌های همان بخش. سه فایل `src/models/audit.py`، `src/models/fx.py` و `src/models/market.py` نیز فقط‌خواندنی و با اجازهٔ شما بررسی شدند. `src/scripts/init_db.py` بررسی شد و تغییری در آن لازم نبود. فایل‌های Stage 6 و Stage 7 تغییر نکردند.
 
 **هیچ تست، کد برنامه، migration، عملیات دیتابیس یا عملیات Git اجرا نشد.** فقط دستورهای خواندنی برای بررسی فایل‌ها و جست‌وجو استفاده شدند.
+
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage1_database_integrity.py src/tests/test_stage5_forecast.py -q
+................................................................................................................ [ 36%]
+................................................................................................................ [ 72%]
+.......................................................................................                          [100%]
+311 passed in 1.50s
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage6_production_pipeline.py src/tests/test_stage789_service_interface.py src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q
+................................................................................................................ [ 64%]
+.............................................................                                                    [100%]
+173 passed in 1.09s
