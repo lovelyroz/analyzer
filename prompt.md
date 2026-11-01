@@ -1,262 +1,137 @@
-# Supplementary Audit — Pytest Warnings, Skip Causes & Timestamp Safety
+# Stage 7 — Master Packet Update After Supplementary Audit
 
-## بخش اول — دستورالعمل Agent
+## نوع کار
+DOCS-ONLY — فقط به‌روزرسانی `STAGE7_MASTER_WORKING_PACKET.md`.
 
-### 1. نوع مأموریت
+## فایل‌های موردنیاز
+1. `STAGE7_MASTER_WORKING_PACKET.md` — تنها فایل مجاز برای تغییر.
+2. `WORKFLOW_RULES.md` — فقط برای رعایت قواعد جاری پروژه؛ READ-ONLY.
+3. `reply.md` — منبع شواهد Supplementary Audit و نتیجهٔ اجرای تست PDF؛ READ-ONLY.
 
-**REPORT-ONLY — NO CODE CHANGES**
+هیچ فایل دیگری را بررسی یا تغییر نده.
+هیچ تست، برنامه، فرمان Git یا فرمان دیتابیس اجرا نکن.
 
-این مأموریت برای ممیزی Warningهای خروجی تست، تعیین تکلیف دو Skip و ارائهٔ برنامهٔ اصلاح است.
+## هدف
+ثبت نتایج گزارش زیر در Master Packet و تهیهٔ فهرست دقیق کارهای باقی‌مانده:
 
-- هیچ کدی را تغییر نده.
-- هیچ تستی را تغییر نده.
-- هیچ مستندی را تغییر نده.
-- هیچ تست یا فرمانی اجرا نکن.
-- هیچ Git operation انجام نده.
-- هیچ فایلی را در GitHub یا مخزن ثبت نکن.
-- گزارش را مستقیماً به کاربر تحویل بده.
+`Supplementary Audit — Pytest Warnings, Skip Causes & Timestamp Safety`
 
-### 2. محل اجرا و کنترل فایل‌ها
+## تغییرات الزامی
 
-کار فقط روی نسخهٔ محلی پروژه `analyzer` انجام شود.
+### 1. به‌روزرسانی Task 019 · S7-TEST-003
+وضعیت را از OPEN به DONE تغییر بده؛ زیرا ممیزی Supplementary Audit علت هر دو Skip را مشخص کرده است:
 
-تمام فایل‌های زیر باید واقعاً در ZIP یا پوشهٔ کاری محلی Agent موجود باشند. پیش از شروع، وجود آن‌ها را بررسی کن.
+- CODAL Golden PDF: نمونهٔ مناسب در مسیرهای candidate تست موجود یا معرفی نشده بود؛ وجود پوشهٔ `pdf/` به‌تنهایی تست Golden PDF را فعال نمی‌کند.
+- openpyxl: بسته در interpreter اجرای تست محلی در دسترس نبوده و `pytest.importorskip()` آن را به Skip تبدیل کرده است؛ درحالی‌که dependency در `requirements.txt` وجود دارد و CI آن را نصب می‌کند.
 
-فقط فایل‌های ارائه‌شده مجاز به بررسی هستند. اگر فایل دیگری ضروری بود، مسیر دقیق و دلیل نیاز را اعلام کن و متوقف شو.
+DONE شدن Task 019 فقط به معنی تعیین علت Skipهاست؛ به معنی اصلاح کد یا حذف Skip نیست.
 
-`PROMPT.md` و `prompt.md` خارج از scope هستند.
+در داشبورد C-11 نیز همین وضعیت جدید ثبت شود. remediation مربوط به openpyxl به Task مستقل منتقل شود.
 
-تمام فایل‌های ورودی READ-ONLY هستند.
+### 2. ثبت Supplementary Audit
+در Master Packet یک بخش با عنوان مناسب برای این ممیزی اضافه کن و موارد زیر را ثبت کن:
 
-### 3. فایل‌های مجاز برای بررسی
+- 153 رخداد `DeprecationWarning` در خروجی pytest.
+- 24 محل `datetime.utcnow()` در سورس و تست‌ها.
+- تفکیک تعداد Warningها از تعداد محل‌های کد.
+- حفظ قرارداد فعلی `naive UTC`.
+- عدم توصیه به تبدیل مستقیم timestampها به `aware UTC`.
+- نیاز به regression test برای حفظ قرارداد زمانی در Audit، KPI و Trend.
+- علت Skip مربوط به openpyxl و نیاز به تبدیل آن به dependency اجباری در تست.
+- حفظ Skip مربوط به Golden PDF در محیط فاقد نمونهٔ واقعی مناسب؛ بدون انتخاب تصادفی PDF و بدون تضعیف معیار تست.
 
-**مستندات و تنظیمات**
+این بخش باید گزارش ممیزی را از کار اجرایی بعدی تفکیک کند.
 
-- `WORKFLOW_RULES.md`
-- `STAGE7_MASTER_WORKING_PACKET.md`
-- `requirements.txt`
-- `.github/workflows/tests.yml`
+### 3. ثبت کارهای اجرایی جدید
+سه Task جدید با شماره‌های آزاد بعد از 057 ایجاد کن. پیش از انتخاب شماره و شناسه، کل Master Packet را بررسی کن تا هیچ شماره یا شناسه‌ای تکراری نباشد.
 
-**کد**
+**Task A — Timestamp Warning Remediation**
+- جایگزینی 24 محل `datetime.utcnow()` با روش سازگار با قرارداد فعلی naive UTC.
+- اصلاح تست freeze مربوط به Trend.
+- افزودن یا اصلاح regression test برای naive UTC.
+- عدم تغییر فرمول‌های مالی، محاسبات KPI یا رفتار Trend.
+- عدم filter یا مخفی‌کردن Warningها.
+- اگر نیاز به helper مشترک وجود دارد، ابتدا layering و محل مناسب آن باید با شواهد بررسی شود.
 
-- `src/ingestion/codal/ingestion.py`
-- `src/models/audit.py`
-- `src/kpi/universal.py`
-- `src/kpi/conditional.py`
-- `src/kpi/industry.py`
-- `src/kpi/schema.py`
-- `src/trend/engine.py`
-- `src/trend/schema.py`
+**Task B — openpyxl Skip Remediation**
+- تبدیل dependency اجباری openpyxl از رفتار `importorskip` به شکست روشن در صورت نصب نبودن.
+- حفظ تست واقعی XLSX؛ حذف یا تضعیف تست ممنوع.
+- نصب dependency و اجرای تست بر عهدهٔ کاربر است، نه Agent.
 
-**تست‌ها**
+**Task C — Fzar PDF Extraction Failure Audit**
+- نتیجهٔ اجرای واقعی کاربر برای `Fzar.pdf` ثبت شود.
+- تست از Skip خارج شده و حداقل 5 ردیف استخراج کرده، اما assertion مربوط به وجود واژه‌های مورد انتظار در `item_name` شکست خورده است.
+- علت دقیق هنوز مشخص نیست: استخراج متن/جدول یا نگاشت داده به `item_name`.
+- این Task در ابتدا REPORT-ONLY/AUDIT است؛ تا پیش از اثبات علت، هیچ اصلاح کد یا تغییر معیار تست مجاز نیست.
+- مناسب‌بودن فایل Fzar برای نمونهٔ Golden نیز باید از نظر محتوای واقعی گزارش بررسی شود؛ از روی نام فایل نتیجه‌گیری نکن.
 
-- `src/tests/test_stage1_rules.py`
-- `src/tests/test_stage2_kpis.py`
-- `src/tests/test_stage4_trend.py`
-- `src/tests/test_codal_extraction.py`
-- `src/tests/test_ingestion_fx.py`
-- `src/tests/test_codal_pdf_extraction.py`
+برای هر Task جدید، شماره، شناسهٔ ثابت، وضعیت، وابستگی‌ها و معیار پذیرش را ثبت کن.
 
-**دادهٔ نمونه**
+### 4. ثبت خروجی واقعی Fzar
+این فرمان و نتیجهٔ آن را در بخش شواهد تست ثبت کن:
 
-- تمام فایل‌های موجود در پوشهٔ محلی `pdf/`، فقط برای بررسی وجود و قابلیت استفاده به‌عنوان نمونهٔ PDF واقعی CODAL.
-
-### 4. شواهد اجرای تست کاربر
-
-این خروجی‌ها توسط کاربر اجرا شده‌اند و مبنای ممیزی هستند.
-
-تست هدفمند:
-
-```text
-pytest src/tests/test_market_history_query.py src/tests/test_stage789_service_interface.py src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -q -rs
-
-862 passed in 5.54s
+```powershell
+$env:CODAL_SAMPLE_PDF = "D:\winprojects\analyzer\pdf\Fzar.pdf"
+pytest src/tests/test_codal_extraction.py::test_real_codal_monthly_activity_pdf -q -rs
 ```
 
-تست کامل:
+نتیجه:
+- 1 failed
+- تست از Skip خارج شد.
+- حداقل 5 raw line استخراج شد.
+- assertion خط 412 در `test_codal_extraction.py` شکست خورد؛ هیچ‌کدام از واژه‌های مورد انتظار در `item_name` نبودند.
 
-```text
-pytest src/tests -q -rs
+این نتیجه را PASS یا مشکل حل‌شده ثبت نکن.
 
-1903 passed, 2 skipped, 153 warnings in 235.08s
-```
+### 5. حفظ وضعیت Taskهای قبلی
+صرفاً به دلیل تکمیل پنج بستهٔ ممیزی، Taskهای اجرایی را DONE نکن.
 
-علت Skipها در خروجی واقعی:
+وضعیت‌های زیر باید حفظ شوند، مگر اینکه شواهد تازه و صریح در `reply.md` خلاف آن را اثبات کند:
 
-```text
-SKIPPED [1] src\tests\test_codal_extraction.py:398:
-real Codal sample PDF not available in CI
+- 022، 023، 024، 027: BLOCKED
+- 029: PARTIAL
+- 030: PARTIAL
+- 032: BLOCKED
+- 033: BLOCKED
+- 034: OPEN
+- 036: BLOCKED
+- 037: OPEN
+- 038: PARTIAL
+- 039: BLOCKED
+- 052: BLOCKED
+- 053: PARTIAL؛ عملیات 053-10 باز است.
+- 054 تا 057: OPEN
 
-SKIPPED [1] src\tests\test_ingestion_fx.py:194:
-could not import 'openpyxl': No module named 'openpyxl'
-```
+همچنین:
+- 021 تا زمان اجرای تست‌های OA1 توسط کاربر OPEN بماند.
+- 044 تا ارائهٔ شواهد کامل تست‌های لازم توسط کاربر OPEN بماند.
+- 053-10، 054–057 و سایر موانع حیاتی در نقشهٔ کار باقی بمانند.
 
-در Warning Summary، تمام Warningهای گزارش‌شده از نوع `DeprecationWarning` مربوط به `datetime.utcnow()` هستند.
+### 6. نقشهٔ اجرایی
+در Master Packet یک خلاصهٔ اولویت‌بندی‌شده اضافه کن:
 
-محل‌های گزارش‌شده:
+1. تکمیل اصلاح مستنداتی 053-10.
+2. اجرای remediation مربوط به Forecast persistence در 054–057.
+3. اصلاح Timestamp Warningها.
+4. اصلاح Skip مربوط به openpyxl.
+5. ممیزی علت شکست Fzar و سپس، فقط در صورت اثبات نقص، تعریف اصلاح کد.
+6. تعیین تکلیف موانع OA1 و provenance تاریخی.
+7. تعیین تکلیف مسیر واقعی تولیدی تا Stage 9 و E2E.
+8. بازنگری نهایی engine پس از رفع یا تعیین تکلیف وابستگی‌ها.
+9. اجرای تست‌های هدفمند و full suite توسط کاربر و سپس بستن معیارهای پایان Stage 7.
 
-- `src/ingestion/codal/ingestion.py:84`
-- `src/tests/test_stage1_rules.py:234`
-- `src/kpi/universal.py:12, 17, 22, 27, 33, 38, 43, 48, 53, 60, 71`
-- `src/kpi/conditional.py:33`
-- `src/kpi/industry.py:12–16, 23–25, 39`
-- `src/trend/engine.py:235`
+### 7. محدودیت‌های نهایی
+- وضعیت کلی Stage 7 همچنان OPEN بماند.
+- هیچ Task مسدودی صرفاً برای کوتاه‌شدن فهرست DONE نشود.
+- هیچ فرمول مالی، threshold یا قرارداد provenance جدیدی اختراع نشود.
+- `reply.md` و `WORKFLOW_RULES.md` تغییر نکنند.
+- فقط `STAGE7_MASTER_WORKING_PACKET.md` تغییر کند.
+- تاریخ آخرین بازنگری و خلاصهٔ تغییرات به‌روزرسانی شود.
 
-این فهرست را با سورس واقعی تطبیق بده و اگر محل دیگری در Warning Summary وجود دارد، آن را نیز ثبت کن.
+## خروجی مورد انتظار
+- نسخهٔ به‌روزشدهٔ Master Packet.
+- فهرست Taskهای تغییر وضعیت‌یافته و دلیل هر تغییر.
+- فهرست Taskهای جدید و وابستگی‌هایشان.
+- خلاصهٔ نقشهٔ کار باقی‌مانده.
 
----
-
-### 5. Task W-001 — ممیزی کامل 153 Warning
-
-هدف، تعیین منشأ دقیق تمام Warningها و مشخص‌کردن اصلاح ایمن آن‌هاست.
-
-برای هر محل فراخوانی `datetime.utcnow()` مشخص کن:
-
-1. فایل و شماره خط.
-2. تابع و مسیر اجرایی‌ای که آن را فراخوانی می‌کند.
-3. نوع timestamp تولیدشده.
-4. آیا timestamp به DB، API، خروجی محاسباتی یا صرفاً metadata داخلی منتقل می‌شود؟
-5. آیا مصرف‌کنندگان آن naive UTC یا timezone-aware UTC انتظار دارند؟
-6. آیا تبدیل نوع timestamp می‌تواند روی مقایسه، serialization، persistence یا PIT اثر بگذارد؟
-7. چه تست‌هایی رفتار فعلی را تثبیت کرده‌اند؟
-
-**بررسی ویژهٔ timestampها**
-
-در `src/models/audit.py` تابع `_utc_now_naive()` وجود دارد که زمان UTC را به naive تبدیل می‌کند.
-
-بررسی کن:
-
-- آیا این تابع قرارداد موجود پروژه را نشان می‌دهد؟
-- آیا برای تمام موارد Warning مناسب است؟
-- آیا لایه‌های KPI و Trend قرارداد زمانی یکسانی دارند؟
-- آیا تبدیل به timezone-aware می‌تواند ناسازگاری با مدل‌های SQLAlchemy یا تست‌ها ایجاد کند؟
-- آیا بهتر است تابع مشترک و مشخصی برای تولید UTC timestamp ایجاد شود یا قراردادهای فعلی حفظ شوند؟
-
-هیچ جایگزینی را صرفاً به دلیل پیشنهاد Python انجام‌شده و صحیح فرض نکن.
-
-**خروجی مورد انتظار:**
-
-یک جدول کامل شامل تمام محل‌های Warning، نوع داده، مصرف‌کننده، ریسک تغییر و روش اصلاح پیشنهادی.
-
-همچنین مشخص کن آیا هر 153 Warning از همین call siteها ناشی شده‌اند یا خیر. تعداد Warningها را با تعداد call siteها اشتباه نگیر.
-
-### 6. Task W-002 — تعیین تکلیف Skip مربوط به CODAL PDF
-
-تست زیر Skip شده است:
-
-`src/tests/test_codal_extraction.py:398`
-
-شرط `_candidate_real_codal_paths()` و متغیر `CODAL_SAMPLE_PDF` را بررسی کن.
-
-موارد لازم:
-
-- تست دقیقاً چه مسیرهایی را برای نمونهٔ PDF بررسی می‌کند؟
-- آیا پوشهٔ `pdf/` پروژه در این مسیرها قرار دارد؟
-- آیا نمونه‌های واقعی موجود در پروژه قابل استفاده‌اند؟
-- آیا کاربر باید متغیر محیطی `CODAL_SAMPLE_PDF` را تنظیم کند؟
-- آیا Skip فقط برای CI بدون نمونهٔ واقعی قابل قبول است؟
-- آیا امکان اجرای واقعی این تست در محیط محلی کاربر وجود دارد؟
-
-Skip را بدون بررسی نمونه‌های واقعی، قابل قبول اعلام نکن.
-
-### 7. Task W-003 — تعیین تکلیف Skip مربوط به openpyxl
-
-تست زیر Skip شده است:
-
-`src/tests/test_ingestion_fx.py:194`
-
-شرط `pytest.importorskip("openpyxl")` را بررسی کن.
-
-موارد لازم:
-
-- آیا `openpyxl` در `requirements.txt` وجود دارد؟
-- آیا GitHub Actions آن را از طریق requirements نصب می‌کند؟
-- آیا این وابستگی در پروژه mandatory است یا optional؟
-- چرا اجرای محلی کاربر نتوانسته آن را import کند؟
-- آیا استفاده از `importorskip` برای وابستگی‌ای که در requirements اجباری اعلام شده مناسب است؟
-- رفتار صحیح تست در نبود وابستگی چیست: Skip، Fail یا رفتار دیگری؟
-
-فرمان دقیق نصب یا بازسازی محیط را پیشنهاد بده، اما اجرا نکن.
-
-### اصلاح بخش W-002 — تعیین تکلیف Skip مربوط به CODAL PDF
-
-**محدودیت مهم مصرف توکن:**
-
-- فایل‌های PDF اصلی پروژه نباید داخل ZIP یا بستهٔ ورودی Agent قرار بگیرند.
-- Agent اجازه ندارد PDFها را بازخوانی، استخراج متن یا تحلیل محتوایی کند.
-- برای این Task، بررسی محتوای PDF ضروری نیست.
-
-Agent فقط باید:
-
-1. تابع `_candidate_real_codal_paths()` در `src/tests/test_codal_extraction.py` را بررسی کند.
-2. مسیرهای جست‌وجوی نمونه PDF و متغیر محیطی `CODAL_SAMPLE_PDF` را مشخص کند.
-3. ساختار پوشهٔ `pdf/` و صرفاً نام فایل‌های موجود در آن را بررسی کند.
-4. تعیین کند آیا مسیر نمونه‌های موجود با مسیرهای مورد انتظار تست سازگار است یا خیر.
-5. فرمان یا تنظیم محیطی لازم برای فعال‌کردن تست را پیشنهاد دهد.
-
-اگر برای تشخیص مشکل واقعاً به محتوای PDF نیاز بود، Agent باید متوقف شود و نام فایل موردنیاز و دلیل ضرورت بررسی محتوای آن را اعلام کند.
-
-در آن صورت، ابتدا فایل منتخب به Markdown تبدیل می‌شود و فقط نسخهٔ Markdown در اختیار Agent قرار خواهد گرفت.
-
-**در این مأموریت هیچ PDF اصلی نباید به Agent تحویل داده شود.**
-
-### 8. Task W-004 — برنامهٔ اصلاح و Regression
-
-پس از ممیزی W-001 تا W-003، برنامهٔ اصلاح را ارائه بده.
-
-برای هر اصلاح مشخص کن:
-
-- فایل‌های دقیق مجاز برای تغییر در مرحلهٔ بعد.
-- رفتار فعلی که باید حفظ شود.
-- تست‌های رگرسیون لازم.
-- خطر احتمالی تغییر قرارداد زمانی.
-- فرمان‌های تست هدفمند.
-- فرمان تست کامل.
-
-در این مرحله هیچ اصلاحی انجام نده.
-
-**ممنوعیت‌های مهم:**
-
-- Warningها را با `filterwarnings` یا غیرفعال‌کردن Warningها پنهان نکن.
-- تست‌ها را برای حذف Warning یا Skip ضعیف نکن.
-- تست واقعی را حذف نکن.
-- timestampها را بدون بررسی قرارداد مصرف‌کننده از naive به aware یا برعکس تبدیل نکن.
-- برای رفع Warningها هیچ فرمول مالی، پارامتر، آستانه یا رفتار محاسباتی را تغییر نده.
-- تعداد Warningها را صرفاً با کاهش خروجی گزارش‌شده کمتر اعلام نکن.
-
-### 9. قالب گزارش
-
-گزارش را دقیقاً با بخش‌های زیر تحویل بده:
-
-1. **Input File Verification**
-2. **W-001 — Complete Warning Inventory**
-3. **Timestamp Contract & Compatibility Analysis**
-4. **W-002 — CODAL PDF Skip Disposition**
-5. **W-003 — openpyxl Skip Disposition**
-6. **W-004 — Safe Remediation Plan**
-7. **Exact Files to Change in the Next Phase**
-8. **Required Regression Tests**
-9. **Recommended Test Commands**
-10. **Unresolved Risks and Dependencies**
-
-برای هر نتیجه، فایل و شماره خط را ذکر کن.
-
-اگر چیزی اثبات نشده است، صریحاً بنویس «اثبات نشده».
-
-هیچ Taskی را در Master Packet تغییر نده؛ گزارش را مستقیماً به کاربر تحویل بده.
-
-## بخش دوم — دستور کار کاربر
-
-### Task List
-
-- [ ] ممیزی کامل 153 Warning و تعیین منشأ آن‌ها.
-- [ ] بررسی ایمنی قراردادهای UTC و timestampها.
-- [ ] تعیین تکلیف Skip مربوط به نمونهٔ PDF واقعی CODAL.
-- [ ] تعیین تکلیف Skip مربوط به `openpyxl`.
-- [ ] ارائهٔ برنامهٔ اصلاح کد و تست‌های Regression بدون اجرای تست توسط Agent.
-
-### Expected Result
-
-گزارش دقیق منشأ Warningها و Skipها، همراه با برنامهٔ اصلاح ایمن و فهرست فایل‌های لازم برای مرحلهٔ بعد.
-
-**این مأموریت REPORT-ONLY است و هیچ فایلی تغییر نمی‌کند.**
+هیچ تستی اجرا نکن و هیچ ادعای اجرای تست نداشته باش.
