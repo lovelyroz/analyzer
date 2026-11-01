@@ -68,8 +68,6 @@ STAMP = datetime(2024, 7, 1, tzinfo=timezone.utc)
 
 def _record(**overrides):
     fields = dict(
-        forecast_id=1,
-        forecast_version=1,
         company_id=7,
         forecast_period_id=101,
         industry_code="PETROCHEMICAL",
@@ -377,18 +375,18 @@ def test_limited_quality_states_score_with_flag(state):
 
 
 def test_duplicate_observations_quarantined_wholesale():
-    first = _record(forecast_id=1, forecast_period_id=101)
-    second = _record(forecast_id=2, forecast_period_id=101)
+    first = _record(forecast_period_id=101)
+    second = _record(forecast_period_id=101, forecast_timestamp=STAMP.replace(day=2))
     verdict = _verdict(_run([first, second], _actual_map([101])))
     assert verdict.series.observation_count == 0
     assert verdict.series.quarantined == {"DUPLICATE_QUARANTINED": 2}
 
 
-def test_duplicate_forecast_id_only_still_collides():
-    # forecast_id is a surrogate, not identity: same key, different id
-    # still collides wholesale.
-    first = _record(forecast_id=1, forecast_version=1, forecast_period_id=101)
-    second = _record(forecast_id=999, forecast_version=9, forecast_period_id=101)
+def test_same_forecast_identity_with_different_timestamps_collides():
+    # Runtime identity is the natural company/period/horizon/scenario key;
+    # a second snapshot timestamp does not create another forecast series.
+    first = _record(forecast_period_id=101)
+    second = _record(forecast_period_id=101, forecast_timestamp=STAMP.replace(day=2))
     verdict = _verdict(_run([first, second], _actual_map([101])))
     assert verdict.series.observation_count == 0
     assert verdict.series.quarantined == {"DUPLICATE_QUARANTINED": 2}
@@ -431,7 +429,7 @@ def test_ttm_observations_conserved_exactly_once():
     records = [_record(forecast_period_id=p) for p in periods]
     ttm = [
         build_observation(
-            _record(forecast_id=100 + i, forecast_period_id=201 + i),
+            _record(forecast_period_id=201 + i),
             "REVENUE",
             _actual(period=201 + i),
         )
@@ -452,10 +450,10 @@ def test_ttm_observations_conserved_exactly_once():
 
 
 def test_ttm_same_period_collision_quarantines_both():
-    regular = _record(forecast_id=1, forecast_period_id=101)
+    regular = _record(forecast_period_id=101)
     ttm = [
         build_observation(
-            _record(forecast_id=2, forecast_period_id=101),
+            _record(forecast_period_id=101, forecast_timestamp=STAMP.replace(day=2)),
             "REVENUE",
             _actual(period=101),
         )

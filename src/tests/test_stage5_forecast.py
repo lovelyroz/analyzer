@@ -10,8 +10,6 @@ from src.forecast.schema import (
     CompanyForecastResult,
     ForecastInputRef,
     ForecastRecord,
-    ForecastVersionExistsError,
-    ForecastVersionStore,
     ScenarioForecastResult,
     SingleForecastChain,
     filter_pit_inputs,
@@ -216,8 +214,8 @@ def test_record_schema_carries_all_contract_fields():
     result = _forecast()
     record = result.to_record("base", forecast_id=7)
     assert isinstance(record, ForecastRecord)
-    assert record.forecast_id == 7
-    assert record.forecast_version == 0  # assigned on store, never at build
+    assert not hasattr(record, "forecast_id")
+    assert not hasattr(record, "forecast_version")
     assert record.company_id == 1
     assert record.forecast_period_id == 101
     assert record.forecast_horizon == "12M"
@@ -234,7 +232,8 @@ def test_record_schema_carries_all_contract_fields():
 def test_records_freeze_all_three_scenarios():
     records = _forecast().records(forecast_id_start=100)
     assert [r.scenario for r in records] == ["BEAR", "BASE", "BULL"]
-    assert [r.forecast_id for r in records] == [100, 101, 102]
+    assert all(not hasattr(r, "forecast_id") for r in records)
+    assert all(not hasattr(r, "forecast_version") for r in records)
     assert all(r.forecast_horizon == "12M" for r in records)
     # The side scenarios carry no data: without dispersion they are refused, so
     # the base is the only chain with a value to freeze.
@@ -273,7 +272,7 @@ def test_missing_metric_is_none_not_zero():
     assert record.forecast_horizon == "3M"
     assert record.is_missing("roe") is True
     assert record.is_missing("eps") is True
-    # Missing is never silently coerced to a zero in the stored record.
+    # Missing is never silently coerced to a zero in the runtime record.
     assert record.eps is None
     assert record.roe is None
     assert not record.is_missing("revenue")
@@ -340,153 +339,7 @@ def test_malformed_input_ref_is_rejected():
 
 
 # --------------------------------------------------------------------------
-# Version preservation and no-overwrite semantics
-# --------------------------------------------------------------------------
-
-def test_version_store_appends_and_never_overwrites():
-    store = ForecastVersionStore()
-    base = _forecast()
-    # August, September, October forecasts for the same series (spec §24).
-    for i, eps in enumerate((1100.0, 1180.0, 1270.0)):
-        result = _forecast()
-        result.calculation_timestamp = datetime(2026, 8 + i, 1, tzinfo=timezone.utc)
-        result.scenario_forecasts.base.eps = eps
-        record = store.save(result.to_record("base", forecast_id=i + 1))
-        assert record.forecast_version == i + 1
-
-    history = store.history(1, 101, "12M", "BASE")
-    assert len(history) == 3
-    assert [r.forecast_version for r in history] == [1, 2, 3]
-    # Every version survives; none was replaced.
-    assert [r.eps for r in history] == [1100.0, 1180.0, 1270.0]
-    assert store.latest(1, 101, "12M", "BASE").eps == 1270.0
-    assert history[0].eps == 1100.0
-
-
-def test_revised_forecast_keeps_the_older_version():
-    store = ForecastVersionStore()
-    store.save(_forecast().to_record("base", forecast_id=1))
-
-    revised = _forecast()
-    revised.scenario_forecasts.base.eps = 999.0
-    store.save(revised.to_record("base", forecast_id=2))
-
-    history = store.history(1, 101, "12M", "BASE")
-    assert len(history) == 2
-    assert history[0].eps != 999.0  # the original survived
-    assert history[1].eps == 999.0
-
-
-def test_identical_resave_is_idempotent():
-    store = ForecastVersionStore()
-    record = _forecast(**{
-        "calculation_timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc)
-    }).to_record("base", forecast_id=1)
-    store.save(record)
-    same = store.save(record)
-    assert same.forecast_version == 1
-    assert store.count() == 1
-    assert store.latest(1, 101, "12M", "BASE").forecast_version == 1
-
-
-def _identical_pair_with_different_surrogate_ids():
-    """Two records with identical forecast state but different surrogate ids.
-
-    ``forecast_id`` is a surrogate the caller mints for its own bookkeeping; it
-    is not forecast content. This is the precondition the idempotency contract
-    must hold for, and it is not exercised by saving one object twice.
-    """
-    pinned = {"calculation_timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc)}
-    record_a = _forecast(**pinned).to_record("base", forecast_id=101)
-    record_b = _forecast(**pinned).to_record("base", forecast_id=202)
-    return record_a, record_b
-
-
-def _assert_different_ids_collapse_onto_one_version(store, record_a, record_b):
-    """The two identical records must be stored as one version.
-
-    Returns the stored history so a caller can pin what was actually kept.
-    """
-    # The precondition itself: identical state, different surrogate identity.
-    assert record_a != record_b
-    assert replace(record_a, forecast_id=record_b.forecast_id) == record_b
-
-    saved_a = store.save(record_a)
-    saved_b = store.save(record_b)
-
-    history = store.history(1, 101, "12M", "BASE")
-    assert len(history) == 1  # only one version exists
-    assert saved_b.forecast_version == saved_a.forecast_version == 1
-    # The returned record is the existing stored version, not the second
-    # submission: it is the stored history entry itself, and it is the submitted
-    # state with only the surrogate identity and the version assignment put to
-    # one side.
-    assert saved_b == history[0]
-    assert replace(saved_b, forecast_id=record_a.forecast_id,
-                   forecast_version=record_a.forecast_version) == record_a
-    return history
-
-
-def test_identical_resave_with_a_different_surrogate_id_is_idempotent():
-    record_a, record_b = _identical_pair_with_different_surrogate_ids()
-    store = ForecastVersionStore()
-    _assert_different_ids_collapse_onto_one_version(store, record_a, record_b)
-    # Nothing was appended behind the one surviving version.
-    assert store.count() == 1
-
-
-def test_explicit_version_collision_is_rejected():
-    store = ForecastVersionStore()
-    store.save(_forecast().to_record("base", forecast_id=1))
-    different = _forecast()
-    different.scenario_forecasts.base.eps = 5.0
-    with pytest.raises(ForecastVersionExistsError):
-        store.save(different.to_record("base", forecast_id=1).__class__(
-            forecast_id=1, forecast_version=1,
-            company_id=1, forecast_period_id=101, industry_code="PETROCHEMICAL",
-            forecast_horizon="12M", scenario="BASE",
-            forecast_timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            data_cutoff_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            model_version="V1.0", forecast_method="RUN_RATE", data_quality="MEDIUM",
-            baseline_method="SEASONAL_BASELINE",
-            revenue=None, operating_profit=None, operating_margin=None,
-            net_profit=5.0, eps=5.0, roe=None,
-        ))
-
-
-def test_revision_trend_reports_direction():
-    store = ForecastVersionStore()
-    for i, eps in enumerate((1100.0, 1180.0, 1270.0)):
-        result = _forecast()
-        result.scenario_forecasts.base.eps = eps
-        store.save(result.to_record("base", forecast_id=i + 1))
-    assert store.revision_trend(1, 101, "12M", "BASE") == "UPWARD"
-
-    store2 = ForecastVersionStore()
-    for i, eps in enumerate((1270.0, 1180.0, 1100.0)):
-        result = _forecast()
-        result.scenario_forecasts.base.eps = eps
-        store2.save(result.to_record("base", forecast_id=i + 1))
-    assert store2.revision_trend(1, 101, "12M", "BASE") == "DOWNWARD"
-
-    store3 = ForecastVersionStore()
-    store3.save(_forecast().to_record("base", forecast_id=1))
-    assert store3.revision_trend(1, 101, "12M", "BASE") is None
-
-
-def test_scenarios_are_separate_series():
-    store = ForecastVersionStore()
-    for scenario in ("bear", "base", "bull"):
-        store.save(_forecast().to_record(scenario, forecast_id=1))
-    assert store.count() == 3
-    assert len(store.history(1, 101, "12M", "BEAR")) == 1
-    assert len(store.history(1, 101, "12M", "BASE")) == 1
-    assert len(store.history(1, 101, "12M", "BULL")) == 1
-
-
-# --------------------------------------------------------------------------
 # Point-in-Time protection
-# --------------------------------------------------------------------------
 
 def test_filter_pit_inputs_drops_future_information():
     refs = [
@@ -513,69 +366,16 @@ def test_future_input_is_flagged_not_silently_used():
                for r in result.assumptions["input_refs"])
 
 
-def test_read_at_cutoff_hides_forecasts_built_on_later_data():
-    store = ForecastVersionStore()
-    store.save(_forecast(
-        input_refs=[ForecastInputRef("base_report",
-                                     available_at=datetime(2025, 6, 1, tzinfo=timezone.utc))],
-    ).to_record("base", forecast_id=1))
-
-    # A September rebuild that secretly saw the October report.
-    late = _forecast(
-        data_cutoff_datetime=datetime(2026, 9, 1, tzinfo=timezone.utc),
-        input_refs=[ForecastInputRef("october_report",
-                                     available_at=datetime(2026, 10, 5, tzinfo=timezone.utc))],
-    )
-    store.save(late.to_record("base", forecast_id=2))
-
-    assert store.read_at_cutoff(
-        1, 101, "12M", "BASE", datetime(2026, 8, 1, tzinfo=timezone.utc)
-    ).forecast_version == 1
-    # Reading at the September cutoff falls back to the clean January record,
-    # never to the one built from the October report.
-    visible = store.read_at_cutoff(
-        1, 101, "12M", "BASE", datetime(2026, 9, 15, tzinfo=timezone.utc)
-    )
-    assert visible is not None
-    assert visible.forecast_version == 1
-    assert [r.fact_key for r in visible.input_refs] == ["base_report"]
-    assert store.latest(1, 101, "12M", "BASE").forecast_version == 2
-    # The late record is flagged as contaminated at its own cutoff.
-    contaminated = store.pit_violations(datetime(2026, 9, 1, tzinfo=timezone.utc))
-    assert [r.forecast_version for r in contaminated] == [2]
-    assert contaminated[0].input_refs[0].fact_key == "october_report"
-    # Reading strictly before the September cutoff sees no contamination.
-    assert store.pit_violations(datetime(2026, 8, 1, tzinfo=timezone.utc)) == []
-
-
-def test_read_at_cutoff_returns_none_when_nothing_available():
-    store = ForecastVersionStore()
-    assert store.read_at_cutoff(1, 101, "12M", "BASE",
-                                datetime(2026, 1, 1, tzinfo=timezone.utc)) is None
-
-
-def test_pit_violations_are_detectable_across_the_store():
-    store = ForecastVersionStore()
-    store.save(_forecast(
-        input_refs=[ForecastInputRef("late", available_at=datetime(2027, 1, 1, tzinfo=timezone.utc))],
-    ).to_record("base", forecast_id=1))
-    violations = store.pit_violations(datetime(2026, 1, 1, tzinfo=timezone.utc))
-    assert len(violations) == 1
-    assert violations[0].forecast_version == 1
-    assert store.pit_violations(datetime(2027, 6, 1, tzinfo=timezone.utc)) == []
-
-
 def test_cutoff_timezone_normalization_is_consistent():
-    store = ForecastVersionStore()
-    store.save(_forecast(
-        data_cutoff_datetime=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
-    ).to_record("base", forecast_id=1))
-    # A +03:30 cutoff equal to the UTC cutoff resolves the same record.
-    same_instant = datetime(2026, 1, 1, 15, 30,
-                            tzinfo=timezone(timedelta(hours=3, minutes=30)))
-    record = store.read_at_cutoff(1, 101, "12M", "BASE", same_instant)
-    assert record is not None
-    assert record.forecast_version == 1
+    cutoff = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
+    same_instant = datetime(
+        2026, 1, 1, 15, 30,
+        tzinfo=timezone(timedelta(hours=3, minutes=30)),
+    )
+    ref = ForecastInputRef("boundary", available_at=cutoff)
+    available, dropped = filter_pit_inputs([ref], same_instant)
+    assert available == [ref]
+    assert dropped == []
 
 
 def test_normalize_datetime_contracts():
@@ -986,254 +786,22 @@ def test_stage4_adapter_is_deterministic():
 
 
 # ==========================================================================
-# 13. Persistent repository (ForecastEngine -> ForecastRecord -> repository
-#     -> persistent storage; spec sections 24, 25, 28, 29)
-# ==========================================================================
+# 13. No-persistence production-path regression coverage follows below.
 
-from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy import create_engine, event, inspect  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
-
-from src.forecast.repo import ForecastRecordRepository  # noqa: E402
 from src.migrations.runner import MigrationRunner  # noqa: E402
-
-
-@pytest.fixture
-def repo():
-    """Fresh in-memory schema, isolated from the on-disk production database."""
-    engine = create_engine("sqlite:///:memory:")
-    MigrationRunner(engine).upgrade()
-    session = sessionmaker(bind=engine)()
-    yield ForecastRecordRepository(session)
-    session.close()
-
-
-def _series_records(eps_values, repo, scenario="base", **overrides):
-    """Save one record per eps value and return the persisted history."""
-    for index, eps in enumerate(eps_values):
-        result = _forecast(**{key: value for key, value in overrides.items()
-                              if key in CONTEXT_KEYS})
-        engine_kwargs = {
-            key: value for key, value in overrides.items()
-            if key not in CONTEXT_KEYS
-        }
-        engine_kwargs.setdefault("company_id", 1)
-        engine_kwargs.setdefault("forecast_period_id", 101)
-        engine_kwargs.setdefault("industry_code", "PETROCHEMICAL")
-        engine_kwargs.setdefault(
-            "data_cutoff_datetime", datetime(2026, 1 + index, 1, tzinfo=timezone.utc))
-        engine_kwargs["financial_context"] = _context()
-        record = ForecastEngine().generate_forecast(**engine_kwargs).to_record(
-            scenario, forecast_id=index + 1)
-        record = replace(record, eps=eps)
-        repo.save(record)
-    return repo.history(1, 101, "12M", scenario.upper())
-
-
-def test_repo_first_forecast_persists(repo):
-    record = _forecast().to_record("base", forecast_id=1)
-    saved = repo.save(record)
-
-    assert saved.forecast_version == 1
-    assert repo.count() == 1
-    reloaded = repo.latest(1, 101, "12M", "BASE")
-    assert reloaded is not None
-    # A missing metric round-trips as None, never as 0 (spec section 27).
-    assert reloaded.eps is not None
-    assert reloaded.company_id == 1
-    assert reloaded.forecast_period_id == 101
-    assert reloaded.scenario == "BASE"
-    assert reloaded.forecast_horizon == "12M"
-
-
-def test_repo_second_save_creates_a_new_version(repo):
-    repo.save(_forecast().to_record("base", forecast_id=1))
-    second = repo.save(_forecast().to_record("base", forecast_id=2))
-
-    assert second.forecast_version == 2
-    assert repo.count() == 2
-    assert len(repo.history(1, 101, "12M", "BASE")) == 2
-
-
-def test_repo_old_version_remains_readable(repo):
-    first = repo.save(_forecast().to_record("base", forecast_id=1))
-    repo.save(_forecast().to_record("base", forecast_id=2))
-
-    history = repo.history(1, 101, "12M", "BASE")
-    assert [r.forecast_version for r in history] == [1, 2]
-    # The August forecast is still there after September overwrote nothing.
-    assert repo.latest(1, 101, "12M", "BASE").forecast_version == 2
-    assert history[0].eps == first.eps
-    assert history[0].forecast_timestamp == first.forecast_timestamp
-
-
-def test_repo_does_not_overwrite_the_previous_forecast(repo):
-    original = repo.save(_forecast().to_record("base", forecast_id=1))
-    different = replace(_forecast().to_record("base", forecast_id=2), eps=999.0)
-    repo.save(different)
-
-    history = repo.history(1, 101, "12M", "BASE")
-    assert len(history) == 2
-    assert history[0].eps == original.eps
-    assert history[0].eps != 999.0
-    assert history[1].eps == 999.0
-
-
-def test_repo_identical_resave_is_idempotent(repo):
-    record = _forecast().to_record("base", forecast_id=1)
-    repo.save(record)
-    again = repo.save(record)
-
-    assert again.forecast_version == 1
-    assert repo.count() == 1
-    assert repo.latest(1, 101, "12M", "BASE").forecast_version == 1
-
-
-def test_repo_identical_resave_with_a_different_surrogate_id_is_idempotent(repo):
-    # Regression: the persistent repository compared records with the caller's
-    # surrogate forecast_id injected into the candidate, so an identical record
-    # carrying a different id was stored as a second version instead of being a
-    # no-op. The surrogate is not forecast content, so it must not affect
-    # idempotency (spec section 24).
-    record_a, record_b = _identical_pair_with_different_surrogate_ids()
-    _assert_different_ids_collapse_onto_one_version(repo, record_a, record_b)
-    assert repo.count() == 1
-
-
-def test_repo_conflicting_version_is_rejected(repo):
-    repo.save(_forecast().to_record("base", forecast_id=1))
-    # The caller asserts this is version 1, but version 1 already exists with
-    # different contents: a silent overwrite must not happen.
-    conflicting = replace(_forecast().to_record("base", forecast_id=2),
-                          eps=5.0, forecast_version=1)
-
-    with pytest.raises(ForecastVersionExistsError):
-        repo.save(conflicting)
-    # The rejected write left nothing behind.
-    assert repo.count() == 1
-    assert repo.latest(1, 101, "12M", "BASE").eps != 5.0
-
-
-def test_repo_same_version_with_different_content_still_conflicts(repo):
-    # Excluding the surrogate from idempotency must not weaken version conflict
-    # protection: the same forecast_version carrying genuinely different
-    # forecast content is still an attempted overwrite (spec section 24).
-    record_a, record_b = _identical_pair_with_different_surrogate_ids()
-    stored = repo.save(record_a)
-
-    # Same state under a different surrogate: a no-op, so still one version.
-    assert repo.save(record_b).forecast_version == stored.forecast_version
-    assert repo.count() == 1
-
-    # Same forecast_version, genuinely different forecast content: still
-    # rejected. Only truly identical content is idempotent.
-    different_content = replace(record_b, eps=999.0, forecast_version=1)
-    with pytest.raises(ForecastVersionExistsError):
-        repo.save(different_content)
-
-    assert repo.count() == 1
-    history = repo.history(1, 101, "12M", "BASE")
-    assert len(history) == 1
-    assert history[0].eps != 999.0
-    assert history[0].eps == stored.eps
-
-
-def test_repo_scenarios_are_separate_series(repo):
-    for scenario in ("bear", "base", "bull"):
-        repo.save(_forecast().to_record(scenario, forecast_id=1))
-
-    assert repo.count() == 3
-    assert len(repo.history(1, 101, "12M", "BEAR")) == 1
-    assert len(repo.history(1, 101, "12M", "BASE")) == 1
-    assert len(repo.history(1, 101, "12M", "BULL")) == 1
-
-
-def test_repo_horizons_are_separate_series(repo):
-    for horizon in ("6M", "12M"):
-        repo.save(_forecast(horizon=horizon).to_record("base", forecast_id=1))
-
-    assert repo.count() == 2
-    assert len(repo.history(1, 101, "6M", "BASE")) == 1
-    assert len(repo.history(1, 101, "12M", "BASE")) == 1
-
-
-def test_repo_preserves_pit_fields(repo):
-    record = _forecast(
-        data_cutoff_datetime=datetime(2026, 3, 1, tzinfo=timezone.utc),
-        calculation_timestamp=datetime(2026, 4, 1, tzinfo=timezone.utc),
-    ).to_record("base", forecast_id=1)
-    record = replace(record, model_version="V2.3")
-    saved = repo.save(record)
-
-    assert saved.model_version == "V2.3"
-    reloaded = repo.latest(1, 101, "12M", "BASE")
-    assert reloaded.data_cutoff_datetime == datetime(2026, 3, 1, tzinfo=timezone.utc)
-    assert reloaded.forecast_timestamp == datetime(2026, 4, 1, tzinfo=timezone.utc)
-    assert reloaded.model_version == "V2.3"
-    assert reloaded.scenario == "BASE"
-    assert reloaded.forecast_method == record.forecast_method
-    assert reloaded.data_quality == record.data_quality
-    assert reloaded.assumptions == record.assumptions
-
-
-def test_repo_preserves_input_provenance(repo):
-    record = _forecast(input_refs=[
-        ForecastInputRef("q4_revenue", report_version_id=99,
-                         available_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
-                         source="codal"),
-    ]).to_record("base", forecast_id=1)
-    repo.save(record)
-
-    reloaded = repo.latest(1, 101, "12M", "BASE")
-    assert len(reloaded.input_refs) == 1
-    ref = reloaded.input_refs[0]
-    assert ref.fact_key == "q4_revenue"
-    assert ref.report_version_id == 99
-    assert ref.available_at == datetime(2025, 6, 1, tzinfo=timezone.utc)
-    assert ref.source == "codal"
-
-
-def test_repo_revision_trend_built_from_stored_versions(repo):
-    history = _series_records((1100.0, 1180.0, 1270.0), repo)
-    assert [r.eps for r in history] == [1100.0, 1180.0, 1270.0]
-    assert repo.revision_trend(1, 101, "12M", "BASE") == "UPWARD"
-
-
-def test_repo_revision_trend_mixed_is_reported(repo):
-    _series_records((1100.0, 900.0, 1270.0), repo)
-    assert repo.revision_trend(1, 101, "12M", "BASE") == "MIXED"
-
-
-def test_repo_read_at_cutoff_hides_forecasts_built_on_later_data(repo):
-    repo.save(_forecast(
-        input_refs=[ForecastInputRef("base_report",
-                                     available_at=datetime(2025, 6, 1, tzinfo=timezone.utc))],
-    ).to_record("base", forecast_id=1))
-
-    late = _forecast(
-        data_cutoff_datetime=datetime(2026, 9, 1, tzinfo=timezone.utc),
-        input_refs=[ForecastInputRef("october_report",
-                                     available_at=datetime(2026, 10, 5, tzinfo=timezone.utc))],
-    )
-    repo.save(late.to_record("base", forecast_id=2))
-
-    visible = repo.read_at_cutoff(
-        1, 101, "12M", "BASE", datetime(2026, 9, 15, tzinfo=timezone.utc))
-    assert visible is not None
-    # Never the version built from the October report.
-    assert visible.forecast_version == 1
-    assert [r.fact_key for r in visible.input_refs] == ["base_report"]
-    assert repo.pit_violations(datetime(2026, 9, 1, tzinfo=timezone.utc)) != []
 
 
 # ==========================================================================
 # 14. Production path: Stage 1 facts + Stage 4 evidence -> engine ->
-#     ForecastRecord -> ForecastRecordRepository (spec sections 9, 15-16,
+#     Stage 1 inputs -> runtime CompanyForecastResult (spec sections 9, 15-16,
 #     24, 25, 29)
 # ==========================================================================
 
 from src.forecast.service import (  # noqa: E402
     _stage1_derived_context,
-    generate_and_persist_forecast,
+    generate_forecast,
 )
 from src.migrations.runner import MigrationRunner  # noqa: E402
 
@@ -1241,6 +809,7 @@ from src.models.entity import Company, Industry  # noqa: E402
 from src.models.normalized import (  # noqa: E402
     FinancialMetric,
     NormalizedFinancialFact,
+    RawFinancialFact,
 )
 from src.models.period import FinancialPeriod  # noqa: E402
 from src.models.report import Report, ReportVersion  # noqa: E402
@@ -1545,186 +1114,174 @@ def _production_kwargs(**overrides):
     return kwargs
 
 
-# --- 1. Stage 1 facts reach build_financial_context -------------------------
+# --- 1. Stage 1 facts reach a runtime Forecast -----------------------------
 
-def test_production_path_builds_forecast_from_stage1_facts(production_db):
-    forecast = generate_and_persist_forecast(
+def test_production_path_builds_runtime_forecast_from_stage1_facts(production_db):
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
 
     base = forecast.scenario_forecasts.base
-    # The seeded revenue is what drives the forecast, not a test fixture.
-    assert base.revenue is not None
-    assert base.revenue > 0.0
-    # No seasonal baseline was declared, so the run rate from Stage 1 wins.
-    assert forecast.baseline_method == "RUN_RATE"
+    assert isinstance(forecast, CompanyForecastResult)
     assert base.revenue == pytest.approx(SEEDED_REVENUE, rel=1e-6)
+    assert forecast.baseline_method == "RUN_RATE"
 
 
-# --- 2. Stage 4 output reaches the engine without recalculation -------------
+# --- 2. Stage 4 evidence and runtime provenance remain available ------------
 
-def test_production_path_uses_stage4_without_recalculation(production_db):
+def test_production_path_preserves_stage4_and_input_provenance(production_db):
     trend = _production_stage4(trend_state="Improving")
-    forecast = generate_and_persist_forecast(
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID,
         **_production_kwargs(trend_result=trend))
+    base_record = forecast.records()[1]
 
-    # Stage 4 is carried through as evidence; the engine never recomputes it.
     assert forecast.assumptions["trend_evidence"] == "Improving"
     assert forecast.assumptions["low_base"] is False
     assert forecast.assumptions["sign_change"] is None
-
-    persisted = ForecastRecordRepository(production_db).latest(
-        COMPANY_ID, PERIOD_ID, "12M", "BASE")
-    assert persisted is not None
-    # Stage 4's own coordinates survive the whole path on the record, not in
-    # the scenario assumptions.
-    assert persisted.stage4_provenance["metric_code"] == _STAGE4_METRIC
-    assert persisted.stage4_provenance["stage"] == "STAGE_4"
-    # Stage 4 evidence is frozen on the record, and the engine did not
-    # recompute it: the stored record carries the same direction the caller
-    # supplied.
-    assert persisted.assumptions["baseline_method"] == "RUN_RATE"
+    assert base_record.stage4_provenance["metric_code"] == _STAGE4_METRIC
+    assert base_record.stage4_provenance["stage"] == "STAGE_4"
+    refs = {ref.fact_key: ref for ref in base_record.input_refs}
+    assert {"REVENUE", "NET_PROFIT", "TOTAL_EQUITY"} <= set(refs)
+    assert refs["REVENUE"].report_version_id is not None
+    assert refs["REVENUE"].available_at == PUBLISHED
 
 
-# --- 3. Real ShareCountHistory reaches the weighted-share calculation -------
+# --- 3. Real ShareCountHistory reaches the unchanged weighted-share calculation
 
 def test_production_path_weights_real_share_history(production_db):
-    forecast = generate_and_persist_forecast(
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
     base = forecast.scenario_forecasts.base
 
     assert base.eps is not None
-    # The weighted average over the real history sits strictly between the two
-    # recorded share counts, so the builder's weighting actually ran.
     assert FORECAST_NET_PROFIT / INCREASED_SHARES < base.eps < FORECAST_NET_PROFIT / SEEDED_SHARES
     assert base.eps == pytest.approx(FORECAST_NET_PROFIT / _WEIGHTED_SHARES, rel=1e-6)
 
 
-# --- 4. ForecastEngine output becomes ForecastRecord ------------------------
+# --- 4. Runtime records preserve scenarios and identity without row IDs ------
 
-def test_production_path_produces_forecast_records(production_db):
-    forecast = generate_and_persist_forecast(
+def test_production_path_returns_three_runtime_scenario_records(production_db):
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
     records = forecast.records()
 
-    assert [r.scenario for r in records] == ["BEAR", "BASE", "BULL"]
-    assert all(isinstance(r, ForecastRecord) for r in records)
-    assert all(r.company_id == COMPANY_ID for r in records)
-    assert all(r.data_cutoff_datetime == CUTOFF for r in records)
+    assert [record.scenario for record in records] == ["BEAR", "BASE", "BULL"]
+    assert all(isinstance(record, ForecastRecord) for record in records)
+    assert all(record.company_id == COMPANY_ID for record in records)
+    assert all(record.forecast_period_id == PERIOD_ID for record in records)
+    assert all(record.data_cutoff_datetime == CUTOFF for record in records)
+    assert all(record.model_version == "V1.0" for record in records)
+    assert all(record.forecast_timestamp == CALCULATED_AT for record in records)
 
 
-# --- 5. ForecastRecord reaches the persistent repository --------------------
+# --- 5. Forecast generation performs no database writes ----------------------
 
-def test_production_path_persists_all_scenarios(production_db):
-    generate_and_persist_forecast(
+def test_production_path_performs_no_database_writes_or_output_persistence(production_db):
+    statements = []
+
+    def _record_sql(_conn, _cursor, statement, _params, _context, _many):
+        if statement.lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE", "REPLACE")):
+            statements.append(statement)
+
+    engine = production_db.get_bind()
+    event.listen(engine, "before_cursor_execute", _record_sql)
+    try:
+        forecast = generate_forecast(
+            production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    finally:
+        event.remove(engine, "before_cursor_execute", _record_sql)
+
+    tables = set(inspect(engine).get_table_names())
+    assert "forecast_versions" not in tables
+    assert "forecast_input_refs" not in tables
+    assert statements == []
+    assert isinstance(forecast, CompanyForecastResult)
+    assert [record.scenario for record in forecast.records()] == ["BEAR", "BASE", "BULL"]
+
+
+# --- 6. Runtime source rows survive generation unchanged ---------------------
+
+def test_production_path_preserves_input_rows(production_db):
+    def _snapshot():
+        return {
+            "raw": tuple(sorted(
+                (row.raw_fact_id, row.raw_item_name, row.value)
+                for row in production_db.query(RawFinancialFact).all()
+            )),
+            "normalized": tuple(sorted(
+                (row.fact_id, row.value_irr, row.source_report_version_id)
+                for row in production_db.query(NormalizedFinancialFact).all()
+            )),
+            "reports": tuple(sorted(
+                (row.report_id, row.title, row.codal_tracking_id)
+                for row in production_db.query(Report).all()
+            )),
+            "report_versions": tuple(sorted(
+                (row.report_version_id, row.report_id, row.version_number, row.publication_datetime)
+                for row in production_db.query(ReportVersion).all()
+            )),
+            "shares": tuple(sorted(
+                (row.share_history_id, row.shares_outstanding)
+                for row in production_db.query(ShareCountHistory).all()
+            )),
+            "actions": tuple(sorted(
+                (row.action_id, row.action_type, row.old_share_count, row.new_share_count)
+                for row in production_db.query(CorporateAction).all()
+            )),
+        }
+
+    before = _snapshot()
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    after = _snapshot()
 
-    repository = ForecastRecordRepository(production_db)
-    assert repository.count() == 3
-    for scenario in ("BEAR", "BASE", "BULL"):
-        latest = repository.latest(COMPANY_ID, PERIOD_ID, "12M", scenario)
-        assert latest is not None
-        assert latest.scenario == scenario
-        assert latest.forecast_version == 1
+    assert before == after
+    assert forecast.company_id == COMPANY_ID
 
 
-# --- 6. The persisted forecast can be read back -----------------------------
+# --- 7. PIT filtering remains enforced in the runtime output ----------------
 
-def test_production_path_reads_forecast_back(production_db):
-    forecast = generate_and_persist_forecast(
+def test_production_path_keeps_only_cutoff_eligible_runtime_provenance(production_db):
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
+    record = forecast.records()[1]
 
-    reloaded = ForecastRecordRepository(production_db).latest(
-        COMPANY_ID, PERIOD_ID, "12M", "BASE")
-    assert reloaded is not None
-    base = forecast.scenario_forecasts.base
-    assert reloaded.revenue == base.revenue
-    assert reloaded.net_profit == base.net_profit
-    # The store keeps 4 decimal places, so a 6-digit EPS is stored coarsely and
-    # read back within the column's own precision, not bit-for-bit.
-    assert reloaded.eps == pytest.approx(base.eps, abs=1e-4)
-    assert reloaded.forecast_method == base.method
-    # Stage 1 provenance survived the round trip.
-    assert {r.fact_key for r in reloaded.input_refs} >= {
-        "REVENUE", "NET_PROFIT", "TOTAL_EQUITY"}
+    assert record.data_cutoff_datetime == CUTOFF
+    assert record.forecast_timestamp == CALCULATED_AT
+    assert record.revenue != 99_999_999.0
+    assert all(
+        ref.report_version_id != 2 for ref in record.input_refs
+    )
+    assert max(
+        ref.available_at for ref in record.input_refs
+        if ref.available_at is not None
+    ) <= CUTOFF
 
 
-# --- 7. PIT metadata survives the complete path -----------------------------
-
-def test_production_path_preserves_pit_metadata(production_db):
-    forecast = generate_and_persist_forecast(
-        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
-
-    reloaded = ForecastRecordRepository(production_db).latest(
-        COMPANY_ID, PERIOD_ID, "12M", "BASE")
-    assert reloaded is not None
-    assert reloaded.data_cutoff_datetime == CUTOFF
-    assert reloaded.forecast_timestamp == forecast.calculation_timestamp
-
-    revenue_ref = next(r for r in reloaded.input_refs if r.fact_key == "REVENUE")
-    assert revenue_ref.available_at == PUBLISHED
-    assert revenue_ref.report_version_id is not None
-    assert revenue_ref.source == "normalized_financial_facts"
-
-    # Every input the forecast saw was published at or before the cutoff, so a
-    # reader at the cutoff can still trust the record.
-    assert reloaded.data_cutoff_datetime >= max(
-        ref.available_at for ref in reloaded.input_refs
-        if ref.available_at is not None)
-    # The restated version published after the cutoff never entered.
-    assert reloaded.revenue != 99_999_999.0
-
-
-# --- 8. Duplicate persistence stays idempotent ------------------------------
-
-def test_production_path_duplicate_save_is_idempotent(production_db):
-    repository = ForecastRecordRepository(production_db)
-    generate_and_persist_forecast(
-        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
-    first = repository.latest(COMPANY_ID, PERIOD_ID, "12M", "BASE")
-
-    # Re-running the path with the same inputs is a no-op, not a new version.
-    generate_and_persist_forecast(
-        production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
-
-    assert repository.count() == 3
-    again = repository.latest(COMPANY_ID, PERIOD_ID, "12M", "BASE")
-    assert again.forecast_version == first.forecast_version == 1
-    assert again.eps == first.eps
-    # Nothing else changed: the re-run produced the same series state, so the
-    # repository found its own latest record and returned it as-is.
-    assert replace(again, forecast_id=first.forecast_id) == replace(
-        first, forecast_id=again.forecast_id)
-
-
-# --- 9. Missing share history stays None ------------------------------------
+# --- 8. Missing share history stays None ------------------------------------
 
 def test_production_path_missing_share_history_keeps_eps_none(empty_share_db):
-    forecast = generate_and_persist_forecast(
+    forecast = generate_forecast(
         empty_share_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
     base = forecast.scenario_forecasts.base
+    record = forecast.records()[1]
 
-    # No share base could be established, so no EPS is invented.
     assert base.eps is None
     assert base.net_profit is not None
-
-    reloaded = ForecastRecordRepository(empty_share_db).latest(
-        COMPANY_ID, PERIOD_ID, "12M", "BASE")
-    assert reloaded is not None
-    assert reloaded.eps is None
-    assert reloaded.is_missing("eps")
+    assert record.eps is None
+    assert record.is_missing("eps")
 
 
-# --- 10. Deterministic repeated execution -----------------------------------
+# --- 9. Repeated runtime calls do not build history or alter output ----------
 
-def test_production_path_is_deterministic():
+def test_production_path_is_deterministic_without_storage():
     def _run():
         engine = create_engine("sqlite:///:memory:")
         MigrationRunner(engine).upgrade()
         session = sessionmaker(bind=engine)()
         try:
             _seed_stage1(session)
-            return generate_and_persist_forecast(
+            return generate_forecast(
                 session, COMPANY_ID, PERIOD_ID, **_production_kwargs())
         finally:
             session.close()
@@ -1736,7 +1293,7 @@ def test_production_path_is_deterministic():
     second_records = second.records()
     assert [r.eps for r in first_records] == [r.eps for r in second_records]
     assert [r.revenue for r in first_records] == [r.revenue for r in second_records]
-    assert first_records[1].eps == second_records[1].eps
+    assert first_records[1].input_refs == second_records[1].input_refs
 
 
 # ==========================================================================
@@ -3950,7 +3507,7 @@ def test_null_announcement_action_is_treated_as_knowable_in_production_path(prod
         new_share_count=2_000_000,
     ))
     production_db.flush()
-    forecast = generate_and_persist_forecast(
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
     base = forecast.scenario_forecasts.base
     # 1M shares for 181 days, 1.5M for 92, then 2M for 92 of the 365-day window.
@@ -4091,7 +3648,7 @@ def test_production_path_without_attribution_declaration_keeps_eps_none(
         "historical_operating_margin": 0.20,
         "historical_net_margin": 0.10,
     })
-    forecast = generate_and_persist_forecast(
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID, **kwargs)
     base = forecast.scenario_forecasts.base
 
@@ -4406,7 +3963,7 @@ def test_side_scenarios_are_baseline_plus_minus_spread():
 
 def test_production_path_with_single_period_fails_side_scenarios_closed(
         production_db):
-    forecast = generate_and_persist_forecast(
+    forecast = generate_forecast(
         production_db, COMPANY_ID, PERIOD_ID, **_production_kwargs())
     assert forecast.assumptions["scenario_spread_methodology_version"] == \
         "HISTORICAL_DISPERSION_V1"

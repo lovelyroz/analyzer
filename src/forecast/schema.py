@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -50,15 +50,16 @@ class CompanyForecastResult:
     def scenarios(self) -> ScenarioForecastResult:
         return self.scenario_forecasts
 
-    def to_record(self, scenario: str, forecast_id: int,
+    def to_record(self, scenario: str, forecast_id: Optional[int] = None,
                   input_refs: Optional[Sequence["ForecastInputRef"]] = None
                   ) -> "ForecastRecord":
-        """Freeze one scenario chain into an immutable, versionable record.
+        """Freeze one scenario into an immutable runtime evaluation record.
 
         ``input_refs`` defaults to the references the caller declared while
-        generating the forecast, so the audit trail survives even when a caller
-        passes none. A missing metric is carried through as ``None`` and is
-        never coerced to zero (spec §27).
+        generating the forecast, so runtime auditability survives even when a
+        caller passes none. ``forecast_id`` is accepted temporarily for source
+        compatibility and deliberately ignored; runtime records have no
+        database identity or version assignment. Missing metrics stay None.
         """
         chain = getattr(self.scenario_forecasts, scenario.lower())
         if input_refs is None:
@@ -71,8 +72,6 @@ class CompanyForecastResult:
                 or ()
             )
         return ForecastRecord(
-            forecast_id=forecast_id,
-            forecast_version=0,
             company_id=self.company_id,
             forecast_period_id=self.forecast_period_id,
             industry_code=self.industry_code,
@@ -95,12 +94,17 @@ class CompanyForecastResult:
             stage4_provenance=self.assumptions.get("__stage4_provenance"),
         )
 
-    def records(self, forecast_id_start: int = 1,
-                input_refs: Sequence["ForecastInputRef"] = ()
+    def records(self, forecast_id_start: Optional[int] = None,
+                input_refs: Optional[Sequence["ForecastInputRef"]] = None
                 ) -> List["ForecastRecord"]:
-        """Freeze all three scenarios into ordered audit records."""
+        """Freeze all scenarios into ordered runtime records.
+
+        ``forecast_id_start`` is ignored for legacy source compatibility.
+        Input provenance defaults to references captured during generation;
+        records have no database ID or version history.
+        """
         return [
-            self.to_record(name, forecast_id_start + i, input_refs)
+            self.to_record(name, input_refs=input_refs)
             for i, name in enumerate(("bear", "base", "bull"))
         ]
 
@@ -182,13 +186,7 @@ class ForecastInputRef:
 
 @dataclass(frozen=True)
 class ForecastRecord:
-    """Immutable, versioned snapshot of one scenario forecast at one cutoff.
-
-    Records are append-only: once stored they are never mutated and never
-    replaced (spec §24).
-    """
-    forecast_id: int
-    forecast_version: int
+    """Immutable in-memory snapshot of one scenario forecast at one cutoff."""
     company_id: int
     forecast_period_id: int
     industry_code: str
@@ -224,10 +222,6 @@ class ForecastRecord:
         return getattr(self, metric) is None
 
 
-class ForecastVersionExistsError(ValueError):
-    """A caller-supplied forecast_version collides with a stored record."""
-
-
 def normalize_datetime(value: Optional[Any]) -> Optional[datetime]:
     """Fold naive datetimes onto UTC so cutoffs remain comparable.
 
@@ -255,119 +249,6 @@ def filter_pit_inputs(refs: Iterable[ForecastInputRef],
         else:
             dropped.append(ref)
     return available, dropped
-
-
-# ``forecast_id`` is a surrogate the caller mints for its own bookkeeping; it
-# never describes the forecast's state. Two records are the same series state
-# when every state field agrees, regardless of the ids they carry (spec §24).
-# ``forecast_version`` is an assignment rather than content for the same reason.
-_SURROGATE = object()
-
-
-def _same_forecast_state(stored: ForecastRecord, record: ForecastRecord) -> bool:
-    """Equal forecast state, ignoring the surrogate ``forecast_id``."""
-    return (replace(stored, forecast_id=_SURROGATE, forecast_version=_SURROGATE)
-            == replace(record, forecast_id=_SURROGATE, forecast_version=_SURROGATE))
-
-
-class ForecastVersionStore:
-    """Append-only registry of versioned forecast records (spec §24).
-
-    Records are stored once and never overwritten. Re-saving the identical
-    record is idempotent; saving a changed record under the same natural key
-    creates the next version rather than replacing the previous one.
-    """
-
-    def __init__(self) -> None:
-        self._by_key: Dict[Tuple[Any, ...], List[ForecastRecord]] = {}
-
-    def save(self, record: ForecastRecord) -> ForecastRecord:
-        key = record.key()
-        versions = self._by_key.setdefault(key, [])
-
-        # A caller-supplied version must match a stored record exactly, or not
-        # at all: anything else is an attempted overwrite.
-        if record.forecast_version != 0:
-            for stored in versions:
-                if stored.forecast_version == record.forecast_version:
-                    if _same_forecast_state(stored, record):
-                        return stored
-                    raise ForecastVersionExistsError(
-                        f"forecast version {record.forecast_version} already stored for {key}"
-                    )
-
-        # Re-saving the identical latest record is a no-op rather than a new
-        # version: the series is unchanged, so nothing was overwritten.
-        if versions:
-            latest = versions[-1]
-            if _same_forecast_state(latest, record):
-                return latest
-
-        stored = replace(record, forecast_version=len(versions) + 1)
-        versions.append(stored)
-        return stored
-
-    def history(self, company_id: int, forecast_period_id: int, horizon: str,
-                scenario: str) -> List[ForecastRecord]:
-        return list(self._by_key.get(
-            (company_id, forecast_period_id, horizon, scenario.upper()), []
-        ))
-
-    def latest(self, company_id: int, forecast_period_id: int, horizon: str,
-               scenario: str) -> Optional[ForecastRecord]:
-        versions = self.history(company_id, forecast_period_id, horizon, scenario)
-        return versions[-1] if versions else None
-
-    def revision_trend(self, company_id: int, forecast_period_id: int, horizon: str,
-                       scenario: str, metric: str = "eps") -> Optional[str]:
-        """Earnings revision direction across preserved versions (spec §24)."""
-        versions = self.history(company_id, forecast_period_id, horizon, scenario)
-        values = [getattr(v, metric) for v in versions]
-        if len(values) < 2 or any(v is None for v in values):
-            return None
-        if all(values[i] < values[i + 1] for i in range(len(values) - 1)):
-            return "UPWARD"
-        if all(values[i] > values[i + 1] for i in range(len(values) - 1)):
-            return "DOWNWARD"
-        return "MIXED"
-
-    def read_at_cutoff(self, company_id: int, forecast_period_id: int, horizon: str,
-                       scenario: str, cutoff_datetime: datetime) -> Optional[ForecastRecord]:
-        """Newest record valid at ``cutoff_datetime`` (spec §25).
-
-        Returns ``None`` when no record exists at that cutoff or when every
-        surviving record depended on information published after it.
-        """
-        cutoff = normalize_datetime(cutoff_datetime)
-        for record in reversed(self.history(company_id, forecast_period_id, horizon, scenario)):
-            if normalize_datetime(record.data_cutoff_datetime) > cutoff:
-                continue
-            if self._late_inputs(record, cutoff):
-                continue
-            return record
-        return None
-
-    def pit_violations(self, cutoff_datetime: datetime) -> List[ForecastRecord]:
-        """Records that saw information published after ``cutoff_datetime``."""
-        cutoff = normalize_datetime(cutoff_datetime)
-        return [
-            record
-            for versions in self._by_key.values()
-            for record in versions
-            if normalize_datetime(record.data_cutoff_datetime) <= cutoff
-            and self._late_inputs(record, cutoff)
-        ]
-
-    @staticmethod
-    def _late_inputs(record: ForecastRecord, cutoff: datetime) -> List[ForecastInputRef]:
-        return [
-            ref for ref in record.input_refs
-            if ref.available_at is not None
-            and normalize_datetime(ref.available_at) > cutoff
-        ]
-
-    def count(self) -> int:
-        return sum(len(versions) for versions in self._by_key.values())
 
 
 SUPPORTED_HORIZONS = ("1M", "3M", "6M", "12M")

@@ -37,80 +37,83 @@ All files listed below must be present in the supplied local `analyzer` project 
 
 ### A. Governance and contracts — READ-ONLY
 
-1. `WORKFLOW_RULES.md`
-2. `STAGE7_MASTER_WORKING_PACKET.md`
-3. `05_Stage5_Forecast_Engine.md`
-4. `07_Stage7_Valuation.md`
+1. `STAGE7_MASTER_WORKING_PACKET.md`
+2. `05_Stage5_Forecast_Engine.md`
+3. `07_Stage7_Valuation.md`
 
 ### B. Stage 5 source — implementation scope
 
-5. `src/forecast/__init__.py`
-6. `src/forecast/service.py`
-7. `src/forecast/schema.py`
-8. `src/forecast/repo.py`
-9. `src/forecast/adapter.py`
-10. `src/forecast/builder.py`
-11. `src/forecast/drivers.py`
-12. `src/forecast/engine.py`
-13. `src/forecast/queries.py`
+4. `src/forecast/__init__.py`
+5. `src/forecast/service.py`
+6. `src/forecast/schema.py`
+7. `src/forecast/repo.py`
+8. `src/forecast/adapter.py`
+9. `src/forecast/builder.py`
+10. `src/forecast/drivers.py`
+11. `src/forecast/engine.py`
+12. `src/forecast/queries.py`
 
 ### C. Models, database, and migration
 
-14. `src/models/forecast.py`
-15. `src/models/entity.py`
-16. `src/models/normalized.py`
-17. `src/models/normalized_provenance.py`
-18. `src/models/period.py`
-19. `src/models/report.py`
-20. `src/models/share_action.py`
-21. `src/core/database.py`
-22. `src/migrations/runner.py`
-23. `src/scripts/init_db.py`
-24. `src/scripts/migrate_db.py`
+13. `src/models/forecast.py`
+14. `src/models/entity.py`
+15. `src/models/normalized.py`
+16. `src/models/normalized_provenance.py`
+17. `src/models/period.py`
+18. `src/models/report.py`
+19. `src/models/share_action.py`
+20. `src/core/database.py`
+21. `src/migrations/runner.py`
+22. `src/scripts/init_db.py`
+23. `src/scripts/migrate_db.py`
 
 ### D. Downstream runtime consumers — READ-ONLY unless a directly necessary contract adjustment is demonstrated
 
-25. `src/evaluation/__init__.py`
-26. `src/evaluation/aggregate.py`
-27. `src/evaluation/artifact.py`
-28. `src/evaluation/metrics.py`
-29. `src/evaluation/observation.py`
-30. `src/evaluation/pipeline.py`
-31. `src/evaluation/reliability.py`
-32. `src/evaluation/schema.py`
-33. `src/valuation/__init__.py`
-34. `src/valuation/engine.py`
-35. `src/valuation/schema.py`
-36. `src/valuation/service.py`
-37. `src/decision/__init__.py`
-38. `src/decision/engine.py`
-39. `src/decision/schema.py`
-40. `src/decision/service.py`
+24. `src/evaluation/__init__.py`
+25. `src/evaluation/aggregate.py`
+26. `src/evaluation/artifact.py`
+27. `src/evaluation/metrics.py`
+28. `src/evaluation/observation.py`
+29. `src/evaluation/pipeline.py`
+30. `src/evaluation/reliability.py`
+31. `src/evaluation/schema.py`
+32. `src/valuation/__init__.py`
+33. `src/valuation/engine.py`
+34. `src/valuation/schema.py`
+35. `src/valuation/service.py`
+36. `src/decision/__init__.py`
+37. `src/decision/engine.py`
+38. `src/decision/schema.py`
+39. `src/decision/service.py`
 
 ### E. Tests
 
-41. `src/tests/test_stage5_forecast.py`
-42. `src/tests/test_stage1_database_architecture.py`
-43. `src/tests/test_stage1_database_integrity.py`
-44. `src/tests/test_stage6_artifact_boundary.py`
-45. `src/tests/test_stage6_artifact_identity.py`
-46. `src/tests/test_stage6_evaluation.py`
-47. `src/tests/test_stage6_evaluation_foundation.py`
-48. `src/tests/test_stage6_evaluation_metrics.py`
-49. `src/tests/test_stage6_p25_adversarial.py`
-50. `src/tests/test_stage6_p25_selection.py`
-51. `src/tests/test_stage6_p38_closure.py`
-52. `src/tests/test_stage6_p39_cutoff.py`
-53. `src/tests/test_stage6_p40_duplicates.py`
-54. `src/tests/test_stage6_p41_cutoff_identity.py`
-55. `src/tests/test_stage6_production_pipeline.py`
-56. `src/tests/test_stage6_reliability_governance.py`
-57. `src/tests/test_stage6_scenario_isolation.py`
-58. `src/tests/test_stage789_service_interface.py`
-59. `src/tests/test_stage7_valuation.py`
-60. `src/tests/test_stage9_decision.py`
+40. `src/tests/test_stage5_forecast.py`
+41. `src/tests/test_stage1_database_architecture.py`
+42. `src/tests/test_stage1_database_integrity.py`
+43. `src/tests/test_stage6_artifact_boundary.py`
+44. `src/tests/test_stage6_artifact_identity.py`
+45. `src/tests/test_stage6_evaluation.py`
+46. `src/tests/test_stage6_evaluation_foundation.py`
+47. `src/tests/test_stage6_evaluation_metrics.py`
+48. `src/tests/test_stage6_p25_adversarial.py`
+49. `src/tests/test_stage6_p25_selection.py`
+50. `src/tests/test_stage6_p38_closure.py`
+51. `src/tests/test_stage6_p39_cutoff.py`
+52. `src/tests/test_stage6_p40_duplicates.py`
+53. `src/tests/test_stage6_p41_cutoff_identity.py`
+54. `src/tests/test_stage6_production_pipeline.py`
+55. `src/tests/test_stage6_reliability_governance.py`
+56. `src/tests/test_stage6_scenario_isolation.py`
+57. `src/tests/test_stage789_service_interface.py`
+58. `src/tests/test_stage7_valuation.py`
+59. `src/tests/test_stage9_decision.py`
 
-Do not inspect files outside this list. If a reference, caller, migration dependency, or test dependency points to an unlisted file, stop before editing and report its exact path and why it is required. Do not silently expand the scope.
+Do not inspect files outside this list, except for the narrowly permitted read-only dependency inspection described in Section 7.
+
+If a reference, caller, migration dependency, or test dependency points to an unlisted file, do not silently expand the scope.
+
+First report its exact path and why it is required. Obtain authorization before inspecting or modifying it.
 
 ## 4. Task execution order
 
@@ -210,7 +213,9 @@ Do not simply delete the ORM model definitions if doing so makes historical migr
 
 **Data preservation rule:**
 
-The only tables authorized for deletion are `forecast_input_refs` and `forecast_versions`. Their contents are analytical Forecast outputs and output-dependent provenance, which the owner has explicitly prohibited from being stored. Do not delete or rewrite raw facts, normalized facts, reports, report versions, periods, corporate actions, share-count history, or any other input-side records.
+The only tables authorized for deletion are `forecast_input_refs` and `forecast_versions`. Their contents are analytical Forecast outputs and output-dependent provenance, which the owner has explicitly prohibited from being stored.
+
+Do not delete or rewrite raw facts, normalized facts, reports, report versions, periods, corporate actions, share-count history, or any other input-side records.
 
 ### Task 056 · S7-T028 — Redesign regression tests
 
@@ -221,6 +226,7 @@ Do not weaken or simply delete existing tests.
 Required coverage:
 
 **A. Runtime Forecast correctness**
+
 - Stage 5 returns the expected runtime `CompanyForecastResult`.
 - Bear, Base, and Bull outputs remain available.
 - Existing financial calculations and scenario invariants remain unchanged.
@@ -228,6 +234,7 @@ Required coverage:
 - Runtime model version, cutoff, timestamp, and required metadata remain available.
 
 **B. No persistence**
+
 - Running the Stage 5 generation service performs no database writes.
 - No Forecast output or scenario row is inserted or updated.
 - No output-dependent provenance row is inserted.
@@ -235,12 +242,14 @@ Required coverage:
 - No in-memory history/version store is used as a replacement.
 
 **C. Final schema**
+
 - After the migration runner completes, neither `forecast_versions` nor `forecast_input_refs` exists.
 - Migration version is 8.
 - Migration history 1–7 remains intact.
 - Migration execution is idempotent.
 
 **D. Raw input preservation**
+
 - Raw and normalized source facts remain present and readable after Forecast generation.
 - Report and ReportVersion data remain intact.
 - ShareCountHistory and CorporateAction inputs remain intact.
@@ -248,12 +257,14 @@ Required coverage:
 - Tests must verify actual rows or stable identifiers, not merely assert that unrelated table names exist.
 
 **E. Runtime provenance and PIT**
+
 - Existing input-side PIT filtering remains effective.
 - Runtime Forecast provenance remains available to downstream consumers where required.
 - Removing the output-dependent database bridge must not silently remove the runtime input references.
 - Do not weaken PIT, cutoff, identity, or provenance tests.
 
 **F. Stage 6 and Stage 7 integration contracts**
+
 - Stage 6 must continue to accept valid runtime Forecast records.
 - Stage 6 must not read Forecast records from a database repository.
 - Stage 7 must continue to receive and consume `CompanyForecastResult` through its existing runtime contract.
@@ -324,20 +335,119 @@ Do not create additional files. If a new migration module or another file is gen
 - No replacement persistence, cache, or history store.
 - No test deletion without a meaningful replacement.
 
-## 7. Execution restrictions
+## 7. Execution restrictions and file inspection permissions
+
+### 7.1. General principle
+
+This task requires source-level inspection of the explicitly listed project files.
+
+**Reading files is explicitly permitted and is NOT considered code execution, project modification, or a prohibited shell operation.**
+
+The previous restriction against shell commands must NOT be interpreted as a prohibition on read-only file inspection.
+
+The agent is explicitly authorized to use the minimum necessary read-only commands to inspect the supplied project.
+
+### 7.2. Permitted read-only operations
+
+The following operations are authorized:
+
+- Reading file contents using `Get-Content`, `type`, `cat`, `sed`, or equivalent read-only commands.
+- Listing explicitly relevant directories and filenames.
+- Searching file contents using read-only commands such as `Select-String`, `grep`, or equivalent.
+- Reading source code, tests, migration definitions, schemas, configuration, and documentation.
+- Inspecting imports, function definitions, class definitions, references, and call sites.
+- Reading directly referenced dependencies when necessary to establish a verified execution path or migration dependency, subject to the scope restrictions below.
+
+The agent may use PowerShell, CMD, or another available local file-reading interface.
+
+Use the simplest available method. Do not execute a script merely to read a file.
+
+### 7.3. Strictly prohibited operations
+
+Unless explicitly authorized by the owner, the agent MUST NOT:
+
+- Execute application code.
+- Run Python scripts or application entry points.
+- Run pytest or any other tests.
+- Execute database migrations.
+- Create, modify, or delete database records.
+- Install or update dependencies.
+- Run formatters, auto-fix tools, or code generators.
+- Execute commands that modify project files outside the explicitly authorized implementation scope.
+- Execute Git commands that modify repository state.
+- Commit, push, pull, merge, or modify branches.
+- Access or modify GitHub or any remote repository.
+- Execute shell commands that run application logic or modify system/project state.
+
+### 7.4. Scope of file inspection
+
+Inspect every required file in Section 3 before making implementation decisions.
+
+If a listed file references another file that is essential to verify:
+
+- The Forecast production call chain,
+- The Stage 6 or Stage 7 runtime contract,
+- The migration dependency,
+- The active ORM registration,
+- The database initialization path,
+
+the agent must first identify the exact unlisted file and explain why it is necessary.
+
+Do not silently expand the inspection scope.
+
+Do not perform repository-wide exploration.
+
+### 7.5. Implementation authorization
+
+Code changes are authorized only within the explicitly permitted file list in Section 5.
+
+Reading a file does not authorize modifying it.
+
+The agent must not modify any file outside Section 5.
+
+If a necessary change requires an unlisted file, stop before making that change and report:
+
+1. Exact file path.
+2. Why the change is necessary.
+3. Which task depends on it.
+4. The proposed minimal modification.
+
+### 7.6. Failure handling
+
+If a required file cannot be accessed:
+
+1. Identify its exact path.
+2. Explain which verification depends on it.
+3. Continue all independent inspections that remain possible.
+4. Report the unresolved dependency.
+
+Do NOT stop the entire task merely because one file is inaccessible.
+
+If a required dependency cannot be inspected safely, do not guess its behavior.
+
+### 7.7. Test execution boundary
+
+The user will run all tests locally and provide the actual output.
+
+The agent must:
+
+- Author and update the required tests.
+- Review the test code statically.
+- Provide exact recommended test commands.
+- Identify expected test coverage.
+
+The agent MUST NOT execute tests or claim that tests passed.
+
+### 7.8. Reporting boundary
 
 - Work only in the supplied local folder `analyzer`.
 - Do not access or edit GitHub or any remote repository.
-- Do not run Git commands or modify branches, commits, remotes, or repository history.
-- Do not run tests.
-- Do not run linters, scripts, migrations, database commands, or shell commands.
-- Do not execute code to validate the implementation.
 - Do not modify the Master Packet or any governance document.
 - Do not write the report into `reply.md`, `temp_report2.md`, or any other file.
-- Do not inspect files outside the explicit required-file list.
-- If a required file is missing or an unlisted dependency is discovered, stop and report it rather than guessing.
+- Do not create additional files.
+- Report directly to the user.
 
-The user will run all tests locally and provide the actual output.
+The agent may use read-only shell commands for file inspection, but must not execute tests, application code, migrations, database commands, Git operations, or other prohibited commands.
 
 ## 8. Required completion report
 
@@ -346,6 +456,7 @@ Report directly to the user. Do not create or modify a report file.
 Report each task separately, preserving its exact number and ID:
 
 ### 057 · S7-T029
+
 - Initial audit findings.
 - Final audit findings.
 - Every verified production caller and test-only caller.
@@ -354,12 +465,14 @@ Report each task separately, preserving its exact number and ID:
 - Evidence for the absence of persistence dependencies.
 
 ### 054 · S7-T026
+
 - Exact service API before and after.
 - Exact write path removed.
 - Runtime contract preserved.
 - All changed files.
 
 ### 055 · S7-T027
+
 - Migration number and name.
 - Confirmation migrations 1–7 were not rewritten.
 - Exact drop order.
@@ -368,6 +481,7 @@ Report each task separately, preserving its exact number and ID:
 - Confirmation that raw input tables are preserved.
 
 ### 056 · S7-T028
+
 - Tests removed or rewritten, with reasons.
 - New tests added and the invariant each one proves.
 - Runtime provenance/PIT tests preserved.
@@ -385,6 +499,7 @@ Also provide:
 - Exact files changed or deleted.
 - Any unmodified but potentially relevant files.
 - Any unresolved dependencies or limitations.
-- Confirmation that no tests, commands, migrations, or Git operations were executed.
+- Confirmation that no tests, application code, migrations, database operations, or Git operations were executed.
+- Confirmation that only authorized read-only file inspection commands were used.
 
 Do not claim success without source-level evidence.

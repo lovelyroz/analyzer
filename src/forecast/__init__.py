@@ -9,7 +9,7 @@ from src.forecast.schema import (
 )
 from src.forecast.drivers import ForecastDriver
 from src.forecast.engine import ForecastEngine
-from src.forecast.service import generate_and_persist_forecast
+from src.forecast.service import generate_forecast
 
 __all__ = [
     "SingleForecastChain",
@@ -17,5 +17,5 @@ __all__ = [
     "CompanyForecastResult",
     "ForecastDriver",
     "ForecastEngine",
-    "generate_and_persist_forecast",
+    "generate_forecast",
 ]

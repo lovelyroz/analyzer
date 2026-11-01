@@ -1,10 +1,8 @@
-"""Stage 5 forecast persistence (spec sections 24, 28, 29).
+"""Legacy-only ORM schema needed to execute historical migration 7.
 
-Stage 5 forecasts are append-only: a new forecast for the same logical identity
-never replaces the previous one, which stays readable as an earlier version
-(spec section 24). The audit trail back to the report version a forecast was
-built from is a separate table, so one forecast can point at several inputs
-without a second PIT implementation (spec section 29).
+These tables are deliberately registered outside the active application Base
+metadata. Migration 7 can still recreate its historical schema and migration 8
+removes it; normal schema initialization cannot recreate these output tables.
 """
 
 from sqlalchemy import (
@@ -18,12 +16,25 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    MetaData,
 )
+from sqlalchemy.orm import declarative_base
 
-from src.core.database import Base
+
+LegacyForecastBase = declarative_base(metadata=MetaData())
+
+# Register FK targets in the isolated legacy metadata. Migration 7 creates only
+# the two selected Forecast tables; these copied input tables are never passed
+# to create_all and remain owned by the active application Base.
+from src.models.entity import Company  # noqa: E402,F401
+from src.models.period import FinancialPeriod  # noqa: E402,F401
+from src.models.report import ReportVersion  # noqa: E402,F401
+
+for _model in (Company, FinancialPeriod, ReportVersion):
+    _model.__table__.to_metadata(LegacyForecastBase.metadata)
 
 
-class ForecastVersion(Base):
+class ForecastVersion(LegacyForecastBase):
     """One immutable version of one scenario forecast (spec section 28).
 
     The business key (company, period, horizon, scenario) identifies the
@@ -81,7 +92,7 @@ class ForecastVersion(Base):
     )
 
 
-class ForecastInputRefModel(Base):
+class ForecastInputRefModel(LegacyForecastBase):
     """Provenance bridge from a stored forecast to the facts that fed it.
 
     One row per input reference, mirroring the in-memory ``ForecastInputRef``.

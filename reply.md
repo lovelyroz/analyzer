@@ -181,3 +181,55 @@ src\tests\test_codal_extraction.py:412: AssertionError
 این متن با `05_Stage5_Forecast_Engine.md` مطابقت دارد و ممنوعیت persistence را حفظ می‌کند. عملیات اصلاح متن انجام شد؛ **053 همچنان PARTIAL می‌ماند** تا بررسی و بستن مستقل طبق پرامپت انجام شود.
 
 فقط فایل [07_Stage7_Valuation.md](/D:/winprojects/analyzer/07_Stage7_Valuation.md) تغییر کرد. فایل دیگری، کد، تست یا تنظیمات تغییر نکرد و هیچ تست یا عملیات Git اجرا نشد.
+
+# P054–057 — Remove Forecast Output Persistence and Preserve Runtime Integration
+اجرای prompt انجام شد. **هیچ تستی اجرا نشده**؛ طبق prompt اجرای آن‌ها بر عهدهٔ شماست، بنابراین موارد نیازمند اجرای تست را `PARTIAL` گزارش می‌کنم.
+
+### 057 · S7-T029 — `PARTIAL`
+
+- در فایل‌های بررسی‌شده، مسیر تولید Forecast در [service.py](/D:/winprojects/analyzer/src/forecast/service.py) تابع `generate_forecast` است. مصرف‌کنندهٔ production دیگری برای سرویس، یا مسیر production اثبات‌شده‌ای که Forecast را به Stage 6 یا Stage 7 وصل کند، پیدا نشد.
+- Stage 6 در `src/evaluation/pipeline.py` رکوردهای runtime را مصرف می‌کند؛ فیلدهای موردنیاز شامل هویت شرکت و دوره، افق، نسخهٔ مدل، cutoff، سناریو، مقادیر مالی و `input_refs` هستند.
+- Stage 7 در `src/valuation/engine.py` و `src/valuation/service.py` نتیجهٔ runtime از نوع `CompanyForecastResult` می‌گیرد و از هویت شرکت/دوره، صنعت، سناریوها، cutoff، نسخهٔ مدل و داده‌های فرضیات استفاده می‌کند.
+- وابستگی کدی به مخزن Forecast در این مسیرها دیده نشد. مدل‌های خروجی فقط برای پشتیبانی تاریخی migration 7 در `src/models/forecast.py` نگه داشته شده‌اند؛ migration 8 آن‌ها را حذف می‌کند.
+- فراخوانی‌های باقی‌ماندهٔ `ForecastRecord` و تبدیل‌های آن در تست‌ها عمدتاً قرارداد runtime را می‌سنجند. ارجاعات schema و migration به جدول‌های قدیمی، پشتیبانی تاریخی‌اند. اجرای نهایی تست‌ها برای تأیید این جمع‌بندی هنوز لازم است.
+
+### 054 · S7-T026 — `PARTIAL`
+
+- API سرویس از `generate_and_persist_forecast(..., persist=True)` به `generate_forecast(...)` تغییر کرد و گزینهٔ persistence، فراخوانی repository و نوشتن رکوردهای خروجی حذف شدند.
+- `CompanyForecastResult` و رکوردهای سناریو با provenance ورودی همچنان در حافظه برمی‌گردند.
+- حذف شد: `src/forecast/repo.py`. تغییر یافتند: `src/forecast/service.py`, `src/forecast/__init__.py`, `src/forecast/schema.py`.
+
+### 055 · S7-T027 — `PARTIAL`
+
+- migration **8** با نام `remove_forecast_output_persistence` اضافه شد. ترتیب حذف: `forecast_input_refs` سپس `forecast_versions`؛ هر دو حذف در نبود جدول نیز امن‌اند.
+- migrationهای 1 تا 7 از نظر شماره و تاریخچه حفظ شده‌اند؛ migration 7 برای ساخت schema تاریخی از metadata جداشده استفاده می‌کند. metadata فعال برنامه جدول‌های خروجی را ثبت نمی‌کند.
+- تست‌ها رفتار دیتابیس تازه، تکرار migration، schema فعال و ارتقای دیتابیس ثبت‌شده در نسخهٔ 7 را پوشش می‌دهند. تست نسخهٔ 7 وجود رکوردهای خروجی و حفظ رکوردهای raw، normalized، report، report version، share history و corporate action را بررسی می‌کند.
+- حذف جدول‌ها به همین دو جدول محدود است. تأیید عملی این پوشش با اجرای تست‌ها باقی است.
+
+### 056 · S7-T028 — `PARTIAL`
+
+- تست‌های مخزن و history store با تست‌های runtime و PIT بازنویسی شدند؛ تست‌های محاسباتی، سناریوها، missing values و provenance نگه داشته شدند.
+- تست‌های جدید عدم نوشتن در دیتابیس، نبود جدول‌های خروجی، حفظ داده‌های ورودی هنگام تولید و migration، و idempotency را پوشش می‌دهند.
+- فرمان‌های پیشنهادی برای اجرای محلی:
+
+```powershell
+pytest src/tests/test_stage1_database_integrity.py src/tests/test_stage5_forecast.py -q
+pytest src/tests/test_stage6_production_pipeline.py src/tests/test_stage789_service_interface.py src/tests/test_stage7_valuation.py src/tests/test_stage9_decision.py -q
+```
+
+### فایل‌ها و محدودیت‌ها
+
+فایل‌های تغییرکرده یا حذف‌شده:
+
+- `src/forecast/service.py`
+- `src/forecast/__init__.py`
+- `src/forecast/schema.py`
+- `src/models/forecast.py`
+- `src/migrations/runner.py`
+- `src/forecast/repo.py` — حذف شد
+- `src/tests/test_stage5_forecast.py`
+- `src/tests/test_stage1_database_integrity.py`
+
+فایل‌های بررسی‌شده شامل تمام ۵۹ فایل فهرست‌شده در بخش ۳ `PROMPT.md` بودند: اسناد governance، فایل‌های Forecast، مدل‌ها و migration، مصرف‌کننده‌های Stage 6/7/9 و تست‌های همان بخش. سه فایل `src/models/audit.py`، `src/models/fx.py` و `src/models/market.py` نیز فقط‌خواندنی و با اجازهٔ شما بررسی شدند. `src/scripts/init_db.py` بررسی شد و تغییری در آن لازم نبود. فایل‌های Stage 6 و Stage 7 تغییر نکردند.
+
+**هیچ تست، کد برنامه، migration، عملیات دیتابیس یا عملیات Git اجرا نشد.** فقط دستورهای خواندنی برای بررسی فایل‌ها و جست‌وجو استفاده شدند.

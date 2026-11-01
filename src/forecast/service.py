@@ -1,19 +1,16 @@
-"""Stage 5 forecast production path (spec sections 9, 15-16, 24, 25, 29).
+"""Stage 5 runtime forecast production path (spec sections 9, 15-16, 25, 29).
 
 The single entry point that turns Stage 1 facts plus a Stage 4 ``TrendResult``
-into persisted forecast versions:
+into runtime forecast results:
 
     Stage 1 facts + Stage 4 TrendResult
         -> build_financial_context()
         -> ForecastEngine
-        -> ForecastRecord
-        -> ForecastRecordRepository
-        -> persistent ForecastVersion / ForecastInputRef
+        -> CompanyForecastResult
 
-Nothing here forecasts anything. Every step is an existing component: the
-queries read Stage 1, the adapter carries Stage 4 across, the builder weights
-the share base, the engine computes the scenarios and the repository stores
-them. The service only orders those steps.
+The queries read Stage 1, the adapter carries Stage 4 across, the builder
+weights the share base, and the engine computes runtime scenarios. The service
+returns those results and their input provenance in memory.
 
 The caller owns the ``Session`` and therefore the transaction boundary, as in
 ``src/ingestion/service.py``; nothing here commits.
@@ -38,7 +35,6 @@ from src.forecast.queries import (
     load_industry_code,
     load_share_history,
 )
-from src.forecast.repo import ForecastRecordRepository
 from src.forecast.schema import (
     CompanyForecastResult,
     ForecastInputRef,
@@ -56,8 +52,6 @@ DEFAULT_FACT_METRICS = (
     "TOTAL_EQUITY",
     "EPS",
 )
-
-FORECAST_SCENARIOS = ("bear", "base", "bull")
 
 # The Stage 5 EPS contract divides profit *attributable to common shareholders*
 # (05_Stage5_Forecast_Engine.md section 9). Stage 1 exposes only NET_PROFIT —
@@ -291,7 +285,7 @@ def _eps_attributable_basis(extra_facts: Optional[Dict[str, Any]]) -> str:
     return "UNVERIFIED_TOTAL_NET_PROFIT"
 
 
-def generate_and_persist_forecast(
+def generate_forecast(
     session: Session,
     company_id: int,
     forecast_period_id: int,
@@ -304,7 +298,6 @@ def generate_and_persist_forecast(
     extra_facts: Optional[Dict[str, Any]] = None,
     share_count: Optional[float] = None,
     calculation_timestamp: Optional[datetime] = None,
-    persist: bool = True,
 ) -> CompanyForecastResult:
     """Run the Stage 5 production path for one company and forecast period.
 
@@ -324,14 +317,12 @@ def generate_and_persist_forecast(
     derived from ``ShareCountHistory``; it never supplants the weighted average
     the builder produced.
 
-    ``calculation_timestamp`` dates the forecast. Re-running the path with the
-    same inputs and the same timestamp yields the identical record, which is
-    what makes a repeat run idempotent rather than a new version; when it is
-    omitted the current UTC instant is used, so a genuine re-forecast is still
-    recorded as one.
+    ``calculation_timestamp`` dates this runtime result. When omitted, the
+    current UTC instant is used. The service reads source inputs through the
+    caller-owned Session and returns the result without persisting it.
 
-    Returns the engine result; the persisted records are reachable from it via
-    ``records()``.
+    Returns the runtime engine result. Its scenario records and input
+    provenance remain available in memory through ``records()``.
     """
     industry_code = load_industry_code(session, company_id)
     if industry_code is None:
@@ -403,10 +394,5 @@ def generate_and_persist_forecast(
         horizon=horizon,
         model_version=model_version,
     )
-
-    if persist:
-        repository = ForecastRecordRepository(session)
-        for scenario in FORECAST_SCENARIOS:
-            repository.save(forecast.to_record(scenario, forecast_id=1))
 
     return forecast

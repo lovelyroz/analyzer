@@ -22,7 +22,11 @@ from src.models.normalized import (  # noqa: F401
     RawFinancialFact,
 )
 from src.models.normalized_provenance import NormalizedFinancialFactInput  # noqa: F401
-from src.models.forecast import ForecastInputRefModel, ForecastVersion  # noqa: F401
+from src.models.forecast import (
+    ForecastInputRefModel,
+    ForecastVersion,
+    LegacyForecastBase,
+)  # noqa: F401
 from src.models.period import FinancialPeriod  # noqa: F401
 from src.models.report import Report, ReportVersion  # noqa: F401
 from src.models.share_action import CorporateAction, ShareCountHistory  # noqa: F401
@@ -145,10 +149,17 @@ def _apply_fx_rates_jalali_components(engine: Engine) -> None:
 
 def _apply_forecast_version_repository(engine: Engine) -> None:
     """CHANGE-007: Stage 5 append-only forecast version store (spec sections 24/28/29)."""
-    Base.metadata.create_all(bind=engine, tables=[
-        Base.metadata.tables["forecast_versions"],
-        Base.metadata.tables["forecast_input_refs"],
+    LegacyForecastBase.metadata.create_all(bind=engine, tables=[
+        LegacyForecastBase.metadata.tables["forecast_versions"],
+        LegacyForecastBase.metadata.tables["forecast_input_refs"],
     ])
+
+
+def _apply_remove_forecast_output_persistence(engine: Engine) -> None:
+    """CHANGE-008: remove output storage while preserving input-side schema."""
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS forecast_input_refs"))
+        connection.execute(text("DROP TABLE IF EXISTS forecast_versions"))
 
 
 def _migration_list() -> Iterable[Migration]:
@@ -160,6 +171,7 @@ def _migration_list() -> Iterable[Migration]:
         Migration(5, "market_daily_jalali_components", _apply_market_daily_jalali_components),
         Migration(6, "fx_rates_jalali_components", _apply_fx_rates_jalali_components),
         Migration(7, "forecast_version_repository", _apply_forecast_version_repository),
+        Migration(8, "remove_forecast_output_persistence", _apply_remove_forecast_output_persistence),
     )
 
 
