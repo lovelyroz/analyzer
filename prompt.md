@@ -1,223 +1,276 @@
-# Package 4 — Final Valuation Engine Review
-## Stage 7 — Controlled Technical Review and Remediation
+# Package 5 — Regression, Audit & Stage 7 Closure
 
-You are working on the financial-data application repository:
+## بخش اول — دستورالعمل Agent
 
-`analyzer`
-# Required Files:
-    WORKFLOW_RULES.md
-    STAGE7_MASTER_WORKING_PACKET.md
-    07_Stage7_Valuation.md
-    src/valuation/engine.py
-    src/valuation/models.py
-    src/valuation/parameters.py
-    src/valuation/schema.py
-    src/valuation/service.py
-    src/forecast/schema.py
-    src/tests/test_stage7_valuation.py
+### 1. نوع و محدودهٔ کار
 
-This is a financial application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of approved financial invariants take priority over implementation convenience.
+**Task Type:** REPORT-ONLY + TEST AUDIT + FINAL EXIT-CRITERIA REVIEW
 
-## 1. Work classification
+این مأموریت صرفاً شامل ممیزی کد، مستندات، تست‌ها و معیارهای خروج Stage 7 است.
 
-**CODE-CHANGING + TEST AUTHORING + TECHNICAL AUDIT**
+- هیچ کدی را تغییر نده.
+- هیچ تستی را تغییر نده.
+- هیچ مستندی را تغییر نده.
+- هیچ تست یا فرمانی را اجرا نکن.
+- هیچ فایل یا گزارشی را در GitHub یا مخزن ثبت نکن.
+- گزارش نهایی را مستقیماً به کاربر تحویل بده.
 
-You may modify only:
+### 2. محل اجرا و فایل‌های ورودی — الزام قطعی
+
+کار را فقط روی نسخهٔ محلی پروژه با نام پوشهٔ `analyzer` انجام بده.
+
+**GitHub منبع اجرای این مأموریت نیست.** فرض نکن به مخزن GitHub دسترسی داری و برای خواندن یا تغییر فایل‌ها از GitHub استفاده نکن.
+
+تمام فایل‌های فهرست‌شده در بخش «فهرست فایل‌های ورودی» باید پیش از شروع کار، واقعاً داخل ZIP یا پوشهٔ کاری محلی در اختیار تو باشند.
+
+پیش از شروع:
+
+1. وجود تک‌تک فایل‌های فهرست‌شده را بررسی کن.
+2. مسیر و وضعیت وجود فایل‌ها را گزارش کن.
+3. اگر حتی یک فایل ضروری موجود نبود، کار وابسته به آن فایل را انجام نده و کمبود را دقیقاً اعلام کن.
+4. اگر برای تکمیل مأموریت به فایلی خارج از فهرست نیاز داشتی، مسیر و دلیل ضرورت آن را اعلام کن و برای دریافت اجازه متوقف شو.
+5. بدون اجازه، فایل دیگری را جست‌وجو یا بررسی نکن.
+
+### 3. قواعد دسترسی و تغییر فایل‌ها
+
+- تمام فایل‌های ورودی صرفاً **READ-ONLY** هستند.
+- هیچ فایلی مجاز به تغییر نیست.
+- `PROMPT.md` و `prompt.md` خارج از محدوده هستند و نباید بررسی شوند.
+- هیچ Git commit، push، pull، branch یا remote operation انجام نده.
+- تست‌ها را حذف، تضعیف، skip یا برای سبز شدن مصنوعی اصلاح نکن.
+- وضعیت BLOCKED را با مستندسازی، توضیح یا تست غیرواقعی به DONE تبدیل نکن.
+- یک مسیر E2E مصنوعی برای اثبات اتصال مراحل ایجاد یا فرض نکن.
+
+### 4. فهرست فایل‌های ورودی
+
+تمام فایل‌های زیر باید در بستهٔ محلی Agent موجود باشند.
+
+**مستندات و تنظیمات**
+
+- `WORKFLOW_RULES.md`
+- `STAGE7_MASTER_WORKING_PACKET.md`
+- `07_Stage7_Valuation.md`
+- `05_Stage5_Forecast_Engine.md`
+- `.github/workflows/tests.yml`
+- `requirements.txt`
+
+**کدهای مرتبط**
+
 - `src/valuation/engine.py`
-- `src/tests/test_stage7_valuation.py`
+- `src/valuation/service.py`
+- `src/valuation/schema.py`
+- `src/valuation/models.py`
+- `src/valuation/parameters.py`
+- `src/forecast/service.py`
+- `src/forecast/schema.py`
+- `src/market/service.py`
+- `src/ingestion/market/queries.py`
+- `src/decision/service.py`
 
-All other supplied files are read-only.
+**تمام ۳۵ فایل تست**
 
-Do not execute tests, application commands, database commands, Git commands, migrations, or any other commands. The user runs all tests locally.
+1. `src/tests/test_codal_acquisition.py`
+2. `src/tests/test_codal_digit_normalization.py`
+3. `src/tests/test_codal_extraction.py`
+4. `src/tests/test_codal_pdf_extraction.py`
+5. `src/tests/test_ingestion_fx.py`
+6. `src/tests/test_ingestion_ohlc.py`
+7. `src/tests/test_jalali_contract.py`
+8. `src/tests/test_market_history_query.py`
+9. `src/tests/test_stage1_database_architecture.py`
+10. `src/tests/test_stage1_database_integrity.py`
+11. `src/tests/test_stage1_rules.py`
+12. `src/tests/test_stage2_kpis.py`
+13. `src/tests/test_stage3_scoring.py`
+14. `src/tests/test_stage4_trend.py`
+15. `src/tests/test_stage5_forecast.py`
+16. `src/tests/test_stage6_artifact_boundary.py`
+17. `src/tests/test_stage6_artifact_identity.py`
+18. `src/tests/test_stage6_evaluation.py`
+19. `src/tests/test_stage6_evaluation_foundation.py`
+20. `src/tests/test_stage6_evaluation_metrics.py`
+21. `src/tests/test_stage6_p25_adversarial.py`
+22. `src/tests/test_stage6_p25_selection.py`
+23. `src/tests/test_stage6_p38_closure.py`
+24. `src/tests/test_stage6_p39_cutoff.py`
+25. `src/tests/test_stage6_p40_duplicates.py`
+26. `src/tests/test_stage6_p41_cutoff_identity.py`
+27. `src/tests/test_stage6_production_pipeline.py`
+28. `src/tests/test_stage6_reliability_governance.py`
+29. `src/tests/test_stage6_scenario_isolation.py`
+30. `src/tests/test_stage789_service_interface.py`
+31. `src/tests/test_stage7_valuation.py`
+32. `src/tests/test_stage8_market.py`
+33. `src/tests/test_stage8_market_parameters.py`
+34. `src/tests/test_stage8_market_service.py`
+35. `src/tests/test_stage9_decision.py`
 
-Do not commit, push, pull, create branches, or modify remote repository settings.
+### 5. وظایف ممیزی
 
-Do not explore files outside the explicitly supplied file list. If another file is essential, stop and report its exact path and why it is needed. Do not inspect `PROMPT.md` or `prompt.md`.
+#### Task 019 — S7-TEST-003: شناسایی دو تست Skip شده
 
-## 2. Assigned tasks
+علت دقیق دو تست Skip شده در اجرای قبلی مجموعهٔ کامل تست‌ها را بررسی کن.
 
-### Task 1 — 033 · S7-T011 — Final Valuation Engine Review
+شواهد موردنیاز:
 
-Perform a complete but tightly scoped technical review of:
+- محل تعریف هر Skip در کد تست.
+- شرط یا دلیل ثبت‌شده برای Skip.
+- اینکه Skip دائمی است یا وابسته به محیط، تنظیمات یا پیش‌شرط خاص.
+- آیا Skip از نظر طراحی قابل قبول است یا پوشش تست ضروری را حذف کرده است؟
 
-`src/valuation/engine.py`
+**نکته:** توضیح موجود در سورس تست را با علت واقعی Skip شدن در اجرای محلی یکی فرض نکن. علت runtime فقط با خروجی واقعی pytest و گزینهٔ `-rs` قابل تأیید است. اگر خروجی اجرای جدید در اختیار تو نیست، این محدودیت را صریحاً گزارش کن.
 
-Evaluate its implementation against the current approved Stage 7 contracts and the supplied Master Packet.
+#### Task 021 — S7-TEST-005: ممیزی پوشش تست‌های OA1
 
-Review at least the following areas:
+پوشش واقعی تست‌ها را در برابر الزامات OA1 بررسی کن.
 
-1. Financial calculations and preservation of existing approved formulas.
-2. Scenario construction and scenario ordering.
-3. Scenario probabilities, probability evidence, and probability normalization.
-4. Parameter selection, parameter consumption, and model-version metadata.
-5. Threshold consumption and valuation-status classification.
-6. Rounding and numerical precision at every relevant calculation boundary.
-7. EPS behavior, including positive, zero, negative, and sign-changing scenarios.
-8. Missing, invalid, non-finite, and inconsistent inputs.
-9. Fail-closed behavior and error handling.
-10. Forecast input references and the existing PIT safeguards.
-11. Target P/E selection and historical P/E handling.
-12. Driver analysis, confidence, risk, alerts, and output metadata.
-13. Output schema consistency and deterministic behavior, except for explicitly time-dependent metadata.
+حداقل این موارد باید بررسی شوند:
 
-For every finding, provide:
-- Exact function or code location.
-- The relevant approved contract or invariant.
-- A concrete explanation of the defect or risk.
-- A reproducible input condition or test case.
-- Financial or operational impact.
-- Whether the issue can safely be fixed without resolving a blocked upstream contract.
+1. Historical Forward P/E بر اساس داده‌های خام همان شرکت.
+2. استفاده از مشاهدات مالی و بازار همراه با provenance معتبر.
+3. انتخاب آخرین مجموعهٔ کامل و معتبر اطلاعات مالی.
+4. انتخاب قیمت بازار بر اساس تاریخ جلالی و تولید هشدار تاریخ واقعی انتخاب‌شده.
+5. رد کردن P/E از پیش محاسبه‌شده در صورت فقدان provenance معتبر.
+6. مستقل بودن مسیر ارزش‌گذاری از Industry P/E.
+7. کنترل سازگاری هویت Forecast با شرکت و دورهٔ ارزش‌گذاری.
+8. محافظت در برابر Overflow و مقادیر عددی غیرمتناهی.
 
-Do not report a defect merely because a feature is deferred or because evidence is unavailable.
+برای هر الزام مشخص کن:
 
-### Task 2 — 038 · S7-PLAN-004 — Controlled Remediation and Regression Tests
+- تست مرتبط کدام است؟
+- تست چه رفتاری را واقعاً اثبات می‌کند؟
+- چه چیزی را اثبات نمی‌کند؟
+- آیا تست مثبت و منفی کافی وجود دارد؟
+- آیا تست صرفاً interface-level است یا رفتار واقعی مسیر اجرایی را پوشش می‌دهد؟
 
-Correct only defects that satisfy all of these conditions:
+وضعیت‌های قبلی را بدون شواهد جدید تغییر نده:
 
-- The defect is demonstrable from the supplied source and approved specification.
-- The correction does not require inventing a financial formula, threshold, parameter, data source, provenance contract, or business rule.
-- The correction does not depend on a blocked upstream task.
-- The correction preserves existing approved financial calculations and public contracts unless a documented defect makes a minimal contract correction unavoidable.
+- Task 025 و 026 قبلاً DONE شده‌اند.
+- Task 022، 023، 024 و 027 همچنان BLOCKED هستند، مگر اینکه شواهد واقعی و قابل بررسی خلاف آن را ثابت کند.
 
-For every correction:
-- Make the smallest justified change.
-- Add or update focused regression tests.
-- Include negative tests for invalid or incomplete inputs where appropriate.
-- Preserve existing tests and their financial assertions.
-- Never weaken, delete, or bypass a test merely to obtain a passing result.
+برای قراردادهای پیاده‌سازی‌نشده، تست صوری یا مصنوعی را به‌عنوان اثبات تکمیل معرفی نکن.
 
-If a defect depends on an unresolved contract, do not implement a speculative workaround. Document the exact dependency and leave it unresolved.
+#### Task 037 — S7-PLAN-003: برنامهٔ اجرای تست نهایی
 
-## 3. Mandatory dependency restrictions
+فرمان‌های دقیق لازم برای اجرای تست‌های هدفمند و سپس کل مجموعه را ارائه کن.
 
-The following upstream tasks are not fully resolved:
+فرمان پیشنهادی تست‌های هدفمند:
 
-- 029 · S7-T007 — D9/PIT and dated parameters: PARTIAL.
-- 030 · S7-T008 — Alert and input contracts: PARTIAL.
-- 032 · S7-T010 — Real production execution path / E2E: BLOCKED.
-- 022 · S7-T013 — Same-company historical Forward P/E: BLOCKED.
-- 023 · S7-T014 — Historical P/E from raw data: BLOCKED.
-- 024 · S7-T015 — Latest complete input set: BLOCKED.
-- 027 · S7-T018 — Reject unproven precomputed P/E: BLOCKED.
+```powershell
+pytest src/tests/test_market_history_query.py src/tests/test_stage789_service_interface.py src/tests/test_stage7_valuation.py src/tests/test_stage8_market.py src/tests/test_stage9_decision.py -q -rs
+```
 
-Tasks 025 · S7-T016 and 026 · S7-T017 have been implemented and verified within their documented scope.
+فرمان مجموعهٔ کامل:
 
-These unresolved tasks impose strict limitations:
+```powershell
+pytest src/tests -q -rs
+```
 
-1. Do not claim that full OA1 compliance has been achieved.
-2. Do not invent historical P/E observations or provenance.
-3. Do not treat the existing numeric `historical_pe_values` sequence as verified provenance.
-4. Do not invent a latest-complete-input selection policy.
-5. Do not claim full PIT based only on observation dates or data cutoffs.
-6. Do not introduce Industry P/E into active Target P/E or cheap/expensive assessment.
-7. Do not activate deferred D1–D5 or sector-specific D6 formulas.
-8. Do not invent thresholds or alter Genesis parameter values.
-9. Do not create an artificial production execution path or claim E2E verification.
+این فرمان‌ها را فقط پیشنهاد بده؛ اجرا نکن.
 
-You must distinguish between:
-- Defects that can be safely corrected now.
-- Findings blocked by missing upstream contracts or evidence.
-- Deliberately deferred or legacy behavior.
-- Findings that are not actual defects.
+کاربر شخصاً تست‌ها را در محیط محلی خود اجرا می‌کند و خروجی واقعی را برای بررسی ارائه خواهد کرد.
 
-**Important:** The final review may identify that Task 033 cannot be fully closed yet. Do not mark it DONE merely because this review was performed.
+#### Task 020 — S7-TEST-004: بررسی امکان E2E واقعی
 
-## 4. Financial invariants and change restrictions
+مسیر واقعی اجرای برنامه را از شواهد موجود بررسی کن.
 
-Preserve all approved financial formulas and their meanings.
+موارد لازم:
 
-In particular:
+- آیا entrypoint واقعی برای اجرای زنجیرهٔ مراحل وجود دارد؟
+- مالک Session و چرخهٔ عمر آن مشخص است؟
+- اتصال واقعی Forecast، Fundamental، Market، Valuation و Decision اثبات شده است؟
+- آیا تست E2E موجود واقعاً از مسیر تولید استفاده می‌کند یا نتایج مراحل قبلی را مستقیماً به‌صورت fixture/helper می‌سازد؟
+- آیا می‌توان یک E2E واقعی و معتبر اجرا کرد؟
 
-- Do not change the underlying Forward P/E or fair-value formulas without explicit specification evidence.
-- Do not change scenario weights or probability rules without an approved parameter contract.
-- Do not invent or recalibrate thresholds.
-- Do not change rounding precision simply for stylistic consistency.
-- Do not reintroduce Industry P/E into active valuation decisions.
-- Do not recalculate Stage 5 EPS inside Stage 7.
-- Do not silently convert invalid or missing financial inputs into apparently valid financial values.
-- Do not allow NaN or infinity to contaminate financial outputs.
-- Do not make unsupported PIT or historical-validity claims.
-- Preserve the existing output contract unless a concrete defect justifies a minimal correction.
+اگر مسیر تولید واقعی اثبات نشده است، Task 020 باید BLOCKED بماند.
 
-If a potential financial correction cannot be justified from the supplied specification, leave the code unchanged and explain the issue.
+وجود تستی که فقط interface سرویس‌ها را بررسی می‌کند، اثبات E2E واقعی نیست.
 
-## 5. Required test coverage
+#### Task 034 — S7-T012: ممیزی معیارهای خروج Stage 7
 
-Review the existing tests and add focused regression tests for every defect you correct.
+تمام معیارهای خروج 040 تا 047 در بخش Exit Criteria فایل `STAGE7_MASTER_WORKING_PACKET.md` را جداگانه بررسی کن.
 
-Where relevant, verify:
-- Scenario probability validity and sum.
-- Missing or malformed scenario inputs.
-- Non-finite numeric values.
-- Zero and negative EPS.
-- Sign changes between scenarios.
-- Missing target multiple and insufficient data.
-- Invalid or conflicting parameter selection.
-- Invalid forecast input references and cutoff violations.
-- Rounding boundaries.
-- Stability of output status, alerts, and metadata.
+برای هر معیار ارائه بده:
 
-Do not create tests that assert invented financial policies.
+- وضعیت: PASS / BLOCKED / OPEN
+- شواهد دقیق از فایل، تابع، قرارداد یا تست
+- شکاف باقی‌مانده
+- Task مسئول رفع شکاف
+- اینکه آیا شواهد واقعاً معیار را اثبات می‌کنند یا صرفاً ادعای انجام کار هستند
 
-Do not run any tests or commands.
+موارد زیر را با دقت ویژه بررسی کن:
 
-At the end, provide the exact commands for the user to execute. At minimum, provide:
+- ادعای PIT بدون provenance و شواهد زمانی معتبر پذیرفته نیست.
+- تاریخ مشاهده به‌تنهایی اثبات‌کنندهٔ زمان انتشار یا در دسترس بودن داده نیست.
+- نبود vintage تاریخی نباید با پارامترهای فعلی جبران یا جعل شود.
+- نبود منبع معتبر Historical P/E باید صریحاً ثبت شود.
+- کامل بودن ورودی‌های مالی باید واقعاً اثبات شده باشد.
+- اتصال E2E باید از مسیر واقعی تولید اثبات شود.
+- تصمیم عدم ذخیره‌سازی خروجی‌های تحلیلی در DB همچنان باید رعایت شود.
+- موارد Forecast Persistence و باقیماندهٔ OA1.7، به‌ویژه `053-10`، نباید نادیده گرفته شوند.
+- متن قدیمی و متناقض OA1.7 در `07_Stage7_Valuation.md` باید در گزارش مشخص شود.
 
-`pytest src/tests/test_stage7_valuation.py -q`
+#### Task 039 — S7-PLAN-005: تعیین وضعیت نهایی Stage 7
 
-If your changes affect the Stage 7/9 service interface, also provide:
+پس از بررسی تمام شواهد، دقیقاً یکی از وضعیت‌های زیر را برای Stage 7 انتخاب کن:
 
-`pytest src/tests/test_stage789_service_interface.py -q`
+**CLOSED**
 
-Do not claim that any test passed unless the user supplies its execution output.
+فقط زمانی مجاز است که تمام معیارهای خروج حیاتی با شواهد واقعی برآورده شده باشند.
 
-## 6. Required final report
+**OPEN — BLOCKED**
 
-Provide a structured report with these exact task identifiers:
+وقتی تکمیل Stage 7 به علت فقدان قرارداد، مسیر تولید، داده، provenance یا شواهد ضروری ممکن نیست.
 
-### 033 · S7-T011 — Final Valuation Engine Review
-Report one of:
-- DONE
-- PARTIAL
-- NOT DONE
-- BLOCKED
+**OPEN — NOT COMPLETE**
 
-Explain the review coverage, findings, unresolved dependencies, and evidence.
+وقتی کارهای ضروری هنوز انجام نشده‌اند، اما مانع خارجی یا وابستگی حل‌نشده‌ای وجود ندارد.
 
-### 038 · S7-PLAN-004 — Controlled Remediation and Regression Tests
-Report one of:
-- DONE
-- PARTIAL
-- NOT DONE
-- BLOCKED
+در تعیین وضعیت نهایی، تمام این موارد را صریحاً تعیین تکلیف کن:
 
-List every code change and test change, with the reason and the defect it addresses.
+- Tasks 019، 020 و 021
+- Tasks 022 تا 027
+- Tasks 029 تا 034
+- Tasks 035 تا 039
+- Tasks 053 تا 057، به‌ویژه باقیماندهٔ OA1.7 یعنی `053-10`
 
-### File control
-List:
-- Every file inspected.
-- Every file modified.
-- Confirmation that no file outside the allowed modification list was changed.
-- Any additional file that was needed but not supplied.
+تفاوت بین «پیاده‌سازی انجام شده»، «تست موفق»، «ممیزی انجام شده» و «معیار خروج اثبات شده» را حفظ کن.
 
-### Financial safety
-Explicitly state:
-- Whether any financial formula changed.
-- Whether any parameter, threshold, scenario weight, or rounding rule changed.
-- Whether any new financial assumption was introduced.
-- Whether any PIT or provenance claim was strengthened.
-- Whether any unresolved dependency remains.
+### 6. قالب گزارش نهایی
 
-### User test commands
-Provide exact commands for the user. Clearly state that tests were not executed by you.
+گزارش را با ساختار زیر تحویل بده:
 
-### Final conclusion
-Separate:
-1. What is technically corrected.
-2. What is only audited.
-3. What remains blocked by upstream contracts.
-4. Whether Task 033 can genuinely be closed.
+1. **Input File Verification** — فهرست فایل‌های موجود و مفقود در بستهٔ محلی.
+2. **Task 019 — Skip Audit** — علت و شواهد دو Skip.
+3. **Task 021 — OA1 Test Coverage Matrix** — ماتریس پوشش الزامات و شکاف‌ها.
+4. **Task 037 — Final Test Commands** — فرمان‌های هدفمند و کامل.
+5. **Task 020 — E2E Audit** — نتیجهٔ بررسی مسیر واقعی تولید.
+6. **Task 034 — Exit Criteria Review** — وضعیت تک‌تک معیارهای 040 تا 047.
+7. **Task 039 — Final Stage 7 Disposition** — یکی از سه وضعیت مجاز همراه با دلیل.
+8. **Task Status Summary** — وضعیت نهایی پیشنهادی تمام Taskهای مرتبط.
+9. **Remaining Blockers** — فهرست دقیق موانع، وابستگی‌ها و مسئول هرکدام.
+10. **User Execution Handoff** — فرمان‌هایی که کاربر باید اجرا کند و خروجی‌هایی که باید تحویل دهد.
 
-Do not update `STAGE7_MASTER_WORKING_PACKET.md` or change any task status. The user and ChatGPT will verify your report and evidence before updating the authoritative task register.
+گزارش باید مبتنی بر شواهد باشد. هرجا شواهد کافی نیست، صریحاً بنویس «اثبات نشده» یا «نیازمند خروجی اجرای کاربر».
 
-Do not claim Stage 7 is complete.
+**هیچ Task یا معیار خروجی را صرفاً برای بستن Stage 7 به DONE یا PASS تغییر نده.**
+
+---
+
+## بخش دوم — دستور کار کاربر
+
+### Task List
+
+- [ ] بررسی وجود تمام فایل‌های ورودی در بستهٔ محلی Agent.
+- [ ] ممیزی دو تست Skip شده و علت آن‌ها.
+- [ ] بررسی پوشش تست‌های OA1 و شکاف‌های باقی‌مانده.
+- [ ] بررسی مسیر واقعی E2E و چرخهٔ عمر Session.
+- [ ] بررسی جداگانهٔ معیارهای خروج 040 تا 047.
+- [ ] تعیین وضعیت نهایی Stage 7 و تمام Taskهای باقی‌مانده.
+- [ ] ارائهٔ فرمان‌های دقیق تست هدفمند و مجموعهٔ کامل.
+
+### Expected Result
+
+یک گزارش ممیزی نهایی مبتنی بر شواهد واقعی، شامل وضعیت هر Task، علت موانع باقی‌مانده، وضعیت معیارهای خروج و فرمان‌های اجرای تست توسط کاربر.
+
+**این مأموریت هیچ تغییر کد یا مستندی ندارد و هیچ تستی توسط Agent اجرا نمی‌شود.**
