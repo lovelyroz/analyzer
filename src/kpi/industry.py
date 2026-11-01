@@ -1,5 +1,5 @@
 from src.kpi.schema import KPIResult
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 
@@ -9,20 +9,20 @@ class IndustryKPIEngine:
     @staticmethod
     def calc_bank_kpis(nii: Optional[float], nim: Optional[float], loan_growth: Optional[float], deposit_growth: Optional[float], npl: Optional[float], company_id: int, period_id: int) -> list:
         return [
-            KPIResult(company_id, period_id, "BANK_NII", nii, "CURRENCY_IRR", "VALID" if nii is not None else "MISSING", datetime.utcnow()),
-            KPIResult(company_id, period_id, "BANK_NIM", nim, "PERCENTAGE", "VALID" if nim is not None else "MISSING", datetime.utcnow()),
-            KPIResult(company_id, period_id, "BANK_LOAN_GROWTH", loan_growth, "PERCENTAGE", "VALID" if loan_growth is not None else "MISSING", datetime.utcnow()),
-            KPIResult(company_id, period_id, "BANK_DEPOSIT_GROWTH", deposit_growth, "PERCENTAGE", "VALID" if deposit_growth is not None else "MISSING", datetime.utcnow()),
-            KPIResult(company_id, period_id, "BANK_NPL", npl, "PERCENTAGE", "VALID" if npl is not None else "MISSING", datetime.utcnow()),
+            KPIResult(company_id, period_id, "BANK_NII", nii, "CURRENCY_IRR", "VALID" if nii is not None else "MISSING", datetime.now(timezone.utc).replace(tzinfo=None)),
+            KPIResult(company_id, period_id, "BANK_NIM", nim, "PERCENTAGE", "VALID" if nim is not None else "MISSING", datetime.now(timezone.utc).replace(tzinfo=None)),
+            KPIResult(company_id, period_id, "BANK_LOAN_GROWTH", loan_growth, "PERCENTAGE", "VALID" if loan_growth is not None else "MISSING", datetime.now(timezone.utc).replace(tzinfo=None)),
+            KPIResult(company_id, period_id, "BANK_DEPOSIT_GROWTH", deposit_growth, "PERCENTAGE", "VALID" if deposit_growth is not None else "MISSING", datetime.now(timezone.utc).replace(tzinfo=None)),
+            KPIResult(company_id, period_id, "BANK_NPL", npl, "PERCENTAGE", "VALID" if npl is not None else "MISSING", datetime.now(timezone.utc).replace(tzinfo=None)),
         ]
 
     # ------------------ Investment / Holding (3 KPIs) ------------------
     @staticmethod
     def calc_holding_kpis(nav: Optional[float], nav_growth: Optional[float], p_nav: Optional[float], company_id: int, period_id: int) -> list:
         return [
-            KPIResult(company_id, period_id, "HOLDING_NAV", nav, "CURRENCY_IRR", "VALID" if nav is not None else "MISSING", datetime.utcnow()),
-            KPIResult(company_id, period_id, "HOLDING_NAV_GROWTH", nav_growth, "PERCENTAGE", "VALID" if nav_growth is not None else "MISSING", datetime.utcnow()),
-            KPIResult(company_id, period_id, "HOLDING_P_NAV", p_nav, "RATIO", "VALID" if p_nav is not None else "MISSING", datetime.utcnow()),
+            KPIResult(company_id, period_id, "HOLDING_NAV", nav, "CURRENCY_IRR", "VALID" if nav is not None else "MISSING", datetime.now(timezone.utc).replace(tzinfo=None)),
+            KPIResult(company_id, period_id, "HOLDING_NAV_GROWTH", nav_growth, "PERCENTAGE", "VALID" if nav_growth is not None else "MISSING", datetime.now(timezone.utc).replace(tzinfo=None)),
+            KPIResult(company_id, period_id, "HOLDING_P_NAV", p_nav, "RATIO", "VALID" if p_nav is not None else "MISSING", datetime.now(timezone.utc).replace(tzinfo=None)),
         ]
 
     # ------------------ Cement / Food / Pharmaceutical (1 KPI each) ------------------
@@ -36,7 +36,7 @@ class IndustryKPIEngine:
             value=sales_volume,
             unit="QUANTITY",
             quality_status="VALID" if sales_volume is not None else "MISSING",
-            calculation_timestamp=datetime.utcnow(),
+            calculation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
     @staticmethod

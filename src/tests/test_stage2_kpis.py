@@ -1,10 +1,13 @@
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from src.kpi.period_utils import calculate_ttm, calculate_yoy_growth
 from src.kpi.universal import UniversalKPIEngine
 from src.kpi.conditional import ConditionalKPIEngine
 from src.kpi.industry import IndustryKPIEngine
 from src.kpi.engine import KPIEngine
+import src.kpi.universal as universal_module
+import src.kpi.conditional as conditional_module
+import src.kpi.industry as industry_module
 
 # ----------------------------------------------------------------------
 # 1. Period Utils Tests
@@ -116,6 +119,31 @@ def test_holding_industry_kpis():
     assert len(results) == 3
     codes = [r.kpi_code for r in results]
     assert "HOLDING_P_NAV" in codes
+
+
+def test_kpi_timestamps_are_naive_utc(monkeypatch):
+    frozen = datetime(2024, 5, 6, 7, 8, 9)
+
+    class FrozenUtcClock:
+        def now(self, tz):
+            assert tz is timezone.utc
+            return frozen.replace(tzinfo=tz)
+
+    clock = FrozenUtcClock()
+    monkeypatch.setattr(universal_module, "datetime", clock)
+    monkeypatch.setattr(conditional_module, "datetime", clock)
+    monkeypatch.setattr(industry_module, "datetime", clock)
+
+    results = [
+        universal_module.UniversalKPIEngine.calc_revenue_growth(2, 1, 1, 10),
+        conditional_module.ConditionalKPIEngine.calc_financial_cost_pressure(1, 2, 1, 10),
+        *industry_module.IndustryKPIEngine.calc_bank_kpis(1, 1, 1, 1, 1, 1, 10),
+        *industry_module.IndustryKPIEngine.calc_holding_kpis(1, 1, 1, 1, 10),
+        industry_module.IndustryKPIEngine.calc_sales_volume_kpi(1, 1, 10, "CEMENT"),
+    ]
+
+    assert all(result.calculation_timestamp == frozen for result in results)
+    assert all(result.calculation_timestamp.tzinfo is None for result in results)
 
 
 def test_industry_zero_kpis():

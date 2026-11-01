@@ -191,7 +191,7 @@ def test_same_month_across_years_fx(session):
 
 
 def test_ingest_fx_xlsx_toman_and_rial(session, tmp_path):
-    openpyxl = pytest.importorskip("openpyxl")
+    import openpyxl
 
     free_path = tmp_path / "free.xlsx"
     wb = openpyxl.Workbook()

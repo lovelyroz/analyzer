@@ -1,5 +1,5 @@
 from typing import Optional, Sequence, Dict, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.trend.schema import (
     ComparisonResult,
@@ -232,7 +232,7 @@ class TrendEngine:
             low_base_flag=low_base,
             sign_change_flag=sign_kind is not None,
             comparisons=comparisons,
-            calculation_timestamp=datetime.utcnow(),
+            calculation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             historical=historical,
             seasonal=seasonal,
             momentum=momentum,

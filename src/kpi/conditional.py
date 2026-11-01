@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from src.kpi.schema import KPIResult
 
 class ConditionalKPIEngine:
@@ -30,6 +30,6 @@ class ConditionalKPIEngine:
             value=val,
             unit="PERCENTAGE",
             quality_status=status,
-            calculation_timestamp=datetime.utcnow(),
+            calculation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
             metadata={"is_conditional": True}
         )

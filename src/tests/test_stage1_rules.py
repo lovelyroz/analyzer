@@ -1,5 +1,5 @@
 # Stage 1 — Data Foundation & Data Model tests
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -231,13 +231,15 @@ def test_share_history_and_corporate_action_fields(db_session):
 
 
 def test_ingestion_run_contract(db_session):
-    run = IngestionRun(source="CODAL", status="COMPLETED", records_found=10, records_inserted=9, records_updated=1, records_failed=0, finished_at=datetime.utcnow())
+    run = IngestionRun(source="CODAL", status="COMPLETED", records_found=10, records_inserted=9, records_updated=1, records_failed=0, finished_at=datetime.now(timezone.utc).replace(tzinfo=None))
     db_session.add(run)
     db_session.commit()
     saved = db_session.get(IngestionRun, run.ingestion_id)
     assert saved.source == "CODAL"
     assert saved.records_found == 10
     assert saved.records_inserted == 9
+    assert saved.started_at.tzinfo is None
+    assert saved.finished_at.tzinfo is None
 
 
 def test_migration_runner_upgrades_empty_database_and_is_idempotent():

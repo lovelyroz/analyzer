@@ -819,23 +819,21 @@ def test_engine_is_deterministic():
 
 
 class _FrozenClock:
-    """Minimal stand-in exposing only the `utcnow` the engine calls."""
+    """Clock stand-in that verifies the engine requests UTC explicitly."""
 
     def __init__(self, frozen):
         self._frozen = frozen
 
-    def utcnow(self):
-        return self._frozen
+    def now(self, tz):
+        from datetime import timezone
+
+        assert tz is timezone.utc
+        return self._frozen.replace(tzinfo=tz)
 
 
-def test_engine_has_no_randomness_or_clock_dependency(monkeypatch):
-    # Neutralising the clock must not change any analytical value. The engine
-    # resolves `datetime.utcnow` through the datetime module object bound in
-    # its own namespace, which is the only patchable target: on Python 3.12
-    # the `datetime.datetime` class is immutable, and the datetime *module*
-    # has never carried a `utcnow` attribute at all - which is why the former
-    # module-level patch raised AttributeError. No analytical calculation
-    # reads the clock, so freezing it can only affect the audit timestamp.
+def test_engine_has_no_randomness_and_emits_naive_utc_timestamp(monkeypatch):
+    # Freezing the UTC clock must not change analytical values. The returned
+    # audit timestamp retains the existing naive-UTC contract.
     import datetime as _datetime
 
     import src.trend.engine as _engine_module
@@ -844,6 +842,7 @@ def test_engine_has_no_randomness_or_clock_dependency(monkeypatch):
     monkeypatch.setattr(_engine_module, "datetime", _FrozenClock(frozen))
     res = _run(val_3m_curr=115.0, val_3m_prev=100.0)
     assert res.calculation_timestamp == frozen
+    assert res.calculation_timestamp.tzinfo is None
     assert res.trend_state == "Improving"
 
 

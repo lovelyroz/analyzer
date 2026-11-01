@@ -1,6 +1,6 @@
 """CODAL extraction-to-persistence facade."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Sequence
 
@@ -81,7 +81,7 @@ def ingest_codal_pdf(
             records_found=0,
             records_failed=1,
             error_log=f"EXTRACTION_FAILED: {exc}",
-            finished_at=datetime.utcnow(),
+            finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         session.add(failed_run)
         session.commit()
