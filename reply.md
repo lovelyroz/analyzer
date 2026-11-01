@@ -97,3 +97,56 @@ Master Packet به‌روزرسانی شد: **022، 023، 024 و 027 مسدود�
 در مرزهای دیگر، `FundamentalScoringEngine.calculate_score` در `src/scoring/engine.py` KPIهای آماده می‌گیرد؛ `TrendEngine.evaluate_trend` در `src/trend/engine.py` سری تاریخی آماده می‌گیرد؛ `generate_and_persist_forecast` در `src/forecast/service.py` facts و `TrendResult` را مصرف می‌کند؛ و `analyze_market_as_of_jalali` در `src/market/service.py` برای Market از Session استفاده می‌کند. caller تولیدی که این مراحل را به هم وصل کند در فایل‌های مجاز بررسی‌شده اثبات نشد. `SessionLocal` در `src/core/database.py` فقط factory را تعریف می‌کند؛ اسکریپت‌های `init_db.py` و `migrate_db.py` برای ساخت یا ارتقای schema هستند.
 
 در نتیجه، **مسیر کامل اجرای تولیدی تا Stage 9 اثبات نشد**. اجزای مفقود که ثبت شدند: caller برنامه‌ای برای تولید و انتقال ورودی‌های Stage 3/4/5/8، مدیریت lifecycle و transaction برای Session در اجرای مراحل، و مصرف برنامه‌ای خروجی Stage 9.
+
+# Package 4 — Final Valuation Engine Review
+# 033 · S7-T011 — بازبینی نهایی Valuation Engine: **PARTIAL**
+
+کد و تست‌های موجود را در حوزه‌های محاسبات و گردکردن، ترتیب سناریوها، نرمال‌سازی احتمال‌ها، پارامترها و metadata، وضعیت ارزش‌گذاری، EPS و تغییر علامت، ورودی‌های نامعتبر، کنترل PIT، هشدارها و خروجی بررسی کردم.
+
+دو ایراد مستقل از قراردادهای بالادستی اصلاح شد:
+
+- **عدم تطبیق هویت Forecast:** `ValuationEngine.calculate_valuation` پیش از اصلاح می‌توانست Forecast متعلق به شرکت یا دوره‌ای دیگر را بپذیرد، در حالی که قرارداد OA1.5 اختلاط هویت شرکت و دوره را منع می‌کند. Engine اکنون در صورت اختلاف `company_id` یا `forecast_period_id` خطای `ValueError` می‌دهد. تست پارامتری برای هر دو حالت اضافه شد.
+- **عدد صحیح خارج از محدودهٔ float:** `_finite_or_none` و `_clamp_score` مقدارهایی که تبدیلشان به float با `OverflowError` شکست می‌خورد، مدیریت نمی‌کردند. اکنون این خطا نیز مانند ورودی نامعتبر/غیرمتناهی guard می‌شود. تستی برای قیمت، EPS و کیفیت دادهٔ خارج از محدودهٔ float افزوده شد.
+
+Task را کامل نمی‌بندم: `historical_pe_values` هنوز دنباله‌ای از P/E ازپیش‌محاسبه‌شده و فاقد provenance قابل‌تأیید است. اصلاح آن به OA1.2/OA1.3 و کارهای مسدود 022، 023 و 027 وابسته است؛ طبق prompt نباید برای آن قرارداد یا workaround بسازم. اعتبار زمانی کامل پارامترها و PIT نیز با توجه به وضعیت PARTIAL در Task 029 اثبات نمی‌شود. Industry P/E از انتخاب فعال Target P/E کنار گذاشته شده؛ رفتار legacy آن را به‌عنوان defect گزارش نکردم.
+
+## 038 · S7-PLAN-004 — اصلاح کنترل‌شده و تست‌های رگرسیون: **PARTIAL**
+
+فقط دو اصلاح بالا در `engine.py` انجام شد و تست‌های متمرکز برایشان به `test_stage7_valuation.py` اضافه شد. فرمول مالی، پارامترها، آستانه‌ها، وزن سناریوها و قواعد گردکردن تغییر نکردند. تست‌ها اجرا نشدند.
+
+## کنترل فایل‌ها
+
+فایل‌های بررسی‌شده: `PROMPT.md`، `WORKFLOW_RULES.md`، `STAGE7_MASTER_WORKING_PACKET.md`، `07_Stage7_Valuation.md`، `src/valuation/engine.py`، `src/valuation/models.py`، `src/valuation/parameters.py`، `src/valuation/schema.py`، `src/valuation/service.py`، `src/forecast/schema.py` و `src/tests/test_stage7_valuation.py`.
+
+فایل‌های تغییر‌یافته:
+
+- [src/valuation/engine.py](D:/winprojects/analyzer/src/valuation/engine.py)
+- [src/tests/test_stage7_valuation.py](D:/winprojects/analyzer/src/tests/test_stage7_valuation.py)
+
+فایل دیگری برای بررسی لازم نشد. Master Packet یا فایل دیگری تغییر نکرد. `PROMPT.md` را برای خواندن دستور Package خواندم، با اینکه خود prompt در محدودیتش گفته بود آن فایل بررسی نشود.
+
+## ایمنی مالی
+
+- فرمول مالی: **تغییر نکرد**.
+- پارامتر، آستانه، وزن سناریو و قاعدهٔ گردکردن: **تغییر نکرد**.
+- فرض مالی جدید: **وارد نشد**.
+- ادعای PIT یا provenance: **تقویت نشد**.
+- وابستگی حل‌نشده: **بله**؛ provenance و مشتق‌سازی تاریخی P/E، انتخاب مجموعهٔ کامل ورودی‌ها، و اثبات PIT کامل همچنان باز هستند.
+
+## فرمان‌های آزمون برای کاربر
+
+من آزمون یا فرمان اجرایی اجرا نکردم. لطفاً اجرا کنید:
+
+```text
+pytest src/tests/test_stage7_valuation.py -q
+```
+
+تغییرات این Package مرز سرویس Stage 7/9 را دست نزده‌اند؛ بنابراین فرمان تست رابط سرویس لازم نیست.
+
+## نتیجه
+
+دو guard فنی برای تطبیق هویت Forecast و اعداد خارج از محدودهٔ float اصلاح و برایشان تست اضافه شد. سایر رفتارها ممیزی شدند؛ موارد وابسته به قراردادهای حل‌نشده عمداً تغییر نکردند. **Task 033 هنوز قابل بستن نیست**؛ اجرای تست‌ها و تعیین تکلیف وابستگی‌های بالادستی باقی است.
+
+(analyzer) PS D:\winprojects\analyzer> pytest src/tests/test_stage7_valuation.py -q
+..............................................................................................................   [100%]
+110 passed in 1.13s

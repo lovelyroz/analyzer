@@ -25,7 +25,7 @@ def _finite_or_none(value: Optional[float]) -> Optional[float]:
         return None
     try:
         numeric = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return numeric if math.isfinite(numeric) else None
 
@@ -36,7 +36,7 @@ def _clamp_score(value: Optional[float], default: float) -> float:
         return default
     try:
         numeric = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return default
     if not math.isfinite(numeric):
         return default
@@ -72,6 +72,11 @@ class ValuationEngine:
         parameter_registry: Optional[ParameterRegistry] = None,
         parameter_as_of: Optional[datetime] = None,
     ) -> ValuationResult:
+        if forecast_result.company_id != company_id:
+            raise ValueError("forecast company_id does not match valuation company_id")
+        if forecast_result.forecast_period_id != period_id:
+            raise ValueError("forecast period_id does not match valuation period_id")
+
         # D9: the effective data cutoff is determined BEFORE parameter selection
         # so that, when a dated selection is requested, it is the governing
         # timestamp. ``valuation_date`` is never used as a substitute.

@@ -1,251 +1,223 @@
-# Package 3 — Real Production Execution Path and Stage Integration
+# Package 4 — Final Valuation Engine Review
+## Stage 7 — Controlled Technical Review and Remediation
 
-Repository: `lovelyroz/analyzer`
+You are working on the financial-data application repository:
 
-## Execution classification
+`analyzer`
+# Required Files:
+    WORKFLOW_RULES.md
+    STAGE7_MASTER_WORKING_PACKET.md
+    07_Stage7_Valuation.md
+    src/valuation/engine.py
+    src/valuation/models.py
+    src/valuation/parameters.py
+    src/valuation/schema.py
+    src/valuation/service.py
+    src/forecast/schema.py
+    src/tests/test_stage7_valuation.py
 
-**REPORT-ONLY + MASTER PACKET DOCUMENTATION UPDATE**
+This is a financial application. Financial correctness, auditability, point-in-time correctness, deterministic behavior, and preservation of approved financial invariants take priority over implementation convenience.
 
-- Do not modify application code.
-- Do not create or modify tests.
-- Do not execute tests or any commands.
-- Do not create a synthetic orchestrator, entrypoint, dependency-injection layer, or substitute E2E pipeline.
-- The only permitted file modification is the explicitly authorized status/evidence update to `STAGE7_MASTER_WORKING_PACKET.md`.
-- Do not create a separate report file.
+## 1. Work classification
 
-## 1. Objective
+**CODE-CHANGING + TEST AUTHORING + TECHNICAL AUDIT**
 
-Investigate whether the repository currently contains a genuine production execution path connecting:
+You may modify only:
+- `src/valuation/engine.py`
+- `src/tests/test_stage7_valuation.py`
 
-1. Stage 1 — persisted financial source data
-2. Stage 3 — Fundamental Scoring
-3. Stage 4 — Historical Trend
-4. Stage 5 — Forecast
-5. Stage 8 — Market Analysis
-6. Stage 7 — Valuation
-7. Stage 9 — Final Decision
+All other supplied files are read-only.
 
-The investigation must establish the actual application entrypoint, caller chain, input ownership, SQLAlchemy Session ownership and lifecycle, and runtime transfer of stage outputs.
+Do not execute tests, application commands, database commands, Git commands, migrations, or any other commands. The user runs all tests locally.
 
-The required outcome is one of:
+Do not commit, push, pull, create branches, or modify remote repository settings.
 
-- **PROVEN:** A genuine production execution path exists and can be traced through the relevant source code.
-- **NOT PRESENT / BLOCKED:** The exact missing production component(s) are identified with source evidence.
+Do not explore files outside the explicitly supplied file list. If another file is essential, stop and report its exact path and why it is needed. Do not inspect `PROMPT.md` or `prompt.md`.
 
-Do not treat the existence of individual service functions as proof of an integrated production pipeline.
+## 2. Assigned tasks
 
-## 2. Required files
+### Task 1 — 033 · S7-T011 — Final Valuation Engine Review
 
-You may inspect only the following explicitly supplied files.
+Perform a complete but tightly scoped technical review of:
 
-### A. Authoritative workflow and Stage 7 records
+`src/valuation/engine.py`
 
-- `STAGE7_MASTER_WORKING_PACKET.md`
-- `WORKFLOW_RULES.md`
+Evaluate its implementation against the current approved Stage 7 contracts and the supplied Master Packet.
 
-### B. Stage specifications
+Review at least the following areas:
 
-- `03_Stage3_Fundamental_Scoring.md`
-- `04_Stage4_Historical_Trend.md`
-- `05_Stage5_Forecast_Engine.md`
-- `07_Stage7_Valuation.md`
-- `08_Stage8_Market_Engine.md`
-- `09_Stage9_Decision_Dashboard.md`
+1. Financial calculations and preservation of existing approved formulas.
+2. Scenario construction and scenario ordering.
+3. Scenario probabilities, probability evidence, and probability normalization.
+4. Parameter selection, parameter consumption, and model-version metadata.
+5. Threshold consumption and valuation-status classification.
+6. Rounding and numerical precision at every relevant calculation boundary.
+7. EPS behavior, including positive, zero, negative, and sign-changing scenarios.
+8. Missing, invalid, non-finite, and inconsistent inputs.
+9. Fail-closed behavior and error handling.
+10. Forecast input references and the existing PIT safeguards.
+11. Target P/E selection and historical P/E handling.
+12. Driver analysis, confidence, risk, alerts, and output metadata.
+13. Output schema consistency and deterministic behavior, except for explicitly time-dependent metadata.
 
-### C. Application entrypoint and Session infrastructure
+For every finding, provide:
+- Exact function or code location.
+- The relevant approved contract or invariant.
+- A concrete explanation of the defect or risk.
+- A reproducible input condition or test case.
+- Financial or operational impact.
+- Whether the issue can safely be fixed without resolving a blocked upstream contract.
 
-- `src/core/database.py`
-- `src/scripts/init_db.py`
-- `src/scripts/migrate_db.py`
-- `src/ingestion/service.py`
+Do not report a defect merely because a feature is deferred or because evidence is unavailable.
 
-### D. Stage execution and data boundaries
+### Task 2 — 038 · S7-PLAN-004 — Controlled Remediation and Regression Tests
 
-- `src/kpi/engine.py`
-- `src/kpi/schema.py`
-- `src/trend/engine.py`
-- `src/trend/schema.py`
-- `src/scoring/engine.py`
-- `src/scoring/schema.py`
-- `src/forecast/service.py`
-- `src/forecast/queries.py`
-- `src/forecast/schema.py`
-- `src/market/service.py`
-- `src/market/schema.py`
-- `src/ingestion/market/queries.py`
-- `src/valuation/service.py`
-- `src/valuation/schema.py`
-- `src/decision/service.py`
-- `src/decision/schema.py`
+Correct only defects that satisfy all of these conditions:
 
-### E. Existing integration and production-path test evidence
+- The defect is demonstrable from the supplied source and approved specification.
+- The correction does not require inventing a financial formula, threshold, parameter, data source, provenance contract, or business rule.
+- The correction does not depend on a blocked upstream task.
+- The correction preserves existing approved financial calculations and public contracts unless a documented defect makes a minimal contract correction unavoidable.
 
-- `src/tests/test_stage1_database_architecture.py`
-- `src/tests/test_stage3_scoring.py`
-- `src/tests/test_stage4_trend.py`
-- `src/tests/test_stage5_forecast.py`
-- `src/tests/test_stage789_service_interface.py`
-- `src/tests/test_stage8_market_service.py`
-- `src/tests/test_stage9_decision.py`
+For every correction:
+- Make the smallest justified change.
+- Add or update focused regression tests.
+- Include negative tests for invalid or incomplete inputs where appropriate.
+- Preserve existing tests and their financial assertions.
+- Never weaken, delete, or bypass a test merely to obtain a passing result.
 
-If another file is necessary, do not inspect it automatically. Report its exact path and why it is necessary, then stop and request authorization.
+If a defect depends on an unresolved contract, do not implement a speculative workaround. Document the exact dependency and leave it unresolved.
 
-Do not perform repository-wide exploration.
+## 3. Mandatory dependency restrictions
 
-## 3. Required investigation tasks
+The following upstream tasks are not fully resolved:
 
-### Task 031 · S7-T009 — Revalidate the production execution-path audit
+- 029 · S7-T007 — D9/PIT and dated parameters: PARTIAL.
+- 030 · S7-T008 — Alert and input contracts: PARTIAL.
+- 032 · S7-T010 — Real production execution path / E2E: BLOCKED.
+- 022 · S7-T013 — Same-company historical Forward P/E: BLOCKED.
+- 023 · S7-T014 — Historical P/E from raw data: BLOCKED.
+- 024 · S7-T015 — Latest complete input set: BLOCKED.
+- 027 · S7-T018 — Reject unproven precomputed P/E: BLOCKED.
 
-The Master Packet already records this audit as DONE, based on the earlier finding that no complete production entrypoint was found.
+Tasks 025 · S7-T016 and 026 · S7-T017 have been implemented and verified within their documented scope.
 
-Do not repeat a broad repository audit.
+These unresolved tasks impose strict limitations:
 
-Revalidate the previous conclusion against the supplied current source files. Determine whether any genuine production caller or application entrypoint has appeared that changes the earlier finding.
+1. Do not claim that full OA1 compliance has been achieved.
+2. Do not invent historical P/E observations or provenance.
+3. Do not treat the existing numeric `historical_pe_values` sequence as verified provenance.
+4. Do not invent a latest-complete-input selection policy.
+5. Do not claim full PIT based only on observation dates or data cutoffs.
+6. Do not introduce Industry P/E into active Target P/E or cheap/expensive assessment.
+7. Do not activate deferred D1–D5 or sector-specific D6 formulas.
+8. Do not invent thresholds or alter Genesis parameter values.
+9. Do not create an artificial production execution path or claim E2E verification.
 
-Required evidence:
+You must distinguish between:
+- Defects that can be safely corrected now.
+- Findings blocked by missing upstream contracts or evidence.
+- Deliberately deferred or legacy behavior.
+- Findings that are not actual defects.
 
-- Exact entrypoint path and callable/function name, if present.
-- Exact caller-to-callee chain.
-- Evidence that the caller is part of an actual application execution path, not a test or an isolated library service.
-- Evidence showing where Stage 1 data is obtained and how it reaches subsequent stages.
-- Evidence showing how Stage 3, Stage 4, Stage 5, Stage 8, Stage 7 and Stage 9 outputs are produced and transferred.
+**Important:** The final review may identify that Task 033 cannot be fully closed yet. Do not mark it DONE merely because this review was performed.
 
-If no new evidence changes the previous finding, retain DONE for Task 031 as a completed audit. Do not interpret DONE as proof that a production pipeline exists.
+## 4. Financial invariants and change restrictions
 
-### Task 032 · S7-T010 — Determine whether a genuine E2E test is possible
+Preserve all approved financial formulas and their meanings.
 
-Establish whether the repository contains an actual production path that can be exercised by an end-to-end integration test.
+In particular:
 
-Inspect the existing `test_stage789_service_interface.py` carefully.
+- Do not change the underlying Forward P/E or fair-value formulas without explicit specification evidence.
+- Do not change scenario weights or probability rules without an approved parameter contract.
+- Do not invent or recalibrate thresholds.
+- Do not change rounding precision simply for stylistic consistency.
+- Do not reintroduce Industry P/E into active valuation decisions.
+- Do not recalculate Stage 5 EPS inside Stage 7.
+- Do not silently convert invalid or missing financial inputs into apparently valid financial values.
+- Do not allow NaN or infinity to contaminate financial outputs.
+- Do not make unsupported PIT or historical-validity claims.
+- Preserve the existing output contract unless a concrete defect justifies a minimal correction.
 
-Distinguish between:
+If a potential financial correction cannot be justified from the supplied specification, leave the code unchanged and explain the issue.
 
-- A real service-to-service handoff.
-- A test that supplies upstream results itself.
-- A genuine production-path E2E test.
+## 5. Required test coverage
 
-An in-memory database does not automatically make a test synthetic. However, manually constructing Forecast, Fundamental and Market results inside the test does not prove that the application produces those results through its actual production execution path.
+Review the existing tests and add focused regression tests for every defect you correct.
 
-If the production entrypoint or required upstream callers do not exist, Task 032 must remain BLOCKED.
+Where relevant, verify:
+- Scenario probability validity and sum.
+- Missing or malformed scenario inputs.
+- Non-finite numeric values.
+- Zero and negative EPS.
+- Sign changes between scenarios.
+- Missing target multiple and insufficient data.
+- Invalid or conflicting parameter selection.
+- Invalid forecast input references and cutoff violations.
+- Rounding boundaries.
+- Stability of output status, alerts, and metadata.
 
-Do not write an alternative test to conceal the missing production path.
+Do not create tests that assert invented financial policies.
 
-### Task 036 · S7-PLAN-002 — Establish execution-path and Session lifecycle evidence
+Do not run any tests or commands.
 
-Trace the actual ownership and lifecycle of the SQLAlchemy Session.
+At the end, provide the exact commands for the user to execute. At minimum, provide:
 
-Answer these questions with source evidence:
+`pytest src/tests/test_stage7_valuation.py -q`
 
-1. Where is the Session created?
-2. Which application component owns it?
-3. Who closes it?
-4. Who controls transaction boundaries?
-5. Do stage services receive an existing Session or create one?
-6. Are commits or rollbacks performed inside individual services?
-7. Is there a single production caller that coordinates the relevant stages?
-8. How are company identity, financial period identity and Jalali analysis date propagated?
-9. How does the Stage 5 Forecast result reach Stage 7?
-10. How do Stage 3 Fundamental and Stage 8 Market results reach Stage 9?
-11. Does the final Decision result return to an actual application/UI caller?
+If your changes affect the Stage 7/9 service interface, also provide:
 
-For each stage, identify:
+`pytest src/tests/test_stage789_service_interface.py -q`
 
-- Input producer.
-- Input source.
-- Execution function.
-- Output type.
-- Actual caller.
-- Session dependency.
-- Output consumer.
+Do not claim that any test passed unless the user supplies its execution output.
 
-Use a compact execution matrix.
+## 6. Required final report
 
-Do not assume that `SessionLocal` being defined establishes Session lifecycle ownership.
+Provide a structured report with these exact task identifiers:
 
-Do not assume that a service accepting `Session` establishes a production caller.
+### 033 · S7-T011 — Final Valuation Engine Review
+Report one of:
+- DONE
+- PARTIAL
+- NOT DONE
+- BLOCKED
 
-### Task 020 · S7-TEST-004 — Decide whether real E2E testing can be performed
+Explain the review coverage, findings, unresolved dependencies, and evidence.
 
-This task is dependent on proof of the actual production execution path.
+### 038 · S7-PLAN-004 — Controlled Remediation and Regression Tests
+Report one of:
+- DONE
+- PARTIAL
+- NOT DONE
+- BLOCKED
 
-If a real path exists:
+List every code change and test change, with the reason and the defect it addresses.
 
-- Identify the exact callable that the E2E test must exercise.
-- Identify the actual data/input requirements.
-- Identify the actual Session lifecycle.
-- Specify the narrowest valid test location and exact proposed test command.
-- Do not implement or execute the test in this package.
+### File control
+List:
+- Every file inspected.
+- Every file modified.
+- Confirmation that no file outside the allowed modification list was changed.
+- Any additional file that was needed but not supplied.
 
-If no real path exists:
+### Financial safety
+Explicitly state:
+- Whether any financial formula changed.
+- Whether any parameter, threshold, scenario weight, or rounding rule changed.
+- Whether any new financial assumption was introduced.
+- Whether any PIT or provenance claim was strengthened.
+- Whether any unresolved dependency remains.
 
-- Keep this task BLOCKED.
-- State exactly which production component is missing.
-- Explain why existing unit, mock and service-integration tests cannot replace it.
+### User test commands
+Provide exact commands for the user. Clearly state that tests were not executed by you.
 
-## 4. Financial and architectural safeguards
+### Final conclusion
+Separate:
+1. What is technically corrected.
+2. What is only audited.
+3. What remains blocked by upstream contracts.
+4. Whether Task 033 can genuinely be closed.
 
-The following constraints are mandatory:
+Do not update `STAGE7_MASTER_WORKING_PACKET.md` or change any task status. The user and ChatGPT will verify your report and evidence before updating the authoritative task register.
 
-- Do not invent financial inputs, provenance, dates, company identity or period identity.
-- Do not manufacture Forecast, Fundamental or Market results to simulate production.
-- Do not use test fixtures as evidence of production data flow.
-- Do not introduce Gregorian date substitutions for Jalali analysis dates.
-- Do not claim full Point-in-Time correctness merely because a service accepts a cutoff or as-of date.
-- Do not introduce persistence for analytical outputs.
-- The application database stores source inputs/raw source data only, according to the owner's approved architecture.
-- Do not introduce a new Session owner or transaction policy based on assumption.
-- Do not modify `src/forecast/service.py` or its persistence behavior in this package. Forecast persistence remediation is tracked separately under Tasks 053–057.
-- Do not redesign any stage or change financial formulas.
-
-## 5. Reporting requirements
-
-Report each task separately, preserving the exact identifiers:
-
-- 031 · S7-T009
-- 032 · S7-T010
-- 036 · S7-PLAN-002
-- 020 · S7-TEST-004
-
-For every task include:
-
-1. Status: DONE, PARTIAL, NOT DONE, or BLOCKED.
-2. Exact source files and functions inspected.
-3. Concrete evidence supporting the status.
-4. What the evidence proves.
-5. What it does NOT prove.
-6. Remaining dependency or missing component, if any.
-
-Include a final execution-path matrix and one explicit conclusion:
-
-**Either the genuine production execution path to Stage 9 is proven, or the exact missing production component(s) are identified.**
-
-Do not use ambiguous language such as "mostly integrated", "production-ready", or "E2E available" without source-level proof.
-
-## 6. Master Packet update
-
-Update only `STAGE7_MASTER_WORKING_PACKET.md`.
-
-- Preserve all existing decisions and historical evidence.
-- Do not overwrite unrelated task statuses.
-- Keep Task 031 DONE if the audit remains complete.
-- Keep Task 032 BLOCKED if a real production path is absent.
-- Update Task 036 based on the actual evidence.
-- Keep Task 020 BLOCKED unless a genuine production E2E path is proven and the test is actually completed by the user.
-- Update the relevant dashboard entry.
-- Clearly distinguish a completed audit from a completed implementation.
-- Do not mark any BLOCKED task as DONE.
-
-No other files may be modified.
-
-## 7. Prohibited actions
-
-- No test execution.
-- No command execution.
-- No code modifications.
-- No new tests.
-- No synthetic orchestration.
-- No repository-wide search.
-- No inspection of files outside the supplied list.
-- No Git commit, push, pull, branch or remote operations.
-
-Return the complete task-by-task report and the exact proposed test command only if a genuine production path is proven.
+Do not claim Stage 7 is complete.

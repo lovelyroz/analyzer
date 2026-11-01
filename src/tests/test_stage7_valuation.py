@@ -158,6 +158,18 @@ def test_valuation_engine_forward_pe_and_expected_fair_value():
     assert result.metadata["scenario_multiple_policy"]["policy_version"] == "STAGE7_V1_EVIDENCE_BACKED"
 
 
+@pytest.mark.parametrize(
+    ("company_id", "period_id"),
+    [(2, 101), (1, 102)],
+)
+def test_valuation_engine_rejects_forecast_identity_mismatch(company_id, period_id):
+    with pytest.raises(ValueError, match="forecast .* does not match valuation"):
+        ValuationEngine().calculate_valuation(
+            company_id, period_id, "PETROCHEMICAL", 1000.0, make_forecast(),
+            historical_pe_values=[7.0],
+        )
+
+
 def test_industry_forward_pe_never_selects_target_pe():
     engine = ValuationEngine()
     forecast = make_forecast()
@@ -932,6 +944,36 @@ def test_p5_missing_data_quality_does_not_crash():
         historical_pe_values=[7.0], data_quality_score=100.0,
     )
     assert missing.valuation_confidence == full.valuation_confidence
+
+
+def test_p5_numeric_values_outside_float_range_are_guarded():
+    engine = ValuationEngine()
+    outside_float_range = 10 ** 10000
+
+    bad_price = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", outside_float_range, make_forecast(),
+        historical_pe_values=[7.0],
+    )
+    assert bad_price.scenarios["base"].forward_pe is None
+    assert bad_price.scenarios["base"].upside_downside_pct is None
+    assert bad_price.valuation_status == "INSUFFICIENT_DATA"
+    _assert_all_p5_outputs_finite_or_none(bad_price)
+
+    bad_eps = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0,
+        make_forecast(outside_float_range, 180.0, 210.0),
+        historical_pe_values=[7.0],
+    )
+    assert bad_eps.scenarios["bear"].eps_forecast is None
+    assert bad_eps.scenarios["bear"].fair_value is None
+    _assert_all_p5_outputs_finite_or_none(bad_eps)
+
+    bad_quality = engine.calculate_valuation(
+        1, 101, "PETROCHEMICAL", 1000.0, make_forecast(),
+        historical_pe_values=[7.0], data_quality_score=outside_float_range,
+    )
+    assert bad_quality.valuation_data_quality == 100.0
+    _assert_all_p5_outputs_finite_or_none(bad_quality)
 
 
 def test_p5_nonfinite_multiple_adjustment_rejected():
@@ -1849,6 +1891,8 @@ def _d9_forecast_without_cutoff():
 
     base = make_forecast(70.0, 140.0, 150.0)
     return SimpleNamespace(
+        company_id=base.company_id,
+        forecast_period_id=base.forecast_period_id,
         scenario_forecasts=base.scenario_forecasts,
         assumptions={},
         data_cutoff_datetime=None,
