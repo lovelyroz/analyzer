@@ -2,6 +2,7 @@
 # The workflow is as follows: ChatGPT handles the oversight and prompt generation. The user then passes the generated prompt to the agent. The agent’s work report is relayed back to ChatGPT, which is responsible for the verification process. All testing is conducted by the user in a local environment.
 # Technical decision: Selecting the safest and most appropriate solution, given the application's architecture and financial objectives—this is ChatGPT's responsibility.
 # Verifiable execution—modifying code, updating documentation, and reviewing tests—must be supported by concrete evidence; a task should not be declared complete simply because a decision has been made.
+# Only ChatGPT is authorized to update the status of the file `STAGE7_MASTER_WORKING_PACKET.md`. This file must be updated by ChatGPT whenever the status of the tasks is determined.
 
 # Stage 7 reference policy:
     - STAGE7_MASTER_WORKING_PACKET.md is the sole authoritative source for task status, remaining work, execution order, dependencies, decisions, and exit criteria.
