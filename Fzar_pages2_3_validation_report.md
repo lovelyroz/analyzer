@@ -59,3 +59,33 @@ The reference page 1 JSON reports an 8 × 26 table and five product records, wit
 Pages 2 and 3 were extracted into a raw, coordinate-preserving JSON structure and visually reviewed. Their major column groups, period labels and units are identifiable from the page images, but the `find_tables()` cell grid does **not** reliably preserve numeric column associations in this environment. Persian source text is retained, with visual verification needed for logical reading order.
 
 **Recommendation:** continue only with a controlled, comparative extraction experiment. Do not use this output for automatic financial calculations or treat the method as ready for a broader production corpus until section segmentation and cell-to-header mapping are improved and revalidated.
+
+## Follow-up: JSON Artifact and Segmentation Assessment
+
+### JSON artifact integrity
+
+- The local `Fzar_pages2_3_structured.json` is **not empty**: 1,920,361 bytes.
+- It parses as valid JSON and contains 2 pages, 2 detector table objects, 75 extracted rows and 4,167 cell entries.
+- All 4,167 cell entries retain a `raw_text` field (596 are non-empty); 3,680 have coordinates. The remaining cells have null geometry as represented by the extractor, and are not given invented coordinates.
+- Local SHA-256: `3bd7342c030efb05f892618267e1c22e164361a7b05bc36134921433063b0391`.
+- This confirms the workspace copy is intact. The reported zero-byte fetched/uploaded copy cannot be independently diagnosed from this workspace; a fresh workspace artifact link is provided with this report.
+
+### Exact environment versions
+
+- Python: **3.12.9**
+- PyMuPDF package: **2.1**
+- MuPDF engine: **1.28.6**
+
+These are separate values from the same running interpreter (`D:\winprojects\analyzer\Scripts\python.exe`); PyMuPDF is the Python package and MuPDF is its underlying engine.
+
+### Section-level extraction feasibility
+
+Section-level extraction is **technically feasible as a next experiment**. The PDF images and existing row coordinates show distinct vertical bands: page 2 sections span approximately y=59–346 (production/sales), 346–466 (raw-material purchases), and 466–542 (energy); page 3 spans y=59–128 (energy continuation), 128–248 (foreign-currency sources/uses), followed by a caption and explanatory notes. These boundaries are visually verified and the original cell coordinates are retained in the JSON.
+
+The current detector still returns one wide table object per page, and earlier `clip=` calls returned the same full table object. Therefore a plain clip parameter has not yet demonstrated independent section extraction. An experiment using separately cropped page regions (or an equivalent in-memory geometric crop) could reduce cross-section grid merging. Then each section's cell x-coordinates could be compared with visually verified header bands to map values to headers. Merged multi-level headers and cells containing several numeric tokens remain risks; uncertain mappings must keep their raw cells and remain unmapped.
+
+### Recommended next experiment and remaining uncertainties
+
+Run `find_tables()` independently on the geometrically isolated sections, compare each result's row/column geometry against the rendered page, and record whether each numeric cell lies wholly within one header-defined column. Keep source text, coordinates, and empty/null distinctions unchanged; only map a value when the visual header and cell association agree. Do not calculate reconciliations for cells that still contain multiple values or cross header bands.
+
+Remaining uncertainties include whether a true cropped-page call will separate these rules (the tested `clip=` call did not), how to represent merged headers without duplicating values, and whether wrapped Persian product labels align with numeric rows after isolation. The local JSON is healthy; the upstream zero-byte copy remains unverified outside this workspace.
