@@ -1,182 +1,319 @@
-# Task: Fzar PDF — Targeted Extraction Follow-up Experiment
+# Task 060 — S7-AUD-011
+## Fzar PDF Extraction Failure Audit — PDFium Evidence-Based Evaluation
 
-**Task type: Experimental analysis and extraction only — NO production code changes.**
+**Task Type: AUDIT-ONLY / REPORT-ONLY**
 
-## Objective
+**ABSOLUTE RESTRICTION: DO NOT MODIFY ANY FILE. DO NOT IMPLEMENT ANY FIX. DO NOT RUN TESTS.**
 
-Continue the previous Fzar PDF extraction experiments using the existing cropped extraction artifacts.
+You are the local engineering audit agent for the repository:
 
-The previous experiment demonstrated that geometric cropping improves table segmentation, but three important limitations remain:
+`analyzer`
 
-1. Product descriptions are not reliably connected to their numeric rows.
-2. The page 2 energy table is not detected by `find_tables()`.
-3. Printed dot placeholders can be mistaken for zero-like characters in the PDF text layer.
+This is a financial-data application. Financial correctness, deterministic behavior, traceability, and preservation of source data are mandatory.
 
-Investigate these three issues with a targeted, evidence-based experiment. Do not repeat the previous full extraction workflow.
+Your task is to investigate the actual Fzar PDF extraction failure and evaluate the PDFium extraction path using the real source PDF.
 
-## Allowed input files
+You must follow the project's current instructions and constraints in:
 
-Read only these files:
+1. `STAGE7_HANDOFF_INSTRUCTION.md`
+2. `STAGE7_MASTER_WORKING_PACKET.md`
+3. `WORKFLOW_RULES.md`
+4. `STAGE7_COMPLETED_CHECKLIST.md`
 
-- `pdf_test/Fzar.pdf`
-- `Fzar_pages2_3_cropped_extraction.json`
-- `Fzar_pages2_3_cropped_extraction_report.md`
+These documents are the governing project references. Do not replace their decisions with assumptions or recommendations from previous reports.
 
-You may inspect the existing page images or render temporary crops from the PDF.
+---
 
-## Task 1 — Product description and numeric-row association
+## 1. Scope and permitted files
 
-Focus on page 2, production and sales section.
+The following repository files are explicitly authorized for inspection:
 
-The previous extraction report states that the detected table ends around x=741.0, while the product-description column extends approximately from x=740.2 to x=762.4.
+- `src/tests/test_codal_extraction.py`
+- `src/ingestion/codal/pdf_extract.py`
+- `src/ingestion/codal/parser.py`
+- `src/ingestion/codal/adapter.py`
 
-Investigate whether coordinate-based text spans can reliably recover the complete product description and associate it with the correct numeric row.
+The original source PDF is also authorized as an audit input:
 
-Requirements:
+- `pdf/Fzar.pdf` (provided locally by the user)
 
-- Extract text spans with their original-page coordinates.
-- Preserve raw Persian text exactly as extracted.
-- Normalize text separately; never overwrite raw text.
-- Identify row boundaries using visual grid lines and text-span coordinates.
-- Associate product descriptions with numeric rows only when vertical alignment and visual evidence support the association.
-- Do not infer a product name from neighboring rows.
-- Preserve wrapped descriptions as one logical label only when their line grouping is visually supported.
-- Include the associated numeric row index and its original-page bounding box.
-- If association is uncertain, explicitly mark it as `AMBIGUOUS`.
+You may inspect the contents and visual layout of `Fzar.pdf`.
 
-Important: Do not treat the fact that a text span is close to a row as sufficient evidence by itself. Verify against a rendered image.
+Do not inspect or modify unrelated repository files.
 
-## Task 2 — Page 2 energy section
+If you need to inspect another repository file to establish a fact, do not access it yet. Instead, report:
 
-The previous experiment found that `find_tables()` returned no table for this section, despite a visible grid.
+- Exact file path required
+- Exact information you need from it
+- Why the four authorized source files are insufficient
+- Which audit conclusion cannot be established without it
 
-Investigate an alternative extraction method based on:
+Do not install, upgrade, or change any package or dependency.
 
-- Text spans and their coordinates.
-- Horizontal and vertical grid-line coordinates, if available.
-- Visual row and column boundaries.
-- Alignment of numeric text within the apparent cells.
+You may inspect the locally available PDFium installation and its existing version, if accessible without modifying the environment. If it is not available, report that fact. Do not install it.
 
-Requirements:
+---
 
-- Do not depend on `find_tables()` succeeding.
-- Attempt to reconstruct the table structure from geometric evidence.
-- Preserve original-page coordinates.
-- Identify period headers and metric headers separately.
-- Map a value to a period and metric only if both associations are visually supported.
-- Keep missing cells distinct from printed dots and numeric zero.
-- Do not force a complete table if the available evidence is insufficient.
+## 2. Mandatory restrictions
 
-The output must distinguish:
-- `NUMERIC`
-- `DOT_PLACEHOLDER`
-- `EMPTY`
-- `TEXT`
-- `AMBIGUOUS`
+You MUST NOT:
 
-## Task 3 — Dot placeholder versus numeric zero
+- Modify production code.
+- Modify tests.
+- Modify project documentation.
+- Create or edit files inside the repository.
+- Install or upgrade packages.
+- Change dependency declarations.
+- Run pytest or any other project test suite.
+- Commit, push, or create branches.
+- Claim that a fix has been implemented.
+- Infer a root cause without direct supporting evidence.
+- Treat successful text extraction alone as proof of successful financial table extraction.
 
-Investigate the dot/zero ambiguity in the following sections:
+This task is strictly an investigation and reporting task.
 
-- Page 2 raw-material purchases.
-- Page 3 foreign-currency sources and uses.
-- Any other section where the previous JSON marked numeric-like cells as ambiguous.
+You may execute read-only diagnostic operations on the supplied PDF and inspect the existing local environment.
 
-Requirements:
+Your final report must be returned directly in your response to the user. Do not save it into the repository.
 
-- Inspect the original rendered PDF at adequate resolution.
-- Compare the visual glyph with the raw PDF text-layer character.
-- Record the original-page bounding box.
-- Determine whether the visual symbol is a centered dot, a genuine zero, an empty cell, or another symbol.
-- Do not classify based only on the extracted Unicode character.
-- Do not convert an ambiguous symbol into zero.
-- If visual evidence is insufficient, retain `AMBIGUOUS`.
+---
 
-Produce a classification summary with counts for each state and section.
+## 3. Audit objective
 
-## Task 4 — Financial validation
+Determine where the Fzar extraction pipeline fails, based on evidence from the actual PDF and the authorized source code.
 
-Only perform reconciliation when all required values have:
+The audit must distinguish these three stages:
 
-- A verified row identity.
-- A verified period association.
-- A verified metric association.
-- A verified unit.
-- A visually confirmed numeric value.
+**Stage A — Source PDF characteristics**
 
-Use:
+What information and structure are actually present in the original PDF?
 
-`Current cumulative = Previous cumulative + Current period`
+**Stage B — PDF extraction**
 
-Use exact decimal arithmetic (`Decimal`), not binary floating-point arithmetic.
+What does the extraction engine actually return from the PDF?
 
-Do not use a tolerance to conceal incorrect extraction. If source precision creates a legitimate rounding difference, document it explicitly.
+**Stage C — Application mapping**
 
-Do not perform reconciliation using inferred zeros or ambiguous values.
+How does the application transform the extracted information into financial records, especially `item_name` and numeric values?
 
+Do not combine these stages into one general statement such as "Persian PDF extraction fails."
+
+---
+
+## 4. Required investigation
+
+### A. Inspect the actual Fzar PDF
+
+Inspect the document visually and programmatically.
+
+Identify and report:
+
+- Number of pages.
+- Relevant pages containing monthly sales or financial tables.
+- Whether text is selectable or the document is image-based.
+- Persian text encoding and character integrity.
+- RTL text direction and reading order.
+- Table structure and visible row/column boundaries.
+- Whether cell positions can be identified reliably.
+- Persian and Latin digits, if present.
+- Decimal separators, thousands separators, negative values, and units.
+- Product/item names and their relationship to their corresponding numeric values.
+
+Use actual page numbers and representative examples.
+
+Do not assume that extracted text order is the same as visual reading order.
+
+### B. Evaluate PDFium
+
+Use the existing local PDFium capability, if available, to inspect the original Fzar PDF.
+
+Evaluate these dimensions independently:
+
+1. Persian character integrity.
+2. RTL reading order.
+3. Table and row reconstruction.
+4. Cell coordinates and bounding boxes.
+5. Relationship between product names and numeric values.
+6. Preservation of digits, decimal separators, and units.
+
+For each dimension, provide:
+
+- A representative example from the original PDF.
+- The corresponding PDFium output.
+- Whether the result is correct, partially correct, or incorrect.
+- Evidence supporting that assessment.
+
+If PDFium is unavailable, clearly report `NOT EVALUABLE` for the affected checks. Do not simulate or invent PDFium output.
+
+Do not conclude that PDFium is suitable merely because it extracts readable Persian text.
+
+### C. Audit the existing application extraction path
+
+Inspect the four authorized source files.
+
+Trace the actual path used by the application from the PDF input to the final `RawLineInput` records.
+
+Specifically establish:
+
+- Which extraction engine is called first.
+- What conditions cause fallback to another engine.
+- How table rows and cells are represented.
+- How text lines and numeric tokens are identified.
+- How Persian item labels are detected.
+- How `item_name` is selected and normalized.
+- How numeric values are parsed.
+- How the adapter determines the extraction backend.
+- What happens when no usable records are extracted.
+
+Do not assume that `parser.py` is part of the production adapter path. Verify actual function calls and imports.
+
+For every important conclusion, provide the exact file path, function name, and line numbers.
+
+### D. Compare source PDF, PDFium output, and application mapping
+
+Select representative rows from Fzar.
+
+For each selected row, compare:
+
+1. What is visibly present in the original PDF.
+2. What PDFium extracts, including coordinates where available.
+3. What the existing application extraction path produces.
+4. What `item_name` and numeric values the adapter ultimately assigns.
+
+Use a comparison table.
+
+Include both successful and failed examples where possible.
+
+If a comparison cannot be performed, state precisely why.
+
+### E. Determine the failure location
+
+Based on the evidence, classify the observed failure into one or more of these categories:
+
+- Source PDF limitation.
+- Text extraction failure.
+- RTL or reading-order failure.
+- Table reconstruction failure.
+- Cell-coordinate or row-association failure.
+- Persian text normalization failure.
+- Item-name detection/mapping failure.
+- Numeric token parsing failure.
+- Adapter integration failure.
+- Insufficient evidence.
+
+Multiple categories may apply.
+
+Do not force a single root cause if the evidence supports multiple independent failures.
+
+---
+
+## 5. Evidence and confidence requirements
+
+Every material conclusion must be supported by evidence.
+
+For source-code claims, provide:
+
+- File path.
+- Function or method name.
+- Line numbers.
+- Relevant behavior.
+
+For PDF claims, provide:
+
+- Page number.
+- Representative visible text or table row.
+- Corresponding extraction output.
+
+For environment claims, provide:
+
+- Available package or engine name.
+- Version, if verifiable.
+- Whether the capability was actually tested on Fzar.
+
+Use these evidence labels:
+
+- `CONFIRMED`: Directly established by inspected source or actual output.
+- `PARTIALLY CONFIRMED`: Some supporting evidence exists, but the complete behavior is not established.
+- `UNVERIFIED`: Not established.
+- `NOT EVALUABLE`: The required input or capability was unavailable.
+
+Never present an assumption as a confirmed finding.
+
+If a prior failure log or diagnostic output is not available locally, state that limitation. Do not reconstruct it from memory.
+
+---
+
+## 6. Required final report structure
+
+Return the report using exactly these sections:
+
+### 1. Executive Summary
+A concise statement of what was established and what remains unknown.
+
+### 2. Environment and PDFium Availability
+Report PDFium availability and version, if verifiable. State whether the actual Fzar PDF was processed.
+
+### 3. Fzar PDF Characteristics
+Describe the actual source document and relevant pages.
+
+### 4. PDFium Evaluation
+Report the six independent evaluation dimensions from Section 4B.
+
+### 5. Existing Application Pipeline
+Describe the verified production extraction path, including function names and line references.
+
+### 6. Representative Row Comparison
+Provide a table comparing source PDF, PDFium output, existing extraction output, and final mapping.
+
+### 7. Failure Classification
+List confirmed, partially confirmed, unverified, and non-evaluable failure categories.
+
+### 8. Root-Cause Assessment
+State the most defensible conclusion supported by evidence. If root cause cannot yet be established, say so explicitly.
+
+### 9. Additional Evidence Required
+List only the exact additional files, logs, or permissions needed to complete the audit. Explain why each is necessary.
+
+### 10. Recommended Next Step
+Recommend the next investigation or a separate implementation task, but do not implement it.
+
+### 11. Task Status
 Report:
-- PASS
-- FAIL
-- NOT_EVALUABLE
 
-A successful arithmetic reconciliation does not, by itself, prove that the row label or column mapping is correct.
+`060 · S7-AUD-011: DONE` only if all feasible audit requirements were completed and evidence is sufficient.
 
-## Task 5 — Final technical assessment
+Otherwise report:
 
-Answer these questions explicitly:
+`060 · S7-AUD-011: PARTIAL`
 
-1. Can the product-description column be reliably associated with numeric rows using coordinate-based text spans?
-2. Can the page 2 energy table be reconstructed without `find_tables()`?
-3. Can dot placeholders be distinguished reliably from numeric zeros in the tested sections?
-4. Which sections now have enough evidence for reliable structured extraction?
-5. Which sections remain unsuitable for automatic financial extraction?
-6. Does this experiment justify another targeted experiment, or have we reached the practical limit of this PDF extraction approach?
+or:
 
-Do not claim success merely because a table-shaped JSON structure can be produced.
+`060 · S7-AUD-011: BLOCKED`
 
-## Required output files
+Explain every unresolved item.
 
-Create:
+---
 
-1. `Fzar_targeted_extraction_followup.json`
-2. `Fzar_targeted_extraction_followup_report.md`
+## 7. Final verification statement
 
-The JSON must preserve:
-- Source page and section.
-- Original-page coordinates.
-- Raw text and normalized text as separate fields.
-- Row and column identities, where established.
-- Header associations and their evidence.
-- Cell classification.
-- Confidence or ambiguity status.
-- Financial validation details.
+End your report with an explicit declaration:
 
-The Markdown report must include:
-- Environment and exact library versions.
-- Methods used.
-- Visual verification approach.
-- Results for each task.
-- Quantitative summary.
-- Financial validation.
-- Explicit limitations and final recommendation.
+- No repository files were modified.
+- No production code was changed.
+- No tests were executed.
+- No packages were installed or upgraded.
+- No commits or pushes were made.
 
-## Strict restrictions
+If any restriction was inadvertently violated, disclose it clearly.
 
-- Do NOT modify production source code.
-- Do NOT modify tests.
-- Do NOT modify configuration or dependencies.
-- Do NOT install or upgrade packages.
-- Do NOT modify any existing extraction artifact.
-- Do NOT modify `WORKFLOW_RULES.md` or any Stage 7 master/canonical document.
-- Do NOT perform Git operations, commits, pushes, or branch changes.
-- Do NOT process other PDFs.
-- Do NOT invent values, labels, units, dates, or missing cells.
-- Do NOT claim visual verification unless the relevant rendered region was actually inspected.
+**Important:** This audit does not authorize implementation. The user and project decision-maker must review the evidence and explicitly approve any subsequent code-change task.
 
-This is an experimental analysis task. Preserve uncertainty rather than manufacturing completeness.
+### Architecture Boundary
 
-## Final response
+The final analyzer application must extract and process CODAL PDF data independently at runtime, without requiring ChatGPT, Luna, GapCode, an AI agent, or any external PDF-assistant skill.
 
-Report both output filenames, summarize the findings for all three target problems, list unresolved limitations, and state clearly whether the extraction method is ready for production use.
+External PDF skills and tools may only be used as diagnostic instruments during this audit.
 
-Do not run the project's test suite.
+Their output must never be treated as proof that the production application can perform the same extraction.
+
+Any proposed production solution must identify the exact libraries, dependencies, integration points, and runtime behavior required within the analyzer application itself.
