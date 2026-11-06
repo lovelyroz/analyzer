@@ -1,153 +1,107 @@
-سلام! مشکل شما دو بخش دارد و هر کدام راه‌حل جدا دارد.
-
-## تشخیص مشکل
-
-**۱. فارسی به هم‌ریخته:** PDF متن را به‌صورت ترتیب بصری (چپ‌به‌راست) ذخیره می‌کند، نه ترتیب منطقی. در نتیجه کلمات و حروف برعکس یا جابجا استخراج می‌شوند. در فایل شما هم همین را می‌بینید: ستون‌ها از راست به چپ هستند ولی متن استخراج‌شده ترتیب سلول‌ها را به‌هم می‌ریزد.
-
-**۲. ارتباط اعداد با جدول:** استخراج متن خام (`extract_text`) ساختار جدول را از بین می‌برد. باید از **استخراج جدول بر اساس مختصات** استفاده کرد. نکته مهم در این گزارش‌ها (گزارش‌های کدال) این است که جدول RTL است، پس ستون اول در سمت راست قرار دارد.
-
-## راه‌حل پیشنهادی
-
-### نصب
-```bash
-pip install pdfplumber pandas arabic-reshaper python-bidi
-```
-
-### ۱. تبدیل اعداد فارسی/عربی به انگلیسی
-
-نکته‌ی مهم در فایل شما: اعداد با ارقام فارسی (`۰-۹`) و عربی (`٠-٩`) **مخلوط** هستند (مثلاً `٢,١۴٨` که `٢` عربی و `۴` فارسی است). پس باید هر دو را پوشش داد. همچنین ممیز اعشاری (`٫`) و جداکننده هزارگان (`٬` و `,`) را هم باید مدیریت کرد.
-
-```python
-import re
-
-_DIGITS = str.maketrans(
-    "۰۱۲۳۴۵۶۷۸۹" "٠١٢٣٤٥٦٧٨٩",
-    "0123456789" "0123456789",
-)
-
-def to_en_digits(s: str) -> str:
-    return s.translate(_DIGITS)
-
-def parse_number(s):
-    """رشته عددی فارسی/عربی را به float/int تبدیل می‌کند."""
-    if s is None:
-        return None
-    s = to_en_digits(str(s)).strip()
-    s = s.replace("٬", ",").replace("٫", ".").replace("−", "-")
-    s = re.sub(r"[,\s]", "", s)
-    if s.startswith("(") and s.endswith(")"):   # اعداد منفی داخل پرانتز
-        s = "-" + s[1:-1]
-    try:
-        f = float(s)
-        return int(f) if f.is_integer() else f
-    except ValueError:
-        return None   # سلول متنی است
-```
-
-### ۲. استخراج جدول با pdfplumber
-
-```python
-import pdfplumber
-import pandas as pd
-
-def extract_tables(pdf_path):
-    results = []
-    with pdfplumber.open(pdf_path) as pdf:
-        for page_no, page in enumerate(pdf.pages, 1):
-            tables = page.extract_tables({
-                "vertical_strategy": "lines",      # اگر خط جدول ندارد: "text"
-                "horizontal_strategy": "lines",
-                "snap_tolerance": 3,
-                "join_tolerance": 3,
-                "intersection_tolerance": 5,
-            })
-            for t_idx, table in enumerate(tables):
-                results.append((page_no, t_idx, table))
-    return results
-```
-
-### ۳. اصلاح ترتیب فارسی و پاکسازی سلول‌ها
-
-```python
-def clean_cell(cell):
-    if cell is None:
-        return ""
-    # حذف شکستگی خط داخل سلول (مثل «سنگ\nپلاک\nتراورتن»)
-    text = " ".join(str(cell).split("\n")).strip()
-    return to_en_digits(text)
-
-def fix_persian_text(text: str) -> str:
-    """
-    اگر متن فارسی برعکس استخراج شد، این تابع را روی آن بزنید.
-    اگر درست بود، نیازی به آن نیست؛ اول تست کنید.
-    """
-    return text[::-1]
-```
-
-> **نکته:** در فایل شما متن فارسی از نظر ترتیب کلمات عمدتاً درست استخراج می‌شود (فقط ترتیب ستون‌ها مشکل دارد). پس قبل از اعمال معکوس‌سازی، خروجی را چک کنید؛ معکوس‌کردن روی متن درست آن را خراب می‌کند.
-
-### ۴. ساخت DataFrame با ترتیب درست ستون‌ها
-
-```python
-def table_to_df(table, rtl=True):
-    rows = [[clean_cell(c) for c in row] for row in table]
-    if rtl:
-        rows = [row[::-1] for row in rows]   # ستون اول = سمت راست
-    df = pd.DataFrame(rows)
-    return df
-
-def numeric_df(df):
-    return df.map(lambda x: parse_number(x) if parse_number(x) is not None else x)
-```
-
-### ۵. اجرا
-
-```python
-tables = extract_tables("Fzar.pdf")
-for page_no, idx, tbl in tables:
-    df = numeric_df(table_to_df(tbl, rtl=True))
-    df.to_csv(f"table_p{page_no}_{idx}.csv", index=False, encoding="utf-8-sig")
-    print(df.head())
-```
-
-`utf-8-sig` باعث می‌شود Excel فارسی را درست نمایش دهد.
-
-## اگر pdfplumber جدول را درست پیدا نکرد
-
-گزارش شما سرستون‌های چندسطحی و سلول‌های ادغام‌شده دارد (مثل «از ابتدای سال مالی تا تاریخ ...» که روی ۴ ستون کشیده شده). در این حالت دو راه دارید:
-
-**الف) استخراج بر اساس مختصات کلمات**، که قابل‌اعتمادترین روش است:
-
-```python
-def extract_by_words(pdf_path, y_tol=4):
-    rows_all = []
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            words = page.extract_words(keep_blank_chars=False, use_text_flow=False)
-            # گروه‌بندی کلمات بر اساس خط (y)
-            words.sort(key=lambda w: (round(w["top"] / y_tol), -w["x1"]))
-            current, last_y = [], None
-            for w in words:
-                y = round(w["top"] / y_tol)
-                if last_y is not None and y != last_y:
-                    rows_all.append(current); current = []
-                current.append((w["x0"], w["x1"], w["text"]))
-                last_y = y
-            if current:
-                rows_all.append(current)
-    return rows_all
-```
-
-سپس هر عدد را با مختصات `x` به نزدیک‌ترین ستون سرستون نسبت دهید. این روش ارتباط عدد با ستون را تضمین می‌کند.
-
-**ب) استفاده از camelot** (برای جدول‌های بدون خط): `pip install camelot-py` و `camelot.read_pdf(path, flavor="stream")`.
-
-## نکات مهم برای فایل‌های شما
-
-1. **ثابت‌بودن ساختار:** چون همه گزارش‌ها ساختار یکسان دارند، یک بار سرستون‌ها را دستی تعریف کنید (مثلاً `ytd_prev_month`, `adjustment`, `month`, `ytd_current`, `ytd_last_year`) و فقط مقادیر را استخراج کنید.
-2. **ستون‌های هر بلوک:** در جدول تولید و فروش، هر دوره ۴ ستون دارد: تعداد تولید، تعداد فروش، نرخ فروش، مبلغ فروش. پس با گروه‌های ۴تایی می‌توانید معنا بدهید.
-3. **اعداد کاذب:** مقادیری مثل `٨۶۵,٠٧۶.۵٩٠٠٠٠٠٠٠١` خطای ممیز شناور در خود گزارش هستند؛ بعد از تبدیل، با `round(x, 2)` گرد کنید.
-4. **اعتبارسنجی:** مجموع ردیف‌ها را با ردیف «جمع» مقایسه کنید تا اشتباه در نگاشت ستون را سریع بفهمید.
-5. **اگر PDF اسکن‌شده بود** (متن قابل انتخاب نبود)، باید OCR بزنید، مثلاً با `pytesseract` و بسته‌ی زبان `fas`.
-
-اگر بخواهید، می‌توانم با همین فایل نمونه یک اسکریپت کامل بنویسم که جدول «تولید و فروش» را با نام ستون‌های انگلیسی و اعداد تمیز خروجی بدهد. فقط بگویید خروجی را CSV می‌خواهید یا Excel.
+(analyzer) PS D:\winprojects\analyzer> cd D:\winprojects\analyzer
+(analyzer) PS D:\winprojects\analyzer>
+(analyzer) PS D:\winprojects\analyzer> @'
+>> from pathlib import Path
+>> from collections import Counter
+>> from src.ingestion.codal.pdf_extract import extract_cell_rows
+>>
+>> pdf_path = Path("pdf/Fzar.pdf")
+>> rows = extract_cell_rows(pdf_path)
+>>
+>> print("=" * 80)
+>> print("TOTAL EXTRACTED ROWS:", len(rows))
+>> print("ROWS PER PAGE:", dict(Counter(r.page for r in rows)))
+>> print("=" * 80)
+>>
+>> for i, row in enumerate(rows, start=1):
+>>     print(
+>>         f"{i:03d} | "
+>>         f"PAGE={row.page} | "
+>>         f"ROW={row.source_row} | "
+>>         f"COL={row.source_column!r} | "
+>>         f"NAME={row.item_name!r} | "
+>>         f"VALUE={row.value_text!r} | "
+>>         f"SECTION={row.source_section!r}"
+>>     )
+>> '@ | & .\Scripts\python.exe -
+================================================================================
+TOTAL EXTRACTED ROWS: 77
+ROWS PER PAGE: {1: 20, 2: 25, 3: 32}
+================================================================================
+001 | PAGE=1 | ROW=2 | COL='1' | NAME='ﺷﺮﮐﺖ:ﭘﻮﻳﺎ زرﮐﺎن آق درهﺳﺮﻣﺎﯾﻪ ﺛﺒﺖ ﺷﺪه' | VALUE='5,400,000' | SECTION='page_1'
+002 | PAGE=1 | ROW=3 | COL='1' | NAME='ﻧﻤﺎدﻓﺰرﺳﺮﻣﺎﯾﻪ ﺛﺒﺖ ﻧﺸﺪه' | VALUE='0' | SECTION='page_1'
+003 | PAGE=1 | ROW=4 | COL='1' | NAME='در ﺗﺎرﯾﺦ ﻣﻨﺘﮫﯽ ﺑﻪ  ﻣﺎھﻪ1 ﮔﺰارش ﻓﻌﺎﻟﯿﺖ ﻣﺎھﺎﻧﻪ' | VALUE='07' | SECTION='page_1'
+004 | PAGE=1 | ROW=4 | COL='2' | NAME='در ﺗﺎرﯾﺦ ﻣﻨﺘﮫﯽ ﺑﻪ  ﻣﺎھﻪ1 ﮔﺰارش ﻓﻌﺎﻟﯿﺖ ﻣﺎھﺎﻧﻪ' | VALUE='30' | SECTION='page_1'
+005 | PAGE=1 | ROW=5 | COL='1' | NAME='وﺿﻌﯿﺖ ﻧﺎﺷﺮﭘﺬﻳﺮﻓﺘﻪ ﺷﺪه در ﻓﺮاﺑﻮرس اﻳﺮان' | VALUE='1405' | SECTION='page_1'
+006 | PAGE=1 | ROW=5 | COL='2' | NAME='وﺿﻌﯿﺖ ﻧﺎﺷﺮﭘﺬﻳﺮﻓﺘﻪ ﺷﺪه در ﻓﺮاﺑﻮرس اﻳﺮان' | VALUE='09' | SECTION='page_1'
+007 | PAGE=1 | ROW=5 | COL='3' | NAME='وﺿﻌﯿﺖ ﻧﺎﺷﺮﭘﺬﻳﺮﻓﺘﻪ ﺷﺪه در ﻓﺮاﺑﻮرس اﻳﺮان' | VALUE='30' | SECTION='page_1'
+008 | PAGE=1 | ROW=8 | COL='1' | NAME='/۵٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ' | VALUE='۶٠' | SECTION='page_1'
+009 | PAGE=1 | ROW=8 | COL='2' | NAME='/۵٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ' | VALUE='۶٠' | SECTION='page_1'
+010 | PAGE=1 | ROW=10 | COL='1' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٠٣' | SECTION='page_1'
+011 | PAGE=1 | ROW=10 | COL='2' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٧٠' | SECTION='page_1'
+012 | PAGE=1 | ROW=10 | COL='3' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٠٣' | SECTION='page_1'
+013 | PAGE=1 | ROW=10 | COL='4' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٧٠' | SECTION='page_1'
+014 | PAGE=1 | ROW=10 | COL='5' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٠٣' | SECTION='page_1'
+015 | PAGE=1 | ROW=10 | COL='6' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٧٠' | SECTION='page_1'
+016 | PAGE=1 | ROW=74 | COL='1' | NAME=',۴٠١ﺗﻮﻟﯿﺪ' | VALUE='٠٨۴١,٢٠٩١,۴۵٧,٧١۶٣١,٨٣٠٠٠٠٨۴١,٢٠٩١,۴۵٧,٧١۶٣١,٨٣٠٠٠٠٠٨۴١,٢٠٩١,۴۵٧,٧١۶٣١,٨٣٨٠.۶١٩,٠٢١۵.٨٢٣,١١٧٣۵,٨٠٢,٩٩١٣' | SECTION='page_1'
+017 | PAGE=1 | ROW=86 | COL='1' | NAME=',٢ﺗﻮﻟﯿﺪ' | VALUE='٢٢٠,۴۶٣٠۴٠,٣٠۶,٩١٢۵٩,۵٣١,٧٠٠٠٠٣٧.٢٢٠,۴۶٣٠۴٠,٣٠۶,٩١٢۵٩,۵٣١,٧٠۵٢.۵٣٢,۵٩٠٠٢,٣۵٨,۵٢۶٣١,٢۶۴,٢٠٨٩.٧۵٢,٩۵۴١٢١,٩٩٨,٠٢٨٨٠,٨٩۵,٩٠٢۶.٢٩۴,٣٧٣۵۵٨,٠۴٨,۶٩٠٠,۵۵۵' | SECTION='page_1'
+018 | PAGE=1 | ROW=92 | COL='1' | NAME=',۴١ﺗﻮﻟﯿﺪ' | VALUE='١٧٨.۴١٩,١۵۶۵,۴۵٨,۶٢٣٢۴,١۵٠٠٠٣٣٣,١٧٨.۴١٩,١۵۶۵,۴۵٨,۶٢٣٢۴,١۵۵۵٩۶٣.۶٠۵۴٩۴,٠۵٢,١٣۴٢٨,۵١٨٨٢,٢٣٢.١٢۴,٢٠٠٩,٣٧٧,٧٢٧۴٢,٧۶٧۴.۵۴۴,٣۵٢.۴٢۶,۴٨١۵,٧٢٠,٣٠٠٠' | SECTION='page_1'
+019 | PAGE=1 | ROW=100 | COL='1' | NAME='ﺗﻦ٠٠٠٠٠٠٠٠٠٠٠٠٠٠٠٠٠٠٠٠,' | VALUE='۵١۵١٢.١٣۶,۵٧۴٨٩٧,٢٢٧,٧٢٨٢٨,۵٨١' | SECTION='page_1'
+020 | PAGE=1 | ROW=108 | COL='1' | NAME=',٢٠١٠٠٠ﺗﻮﻟﯿﺪ' | VALUE='٠٠۵١١.٢١٩,٨٨٢۶١٩,۶٣٨,٢۶۶۴٣,۴۵١,٨١٠٠٠٠٠٠,٠٠۵١١.٢١٩,٨٨٢۶١٩,۶٣٨,٢۶۶۴٣,۴۵١,٨١٠٠۵,٠١١۶٠.١١٧,٢۴٨٩١,١٧٩,۵٨١٢٩,١٧۶,٣٠٠۵,٠١۶٧١.٣٢۶,١٣٣٢٧۴,۶١٨,۵۶٧۶٢,۶٢٨,١٢٠٠٠' | SECTION='page_1'
+021 | PAGE=2 | ROW=1 | COL='1' | NAME='/۵٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ' | VALUE='۶٠' | SECTION='page_2'
+022 | PAGE=2 | ROW=1 | COL='2' | NAME='/۵٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ' | VALUE='۶٠' | SECTION='page_2'
+023 | PAGE=2 | ROW=3 | COL='1' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٠٣' | SECTION='page_2'
+024 | PAGE=2 | ROW=3 | COL='2' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٧٠' | SECTION='page_2'
+025 | PAGE=2 | ROW=3 | COL='3' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٠٣' | SECTION='page_2'
+026 | PAGE=2 | ROW=3 | COL='4' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٧٠' | SECTION='page_2'
+027 | PAGE=2 | ROW=3 | COL='5' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٠٣' | SECTION='page_2'
+028 | PAGE=2 | ROW=3 | COL='6' | NAME='/۴٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ وﺿﻌﯿﺖ' | VALUE='٧٠' | SECTION='page_2'
+029 | PAGE=2 | ROW=60 | COL='1' | NAME='/٣ﻋﯿﺎر' | VALUE='٧' | SECTION='page_2'
+030 | PAGE=2 | ROW=63 | COL='1' | NAME='ﺗﻦ٠٠٠٠٠٠٠٠٠٠٠۵١٨,' | VALUE='٩١٠٠٠۵١٨' | SECTION='page_2'
+031 | PAGE=2 | ROW=89 | COL='1' | NAME='ﺟﻤﻊ٧۵٨,' | VALUE='٩٧٣,۵٢٠٧۵٨,٩٧٣,۵٢١٨٨,٩۴١,۶٨٣٧,٩٢۵,١٣۶۵١,٩۵٨,۵١' | SECTION='page_2'
+032 | PAGE=2 | ROW=93 | COL='1' | NAME='/۵٠۴١ازاﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ' | VALUE='۶٠' | SECTION='page_2'
+033 | PAGE=2 | ROW=125 | COL='1' | NAME=')اﺻﻼح ﺷﺪه(' | VALUE='١٣' | SECTION='page_2'
+034 | PAGE=2 | ROW=125 | COL='2' | NAME=')اﺻﻼح ﺷﺪه(' | VALUE='۶٠' | SECTION='page_2'
+035 | PAGE=2 | ROW=125 | COL='3' | NAME=')اﺻﻼح ﺷﺪه(' | VALUE='۵٠۴١' | SECTION='page_2'
+036 | PAGE=2 | ROW=131 | COL='1' | NAME='/۴٠۴١ﺗﺎرﯾﺦ' | VALUE='٠٣' | SECTION='page_2'
+037 | PAGE=2 | ROW=131 | COL='2' | NAME='/۴٠۴١ﺗﺎرﯾﺦ' | VALUE='٧٠' | SECTION='page_2'
+038 | PAGE=2 | ROW=133 | COL='1' | NAME='/۵٠۴١ﻣﺎﻟﯽ' | VALUE='٠٣' | SECTION='page_2'
+039 | PAGE=2 | ROW=133 | COL='2' | NAME='/۵٠۴١ﻣﺎﻟﯽ' | VALUE='٩٠' | SECTION='page_2'
+040 | PAGE=2 | ROW=138 | COL='1' | NAME='ﻧﺮخ - رﯾﺎلﻣﺒﻠﻎ' | VALUE='-' | SECTION='page_2'
+041 | PAGE=2 | ROW=142 | COL='1' | NAME='ﻧﺮخ' | VALUE='-' | SECTION='page_2'
+042 | PAGE=2 | ROW=144 | COL='1' | NAME='ﻣﺒﻠﻎ' | VALUE='-' | SECTION='page_2'
+043 | PAGE=2 | ROW=152 | COL='1' | NAME='ﻧﺮخ - رﯾﺎلﻣﺒﻠﻎ' | VALUE='-' | SECTION='page_2'
+044 | PAGE=2 | ROW=156 | COL='1' | NAME='ﻧﺮخ - رﯾﺎلﻣﺒﻠﻎ' | VALUE='-' | SECTION='page_2'
+045 | PAGE=2 | ROW=164 | COL='1' | NAME='ﻣﺘﺮﻣﮑﻌﺐ۴۵٣,' | VALUE='٢٠٧۴,١١٧٢٠٠٠۴۵٣,٢٠٧۴,١١٧٢٠٠٠۴۵٣,٢٠٧۴,١١٧٢١۶٧,٢۴٨٩,٣١١۶۴٠,١' | SECTION='page_2'
+046 | PAGE=3 | ROW=10 | COL='1' | NAME=')اﺻﻼح ﺷﺪه(' | VALUE='١٣' | SECTION='page_3'
+047 | PAGE=3 | ROW=10 | COL='2' | NAME=')اﺻﻼح ﺷﺪه(' | VALUE='۶٠' | SECTION='page_3'
+048 | PAGE=3 | ROW=10 | COL='3' | NAME=')اﺻﻼح ﺷﺪه(' | VALUE='۵٠۴١' | SECTION='page_3'
+049 | PAGE=3 | ROW=16 | COL='1' | NAME='/۴٠۴١ﺗﺎرﯾﺦ' | VALUE='٠٣' | SECTION='page_3'
+050 | PAGE=3 | ROW=16 | COL='2' | NAME='/۴٠۴١ﺗﺎرﯾﺦ' | VALUE='٧٠' | SECTION='page_3'
+051 | PAGE=3 | ROW=18 | COL='1' | NAME='/۵٠۴١ﻣﺎﻟﯽ' | VALUE='٠٣' | SECTION='page_3'
+052 | PAGE=3 | ROW=18 | COL='2' | NAME='/۵٠۴١ﻣﺎﻟﯽ' | VALUE='٩٠' | SECTION='page_3'
+053 | PAGE=3 | ROW=23 | COL='1' | NAME='ﻧﺮخ - رﯾﺎلﻣﺒﻠﻎ' | VALUE='-' | SECTION='page_3'
+054 | PAGE=3 | ROW=27 | COL='1' | NAME='ﻧﺮخ' | VALUE='-' | SECTION='page_3'
+055 | PAGE=3 | ROW=29 | COL='1' | NAME='ﻣﺒﻠﻎ' | VALUE='-' | SECTION='page_3'
+056 | PAGE=3 | ROW=37 | COL='1' | NAME='ﻧﺮخ - رﯾﺎلﻣﺒﻠﻎ' | VALUE='-' | SECTION='page_3'
+057 | PAGE=3 | ROW=41 | COL='1' | NAME='ﻧﺮخ - رﯾﺎلﻣﺒﻠﻎ' | VALUE='-' | SECTION='page_3'
+058 | PAGE=3 | ROW=50 | COL='1' | NAME='ﺟﻤﻊ ﮐﻞ٨٠٠,' | VALUE='٧٠٨٠٠,٧٣۶٩١٧٩,٧' | SECTION='page_3'
+059 | PAGE=3 | ROW=56 | COL='1' | NAME='/۵٠۴١از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ' | VALUE='۶٠' | SECTION='page_3'
+060 | PAGE=3 | ROW=58 | COL='1' | NAME='/۵٠۴١دوره ﯾﮑﻤﺎھﻪ از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ' | VALUE='٠٣' | SECTION='page_3'
+061 | PAGE=3 | ROW=58 | COL='2' | NAME='/۵٠۴١دوره ﯾﮑﻤﺎھﻪ از اﺑﺘﺪای ﺳﺎل ﻣﺎﻟﯽ ﺗﺎ ﺗﺎرﯾﺦ' | VALUE='٧٠' | SECTION='page_3'
+062 | PAGE=3 | ROW=116 | COL='1' | NAME='ﻣﺎھﻪ ﻣﻨﺘﮫﯽ ﺑﻪ ١ﮐﺎدر ﺗﻮﺿﯿﺤﯽ ﻣﺮﺑﻮط ﺑﻪ اطﻼﻋﺎت دوره' | VALUE='٠٣' | SECTION='page_3'
+063 | PAGE=3 | ROW=116 | COL='2' | NAME='ﻣﺎھﻪ ﻣﻨﺘﮫﯽ ﺑﻪ ١ﮐﺎدر ﺗﻮﺿﯿﺤﯽ ﻣﺮﺑﻮط ﺑﻪ اطﻼﻋﺎت دوره' | VALUE='٧٠' | SECTION='page_3'
+064 | PAGE=3 | ROW=116 | COL='3' | NAME='ﻣﺎھﻪ ﻣﻨﺘﮫﯽ ﺑﻪ ١ﮐﺎدر ﺗﻮﺿﯿﺤﯽ ﻣﺮﺑﻮط ﺑﻪ اطﻼﻋﺎت دوره' | VALUE='۵٠۴١' | SECTION='page_3'
+065 | PAGE=3 | ROW=117 | COL='1' | NAME='ھﯿﭽﮕﻮﻧﻪ ﻓﺮوش ﺷﻤﺶ طﻼ و ارز ﺑﻪ ﻣﻨﻈﻮر رﻓﻊ ﺗﻌﮫﺪ ارزی ﺻﺎدرات۵٠۴١-ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( در ﻣﮫﺮ ﻣﺎه' | VALUE='٢' | SECTION='page_3'
+066 | PAGE=3 | ROW=117 | COL='2' | NAME='ھﯿﭽﮕﻮﻧﻪ ﻓﺮوش ﺷﻤﺶ طﻼ و ارز ﺑﻪ ﻣﻨﻈﻮر رﻓﻊ ﺗﻌﮫﺪ ارزی ﺻﺎدرات۵٠۴١-ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( در ﻣﮫﺮ ﻣﺎه' | VALUE='٩۵٧٣' | SECTION='page_3'
+067 | PAGE=3 | ROW=117 | COL='3' | NAME='ھﯿﭽﮕﻮﻧﻪ ﻓﺮوش ﺷﻤﺶ طﻼ و ارز ﺑﻪ ﻣﻨﻈﻮر رﻓﻊ ﺗﻌﮫﺪ ارزی ﺻﺎدرات۵٠۴١-ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( در ﻣﮫﺮ ﻣﺎه' | VALUE='٠' | SECTION='page_3'
+068 | PAGE=3 | ROW=117 | COL='4' | NAME='ھﯿﭽﮕﻮﻧﻪ ﻓﺮوش ﺷﻤﺶ طﻼ و ارز ﺑﻪ ﻣﻨﻈﻮر رﻓﻊ ﺗﻌﮫﺪ ارزی ﺻﺎدرات۵٠۴١-ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( در ﻣﮫﺮ ﻣﺎه' | VALUE='١' | SECTION='page_3'
+069 | PAGE=3 | ROW=119 | COL='1' | NAME='/۵٠۴١ﮐﺎدر ﺗﻮﺿﯿﺤﯽ ﻣﺮﺑﻮط اطﻼﻋﺎت ﺗﺠﻤﻌﯽ از اﺑﺘﺪای ﺳﺎل ﺗﺎ ﭘﺎﯾﺎن ﻣﻮرخ' | VALUE='٠٣' | SECTION='page_3'
+070 | PAGE=3 | ROW=119 | COL='2' | NAME='/۵٠۴١ﮐﺎدر ﺗﻮﺿﯿﺤﯽ ﻣﺮﺑﻮط اطﻼﻋﺎت ﺗﺠﻤﻌﯽ از اﺑﺘﺪای ﺳﺎل ﺗﺎ ﭘﺎﯾﺎن ﻣﻮرخ' | VALUE='٧٠' | SECTION='page_3'
+071 | PAGE=3 | ROW=120 | COL='1' | NAME='ﻣﺠﻤﻮع ﻓﺮوش ﺷﻤﺶ طﻼ در ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( ﺗﺎ ﭘﺎﯾﺎن ﻣﮫﺮ ﻣﺎه' | VALUE='۴٢٣.۵۴' | SECTION='page_3'
+072 | PAGE=3 | ROW=120 | COL='2' | NAME='ﻣﺠﻤﻮع ﻓﺮوش ﺷﻤﺶ طﻼ در ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( ﺗﺎ ﭘﺎﯾﺎن ﻣﮫﺮ ﻣﺎه' | VALUE='۵٣٨.٩٢٧.٠٣' | SECTION='page_3'
+073 | PAGE=3 | ROW=120 | COL='3' | NAME='ﻣﺠﻤﻮع ﻓﺮوش ﺷﻤﺶ طﻼ در ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( ﺗﺎ ﭘﺎﯾﺎن ﻣﮫﺮ ﻣﺎه' | VALUE='٠٠١.٠٠۶.۵' | SECTION='page_3'
+074 | PAGE=3 | ROW=120 | COL='4' | NAME='ﻣﺠﻤﻮع ﻓﺮوش ﺷﻤﺶ طﻼ در ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( ﺗﺎ ﭘﺎﯾﺎن ﻣﮫﺮ ﻣﺎه' | VALUE='١۵٩.٨٨٢.٢٩' | SECTION='page_3'
+075 | PAGE=3 | ROW=120 | COL='5' | NAME='ﻣﺠﻤﻮع ﻓﺮوش ﺷﻤﺶ طﻼ در ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( ﺗﺎ ﭘﺎﯾﺎن ﻣﮫﺮ ﻣﺎه' | VALUE='۵٠۴١' | SECTION='page_3'
+076 | PAGE=3 | ROW=120 | COL='6' | NAME='ﻣﺠﻤﻮع ﻓﺮوش ﺷﻤﺶ طﻼ در ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( ﺗﺎ ﭘﺎﯾﺎن ﻣﮫﺮ ﻣﺎه' | VALUE='۴۶٣،٧۴' | SECTION='page_3'
+077 | PAGE=3 | ROW=120 | COL='7' | NAME='ﻣﺠﻤﻮع ﻓﺮوش ﺷﻤﺶ طﻼ در ﺷﺮﮐﺖ اﺳﺘﺤﺼﺎل ﻣﻮاد ﻣﻌﺪﻧﯽ ﺗﺨﺖ ﺳﻠﯿﻤﺎن )ﺷﺮﮐﺖ ﺗﺎﺑﻌﻪ( ﺗﺎ ﭘﺎﯾﺎن ﻣﮫﺮ ﻣﺎه' | VALUE='۵٠۴١' | SECTION='page_3'
