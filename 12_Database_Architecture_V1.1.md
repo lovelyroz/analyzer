@@ -72,7 +72,18 @@ Market and FX foundations remain separate branches and are consumed by their app
 - `companies`
 - `financial_periods`
 
-Company identity is stable and is not based only on ticker. The implementation also preserves an optional national identifier.
+#### Company and industry contract — reviewed
+
+- Each company belongs to **exactly one industry** in this version.
+- Subsidiary-company relationships, multiple industry assignments, and sub-industry classifications are out of scope.
+- The seven V1 industry groups remain the initial catalog. The catalog is data-driven and may be extended with additional industry groups without redesigning the schema.
+- A company's industry must be explicitly selected and validated before any report or financial data for that company is admitted.
+- An absent, unknown, ambiguous, or guessed industry is a hard admission failure. The system must not assign a default or infer an industry.
+- Company identity uses the stable internal `company_id`; it must never depend solely on the ticker.
+- For V1, the ticker remains a fixed company attribute. A separate ticker-history table is not introduced: the current CODAL ingestion boundary receives an already-resolved `company_id`, so ticker history would add identity/mapping complexity without helping the extraction path. Any future need to support ticker changes must be separately designed around stable `company_id` and must not change historical report ownership.
+- The optional national identifier may supplement identity matching but must not replace `company_id`.
+
+The current implementation contains `parent_industry_id`, but parent/child industry classification is not part of the approved V1 contract. Its removal or migration treatment must be handled during schema implementation review, not by silently assigning sub-industries.
 
 ### Report / PIT
 
@@ -212,11 +223,14 @@ DB foundation tables + IngestionRun
 - Core persistence does not depend on file extension.
 - Architecture completion does **not** require loading production data into the database.
 
-### Failure and audit
+### Failure, admission gates, and audit
 
+- Company identity and the company's single industry must be resolved and validated before report/raw persistence.
+- Unknown or ambiguous company identity, industry, report type, financial period, or source attribution is a hard admission failure. The system must not guess, silently default, or persist a partially identified record.
 - Failed raw ingestion must not leave partial report/raw writes.
-- The failed `IngestionRun` remains auditable.
-- NULL ≠ 0 is enforced; missing values stay missing.
+- The failed `IngestionRun` remains auditable, but failed source data must not be inserted into the report or financial-fact tables.
+- NULL ≠ 0 remains mandatory. A genuinely absent numeric value in an otherwise identified and valid source row may remain NULL; this is not permission to persist an unidentified or ambiguous record.
+- Validation must distinguish a known-but-blank source value from an unknown label, unknown unit, unresolved period, or unresolved company/industry. The latter cases must be rejected or quarantined outside the analytical database until resolved.
 
 ---
 
