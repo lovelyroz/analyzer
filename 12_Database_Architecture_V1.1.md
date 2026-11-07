@@ -8,15 +8,15 @@
 
 **ORM:** SQLAlchemy
 
-**Schema migration version:** 6
+**Schema migration version:** 8
 
-This document is reopened for review. Its existing decisions are provisional until each section is audited and explicitly re-approved. Earlier V1 / V1.1 / V1.2 references remain historical context; supersession and precedence will be re-established during review. It implements the locked Stage 1 contract (including CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007) and supports Stages 2–9 without moving analytical ownership into the database.
+This document is reopened for review. The decisions explicitly recorded as reviewed/approved below are the current working contract; sections not yet audited remain provisional. Earlier V1 / V1.1 / V1.2 references are historical context and do not override the decisions recorded here. The database stores identified source inputs and their provenance; backend services own runtime calculations and analytical outputs. This contract supports Stages 2–9 without persisting calculated analytical results.
 
 ---
 
 ## 1. Purpose
 
-The database is the auditable Data Foundation. It stores source reports, financial periods, raw financial facts, standardized concepts, mapping decisions, normalized/derived facts, FX, market data, share history, corporate actions, data quality, and ingestion audit information.
+The database is the auditable Data Foundation. It stores identified source inputs and their provenance, report/version and period metadata, the controlled concept/mapping metadata needed to interpret source inputs, market/FX/share foundations, and ingestion audit information. It must not become a store for values that the backend can validly derive from persisted inputs.
 
 The database must be:
 
@@ -34,35 +34,31 @@ It is not a replacement for KPI, scoring, trend, forecast, evaluation, valuation
 
 ```text
 External Sources
-  ├─ Codal financial reports (PDF)
+  ├─ CODAL financial reports (current PDF path; Excel adapter planned)
   ├─ Daily market data (CSV / XLSX / …)
   └─ FX data — FREE_MARKET & OPERATIONAL (CSV / XLSX / …)
           ↓
-Format / Extraction Adapters  (CHANGE-007)
-        ├─ CODAL PDF Acquisition → PDF bytes
-        ├─ CODAL PDF Extraction (pypdf text-first) → RawLineInput[]
+Format-specific acquisition / extraction adapters
+  ├─ CODAL PDF adapter (existing; retain during Excel transition)
+  ├─ CODAL Excel adapter (planned; emits the same common DTO contract)
   ├─ OHLC parser → MarketDaily fields
-  └─ FX parser (+ explicit Toman→Rial if needed) → FxRateInput[]
+  └─ FX parser → FxRateInput[]
+          ↓
+Common DTO boundary
           ↓
 Core Ingestion (service.py)
   + IngestionRun audit
           ↓
-Raw Source Layer
+Persisted source-input / foundation layer
           ↓
-Mapping Decision Layer
+Backend runtime mapping, validation and calculations
           ↓
-Standard Concept Catalog
-          ↓
-Normalized Fact Layer
-          ↓
-Derived Fact + Reconciliation Layer
-          ↓
-Stages 2–9
+Stages 2–9 consume runtime results; calculated outputs are not persisted
 ```
 
 Market and FX foundations remain separate branches and are consumed by their appropriate downstream stages.
 
----
+**Persistence principle:** persist identified source inputs, not redundant totals or system-generated calculations. A value is not considered a base input merely because a source workbook contains a populated cell; its semantic role must be established. See the financial fact policy in Section 3.
 
 ## 3. Core Domains
 
@@ -85,23 +81,74 @@ Market and FX foundations remain separate branches and are consumed by their app
 
 The current implementation contains `parent_industry_id`, but parent/child industry classification is not part of the approved V1 contract. Its removal or migration treatment must be handled during schema implementation review, not by silently assigning sub-industries.
 
+### FinancialPeriod — reviewed and approved contract
+
+A financial period describes the actual source reporting span, using Jalali calendar components. Do not use SQL/Gregorian `Date` fields as the authoritative financial-period dates.
+
+Required date components:
+
+- `start_jalali_year`, `start_jalali_month`, `start_jalali_day`
+- `end_jalali_year`, `end_jalali_month`, `end_jalali_day`
+
+Retain and define these period attributes:
+
+- `fiscal_year`: the company's fiscal-year label, resolved from its actual fiscal calendar and source; do not assume it is always Farvardin-starting.
+- `fiscal_quarter`: nullable where not applicable; otherwise an integer from 1 through 4.
+- `period_type`: describes the duration/span of the source data, not how often the report is published.
+- `months_length`: number of months represented by the source period.
+- `is_ytd`: whether the source amount is cumulative from the start of that company's fiscal year.
+
+The actual start of a fiscal year/period must be resolved from the source or a validated company fiscal calendar. Never infer Farvardin 1 or another start date from a market-wide convention.
+
+For the usual cumulative quarterly filing pattern:
+
+| Fiscal quarter | Source period type | months_length | is_ytd |
+|---|---|---:|---|
+| Q1 | `QUARTER` | 3 | true |
+| Q2 | `SEMI_ANNUAL` | 6 | true |
+| Q3 | `NINE_MONTH` | 9 | true |
+| Q4 | `ANNUAL` | 12 | true |
+
+Monthly source periods use `MONTH`, `months_length=1`, and `is_ytd=false`.
+
+Standalone-quarter amounts derived by differencing cumulative YTD reports are runtime calculations, not separate persisted source facts. A valid differencing operation must use compatible report versions from the same fiscal-year reporting chain; it must not subtract a restated later cumulative report from an incompatible earlier version.
+
+`TTM` is not a source `FinancialPeriod` type. TTM is a derived analytical window and is computed at runtime.
+
+The logical period identity is the company plus the exact Jalali start date and end date. Enforce valid Jalali components, start date not after end date, quarter range 1–4, and consistency between dates, duration, period type, and YTD semantics. Reject unresolved or contradictory period metadata rather than guessing.
+
+**Migration caution:** existing SQL `Date` values must be inspected before migration. Do not assume they represent Gregorian dates or Jalali dates and do not blindly convert them. Ambiguous/unresolvable records require an explicit migration report and safe resolution path.
+
 ### Report / PIT
 
 - `reports`
 - `report_versions`
 
-`Report` identifies the logical report. `ReportVersion` identifies a published historical state. Publication datetime belongs to `ReportVersion`.
+`Report` identifies the logical report. `ReportVersion` identifies a published historical state. Publication datetime belongs to `ReportVersion`. Each version is a distinct source snapshot; PIT consumers must select the version available at the relevant cutoff.
 
-### Financial normalization
+### Financial fact and calculation contract — reviewed and approved
 
-- `raw_financial_facts`
-- `financial_metrics`
-- `mapping_rules`
-- `mapping_decisions`
-- `normalized_financial_facts`
-- `normalized_financial_fact_inputs`
-- `derived_financial_facts`
-- `derived_financial_fact_inputs`
+The database stores **base/source input facts** required for analysis. It does not store redundant totals or values calculated by the application.
+
+- Persist independently reported input components such as production quantity, sales quantity, unit price/rate, unit cost, and other genuine source inputs when their meaning, unit, period, and provenance are resolved.
+- Do not persist a total/subtotal or other value when it is a reproducible calculation from identified base inputs and a valid, explicitly defined calculation rule. The backend computes it when needed.
+- A populated cell is not automatically a base input. Its semantic role must be classified; a computed total in a source report is not promoted to an input merely because the company accounting system published it.
+- Never invent a formula from labels or visual proximity. A derived value may be calculated only when its formula/relationship is known and all required inputs are available and valid.
+- Do not substitute one measure for another. For example, production quantity is not sales quantity.
+- A blank source cell is not zero. A blank base-input cell remains unknown/NULL. A blank calculated cell may be calculated at runtime only if its calculation rule is known and every required input is present; otherwise its result remains unknown.
+- An explicit source zero remains zero. Do not turn NULL into zero or zero into NULL.
+- Do not infer missing inputs, totals, quantities, rates, units, periods, or labels.
+- Calculated values are runtime-only. They must not be inserted into raw, normalized, derived, cache, or history tables.
+- Runtime calculation results must retain enough in-memory lineage to explain their inputs and formula where auditability requires it, but this does not authorize persistence of the calculated result.
+
+The current schema/document references `derived_financial_facts` and `derived_financial_fact_inputs`. These tables conflict with the approved no-persisted-calculations policy if they store application-calculated financial values. Their future treatment must be resolved in the schema implementation/migration plan: remove or deprecate them safely, inspect existing contents before any destructive migration, and do not write new calculated results to them. The same no-duplication review applies to normalized fact tables: mapping/classification metadata may be persisted where necessary, but a second persisted copy of a source value or a calculated/analytical value is not permitted without a separately approved data contract.
+
+### Financial normalization and mapping
+
+- `raw_financial_facts` is the source-input fact layer, limited by the policy above.
+- `financial_metrics` is the controlled catalog of concepts/metrics, not a repository of calculated results.
+- `mapping_rules` and `mapping_decisions` may retain the metadata needed to map source labels to concepts and to audit/resolve mappings.
+- Mapping/normalization performed by the backend must not silently create or persist calculated financial amounts. Any persisted normalized representation must be justified as necessary metadata or a canonical representation of an input, not a redundant analytical result.
 
 ### Market / FX / ownership
 
@@ -196,9 +243,9 @@ Same calendar day may hold both FREE_MARKET and OPERATIONAL rows.
 ### Layering
 
 ```text
-Source file / PDF / API
+Source file / PDF / Excel / API
         ↓
-Adapter or CODAL PDF Extraction Layer
+Format-specific acquisition and extraction adapter
         ↓
 Common DTOs (RawLineInput, FxRateInput, OHLC field map)
         ↓
@@ -207,15 +254,21 @@ ingest_codal_report / ingest_ohlc_* / ingest_fx_rates
 DB foundation tables + IngestionRun
 ```
 
-### CODAL
+### CODAL source formats and Excel transition
 
-- Inputs are PDFs.
-- Acquisition is independent from PDF parsing and database persistence.
-- The current implementation provides deterministic local-file acquisition and retryable HTTP acquisition.
-- Text extraction uses `pypdf`; image-only or no-text PDFs are rejected explicitly. OCR is not silently substituted.
-- Extraction (layout/table/OCR) is **outside** `ingest_codal_report`.
-- Core function receives `RawLineInput` sequence + report metadata (tracking id, URL, publication datetime, restatement flag).
-- Raw facts remain immutable; mapping/normalization are separate later steps.
+The intended direction is to replace CODAL PDF acquisition/extraction with Excel acquisition/extraction, while preserving the common ingestion and persistence contract.
+
+- The Excel adapter must emit the same common financial input DTO contract consumed by `ingest_codal_report`; the existing downstream persistence boundary must remain format-independent.
+- Preserve the established `RawLineInput` semantics and compatibility. Any required Excel provenance extension (such as workbook/sheet/cell coordinates) must be additive and must not break existing PDF callers.
+- Excel workbooks are heterogeneous. Do not assume fixed worksheet names, row numbers, column numbers, or identical layouts across companies or report types.
+- Preserve original source labels, raw numeric values, units/currencies, period metadata, and precise source provenance. For Excel, provenance should identify at least workbook/source identity, worksheet, row, and cell/column where available.
+- Do not guess mappings, units, period boundaries, company identity, report type, or source attribution. Unresolved required metadata is an admission failure or must remain outside the analytical database until resolved.
+- Read cached formula results from the workbook; do not evaluate spreadsheet formulas in the extraction adapter. If a formula cell has no usable cached result, emit an explicit warning/rejection/unknown state; never fabricate a value.
+- Preserve the distinction between base input cells and calculated total/subtotal cells. Only identified base inputs are candidates for financial-fact persistence. Calculated cells are not persisted as financial facts; the backend computes reproducible values from validated inputs at runtime.
+- A blank base-input cell remains NULL/unknown, not zero. A blank calculated cell may be computed only when the formula semantics are known and all required base inputs are present. Otherwise it remains unknown.
+- Quarterly CODAL filings commonly report cumulative year-to-date values. Q1/Q2/Q3/Q4 source periods must follow the FinancialPeriod contract in Section 3. Standalone-quarter values are derived at runtime, using compatible report versions; they are not source facts to persist.
+- Do not remove or disable the existing PDF acquisition/extraction path until the Excel adapter has been implemented and passed end-to-end validation against representative reports. During transition, both adapters may coexist and feed the same common DTO/persistence path.
+- The current implementation uses PDF acquisition/extraction and `pypdf`; image-only/no-text PDFs are explicitly rejected and OCR is not silently substituted. This describes the current path, not the target format policy.
 
 ### OHLC / FX formats
 
@@ -229,10 +282,8 @@ DB foundation tables + IngestionRun
 - Unknown or ambiguous company identity, industry, report type, financial period, or source attribution is a hard admission failure. The system must not guess, silently default, or persist a partially identified record.
 - Failed raw ingestion must not leave partial report/raw writes.
 - The failed `IngestionRun` remains auditable, but failed source data must not be inserted into the report or financial-fact tables.
-- NULL ≠ 0 remains mandatory. A genuinely absent numeric value in an otherwise identified and valid source row may remain NULL; this is not permission to persist an unidentified or ambiguous record.
+- NULL ≠ 0 remains mandatory. A genuinely absent base numeric input in an otherwise identified and valid source row may remain NULL; this is not permission to persist an unidentified or ambiguous record.
 - Validation must distinguish a known-but-blank source value from an unknown label, unknown unit, unresolved period, or unresolved company/industry. The latter cases must be rejected or quarantined outside the analytical database until resolved.
-
----
 
 ## 15. Migration Policy
 
@@ -242,7 +293,7 @@ Production/schema evolution uses the versioned migration runner:
 
 `python -m src.scripts.migrate_db`
 
-Current schema versions:
+The repository migration runner currently reaches schema version **8**. The architecture document must stay synchronized with the executable migration history:
 
 | Version | Name |
 |---|---|
@@ -252,14 +303,16 @@ Current schema versions:
 | 4 | `one_current_report_version` |
 | 5 | `market_daily_jalali_components` |
 | 6 | `fx_rates_jalali_components` |
+| 7 | `forecast_version_repository` |
+| 8 | `remove_forecast_output_persistence` |
 
-Migrations are ordered and idempotent. Existing raw values are not silently rewritten.
+Migrations are ordered and idempotent. Existing source values must not be silently rewritten. Any future migration implementing the Jalali FinancialPeriod contract or removing/deprecating calculated-fact persistence must first inspect existing rows, report ambiguous data, and avoid destructive or guessed conversions. Migration 8's removal of forecast-output persistence is consistent with the runtime-only analytical-output policy.
 
 ---
 
 ## 16. Ownership Boundaries
 
-Unchanged from V1.1: database owns source preservation and foundations; analytical stages own scoring, forecast, valuation, decision.
+Database owns identified source-input preservation, provenance, controlled catalogs/mapping metadata, market/FX/share foundations, and ingestion audit. Backend services own mapping execution where appropriate, runtime calculations, reconciliation, KPI/scoring, trends, forecasts, valuation, and decisions. Calculated financial values and analytical/decision outputs are runtime-only and must not be persisted.
 
 ---
 
@@ -269,4 +322,4 @@ Unchanged from V1.1: database owns source preservation and foundations; analytic
 
 Overall Analyzer architecture remains **V1** with exactly nine analytical stages.
 
-Approved amendments: CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007.
+Approved/reviewed decisions recorded in this revision: company/industry admission contract; FinancialPeriod Jalali/YTD contract; source-input-only financial persistence and runtime calculation policy; Excel adapter direction with common DTO/persistence boundary and safe PDF transition; migration history corrected through version 8. CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007 remain historical amendment references pending a complete section-by-section audit.
