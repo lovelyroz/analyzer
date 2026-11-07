@@ -2,7 +2,7 @@
 
 ## Status
 
-**LOCKED — DATABASE CONTRACT V1.3**
+**UNDER REVIEW — DATABASE CONTRACT V1.3 (REOPENED FOR ARCHITECTURAL REVIEW)**
 
 **Database engine:** SQLite
 
@@ -10,7 +10,7 @@
 
 **Schema migration version:** 6
 
-This document supersedes earlier V1 / V1.1 / V1.2 database architecture references. It implements the locked Stage 1 contract (including CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007) and supports Stages 2–9 without moving analytical ownership into the database.
+This document is reopened for review. Its existing decisions are provisional until each section is audited and explicitly re-approved. Earlier V1 / V1.1 / V1.2 references remain historical context; supersession and precedence will be re-established during review. It implements the locked Stage 1 contract (including CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007) and supports Stages 2–9 without moving analytical ownership into the database.
 
 ---
 
