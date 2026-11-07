@@ -16,7 +16,7 @@ This document is reopened for review. The decisions explicitly recorded as revie
 
 ## 1. Purpose
 
-The database is the auditable Data Foundation. It stores identified source inputs and their provenance, report/version and period metadata, the controlled concept/mapping metadata needed to interpret source inputs, market/FX/share foundations, and ingestion audit information. It must not become a store for values that the backend can validly derive from persisted inputs.
+The database is the auditable Data Foundation. It stores only selected, classified, analysis-relevant financial inputs in canonical form, their minimal source provenance, report/version and period metadata, controlled metric definitions, market/FX/share foundations, and ingestion audit information. It does not retain a general raw financial-line archive. Source rows are classified and mapped at ingestion; irrelevant details are discarded rather than accumulated in the database.
 
 The database must be:
 
@@ -49,16 +49,18 @@ Common DTO boundary
 Core Ingestion (service.py)
   + IngestionRun audit
           ↓
-Persisted source-input / foundation layer
+Ingestion-time classification and mapping
+  ├─ persist selected canonical financial inputs + minimal provenance
+  └─ discard irrelevant / unneeded source rows
           ↓
-Backend runtime mapping, validation and calculations
+Backend runtime calculations and analysis
           ↓
 Stages 2–9 consume runtime results; calculated outputs are not persisted
 ```
 
 Market and FX foundations remain separate branches and are consumed by their appropriate downstream stages.
 
-**Persistence principle:** persist identified source inputs, not redundant totals or system-generated calculations. A value is not considered a base input merely because a source workbook contains a populated cell; its semantic role must be established. See the financial fact policy in Section 3.
+**Persistence principle:** do not persist raw financial rows. Resolve each candidate source item at ingestion into a required canonical metric, a simple OTHER_* bucket, or an explicit discard/reject outcome. Persist only the selected canonical input value and minimal provenance. Do not persist redundant totals or system-generated calculations. See the financial fact policy in Section 3.
 
 ## 3. Core Domains
 
@@ -128,29 +130,40 @@ The logical period identity is the company plus the exact Jalali start date and 
 
 ### Financial fact and calculation contract — reviewed and approved
 
-The database stores **base/source input facts** required for analysis. It does not store redundant totals or values calculated by the application.
+The database does **not** retain raw financial statement rows or a general-purpose raw-fact archive. Every candidate item must be resolved at ingestion. The objective is an analysis-ready financial data foundation, not a reconstruction of each company's accounting ledger or a full copy of its statements.
 
-- Persist independently reported input components such as production quantity, sales quantity, unit price/rate, unit cost, and other genuine source inputs when their meaning, unit, period, and provenance are resolved.
-- Do not persist a total/subtotal or other value when it is a reproducible calculation from sufficient, identified base inputs and a valid, explicitly defined calculation rule. The backend computes it when needed.
-- **Preserve a reported aggregate when it is the only available source observation.** If a report provides only a total/aggregate and does not provide the underlying components needed to reconstruct it, retain that reported amount as a source observation (for example, a sale of an asset reported only as one amount, or an item under «سایر درآمدها» / «سایر هزینه‌ها»). Do not discard genuine reported information merely because it is an aggregate.
-- A populated cell is not automatically a base input. Its semantic role must be classified. A reported aggregate is redundant only when sufficient validated components and an explicit valid rule make it reproducible; otherwise it remains a source observation, not an application-generated calculation.
-- Where both components and an aggregate are present, do not persist both as independent additive inputs when the aggregate is reproducible from those components. Preserve source provenance and any relevant source-row classification so the backend can avoid double counting.
-- Never invent a formula from labels or visual proximity. A derived value may be calculated only when its formula/relationship is known and all required inputs are available and valid.
+At ingestion, each candidate item must receive one of these outcomes:
+
+1. **Map to a required canonical metric** when it has clear analytical meaning and is needed by downstream analysis.
+2. **Map to a simple, controlled OTHER_* bucket** when it is a genuine financial amount but its detailed accounting breakdown is not needed. Examples include OTHER_INCOME, OTHER_EXPENSE, and, if required by analysis, a similarly simple bucket for miscellaneous asset disposals. The bucket catalog should remain small and understandable; do not create a separate metric for every incidental disclosure.
+3. **Discard** a source row that has no analytical use and is not needed for minimal provenance or audit.
+4. **Reject or quarantine before financial persistence** when a required identity, metric meaning, unit, period, or source attribution cannot be resolved safely. Do not guess.
+
+Additional rules:
+
+- Persist independently meaningful inputs required for analysis, such as production quantity, sales quantity, selling rate, cost inputs, and other selected canonical measures, only after their meaning, unit, period, and provenance are resolved.
+- Do not persist a total/subtotal when it is reproducible from sufficient validated inputs using a known, explicitly defined calculation rule. The backend computes it when needed.
+- A reported aggregate that is not required as a distinct analytical input may be mapped into the relevant OTHER_* bucket rather than retained as a separate raw row. This includes an amount reported only as one figure, such as a miscellaneous asset sale, other income, or other expense. Preserve the useful amount in the simple bucket; do not preserve its raw accounting detail.
+- When both components and an aggregate are present, avoid double counting. Use the components for metrics that require them; map only genuinely non-overlapping residual items to an OTHER_* bucket. Never add a total to its own components.
+- Do not infer formulas from labels or visual proximity. A derived value may be calculated only when its formula/relationship is known and all required inputs are available and valid.
 - Do not substitute one measure for another. For example, production quantity is not sales quantity.
 - A blank source cell is not zero. A blank base-input cell remains unknown/NULL. A blank calculated cell may be calculated at runtime only if its calculation rule is known and every required input is present; otherwise its result remains unknown.
 - An explicit source zero remains zero. Do not turn NULL into zero or zero into NULL.
 - Do not infer missing inputs, totals, quantities, rates, units, periods, or labels.
-- Calculated values are runtime-only. They must not be inserted into raw, normalized, derived, cache, or history tables.
+- Calculated values are runtime-only. They must not be inserted into financial-input, normalized, derived, cache, or history tables.
+- Keep only minimal provenance with each persisted canonical input: at least the company/report identity, report version, financial period, and source locator sufficient to trace the value back to its origin (for example, source section/row for PDF or workbook/sheet/cell for Excel). Do not retain every original label, raw row payload, or unused source value merely for archival purposes.
 - Runtime calculation results must retain enough in-memory lineage to explain their inputs and formula where auditability requires it, but this does not authorize persistence of the calculated result.
 
-The current schema/document references `derived_financial_facts` and `derived_financial_fact_inputs`. These tables conflict with the approved no-persisted-calculations policy if they store application-calculated financial values. Their future treatment must be resolved in the schema implementation/migration plan: remove or deprecate them safely, inspect existing contents before any destructive migration, and do not write new calculated results to them. The same no-duplication review applies to normalized fact tables: mapping/classification metadata may be persisted where necessary, but a second persisted copy of a source value or a calculated/analytical value is not permitted without a separately approved data contract.
+The existing raw_financial_facts table is incompatible with this target if it acts as a general raw-row archive. The existing normalized-input model may become the canonical persisted financial fact layer, but it must not duplicate a separate raw-value layer. Existing derived_financial_facts and derived_financial_fact_inputs are incompatible if they persist application-calculated financial values. Their future schema/migration treatment must inspect existing data first and be non-destructive until a safe migration is designed. Do not write new raw-row archives or calculated results during transition.
 
 ### Financial normalization and mapping
 
-- `raw_financial_facts` is the source-input fact layer, limited by the policy above.
-- `financial_metrics` is the controlled catalog of concepts/metrics, not a repository of calculated results.
-- `mapping_rules` and `mapping_decisions` may retain the metadata needed to map source labels to concepts and to audit/resolve mappings.
-- Mapping/normalization performed by the backend must not silently create or persist calculated financial amounts. Any persisted normalized representation must be justified as necessary metadata or a canonical representation of an input, not a redundant analytical result.
+- `financial_metrics` is the small, controlled catalog of canonical analysis metrics and OTHER_* buckets; it is metadata, not a repository of calculated results.
+- Ingestion-time mapping resolves source labels into canonical metrics or OTHER_* buckets before persistence. Unresolved mappings must not silently enter the financial-input tables.
+- `mapping_rules` may retain concise, versioned mapping metadata needed to make this classification repeatable. Per-source-row raw mapping archives are not a target requirement.
+- The target financial fact table is the canonical selected-input layer (the existing `normalized_financial_facts` is a candidate for redesign as that layer). It stores one resolved value per accepted metric/period/report version, with minimal provenance; it is not a second copy of raw facts.
+- `normalized_financial_fact_inputs` is not automatically required; retain a composition/provenance relationship only if a concrete analysis or audit requirement cannot be met by the minimal source locator.
+- Mapping and normalization must not silently create or persist calculated financial amounts.
 
 ### Market / FX / ownership
 
@@ -169,7 +182,7 @@ The current schema/document references `derived_financial_facts` and `derived_fi
 
 ## 4–11. (Unchanged principles from V1.1)
 
-Raw facts, metrics, mapping, normalized/derived provenance, periods, ReportVersion PIT rules, and base FX architecture remain as in DATABASE_CONTRACT_V1.1 (CHANGE-003) and the locked Stage 1 principles (NULL ≠ 0, raw immutability, IRR base currency).
+Metric catalog, ingestion-time mapping, canonical selected-input facts, minimal provenance, periods, ReportVersion PIT rules, and base FX architecture remain subject to the locked Stage 1 principles where compatible (NULL ≠ 0, PIT versioning, IRR base currency). Raw financial-row retention is explicitly not part of the target contract.
 
 ---
 
@@ -263,10 +276,10 @@ The intended direction is to replace CODAL PDF acquisition/extraction with Excel
 - The Excel adapter must emit the same common financial input DTO contract consumed by `ingest_codal_report`; the existing downstream persistence boundary must remain format-independent.
 - Preserve the established `RawLineInput` semantics and compatibility. Any required Excel provenance extension (such as workbook/sheet/cell coordinates) must be additive and must not break existing PDF callers.
 - Excel workbooks are heterogeneous. Do not assume fixed worksheet names, row numbers, column numbers, or identical layouts across companies or report types.
-- Preserve original source labels, raw numeric values, units/currencies, period metadata, and precise source provenance. For Excel, provenance should identify at least workbook/source identity, worksheet, row, and cell/column where available.
+- Use original source labels and raw numeric values transiently during extraction and mapping, but do not persist a general archive of them. Persist only the resolved canonical metric/bucket value and its minimal provenance. For Excel, the source locator should identify at least workbook/source identity, worksheet, and row/cell where available.
 - Do not guess mappings, units, period boundaries, company identity, report type, or source attribution. Unresolved required metadata is an admission failure or must remain outside the analytical database until resolved.
 - Read cached formula results from the workbook; do not evaluate spreadsheet formulas in the extraction adapter. If a formula cell has no usable cached result, emit an explicit warning/rejection/unknown state; never fabricate a value.
-- Preserve the distinction between base input cells, reproducible aggregate cells, and sole-available reported aggregate observations. Persist identified base inputs; do not separately persist an aggregate that is reproducible from sufficient validated inputs; but retain an aggregate as a source observation when its underlying components are absent and it is the only reported value. Application-generated calculations remain runtime-only.
+- Classify each source row during ingestion as a canonical metric, an OTHER_* bucket item, or discard/reject. Do not persist the original row merely because it exists in the workbook. Reproducible aggregates are calculated at runtime; miscellaneous amounts that matter only as broad totals are mapped into the relevant OTHER_* bucket. Application-generated calculations remain runtime-only.
 - A blank base-input cell remains NULL/unknown, not zero. A blank calculated cell may be computed only when the formula semantics are known and all required base inputs are present. Otherwise it remains unknown.
 - Quarterly CODAL filings commonly report cumulative year-to-date values. Q1/Q2/Q3/Q4 source periods must follow the FinancialPeriod contract in Section 3. Standalone-quarter values are derived at runtime, using compatible report versions; they are not source facts to persist.
 - Do not remove or disable the existing PDF acquisition/extraction path until the Excel adapter has been implemented and passed end-to-end validation against representative reports. During transition, both adapters may coexist and feed the same common DTO/persistence path.
@@ -314,7 +327,7 @@ Migrations are ordered and idempotent. Existing source values must not be silent
 
 ## 16. Ownership Boundaries
 
-Database owns identified source-input preservation, provenance, controlled catalogs/mapping metadata, market/FX/share foundations, and ingestion audit. Backend services own mapping execution where appropriate, runtime calculations, reconciliation, KPI/scoring, trends, forecasts, valuation, and decisions. Calculated financial values and analytical/decision outputs are runtime-only and must not be persisted.
+Database owns selected canonical financial inputs, minimal provenance, controlled metric/bucket catalogs and mapping metadata, market/FX/share foundations, and ingestion audit. Ingestion services own source-row classification and mapping before persistence. Backend services own runtime calculations, reconciliation, KPI/scoring, trends, forecasts, valuation, and decisions. Raw financial-row archives, calculated financial values, and analytical/decision outputs are not persisted.
 
 ---
 
