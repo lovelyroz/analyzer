@@ -10,7 +10,7 @@
 
 **Schema migration version:** 8
 
-This document is reopened for review. The decisions explicitly recorded as reviewed/approved below are the current working contract; sections not yet audited remain provisional. Earlier V1 / V1.1 / V1.2 references are historical context and do not override the decisions recorded here. The database stores identified source inputs and their provenance; backend services own runtime calculations and analytical outputs. This contract supports Stages 2–9 without persisting calculated analytical results.
+This document is reopened for review. The decisions explicitly recorded as reviewed/approved below are the current working contract; sections not yet audited remain provisional. Earlier V1 / V1.1 / V1.2 references are historical context and do not override the decisions recorded here. The database stores selected canonical financial inputs and minimal provenance, not raw financial statement rows; backend services own runtime calculations and analytical outputs. This contract supports Stages 2–9 without persisting calculated analytical results.
 
 ---
 
@@ -293,9 +293,9 @@ The intended direction is to replace CODAL PDF acquisition/extraction with Excel
 
 ### Failure, admission gates, and audit
 
-- Company identity and the company's single industry must be resolved and validated before report/raw persistence.
+- Company identity and the company's single industry must be resolved and validated before report/canonical-financial-input persistence.
 - Unknown or ambiguous company identity, industry, report type, financial period, or source attribution is a hard admission failure. The system must not guess, silently default, or persist a partially identified record.
-- Failed raw ingestion must not leave partial report/raw writes.
+- Failed financial ingestion must not leave partial report or canonical-financial-input writes.
 - The failed `IngestionRun` remains auditable, but failed source data must not be inserted into the report or financial-fact tables.
 - NULL ≠ 0 remains mandatory. A genuinely absent base numeric input in an otherwise identified and valid source row may remain NULL; this is not permission to persist an unidentified or ambiguous record.
 - Validation must distinguish a known-but-blank source value from an unknown label, unknown unit, unresolved period, or unresolved company/industry. The latter cases must be rejected or quarantined outside the analytical database until resolved.
@@ -337,4 +337,4 @@ Database owns selected canonical financial inputs, minimal provenance, controlle
 
 Overall Analyzer architecture remains **V1** with exactly nine analytical stages.
 
-Approved/reviewed decisions recorded in this revision: company/industry admission contract; FinancialPeriod Jalali/YTD contract; source-input-only financial persistence and runtime calculation policy; Excel adapter direction with common DTO/persistence boundary and safe PDF transition; migration history corrected through version 8. CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007 remain historical amendment references pending a complete section-by-section audit.
+Approved/reviewed decisions recorded in this revision: company/industry admission contract; FinancialPeriod Jalali/YTD contract; selected canonical-input persistence without raw financial-row retention, simple OTHER_* buckets, minimal provenance, and runtime calculation policy; Excel adapter direction with common DTO/persistence boundary and safe PDF transition; migration history corrected through version 8. CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007 remain historical amendment references pending a complete section-by-section audit.
