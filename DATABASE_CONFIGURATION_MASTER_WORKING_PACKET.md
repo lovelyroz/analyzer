@@ -10,7 +10,7 @@
 
 **سند معماری مبنا:** `12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-08 — ایجاد Packet و ثبت یافته‌های اولیه ممیزی FinancialPeriod و مرز Report/Period.
+آخرین بازنگری: 2026-11-08 — تکمیل بخش‌هایی از ممیزی read/write و مقایسهٔ ORM با migration runner؛ DB-AUD-001 همچنان PARTIAL.
 
 ## 2. قواعد مدیریت Taskها
 
@@ -166,6 +166,35 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 - هنوز migration یا تستی برای این Packet اجرا نشده است.
 - تاریخ‌ها و رکوردهای واقعی DB هنوز برای معنای تقویمی و قابلیت مهاجرت بررسی نشده‌اند.
 
+
+### 4.5 Read/write call-site map and ORM–migration comparison — DB-AUD-001 continuation
+
+**بررسی تکمیلی read/write:** فایل‌های زیر به‌صورت مستقیم بررسی شدند. این نقشه، مسیرهای اصلی شناسایی‌شده را ثبت می‌کند؛ هنوز ادعای پوشش تمام queryها و call siteهای کل repository را ندارد.
+
+| حوزه / جدول | مسیر نوشتن مشاهده‌شده | مسیر خواندن مشاهده‌شده | نکتهٔ ممیزی |
+|---|---|---|---|
+| `reports`, `report_versions`, `raw_financial_facts` | `src/ingestion/service.py::ingest_codal_report`؛ facadeها در `src/ingestion/codal/ingestion.py` و `pipeline.py` | در این مرحله، queryهای انتخاب نسخه و تمام مصرف‌کنندگان downstream هنوز فهرست نشده‌اند | یک `period_id` به Report و همهٔ raw lineها داده می‌شود؛ برای گزارش چنددوره‌ای ناکافی است. نسخهٔ جدید، current قبلی را غیرفعال و `supersedes_version_id` را به آخرین نسخه وصل می‌کند. |
+| `market_daily` | `src/ingestion/market/ingestion.py::ingest_ohlc_csv`؛ upsert با `find_market_daily_existing` در `src/ingestion/common/identity.py` | `src/ingestion/market/queries.py`؛ انتخاب قیمت و تاریخچه بر اساس Jalali | شرکت با ticker جست‌وجو می‌شود؛ تاریخ ذخیره‌شده برای مسیر CSV جلالی است و `trade_date=None`. |
+| `fx_rates` | `src/ingestion/service.py::ingest_fx_rates`؛ facade در `src/ingestion/fx/ingestion.py`؛ upsert با `find_fx_existing` | مسیرهای read مصرف‌کنندگان FX هنوز کامل فهرست نشده‌اند | تاریخ جلالی به‌صورت سه جزء ذخیره می‌شود و `rate_date=None`. |
+| `ingestion_runs` | مسیرهای CODAL، Market و FX در زمان شروع/موفقیت/شکست؛ helperهای `src/ingestion/common/run_tracker.py` نیز موجودند | queryهای گزارش‌گیری از runها در این مرحله شناسایی کامل نشده‌اند | منطق audit بین سرویس‌ها تکراری است؛ بعضی مسیرهای شکست commit جداگانه دارند. |
+| `industries`, `financial_metrics` | `src/scripts/seed_data.py::seed_initial_data` | seed با query بر اساس code برای جلوگیری از درج تکراری | ساخت Company در این فایل انجام نمی‌شود؛ خطای seed پس از rollback فقط چاپ می‌شود و exception دوباره raise نمی‌شود. |
+| `financial_periods` | در مسیر CODAL، period از قبل موجود فرض و با `session.get` خوانده می‌شود؛ writer مستقل در مسیرهای بررسی‌شده پیدا نشد | `src/ingestion/service.py` برای اعتبارسنجی وجود period و تطبیق company | منشأ ایجاد/مدیریت دوره هنوز باید در جست‌وجوی کامل call siteها مشخص شود. |
+| `share_count_history`, `corporate_actions` | writer در مسیرهای ingestion بررسی‌شده پیدا نشد | مصرف‌کنندگان کامل هنوز بررسی نشده‌اند | مدل‌ها وجود دارند، اما مسیر عملیاتی ثبت/به‌روزرسانی در دامنهٔ بررسی فعلی مشخص نیست. |
+| `normalized_financial_facts`, `mapping_decisions`, `derived_financial_facts` و bridge | writer در فایل‌های ingestion بررسی‌شده مشاهده نشد؛ مدل‌ها و migrationها تعریف شده‌اند | queryهای downstream این جداول هنوز کامل ممیزی نشده‌اند | وجود schema به‌تنهایی اثبات نمی‌کند که مسیر تولیدی از آن استفاده می‌کند. |
+
+**مقایسهٔ ORM و migration runner:**
+
+1. Migration شمارهٔ ۱، `Base.metadata.create_all()` را اجرا می‌کند. بنابراین baseline تازه از metadata همان نسخهٔ کد ساخته می‌شود؛ migration شمارهٔ ۱ یک snapshot مستقل و ثابت از schema تاریخی تعریف نکرده است.
+2. Migration شمارهٔ ۲ ستون‌های `statement_type`، `parent_metric_id`، `sign_convention` و `is_derived` را در `financial_metrics` و ستون‌های `raw_fact_id` و `mapping_decision_id` را در `normalized_financial_facts` در صورت نبود اضافه می‌کند؛ سپس mapping و derived tables را می‌سازد. این ستون‌ها در ORM فعلی نیز تعریف شده‌اند.
+3. Migration شمارهٔ ۳ جدول `normalized_financial_fact_inputs` را می‌سازد؛ مدل آن در ORM فعال ثبت شده است.
+4. Migration شمارهٔ ۴ unique partial index برای حداکثر یک ReportVersion جاری به‌ازای هر Report می‌سازد. ORM نیز index متناظر با شرط SQLite را تعریف می‌کند.
+5. Migrationهای ۵ و ۶ ستون‌های Jalali را به‌ترتیب به `market_daily` و `fx_rates` اضافه می‌کنند و مدل‌های فعلی نیز این ستون‌ها را دارند؛ اما نه ORM و نه این migrationها unique index مرکب بر تاریخ Jalali برای هر شرکت/نرخ تعریف نمی‌کنند.
+6. Migrationهای ۷ و ۸ به‌ترتیب جدول‌های Forecast legacy را ایجاد و سپس حذف می‌کنند. این جدول‌ها در metadata فعال نیستند؛ در پایان upgrade نسخهٔ ۸ نباید باقی بمانند.
+7. مسیر legacy در `MigrationRunner.upgrade()` اگر هر جدول غیر از `schema_migrations` وجود داشته باشد و migration history خالی باشد، فقط رکورد baseline نسخهٔ ۱ را ثبت می‌کند و migration شمارهٔ ۱ را اجرا نمی‌کند. در نتیجه، اگر schema قدیمی ناقص باشد، runner لزوماً تمام جدول‌های baseline را ایجاد/ترمیم نمی‌کند؛ فقط تغییرات بعدی را اجرا می‌کند. این رفتار باید در طرح migration آینده لحاظ شود.
+8. محدودیت unique فعلی `market_daily(company_id, trade_date)` و `fx_rates(rate_date, currency_from, currency_to, rate_type)` برای ردیف‌هایی که تاریخ Gregorian آن‌ها NULL است، یکتایی تاریخ‌های Jalali را تضمین نمی‌کند. upsertهای برنامه‌ای بر اساس Jalali components جست‌وجو می‌کنند، اما constraint دیتابیس متناظر وجود ندارد. در SQLite، مقدار NULL در unique constraint مانع درج چند ردیف با NULL مشترک نمی‌شود.
+
+**نتیجهٔ تکمیلی:** اختلاف عمده‌ای از نوع «ستون Jalali در ORM وجود ندارد ولی migration آن را می‌سازد» در نسخهٔ فعلی مشاهده نشد؛ اما migration runner دارای baseline وابسته به metadata جاری و رفتار legacy baseline غیرترمیمی است. همچنین یکتایی تاریخ‌های Jalali در سطح DB تضمین نشده است. مقایسهٔ قطعی schema واقعی نصب‌شده با ORM همچنان به دسترسی read-only به فایل‌های DB واقعی نیاز دارد.
+
 ## 5. نقشهٔ کار و Taskهای اجرایی
 
 ترتیب زیر ترتیب پیشنهادی اجراست؛ تغییر ترتیب فقط با ثبت دلیل و وابستگی انجام شود.
@@ -226,5 +255,6 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 |---|---|---|
 | 2026-11-08 | ایجاد Master Working Packet؛ ثبت اصول مصوب و یافته‌های اولیه FinancialPeriod/Report-period | Initial repository audit; no code/schema changes |
 | 2026-11-08 | Inventory اولیهٔ ۱۹ جدول ORM، migrationهای ۱ تا ۸، bootstrap scripts و تست‌های Stage 1؛ DB-AUD-001 همچنان PARTIAL | Tree snapshot `950d4b07ffb446c5188e2133e6ffa223ecacf753`; source files inspected; no code/schema/data changes |
+| 2026-11-08 | افزودن نقشهٔ اولیهٔ read/write برای CODAL، Market، FX، audit و seed؛ مقایسهٔ migrationها با ORM؛ ثبت مشکل baseline legacy و نبود uniqueness جلالی در DB؛ DB-AUD-001 همچنان PARTIAL | `src/ingestion/service.py`, `src/ingestion/codal/{ingestion,pipeline}.py`, `src/ingestion/market/{ingestion,queries}.py`, `src/ingestion/fx/ingestion.py`, `src/ingestion/common/identity.py`, `src/migrations/runner.py`, model and script files; no code/schema/data changes |
 
 **یادآوری:** این Packet سند زنده است. پس از هر ممیزی یا تغییر مصوب، وضعیت Taskها، شواهد، تصمیم‌ها و نقشهٔ کار باید همین‌جا به‌روز شود. گزارش‌های اجرایی می‌توانند در فایل‌های جداگانه باشند، اما نتیجهٔ پذیرفته‌شده و وضعیت نهایی هر Task باید به این فایل منتقل شود.
