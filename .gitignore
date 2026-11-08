@@ -15,6 +15,7 @@ Lib/
 Include/
 pdf/
 pdf_test/
+excel/
 
 
 # Local databases / runtime data
