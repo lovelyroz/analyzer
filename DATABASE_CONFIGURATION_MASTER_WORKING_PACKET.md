@@ -10,7 +10,7 @@
 
 **سند معماری مبنا:** `12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-08 — تکمیل بخشی از نقشهٔ read/write و مقایسهٔ ORM/migration؛ بررسی مصرف‌کنندگان و adapterهای FinancialPeriod؛ محدودیت تخصیص دوره در PDF و تست‌ها ثبت شد؛ DB-AUD-001 و DB-AUD-002 همچنان PARTIAL.
+آخرین بازنگری: 2026-11-08 — علاوه بر ممیزی اولیهٔ schema، مصرف‌کنندگان و adapterهای FinancialPeriod، شواهد ساختار زمانی چهار workbook واقعی XLSX ثبت شد؛ فرض یک period برای کل گزارش با نمونه‌ها رد شد؛ DB-AUD-001 و DB-AUD-002 همچنان PARTIAL.
 
 ## 2. قواعد مدیریت Taskها
 
@@ -254,6 +254,42 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 **وضعیت DB-AUD-002:** PARTIAL. محدودیت DTO/parser/persistence و ضعف پوشش تستی مستند شد؛ اما ممیزی نمونه‌های واقعی باید با بازبینی تصویری/ساختاری PDFهای متنوع و استخراج headerهای زمانی آن‌ها ادامه یابد. هیچ period assignment یا Golden value از روی حدس ساخته نشده است.
 
+### 4.8 ممیزی ساختار زمانی نمونه‌های واقعی Excel — DB-AUD-002
+
+**منبع شواهد:** گزارش `DB-AUD-002_REAL_EXCEL_TEMPORAL_AUDIT.md`، بررسی‌شده در 2026-11-08. این بررسی فقط‌خواندنی بوده و هیچ workbook، کد، تست، مدل یا migration تغییر نکرده است.
+
+**دامنه:** چهار فایل XLSX موجود در `excel/` بررسی شده‌اند؛ هرکدام یک worksheet با نام `Recovered_Sheet1` دارند:
+- `cheshme.xlsx` — A1:V222؛ شامل جداول پرتفوی، گردش ابتدا/تغییرات/انتها، درآمد سود سهام و جریان‌های درآمدی ماهانه/YTD.
+- `fzar.xlsx` — A1:Z63؛ شامل تولید و فروش، خرید، انرژی و ارز با ستون‌های YTD، اصلاحات، یک‌ماهه، YTD جاری، YTD مقایسه‌ای و پیش‌بینی.
+- `fzar2.xlsx` — A1:Z874؛ شامل صورت سود و زیان، صورت وضعیت مالی و جداول پیوست با تاریخ‌ها و semantics متفاوت.
+- `samanBank.xlsx` — A1:M489؛ شامل جداول مانده در تاریخ، جریان‌های شش‌ماهه، مقایسهٔ سال قبل، نرخ‌ها و برآوردها.
+
+**یافته‌های قطعی از نمونه‌ها:**
+
+1. ساختار سرستون زمانی بین شرکت‌ها و حتی بین جدول‌های یک Worksheet یکسان نیست؛ headerها می‌توانند merged، چندردیفی، گروه‌بندی‌شده یا در کنار ستون‌های غیرزمانی باشند.
+2. یک workbook/worksheet می‌تواند چندین جدول مستقل داشته باشد و هر جدول قرارداد زمانی خودش را داشته باشد.
+3. در یک جدول واحد ممکن است ستون‌های YTD، یک‌ماهه، YTD اصلاح‌شده، YTD سال قبل، مانده در تاریخ، نرخ و پیش‌بینی کنار هم قرار گیرند.
+4. تاریخ پایان به‌تنهایی برای تعیین نوع دوره کافی نیست. عبارت‌هایی مانند «دوره یک ماهه منتهی به»، «از ابتدای سال مالی تا تاریخ»، «دوره ۶ ماهه منتهی به» و «به تاریخ» معنای متفاوت دارند و باید حفظ شوند.
+5. بعضی جداول فقط «ابتدای دوره» و «انتهای دوره» دارند و تاریخ دقیق در خود جدول نیست؛ نسبت‌دادن تاریخ از عنوان workbook یا جدول دیگر بدون شاهد قطعی مجاز نیست.
+6. عنوان workbook همیشه برای تعیین دورهٔ تمام جدول‌های داخل آن کافی نیست؛ در نمونهٔ `fzar2.xlsx` تاریخ یک جدول جریان نقدی با تاریخ عنوان workbook متفاوت گزارش شده است. این اختلاف باید در سطح جدول بررسی شود، نه با ارث‌بری خودکار period از عنوان workbook.
+7. نمونه‌های بررسی‌شده ستون standalone-quarter صریح و قابل‌تأیید نشان ندادند؛ بنابراین این ممیزی وجود یا قواعد عمومی تشخیص standalone quarter را اثبات نمی‌کند.
+8. در این چهار نمونه فقط یک worksheet وجود داشت؛ دربارهٔ رفتار workbookهای چندworksheet نتیجه‌گیری نمی‌شود.
+
+**نتیجه برای قرارداد داده:**
+
+فرض یک `period_id` برای کل Report یا حتی یک دوره برای کل worksheet با شواهد واقعی سازگار نیست. حداقل، هر مقدار canonical باید به context ستون/سلول و دورهٔ مستقل خودش متصل شود. گروه‌بندی headerها، measure columnها، merged cells، تاریخ، نوع دوره، comparative/restated status و locator دقیق باید در مرز extraction/DTO قابل‌حفظ باشند. تاریخ‌ها و دوره‌های مبهم باید پیش از persistence رد یا quarantine شوند؛ period از ترتیب ستون، عنوان گزارش، انتشار ماهانه یا arithmetic coincidence حدس زده نشود.
+
+این شواهد، نیاز به قرارداد چنددوره‌ای را تقویت می‌کند؛ اما هنوز شکل نهایی association بین Report، ReportVersion، جدول/ستون و FinancialPeriod را تعیین نمی‌کند. آن تصمیم در DB-DES-003 (Task 008) و با هماهنگی قرارداد canonical input در Task 006 گرفته خواهد شد.
+
+**محدودیت شواهد:**
+- فقط چهار workbook موجود در پوشهٔ محلیِ ارائه‌شده بررسی شده‌اند؛ این نمونه‌ها نمایندهٔ تنوع کل ناشران و همهٔ قالب‌های CODAL نیستند.
+- هویت قطعی ناشر برای هر چهار فایل از محتوای workbook احراز نشده است.
+- تاریخ شروع سال مالی، semantics برخی comparative/restated columns و period برخی جداول فاقد header صریح حل نشده‌اند.
+- هیچ standalone-quarter صریح در این نمونه‌ها تأیید نشد.
+- فایل‌های XLS اصلی که HTML دارند در دامنهٔ این بررسی نبودند؛ فقط XLSXهای تبدیل‌شده بررسی شدند.
+
+**وضعیت DB-AUD-002:** همچنان PARTIAL. شواهد واقعی Excel اکنون یک نمونهٔ اولیه از تنوع temporal structure را اثبات می‌کنند و فرض یک دوره برای کل گزارش را رد می‌کنند؛ اما ممیزی تمام call siteها، دامنهٔ وسیع‌تری از انواع گزارش/شرکت، و پیشنهاد نهایی دربارهٔ هویت/اتصال period هنوز تکمیل نشده است. هیچ schema، migration یا کدی تغییر نکرده است.
+
 ## 5. نقشهٔ کار و Taskهای اجرایی
 
 ترتیب زیر ترتیب پیشنهادی اجراست؛ تغییر ترتیب فقط با ثبت دلیل و وابستگی انجام شود.
@@ -317,5 +353,6 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 | 2026-11-08 | افزودن نقشهٔ اولیهٔ read/write برای CODAL، Market، FX، audit و seed؛ مقایسهٔ migrationها با ORM؛ ثبت مشکل baseline legacy و نبود uniqueness جلالی در DB؛ DB-AUD-001 همچنان PARTIAL | `src/ingestion/service.py`, `src/ingestion/codal/{ingestion,pipeline}.py`, `src/ingestion/market/{ingestion,queries}.py`, `src/ingestion/fx/ingestion.py`, `src/ingestion/common/identity.py`, `src/migrations/runner.py`, model and script files; no code/schema/data changes |
 | 2026-11-08 | بررسی مصرف‌کنندگان اصلی FinancialPeriod در forecast، valuation، decision، PIT و TTM؛ ثبت وابستگی ترتیب period به ID و فقدان metadata برای TTM؛ DB-AUD-002 همچنان PARTIAL | `src/forecast/queries.py`, `src/forecast/service.py`, `src/kpi/period_utils.py`, `src/core/point_in_time.py`, `src/valuation/service.py`, `src/decision/service.py`, selected Stage 1 tests; no code/schema/data changes |
 | 2026-11-08 | ممیزی PDF table/text adapters، RawLineInput، CODAL persistence و 19-PDF test matrix؛ ثبت فقدان period per value/header parsing و نبود آزمون تخصیص دورهٔ چندستونه؛ طرح association در سطح ReportVersion فقط به‌عنوان گزینهٔ طراحی ثبت شد؛ DB-AUD-002 همچنان PARTIAL | `src/ingestion/codal/{pdf_extract,adapter,pipeline}.py`, `src/ingestion/service.py`, `src/tests/test_codal_pdf_extraction.py`, `src/tests/codal_19_pdf_validation_{plan,matrix}.md`; no code/schema/data changes |
+| 2026-11-08 | ممیزی چهار workbook واقعی XLSX؛ ثبت headerهای چندردیفی/merged، چند جدول مستقل در یک worksheet، ترکیب snapshot/flow/YTD/monthly/comparative/forecast و رد فرض یک period برای کل report؛ DB-AUD-002 همچنان PARTIAL | `DB-AUD-002_REAL_EXCEL_TEMPORAL_AUDIT.md`; `excel/cheshme.xlsx`, `excel/fzar.xlsx`, `excel/fzar2.xlsx`, `excel/samanBank.xlsx`; no code/schema/data changes |
 
 **یادآوری:** این Packet سند زنده است. پس از هر ممیزی یا تغییر مصوب، وضعیت Taskها، شواهد، تصمیم‌ها و نقشهٔ کار باید همین‌جا به‌روز شود. گزارش‌های اجرایی می‌توانند در فایل‌های جداگانه باشند، اما نتیجهٔ پذیرفته‌شده و وضعیت نهایی هر Task باید به این فایل منتقل شود.
