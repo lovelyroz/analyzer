@@ -10,7 +10,7 @@
 
 **سند معماری مبنا:** `12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-08 — تکمیل بخش‌هایی از ممیزی read/write و مقایسهٔ ORM با migration runner؛ DB-AUD-001 همچنان PARTIAL.
+آخرین بازنگری: 2026-11-08 — تکمیل بخشی از نقشهٔ read/write و مقایسهٔ ORM/migration؛ بررسی مصرف‌کنندگان FinancialPeriod؛ DB-AUD-001 و DB-AUD-002 همچنان PARTIAL.
 
 ## 2. قواعد مدیریت Taskها
 
@@ -195,6 +195,32 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 **نتیجهٔ تکمیلی:** اختلاف عمده‌ای از نوع «ستون Jalali در ORM وجود ندارد ولی migration آن را می‌سازد» در نسخهٔ فعلی مشاهده نشد؛ اما migration runner دارای baseline وابسته به metadata جاری و رفتار legacy baseline غیرترمیمی است. همچنین یکتایی تاریخ‌های Jalali در سطح DB تضمین نشده است. مقایسهٔ قطعی schema واقعی نصب‌شده با ORM همچنان به دسترسی read-only به فایل‌های DB واقعی نیاز دارد.
 
+
+### 4.6 تکمیل بررسی مصرف‌کنندگان FinancialPeriod — DB-AUD-002
+
+**مصرف‌کنندگان مستقیم بررسی‌شده:**
+
+| فایل / تابع | استفاده از دوره | یافته |
+|---|---|---|
+| `src/forecast/queries.py::_period_rows` | join از `NormalizedFinancialFact.period_id` به `FinancialPeriod` و خواندن `end_date` | دوره‌ها از طریق `period_id` گروه‌بندی می‌شوند؛ تاریخ پایان فقط همراه ردیف خوانده می‌شود. |
+| `src/forecast/queries.py::load_financial_fact_periods` | ساخت یک گروه برای هر `period_id` | ترتیب خروجی با `sorted(periods)` یعنی شناسهٔ عددی period انجام می‌شود، نه تاریخ پایان یا تاریخ جلالی. سپس مصرف‌کننده آخرین عضو را آخرین دوره فرض می‌کند. اگر ترتیب ایجاد ID با ترتیب زمانی متفاوت باشد، دورهٔ اشتباه «آخرین» تلقی می‌شود. |
+| `src/forecast/queries.py::load_financial_facts` | انتخاب facts از `periods[-1]` | انتخاب جدیدترین دوره به‌طور غیرمستقیم به ترتیب ID وابسته است؛ باید با کلید زمانی معتبر دوره جایگزین شود. |
+| `src/kpi/period_utils.py::calculate_ttm` | جمع چهار مقدار آخر آرایهٔ ورودی | فقط طول آرایه و None را کنترل می‌کند؛ نوع دوره، ترتیب زمانی، فاصله/پیوستگی، standalone در برابر YTD، ماهیت FLOW و سازگاری سال مالی را دریافت یا اعتبارسنجی نمی‌کند. این تابع به‌تنهایی برای TTM مالی قابل اتکا نیست. |
+| `src/forecast/service.py::generate_forecast` | خواندن period facts و استفاده از ترتیب آن‌ها برای آخرین/قبلی | برای حاشیه سود، equity آغازین و revenue قبلی به ترتیب periodها تکیه می‌کند؛ در نتیجه ایراد مرتب‌سازی در query مستقیماً بر ورودی forecast اثر دارد. |
+| `src/valuation/service.py::calculate_valuation_as_of_jalali` و `src/decision/service.py::calculate_decision_as_of_jalali` | دریافت `period_id` و تطبیق آن با forecast | این توابع دوره را به‌عنوان شناسهٔ خروجی/ورودی می‌گیرند؛ انتخاب و اعتبارسنجی تقویمی دوره در این لایه انجام نمی‌شود. |
+| `src/core/point_in_time.py::select_report_version` | انتخاب نسخهٔ گزارش تا cutoff | فقط در محدودهٔ یک `report_id` بر اساس publication datetime نسخهٔ آخر را انتخاب می‌کند؛ اتصال Report به یک period همچنان تک‌دوره‌ای است. بررسی جامع تمام PIT queryها به Task 004 نیز مربوط است. |
+
+**شواهد و پیامدها:**
+
+1. مرتب‌سازی `load_financial_fact_periods` بر اساس `period_id` است، نه `end_date`. شناسهٔ دیتابیس تضمین زمانی ندارد؛ بنابراین «آخرین period» و «period قبلی» می‌توانند اشتباه انتخاب شوند. اصلاح باید بر اساس تاریخ جلالی معتبر و ترتیب قطعی انجام شود، نه صرفاً جایگزینی یک فیلد با Gregorian Date.
+2. `calculate_ttm` دادهٔ کافی برای تشخیص standalone-quarter از YTD ندارد. جمع چهار مقدار YTD می‌تواند از نظر مالی غلط باشد؛ قبل از محاسبه باید مقادیر مستقل فصل runtime از گزارش‌های YTD سازگار استخراج شوند، سپس پنجرهٔ TTM بر اساس چهار فصل پیوسته ساخته شود.
+3. در queryهای forecast، `FinancialPeriod.end_date` به‌صورت SQL Date خوانده و به‌عنوان `period_end_date` در provenance/runtime result حمل می‌شود. این با تصمیم مصوب استفاده از تاریخ جلالی به‌عنوان مرجع دوره سازگار نیست و نیازمند تغییر قرارداد مصرف‌کنندگان است.
+4. تست `src/tests/test_stage1_database_architecture.py` نمونهٔ FinancialPeriod را با `datetime.date(2024, ...)` می‌سازد و `fiscal_year=1403` می‌دهد. این فقط قرارداد فعلی ORM را نشان می‌دهد و صحت نگاشت تقویم یا دادهٔ واقعی را اثبات نمی‌کند.
+5. ساختار فعلی `Report.financial_period_id` و `RawFinancialFact.period_id` همچنان هر گزارش/ردیف را به یک period محدود می‌کند؛ DTO و ingestion هیچ دورهٔ مستقل برای هر ستون/مقدار ارائه نمی‌کنند. برای گزارش چندستونه باید تخصیص period در سطح هر مقدار canonical تعریف شود؛ اینکه Report یک دورهٔ اصلی اختیاری/نمایشی داشته باشد یا رابطهٔ جداگانهٔ Report–Period لازم باشد، هنوز تصمیم طراحی نهایی می‌خواهد.
+6. مصرف‌کنندهٔ Share history در `src/forecast/queries.py` تاریخ‌های `ShareCountHistory` و `CorporateAction` را با `normalize_datetime(cutoff).date()` مقایسه می‌کند. این موضوع در دامنهٔ Task 009 (Share/Market/FX) نیز باید با سیاست تاریخ جلالی تطبیق داده شود؛ در این Task تغییری پیشنهاد/اعمال نشده است.
+
+**وضعیت DB-AUD-002:** همچنان PARTIAL. مصرف‌کنندگان اصلی forecast/valuation/decision و TTM بررسی شدند، اما تمام call siteهای repository، قراردادهای تمام adapterها و نمونه‌های واقعی گزارش‌های چندستونه هنوز بررسی نشده‌اند. هیچ تصمیم نهایی دربارهٔ نقش period در Report یا تغییر schema گرفته نشده است.
+
 ## 5. نقشهٔ کار و Taskهای اجرایی
 
 ترتیب زیر ترتیب پیشنهادی اجراست؛ تغییر ترتیب فقط با ثبت دلیل و وابستگی انجام شود.
@@ -256,5 +282,6 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 | 2026-11-08 | ایجاد Master Working Packet؛ ثبت اصول مصوب و یافته‌های اولیه FinancialPeriod/Report-period | Initial repository audit; no code/schema changes |
 | 2026-11-08 | Inventory اولیهٔ ۱۹ جدول ORM، migrationهای ۱ تا ۸، bootstrap scripts و تست‌های Stage 1؛ DB-AUD-001 همچنان PARTIAL | Tree snapshot `950d4b07ffb446c5188e2133e6ffa223ecacf753`; source files inspected; no code/schema/data changes |
 | 2026-11-08 | افزودن نقشهٔ اولیهٔ read/write برای CODAL، Market، FX، audit و seed؛ مقایسهٔ migrationها با ORM؛ ثبت مشکل baseline legacy و نبود uniqueness جلالی در DB؛ DB-AUD-001 همچنان PARTIAL | `src/ingestion/service.py`, `src/ingestion/codal/{ingestion,pipeline}.py`, `src/ingestion/market/{ingestion,queries}.py`, `src/ingestion/fx/ingestion.py`, `src/ingestion/common/identity.py`, `src/migrations/runner.py`, model and script files; no code/schema/data changes |
+| 2026-11-08 | بررسی مصرف‌کنندگان اصلی FinancialPeriod در forecast، valuation، decision، PIT و TTM؛ ثبت وابستگی ترتیب period به ID و فقدان metadata برای TTM؛ DB-AUD-002 همچنان PARTIAL | `src/forecast/queries.py`, `src/forecast/service.py`, `src/kpi/period_utils.py`, `src/core/point_in_time.py`, `src/valuation/service.py`, `src/decision/service.py`, selected Stage 1 tests; no code/schema/data changes |
 
 **یادآوری:** این Packet سند زنده است. پس از هر ممیزی یا تغییر مصوب، وضعیت Taskها، شواهد، تصمیم‌ها و نقشهٔ کار باید همین‌جا به‌روز شود. گزارش‌های اجرایی می‌توانند در فایل‌های جداگانه باشند، اما نتیجهٔ پذیرفته‌شده و وضعیت نهایی هر Task باید به این فایل منتقل شود.
