@@ -224,6 +224,7 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 | Date | Change | Evidence / Commit |
 |---|---|---|
-| 2026-11-08 | ایجاد Master Working Packet؛ ثبت اصول مصوب و یافته‌های اولیه FinancialPeriod/Report-period | Initial repository audit; no code/schema changes |\n| 2026-11-08 | Inventory اولیهٔ ۲۰ جدول ORM، migrationهای ۱ تا ۸، bootstrap scripts و تست‌های Stage 1؛ DB-AUD-001 همچنان PARTIAL | Tree snapshot `950d4b07ffb446c5188e2133e6ffa223ecacf753`; source files inspected; no code/schema/data changes |
+| 2026-11-08 | ایجاد Master Working Packet؛ ثبت اصول مصوب و یافته‌های اولیه FinancialPeriod/Report-period | Initial repository audit; no code/schema changes |
+| 2026-11-08 | Inventory اولیهٔ ۲۰ جدول ORM، migrationهای ۱ تا ۸، bootstrap scripts و تست‌های Stage 1؛ DB-AUD-001 همچنان PARTIAL | Tree snapshot `950d4b07ffb446c5188e2133e6ffa223ecacf753`; source files inspected; no code/schema/data changes |
 
 **یادآوری:** این Packet سند زنده است. پس از هر ممیزی یا تغییر مصوب، وضعیت Taskها، شواهد، تصمیم‌ها و نقشهٔ کار باید همین‌جا به‌روز شود. گزارش‌های اجرایی می‌توانند در فایل‌های جداگانه باشند، اما نتیجهٔ پذیرفته‌شده و وضعیت نهایی هر Task باید به این فایل منتقل شود.
