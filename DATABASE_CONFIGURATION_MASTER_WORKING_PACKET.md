@@ -10,7 +10,7 @@
 
 **سند معماری مبنا:** `12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-08 — تکمیل بخشی از نقشهٔ read/write و مقایسهٔ ORM/migration؛ بررسی مصرف‌کنندگان FinancialPeriod؛ DB-AUD-001 و DB-AUD-002 همچنان PARTIAL.
+آخرین بازنگری: 2026-11-08 — تکمیل بخشی از نقشهٔ read/write و مقایسهٔ ORM/migration؛ بررسی مصرف‌کنندگان و adapterهای FinancialPeriod؛ محدودیت تخصیص دوره در PDF و تست‌ها ثبت شد؛ DB-AUD-001 و DB-AUD-002 همچنان PARTIAL.
 
 ## 2. قواعد مدیریت Taskها
 
@@ -221,6 +221,39 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 **وضعیت DB-AUD-002:** همچنان PARTIAL. مصرف‌کنندگان اصلی forecast/valuation/decision و TTM بررسی شدند، اما تمام call siteهای repository، قراردادهای تمام adapterها و نمونه‌های واقعی گزارش‌های چندستونه هنوز بررسی نشده‌اند. هیچ تصمیم نهایی دربارهٔ نقش period در Report یا تغییر schema گرفته نشده است.
 
+
+### 4.7 ممیزی adapter و شواهد گزارش‌های چندستونه — DB-AUD-002
+
+**مرز استخراج PDF:**
+
+1. `src/ingestion/codal/pdf_extract.py` دو مسیر دارد:
+   - pdfplumber table extraction: سرستون‌ها را در `source_column` به شکل label متنی نگه می‌دارد؛ اما سرستون تاریخ/دوره را parse و به یک شناسه/ساختار FinancialPeriod تبدیل نمی‌کند.
+   - pypdf text fallback: چند عدد یک ردیف را به‌صورت ordinal با `source_column="1","2",...` خارج می‌کند؛ ارتباط عددها با تاریخ‌های سرستون در این مسیر نیز وجود ندارد.
+2. `src/ingestion/codal/adapter.py` هر ExtractedCellRow را به RawLineInput تبدیل می‌کند و فقط item name/value/unit/currency/source section/row/column را نگه می‌دارد. فیلد period، fiscal year، period start/end، YTD/standalone یا header context وجود ندارد.
+3. `RawLineInput` در `src/ingestion/service.py` نیز همین محدودیت را دارد. متد `ingest_codal_report` یک `period_id` می‌گیرد و همان مقدار را برای همهٔ RawFinancialFactها ذخیره می‌کند.
+4. `Report.financial_period_id` هم اجباری است؛ بنابراین حتی مدل Report هم در حال حاضر فقط یک دورهٔ اصلی را نمایش می‌دهد. ReportVersion رابطهٔ دوره‌ای مستقل ندارد.
+5. اعتبارسنجی `validate_raw_lines` فقط non-empty بودن item_name را کنترل می‌کند؛ هیچ کنترل معنایی برای تشخیص سرستون تاریخ، تطبیق تعداد مقدارها با دوره‌ها یا ابهام دوره‌ای ندارد.
+
+**شواهد تستی موجود و محدودیت آن‌ها:**
+
+- `test_text_parser_preserves_row_and_column_for_multi_value_statement_rows` سه عدد را از یک ردیف استخراج و ستون‌های 1 تا 3 را حفظ می‌کند؛ هیچ تاریخ یا period به آن‌ها متصل نیست.
+- تست‌های persistence و PIT در `src/tests/test_codal_pdf_extraction.py` برای هر PDF یک `period_id` واحد به کل ingestion می‌دهند و سپس assert می‌کنند تمام facts همان period را دارند. این تست‌ها صحت FK، provenance مکانی، idempotency و PIT نسخه را می‌سنجند، نه صحت تخصیص دوره برای ستون‌های متعدد.
+- تست corpus شامل ۱۹ PDF است و plan/matrix آن، Golden accuracy را تا زمان وجود مرجع مستقل BLOCKED می‌داند. بنابراین از شواهد فعلی نمی‌توان نتیجه گرفت همهٔ شکل‌های گزارش‌های واقعی از نظر تشخیص دوره و standalone/YTD درست پشتیبانی می‌شوند.
+- فایل‌های PDF در مخزن موجودند، اما در این ممیزی هیچ ادعایی دربارهٔ صحت معنایی سرستون‌ها/دوره‌های تک‌تک آن‌ها یا استخراج مقدار مورد انتظار نشده است. چنین ادعایی نیازمند بررسی صفحه/جدول واقعی و منبع مستقل دوره است.
+
+**Adapterهای دیگر:**
+
+- `src/ingestion/market/adapter.py` و `src/ingestion/fx/adapter.py` adapterهای مختص دادهٔ روزانه بازار و نرخ ارز هستند؛ قرارداد آن‌ها معادل DTO صورت‌های مالی CODAL نیست و نباید به‌عنوان مرز مشترک financial statements تلقی شوند.
+- در tree فعلی، adapter مستقل Excel برای صورت‌های مالی CODAL شناسایی نشد. وجود adapter Excel در FX، پشتیبانی Excel از صورت‌های مالی شرکت‌ها را اثبات نمی‌کند.
+
+**نتیجهٔ ممیزی و مرز تصمیم:**
+
+قرارداد فعلی برای گزارش چندستونه، از مرحلهٔ extraction تا persistence، دورهٔ هر مقدار را حفظ نمی‌کند. اصلاح فقط با اضافه‌کردن یک `period_id` به Report کافی نیست. قرارداد آینده باید حداقل این رابطه را بدون حدس پشتیبانی کند: هر مقدار منتخب مالی ← دقیقاً یک دورهٔ معتبر ← یک گزارش/نسخه و locator منبع. برای ستون‌های دارای header مبهم یا تاریخ/مدت نامشخص، ingestion باید قبل از persistence متوقف شود یا آن مقدار را تا رفع ابهام quarantine کند؛ نباید period از ترتیب ستون، عنوان گزارش یا publication date حدس زده شود.
+
+**گزینهٔ معماری برای مرحلهٔ طراحی (پیشنهاد، نه تصمیم مصوب):** یک association در سطح ReportVersion برای دوره‌های پوشش‌داده‌شده، با حفظ source-column/header locator، و اتصال هر canonical input به period مشخص خودش. این طرح از نسبت‌دادن یک period واحد به کل Report جلوگیری می‌کند؛ اما شکل دقیق association، الزامی/اختیاری بودن `Report.financial_period_id` قدیمی و نگاشت نسخه‌های اصلاحی باید در Task 008 و Task 006 نهایی شود. در این مرحله هیچ schema یا migration تغییر نمی‌کند.
+
+**وضعیت DB-AUD-002:** PARTIAL. محدودیت DTO/parser/persistence و ضعف پوشش تستی مستند شد؛ اما ممیزی نمونه‌های واقعی باید با بازبینی تصویری/ساختاری PDFهای متنوع و استخراج headerهای زمانی آن‌ها ادامه یابد. هیچ period assignment یا Golden value از روی حدس ساخته نشده است.
+
 ## 5. نقشهٔ کار و Taskهای اجرایی
 
 ترتیب زیر ترتیب پیشنهادی اجراست؛ تغییر ترتیب فقط با ثبت دلیل و وابستگی انجام شود.
@@ -283,5 +316,6 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 | 2026-11-08 | Inventory اولیهٔ ۱۹ جدول ORM، migrationهای ۱ تا ۸، bootstrap scripts و تست‌های Stage 1؛ DB-AUD-001 همچنان PARTIAL | Tree snapshot `950d4b07ffb446c5188e2133e6ffa223ecacf753`; source files inspected; no code/schema/data changes |
 | 2026-11-08 | افزودن نقشهٔ اولیهٔ read/write برای CODAL، Market، FX، audit و seed؛ مقایسهٔ migrationها با ORM؛ ثبت مشکل baseline legacy و نبود uniqueness جلالی در DB؛ DB-AUD-001 همچنان PARTIAL | `src/ingestion/service.py`, `src/ingestion/codal/{ingestion,pipeline}.py`, `src/ingestion/market/{ingestion,queries}.py`, `src/ingestion/fx/ingestion.py`, `src/ingestion/common/identity.py`, `src/migrations/runner.py`, model and script files; no code/schema/data changes |
 | 2026-11-08 | بررسی مصرف‌کنندگان اصلی FinancialPeriod در forecast، valuation، decision، PIT و TTM؛ ثبت وابستگی ترتیب period به ID و فقدان metadata برای TTM؛ DB-AUD-002 همچنان PARTIAL | `src/forecast/queries.py`, `src/forecast/service.py`, `src/kpi/period_utils.py`, `src/core/point_in_time.py`, `src/valuation/service.py`, `src/decision/service.py`, selected Stage 1 tests; no code/schema/data changes |
+| 2026-11-08 | ممیزی PDF table/text adapters، RawLineInput، CODAL persistence و 19-PDF test matrix؛ ثبت فقدان period per value/header parsing و نبود آزمون تخصیص دورهٔ چندستونه؛ طرح association در سطح ReportVersion فقط به‌عنوان گزینهٔ طراحی ثبت شد؛ DB-AUD-002 همچنان PARTIAL | `src/ingestion/codal/{pdf_extract,adapter,pipeline}.py`, `src/ingestion/service.py`, `src/tests/test_codal_pdf_extraction.py`, `src/tests/codal_19_pdf_validation_{plan,matrix}.md`; no code/schema/data changes |
 
 **یادآوری:** این Packet سند زنده است. پس از هر ممیزی یا تغییر مصوب، وضعیت Taskها، شواهد، تصمیم‌ها و نقشهٔ کار باید همین‌جا به‌روز شود. گزارش‌های اجرایی می‌توانند در فایل‌های جداگانه باشند، اما نتیجهٔ پذیرفته‌شده و وضعیت نهایی هر Task باید به این فایل منتقل شود.
