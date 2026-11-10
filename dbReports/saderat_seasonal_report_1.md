@@ -111,21 +111,26 @@ The percentage-change columns and EPS are derived/ratio-like. Amounts are report
 - EPS rows `A32:A37` overlap conceptually: operating/nonoperating, continuing/discontinued, basic EPS, and net EPS rows are all present. Their exact formula/relationship is not documented in the workbook; do not sum them.
 - In the cash-flow statement, “cash generated from operations” (`A194`) is followed by income tax paid and net operating cash flow (`A196`); these are hierarchical. The investment and financing net cash rows similarly summarize components.
 
-## 9. Ambiguities requiring clarification
+## 9. Items requiring owner clarification
 
-1. **Comparative durations:** Confirm that `C10/C56/C191` represent the six months ended ۱۴۰۲/۰۳/۳۱ and `D10/D56/D191` the full prior fiscal year ended ۱۴۰۲/۰۹/۳۰. Dates, title, and equity roll-forward support this, but the C headers do not spell out duration.
-2. **Fiscal-year policy:** Equity dates strongly support a ۱۴۰۱/۱۰/۰۱ opening and ۱۴۰۲/۰۹/۳۰ closing for the comparative year. Confirm whether this is the company's regular fiscal-year calendar and whether the current year began ۱۴۰۲/۱۰/۰۱.
-3. **Blank-label totals:** Identify rows 101 and 132 in the financial-position statement (`B101:E101`, `B132:E132`). Their values match nearby subtotal structure, but the source label is blank.
-4. **Restatement details:** Explain the restated comparative figures. The worksheet contains “reasons for changes” headings but no explanatory content in their associated areas.
-5. **Percentage-change basis:** Confirm the formula and comparison basis of E columns, especially in the balance sheet where three dates appear but only one percent-change column is supplied. Observed statement values suggest B vs C.
-6. **Income tax and special lines:** Expense and tax rows have zero values in this sample. Zero is an observed value; it does not establish that the item is conceptually absent.
-7. **Capital row and EPS grouping:** Confirm the temporal definition of `سرمايه` at A38 and the intended computation/relationship among EPS labels A32:A37.
-8. **Cash-flow comparative basis:** Confirm whether the start/end cash rows in comparative columns C and D follow six-month and full-year intervals respectively; the table's start-of-year wording is not expanded by separate column dates.
-9. **Audit assurance scope:** “Audited” appears in title/column labels, but the workbook itself does not contain the audit opinion or auditor's report.
+The following points remain unresolved from the workbook itself and should not be inferred during standardization:
 
-## 10. Recommended next inspection step
+1. **Comparative flow-period durations:** Please confirm that columns C in the income, comprehensive-income, and cash-flow statements (headers C10/C56/C191) represent the corresponding six months ended ۱۴۰۲/۰۳/۳۱, and columns D (D10/D56/D191) represent the full prior fiscal year ended ۱۴۰۲/۰۹/۳۰. The dates and equity roll-forward support this interpretation, but the C headers do not explicitly state “six months.” This also determines the interpretation of the comparative cash-flow opening/closing balances.
+2. **Company fiscal-year calendar:** The equity statement shows an opening balance at ۱۴۰۱/۱۰/۰۱ and a restated closing balance at ۱۴۰۲/۰۹/۳۰. Please confirm whether this is the bank’s regular fiscal-year calendar and whether the current fiscal year began on ۱۴۰۲/۱۰/۰۱.
+3. **Blank-label rows in the statement of financial position:** What are the meanings of rows 101 and 132 (B101:E101 and B132:E132)? The source workbook has numeric values but genuinely blank labels; neighboring rows and formatting do not establish their identities.
+4. **Reasons and scope of restatement:** The workbook marks comparative figures as restated and contains headings for reasons for changes, but the explanatory areas are empty. Do you have the published filing notes or other source evidence identifying what was restated and why? If not, we will retain the reason as unknown rather than infer it.
+5. **Capital and EPS rows:** Should the سرمايه row (A38) and EPS rows (A32:A37) be included in the data set for this standard? If yes, do you have a source definition for the reporting date/period represented by capital and for the distinctions among the EPS rows?
 
-Have the report owner confirm the comparative-duration mapping, fiscal-year calendar, blank-label rows 101/132, restatement explanations, and percentage-change basis. Then inspect the original published filing or an unflattened source export for the missing explanatory notes and audit opinion. Keep all decisions as evidence-backed, owner-confirmed mappings; this inspection does not finalize DB-STD-003.
+### Findings no longer requiring clarification
+
+- **Percentage-change columns:** The follow-up arithmetic check verified that every numeric E value in the examined statement ranges matches the nearest whole percentage from (B - C) / abs(C) * 100 where C is nonzero. The observed comparison basis is B versus C; this is a verified workbook calculation, not an unresolved question.
+- **Cash-flow arithmetic:** Opening cash plus net change reconciles to closing cash in columns B, C, and D. The period meaning of C/D is covered by question 1 above.
+- **Zero-valued lines:** Zero values are preserved as reported. They do not prove that a line is conceptually absent, so no inference or special owner decision is made from zero alone.
+- **Audit evidence:** The workbook labels the statements audited but does not contain the audit opinion or auditor’s report. This is a source-document limitation; the workbook alone cannot establish the assurance scope.
+
+## 10. Next step
+
+Obtain owner confirmation for the five items above. Where supporting filing notes or other source evidence are unavailable, preserve the unresolved status and do not create inferred labels or explanations. This inspection remains a sample assessment; it does not finalize DB-STD-003.
 
 ## Appendix A. Complete text-cell source Header and label inventory
 
