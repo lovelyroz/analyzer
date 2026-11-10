@@ -1,0 +1,353 @@
+# CODAL Excel Preprocessing — Master Working Packet
+
+## 1. Purpose and authority
+
+This Master Working Packet governs the design, implementation, testing, and future maintenance of the standalone CODAL Excel preprocessing utility for Analyzer.
+
+Its purpose is to standardize downloaded CODAL Excel workbooks **before** they enter the financial extraction/ingestion workflow.
+
+The utility is an operational preprocessing tool. It is **not** a new analytical stage, financial-data extractor, metric mapper, or database ingestion engine.
+
+This packet is the working authority for this utility's scope, task sequence, decisions, open questions, evidence, and completion status. It does not replace the Analyzer Master Architecture, Database Contract, or financial report standards.
+
+**Current status: DESIGN IN PROGRESS — NO IMPLEMENTATION AUTHORIZED YET.**
+
+## 2. Core operating principles
+
+1. The user controls which company folder is processed on each run.
+2. The utility must process only the explicitly supplied company folder; it must not crawl the entire `codal` tree or discover other companies.
+3. Company identity and industry are determined from the selected folder path and the central company registry, not from workbook filenames, sheet names, workbook contents, or layout similarity.
+4. Original input files must remain unchanged. The user decides when to delete them.
+5. Converted workbooks are written to a separate `processed` output tree.
+6. Conversion must be real XLS-to-XLSX conversion. Renaming the extension is not conversion.
+7. Processing must be deterministic, observable, safe to rerun, and must never silently overwrite an existing output.
+8. The utility must not extract financial facts, infer financial periods, classify metrics, or write to the database. Those responsibilities belong to later stages.
+
+## 3. Confirmed owner decisions
+
+### 3.1 Input folder layout
+
+The user's current layout is:
+
+```text
+codal/
+└── bank/
+    └── saman/
+        ├── monthly/
+        └── quarterly/
+```
+
+The user supplies the company folder, for example:
+
+```text
+codal/bank/saman/
+```
+
+The utility recursively scans **only that supplied company folder**.
+
+It must not scan sibling company folders, the industry folder, or the complete `codal` tree.
+
+### 3.2 Report types
+
+There are exactly two CODAL financial report types in this preprocessing scope:
+
+| Type code | Folder name | Meaning |
+|---|---|---|
+| `01` | `monthly` | Monthly activity report |
+| `02` | `quarterly` | Quarterly/cumulative financial report |
+
+The quarterly category includes reports covering 3, 6, 9, and 12 months. These are not four separate report types.
+
+A workbook's actual financial period (for example, 3-month, 6-month, 9-month, or 12-month) is separate metadata. The preprocessing filename code identifies the report category, not the exact period length.
+
+The presence of monthly and quarterly source values within one workbook must not cause the utility to split the workbook into multiple reports. The utility only converts and assigns an identity.
+
+### 3.3 Company registry and company codes
+
+- Company codes do not currently exist as a complete preassigned catalogue.
+- The user wants to control company registration and add companies manually in the future.
+- A central `companies.json` registry will hold industry and company codes and human-readable names.
+- The utility must not silently invent or assign a code to an unknown company.
+- If the selected company folder cannot be resolved unambiguously through the registry, processing must stop with a clear error.
+- Registry changes are manual and owner-controlled.
+
+The exact code uniqueness scope (globally unique company code versus unique within each industry) remains an open design decision and must be settled before implementation.
+
+### 3.4 Output naming convention
+
+The agreed filename structure is:
+
+```text
+II-CC-TT-NNNN.xlsx
+```
+
+| Segment | Length | Meaning |
+|---|---:|---|
+| `II` | 2 digits | Industry code |
+| `CC` | 2 digits | Company code |
+| `TT` | 2 digits | Report type: `01` monthly, `02` quarterly |
+| `NNNN` | 4 digits | Sequential report number |
+
+Illustrative example only:
+
+```text
+01-01-01-0001.xlsx
+01-01-01-0002.xlsx
+01-01-02-0001.xlsx
+```
+
+The industry-code catalogue and final company-code allocation rules are not yet locked.
+
+The working numbering rule is an independent sequence for each company and report type. For example, a company's monthly sequence and quarterly sequence each start at `0001`. The exact persistence and rerun behavior must be finalized before implementation.
+
+### 3.5 Input filenames and ordering
+
+- Input filenames are not standardized and must never be used to identify the company or report type.
+- Input filenames may be Persian, irregular, duplicated across different subfolders, or contain unusual characters.
+- The utility must enumerate all eligible workbooks under the supplied company folder and establish a deterministic order from their names/relative paths.
+- Output sequence numbers are assigned according to that deterministic processing order.
+- The exact cross-platform sorting rule, including Unicode normalization and tie-breaking for identical filenames in different subfolders, is an implementation specification item to finalize.
+- A failed conversion must not be recorded as a successfully created output or permanently consume a successful-output sequence number.
+
+### 3.6 Output location and source preservation
+
+Converted files are stored separately under a `processed` tree, preserving the industry/company hierarchy. Example:
+
+```text
+processed/
+└── bank/
+    └── saman/
+        ├── 01-01-01-0001.xlsx
+        ├── 01-01-01-0002.xlsx
+        └── 01-01-02-0001.xlsx
+```
+
+- Original XLS files remain in their input folders.
+- The utility must not delete, move, rename, or modify original inputs.
+- The user manually deletes input files later, after checking the processed outputs.
+- Existing output files must never be overwritten silently.
+
+## 4. Proposed execution contract
+
+The intended high-level execution is:
+
+```text
+User supplies one company-folder path
+        |
+        v
+Validate the supplied folder and resolve its industry/company
+        |
+        v
+Load and validate companies.json
+        |
+        v
+Recursively enumerate eligible workbooks under that folder
+        |
+        v
+Determine each report type from its monthly/quarterly folder ancestry
+        |
+        v
+Sort eligible inputs deterministically
+        |
+        v
+Convert each XLS workbook to a genuine XLSX workbook
+        |
+        v
+Assign the next valid identifier and standard filename
+        |
+        v
+Write to processed/<industry>/<company>/
+        |
+        v
+Validate output and record run results
+```
+
+This is a design outline, not an implementation mandate for a particular library or command-line interface.
+
+### 4.1 Folder classification
+
+The report type is determined from the path beneath the selected company folder:
+
+- Files under a `monthly` directory belong to type `01`.
+- Files under a `quarterly` directory belong to type `02`.
+- Nested subdirectories beneath either folder are allowed.
+- A file outside either recognized report-type subtree, or a file whose path yields conflicting classifications, must not be processed as a valid report. It must be reported as skipped/rejected with a reason.
+
+### 4.2 Conversion
+
+The conversion implementation/library has not been selected.
+
+The selected method must:
+- genuinely convert XLS content to XLSX;
+- preserve workbook sheets and cell values to the extent supported by the chosen converter;
+- report unsupported or lossy workbook features rather than silently claiming full fidelity;
+- validate that the resulting file can be opened as XLSX;
+- never replace a failed conversion with a renamed copy of the original.
+
+### 4.3 Output numbering and failure behavior
+
+The final allocation algorithm is still open. At minimum:
+- numbering must not collide with existing processed outputs;
+- monthly and quarterly sequences remain separate;
+- failed conversions do not create successful output records;
+- a partially written output must be cleaned up or clearly quarantined;
+- an existing output must not be overwritten;
+- the run report must identify every input as converted, skipped, or failed, with a reason.
+
+### 4.4 Rerun safety
+
+Rerun behavior must be designed before implementation. The utility must not generate a second identity for the same source merely because the user reruns the script before manually deleting the input files.
+
+A persistent processing manifest and/or source-content hash may be appropriate. The exact mechanism, location, and duplicate policy remain open.
+
+## 5. Central registry — preliminary shape
+
+A JSON registry is approved in principle. The following is an illustrative shape only; code assignments and uniqueness rules are not yet finalized.
+
+```json
+{
+  "industries": {
+    "bank": {
+      "code": "01",
+      "name": "Bank"
+    }
+  },
+  "companies": {
+    "bank/saman": {
+      "code": "01",
+      "name": "Bank Saman"
+    },
+    "bank/saderat": {
+      "code": "02",
+      "name": "Bank Saderat"
+    }
+  }
+}
+```
+
+Registry requirements:
+- codes are strings, preserving leading zeroes;
+- industry and company codes must have exactly two decimal digits;
+- duplicate codes must be detected according to the final uniqueness policy;
+- unknown industries or companies must cause a clear stop, not an inferred default;
+- manual registry edits must be validated before processing;
+- registry format should include a schema/version field before it is treated as a production contract.
+
+## 6. Scope boundaries
+
+### In scope
+
+- one user-supplied company folder per execution;
+- recursive discovery within that folder only;
+- classification as monthly or quarterly from folder ancestry;
+- manual company/industry registry lookup;
+- deterministic input ordering;
+- real XLS-to-XLSX conversion;
+- standard output naming;
+- separate processed output tree;
+- collision prevention, rerun safety, and execution reporting.
+
+### Explicitly out of scope
+
+- crawling all companies or all of `codal`;
+- automatic company identification from workbook content or filename;
+- automatic creation of company codes;
+- deleting or modifying source workbooks;
+- extracting financial values or report periods;
+- deciding whether a quarterly report contains standalone or year-to-date values;
+- mapping rows/columns to financial metrics;
+- validating financial semantics;
+- database writes or migrations;
+- changing downstream financial extraction/ingestion contracts.
+
+## 7. Open design decisions — must resolve before implementation
+
+| ID | Question | Current status |
+|---|---|---|
+| PREP-OPEN-001 | Are company codes unique globally or only within an industry? | OPEN |
+| PREP-OPEN-002 | What are the final two-digit industry codes for all supported industries? | OPEN |
+| PREP-OPEN-003 | What exact sorting rule is used for Persian/Unicode filenames and nested paths? | OPEN |
+| PREP-OPEN-004 | How are sequence numbers persisted and recovered after reruns? | OPEN |
+| PREP-OPEN-005 | Should a manifest map source hashes/paths to prior outputs to prevent duplicate processing? | OPEN |
+| PREP-OPEN-006 | What should happen when an input is already XLSX rather than XLS? | OPEN |
+| PREP-OPEN-007 | Which conversion engine is reliable in the user's Windows environment, and what fidelity limits apply? | OPEN |
+| PREP-OPEN-008 | What exact CLI/user interaction supplies and validates the company-folder path? | OPEN |
+| PREP-OPEN-009 | What is the policy if a workbook is found outside monthly/quarterly, or both classifications appear in its ancestry? | OPEN |
+| PREP-OPEN-010 | What happens when the 4-digit sequence reaches 9999? | OPEN |
+
+No implementation should begin while any open decision that affects identity, collision safety, conversion correctness, or data loss remains unresolved.
+
+## 8. Documentation alignment required
+
+The repository contains earlier CODAL documents that describe PDF extraction or use older monthly/accumulated terminology. The Excel preprocessing direction and the owner's clarified two-category model must be reconciled with those documents through explicit, reviewed amendments.
+
+At minimum, review:
+- `10_Production_Codal_Extraction_and_Data_Load.md`;
+- `DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`, especially its Excel/PDF transition and report-type sections;
+- relevant Stage 1 / database ingestion contracts where the preprocessing output identity or file format affects their interface.
+
+This packet does not silently supersede or rewrite those documents. Any required change must be recorded explicitly and must preserve the existing financial-data and database contracts unless an approved change is necessary.
+
+## 9. Task plan and status
+
+Status legend:
+- `[x]` DONE — entire task completed with evidence.
+- `[~]` PARTIAL — some work is complete, but a decision or evidence remains.
+- `[ ]` OPEN — not started.
+- `[!]` BLOCKED — cannot proceed without an external decision or dependency.
+
+### Phase A — Design
+
+- [~] PREP-001 — Record the owner's scope, folder, report-type, naming, and source-preservation decisions. The current packet records them; open details remain.
+- [ ] PREP-002 — Finalize industry and company code policy.
+- [ ] PREP-003 — Finalize deterministic sorting and sequence allocation.
+- [ ] PREP-004 — Finalize rerun/idempotency and manifest policy.
+- [ ] PREP-005 — Select and validate the XLS-to-XLSX conversion approach.
+- [ ] PREP-006 — Finalize the command-line/user interaction and execution report contract.
+- [ ] PREP-007 — Reconcile affected repository documentation.
+- [ ] PREP-008 — Audit the complete preprocessing specification and obtain owner approval.
+- [ ] PREP-009 — Freeze the V1 specification.
+
+### Phase B — Implementation (not authorized yet)
+
+- [ ] PREP-101 — Implement registry loading and validation.
+- [ ] PREP-102 — Implement explicit company-folder validation and bounded recursive enumeration.
+- [ ] PREP-103 — Implement monthly/quarterly path classification and deterministic ordering.
+- [ ] PREP-104 — Implement safe XLS-to-XLSX conversion.
+- [ ] PREP-105 — Implement identifier allocation, output naming, and collision protection.
+- [ ] PREP-106 — Implement rerun safety and processing manifest, if approved.
+- [ ] PREP-107 — Implement execution report and failure handling.
+
+### Phase C — Verification (not authorized yet)
+
+- [ ] PREP-201 — Add tests for path boundaries and prove sibling companies are never scanned.
+- [ ] PREP-202 — Add tests for monthly/quarterly classification, nested folders, and invalid paths.
+- [ ] PREP-203 — Add tests for unusual Persian/Unicode filenames, duplicate names in different folders, and deterministic ordering.
+- [ ] PREP-204 — Add tests for conversion validity and unsupported/lossy workbook cases.
+- [ ] PREP-205 — Add tests for numbering, collisions, failed conversions, and reruns.
+- [ ] PREP-206 — Verify source XLS files remain unchanged and are never deleted.
+- [ ] PREP-207 — Perform a requirement-by-requirement audit and record actual test evidence.
+
+## 10. Implementation and workflow rules
+
+- Design must be reviewed and approved before implementation.
+- Do not modify database schema, migrations, financial extraction logic, or downstream ingestion as part of this utility unless a separate approved task explicitly requires it.
+- The user runs tests locally unless explicitly authorizing otherwise. Provide exact commands; do not claim tests were run without evidence.
+- Keep implementation changes limited to the approved file scope.
+- Do not edit `WORKFLOW_RULES.md`.
+- Do not mark a task complete based on intent, a prompt, or code presence alone.
+- Any change to an approved decision must be recorded as an explicit amendment with reason and impact; do not silently rewrite prior decisions.
+
+## 11. Current completion state
+
+```text
+Packet: CREATED — WORKING DRAFT
+Design: IN PROGRESS
+Owner approval of complete specification: PENDING
+Implementation: NOT STARTED
+Tests: NOT STARTED
+Audit: NOT STARTED
+Overall: DESIGN IN PROGRESS
+```
+
+The next action is to resolve the open design decisions with the owner, then audit and freeze the specification. No code changes are authorized by this packet yet.
