@@ -19,7 +19,7 @@ This packet is the working authority for this utility's scope, task sequence, de
 3. Company identity and industry are determined from the selected folder path and the central company registry, not from workbook filenames, sheet names, workbook contents, or layout similarity.
 4. Original input files must remain unchanged. The user decides when to delete them.
 5. Converted workbooks are written to a separate `processed` output tree.
-6. Conversion must be real XLS-to-XLSX conversion. Renaming the extension is not conversion.
+6. Input files are `.xls` files whose payload is HTML-formatted CODAL report content, not native binary XLS workbooks. The utility must parse that HTML-based representation and generate a genuine XLSX workbook; changing the extension is not conversion.
 7. Processing must be deterministic, observable, safe to rerun, and must never silently overwrite an existing output.
 8. The utility must not extract financial facts, infer financial periods, classify metrics, or write to the database. Those responsibilities belong to later stages.
 
@@ -116,6 +116,7 @@ The working numbering rule is an independent sequence for each company and repor
 
 ### 3.5 Input filenames and deterministic ordering
 
+- Input files in V1 are `.xls`-extension files containing HTML-formatted report content. The `.xls` extension does not mean that the payload is a native binary XLS workbook.
 - Input filenames are not standardized and must never be used to identify the company or report type.
 - Input filenames may be Persian, irregular, duplicated across different subfolders, or contain unusual characters.
 - The utility enumerates eligible workbooks under the supplied company folder and sorts them by their **relative paths from that company folder**, not by absolute paths.
@@ -168,7 +169,7 @@ Determine each report type from its monthly/quarterly folder ancestry
 Sort eligible inputs deterministically
         |
         v
-Convert each XLS workbook to a genuine XLSX workbook
+Parse each HTML-based `.xls` input and generate a genuine XLSX workbook
         |
         v
 Assign the next valid identifier and standard filename
@@ -191,16 +192,19 @@ The report type is determined from the path beneath the selected company folder:
 - Nested subdirectories beneath either folder are allowed.
 - A file outside either recognized report-type subtree, or a file whose path yields conflicting classifications, must not be processed as a valid report. It must be reported as skipped/rejected with a reason.
 
-### 4.2 Conversion
+### 4.2 HTML-based XLS input to genuine XLSX output
 
-The conversion implementation/library has not been selected.
+The owner has clarified that V1 does not receive native `.xlsx` inputs. The downloaded files have an `.xls` extension, but their contents are HTML-formatted CODAL report data. This mismatch between filename extension and actual payload format was the source of parsing difficulties and is the reason for the preprocessing step.
 
-The selected method must:
-- genuinely convert XLS content to XLSX;
-- preserve workbook sheets and cell values to the extent supported by the chosen converter;
-- report unsupported or lossy workbook features rather than silently claiming full fidelity;
-- validate that the resulting file can be opened as XLSX;
-- never replace a failed conversion with a renamed copy of the original.
+Accordingly, this is not a conventional native-XLS-to-XLSX conversion task. The utility must:
+- read and parse the HTML payload contained in each `.xls` input;
+- interpret the report's HTML table structure sufficiently to construct a genuine `.xlsx` workbook;
+- preserve the report's tabular structure, cell values, and relevant row/column relationships as faithfully as the source permits;
+- explicitly handle and report unsupported, malformed, ambiguous, or lossy cases rather than silently claiming full fidelity;
+- validate that the resulting file is a genuine XLSX package that can be opened by an XLSX reader;
+- never merely rename the `.xls` file or wrap its unchanged HTML payload in an `.xlsx` extension.
+
+The parsing/conversion library and exact fidelity strategy have not yet been selected. They must be evaluated against representative CODAL inputs before implementation.
 
 ### 4.3 Output numbering and failure behavior
 
@@ -265,7 +269,7 @@ Registry requirements:
 - classification as monthly or quarterly from folder ancestry;
 - manual company/industry registry lookup;
 - deterministic input ordering;
-- real XLS-to-XLSX conversion;
+- parsing HTML-based `.xls` inputs and generating genuine XLSX workbooks;
 - standard output naming;
 - separate processed output tree;
 - collision prevention, rerun safety, and execution reporting.
@@ -292,7 +296,7 @@ Registry requirements:
 | PREP-OPEN-003 | What exact sorting rule is used for Persian/Unicode filenames and nested paths? | CLOSED — sort by relative path; normalize to NFC for comparison only; compare normalized paths using case-sensitive Unicode code-point lexicographic order; use the original relative path as the tie-breaker when normalized paths are equal. |
 | PREP-OPEN-004 | How are sequence numbers persisted and recovered after reruns? | CLOSED — no persistent sequence history; allocate around outputs currently present, and allow reuse after the user deletes outputs. |
 | PREP-OPEN-005 | Should a manifest map source hashes/paths to prior outputs to prevent duplicate processing? | CLOSED — no permanent manifest or cross-run content deduplication in V1; use temporary in-memory state and a per-run report only. |
-| PREP-OPEN-006 | What should happen when an input is already XLSX rather than XLS? | OPEN |
+| PREP-OPEN-006 | What should happen when an input is already XLSX rather than XLS? | CLOSED — V1 inputs are `.xls`-extension files containing HTML-formatted CODAL report content; native XLSX input is not part of the current input contract. |
 | PREP-OPEN-007 | Which conversion engine is reliable in the user's Windows environment, and what fidelity limits apply? | OPEN |
 | PREP-OPEN-008 | What exact CLI/user interaction supplies and validates the company-folder path? | OPEN |
 | PREP-OPEN-009 | What is the policy if a workbook is found outside monthly/quarterly, or both classifications appear in its ancestry? | OPEN |
@@ -324,8 +328,9 @@ Status legend:
 - [~] PREP-001 — Record the owner's scope, folder, report-type, naming, and source-preservation decisions. The current packet records them; open details remain.
 - [x] PREP-002 — Finalize industry and company code policy. Company codes are unique within industry; the initial seven industry codes are approved and stable.
 - [x] PREP-003 — Finalize deterministic sorting and sequence allocation. Relative-path ordering, NFC comparison normalization, Unicode code-point ordering, original-path tie-breaking, and independent available-number allocation are specified.
+- [x] PREP-006 (input-format clarification only) — Confirm that V1 inputs are HTML-formatted `.xls` files and that native `.xlsx` inputs are not expected. The parsing/conversion engine remains open under PREP-005.
 - [x] PREP-004 — Finalize rerun/idempotency and manifest policy. No permanent manifest or cross-run deduplication; protect existing outputs, allocate available numbers, and produce a temporary per-run report.
-- [ ] PREP-005 — Select and validate the XLS-to-XLSX conversion approach.
+- [ ] PREP-005 — Select and validate the HTML-based `.xls` to genuine XLSX parsing/conversion approach.
 - [ ] PREP-006 — Finalize the command-line/user interaction and execution report contract.
 - [ ] PREP-007 — Reconcile affected repository documentation.
 - [ ] PREP-008 — Audit the complete preprocessing specification and obtain owner approval.
@@ -336,7 +341,7 @@ Status legend:
 - [ ] PREP-101 — Implement registry loading and validation.
 - [ ] PREP-102 — Implement explicit company-folder validation and bounded recursive enumeration.
 - [ ] PREP-103 — Implement monthly/quarterly path classification and deterministic ordering.
-- [ ] PREP-104 — Implement safe XLS-to-XLSX conversion.
+- [ ] PREP-104 — Implement safe parsing of HTML-based `.xls` inputs and generation of genuine XLSX workbooks.
 - [ ] PREP-105 — Implement identifier allocation, output naming, and collision protection.
 - [ ] PREP-106 — Implement output-collision/partial-file safety and temporary per-run state/report; do not implement a permanent processing manifest in V1.
 - [ ] PREP-107 — Implement execution report and failure handling.
