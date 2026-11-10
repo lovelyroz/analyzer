@@ -114,13 +114,15 @@ These codes are stable identifiers and must not be renumbered if the catalogue i
 
 The working numbering rule is an independent sequence for each company and report type. For example, a company's monthly sequence and quarterly sequence each start at `0001`. Sequence allocation is based on output files currently present: the utility must choose an available number and must never overwrite an existing output. If the user deletes processed outputs after database import, those numbers may be reused in a later run; output filenames are temporary processing identifiers, not permanent database identities.
 
-### 3.5 Input filenames and ordering
+### 3.5 Input filenames and deterministic ordering
 
 - Input filenames are not standardized and must never be used to identify the company or report type.
 - Input filenames may be Persian, irregular, duplicated across different subfolders, or contain unusual characters.
-- The utility must enumerate all eligible workbooks under the supplied company folder and establish a deterministic order from their names/relative paths.
-- Output sequence numbers are assigned according to that deterministic processing order.
-- The exact cross-platform sorting rule, including Unicode normalization and tie-breaking for identical filenames in different subfolders, is an implementation specification item to finalize.
+- The utility enumerates eligible workbooks under the supplied company folder and sorts them by their **relative paths from that company folder**, not by absolute paths.
+- For sorting only, each relative path is normalized to Unicode NFC. This normalization must not rename or otherwise modify the actual source file or path.
+- The normalized relative paths are compared using Unicode code-point lexicographic ordering. Sorting is case-sensitive; no locale-dependent collation is used.
+- If two distinct original relative paths become equal after NFC normalization, their original, unnormalized relative paths are compared using Unicode code-point lexicographic ordering as the final tie-breaker.
+- Output sequence numbers are assigned according to this deterministic order, independently within each company/report-type sequence.
 - A failed conversion must not be recorded as a successfully created output or consume a sequence number within that run.
 
 ### 3.6 Output location and source preservation
@@ -223,7 +225,7 @@ The selected method must:
 
 ## 5. Central registry — preliminary shape
 
-A JSON registry is approved in principle. The following is an illustrative shape only; actual code assignments and the final industry catalogue are not yet finalized. Company codes are unique within each industry, while the industry/company code pair is unique across the registry.
+A JSON registry is approved in principle. The following is an illustrative shape only; actual company assignments are owner-controlled. The initial industry catalogue is finalized. Company codes are unique within each industry, while the industry/company code pair is unique across the registry.
 
 ```json
 {
@@ -287,7 +289,7 @@ Registry requirements:
 |---|---|---|
 | PREP-OPEN-001 | Are company codes unique globally or only within an industry? | CLOSED — unique within each industry; `II-CC` identifies the company. |
 | PREP-OPEN-002 | What are the initial two-digit industry codes? | CLOSED — codes `01`–`07` assigned to BANK, INVESTMENT, PETROCHEMICAL, METALS, CEMENT, FOOD, PHARMACEUTICAL respectively; future additions receive the next available code and existing codes never change. |
-| PREP-OPEN-003 | What exact sorting rule is used for Persian/Unicode filenames and nested paths? | OPEN |
+| PREP-OPEN-003 | What exact sorting rule is used for Persian/Unicode filenames and nested paths? | CLOSED — sort by relative path; normalize to NFC for comparison only; compare normalized paths using case-sensitive Unicode code-point lexicographic order; use the original relative path as the tie-breaker when normalized paths are equal. |
 | PREP-OPEN-004 | How are sequence numbers persisted and recovered after reruns? | CLOSED — no persistent sequence history; allocate around outputs currently present, and allow reuse after the user deletes outputs. |
 | PREP-OPEN-005 | Should a manifest map source hashes/paths to prior outputs to prevent duplicate processing? | CLOSED — no permanent manifest or cross-run content deduplication in V1; use temporary in-memory state and a per-run report only. |
 | PREP-OPEN-006 | What should happen when an input is already XLSX rather than XLS? | OPEN |
@@ -321,7 +323,7 @@ Status legend:
 
 - [~] PREP-001 — Record the owner's scope, folder, report-type, naming, and source-preservation decisions. The current packet records them; open details remain.
 - [x] PREP-002 — Finalize industry and company code policy. Company codes are unique within industry; the initial seven industry codes are approved and stable.
-- [ ] PREP-003 — Finalize deterministic sorting and sequence allocation.
+- [x] PREP-003 — Finalize deterministic sorting and sequence allocation. Relative-path ordering, NFC comparison normalization, Unicode code-point ordering, original-path tie-breaking, and independent available-number allocation are specified.
 - [x] PREP-004 — Finalize rerun/idempotency and manifest policy. No permanent manifest or cross-run deduplication; protect existing outputs, allocate available numbers, and produce a temporary per-run report.
 - [ ] PREP-005 — Select and validate the XLS-to-XLSX conversion approach.
 - [ ] PREP-006 — Finalize the command-line/user interaction and execution report contract.
@@ -371,4 +373,4 @@ Audit: NOT STARTED
 Overall: DESIGN IN PROGRESS
 ```
 
-The next action is to resolve the open design decisions with the owner, then audit and freeze the specification. No code changes are authorized by this packet yet.
+The next action is to resolve the remaining open design decisions with the owner, then audit and freeze the specification. No code changes are authorized by this packet yet.
