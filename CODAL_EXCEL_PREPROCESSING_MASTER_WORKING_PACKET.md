@@ -328,7 +328,6 @@ Status legend:
 - [~] PREP-001 — Record the owner's scope, folder, report-type, naming, and source-preservation decisions. The current packet records them; open details remain.
 - [x] PREP-002 — Finalize industry and company code policy. Company codes are unique within industry; the initial seven industry codes are approved and stable.
 - [x] PREP-003 — Finalize deterministic sorting and sequence allocation. Relative-path ordering, NFC comparison normalization, Unicode code-point ordering, original-path tie-breaking, and independent available-number allocation are specified.
-- [x] PREP-006 (input-format clarification only) — Confirm that V1 inputs are HTML-formatted `.xls` files and that native `.xlsx` inputs are not expected. The parsing/conversion engine remains open under PREP-005.
 - [x] PREP-004 — Finalize rerun/idempotency and manifest policy. No permanent manifest or cross-run deduplication; protect existing outputs, allocate available numbers, and produce a temporary per-run report.
 - [ ] PREP-005 — Select and validate the HTML-based `.xls` to genuine XLSX parsing/conversion approach.
 - [ ] PREP-006 — Finalize the command-line/user interaction and execution report contract.
