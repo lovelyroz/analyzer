@@ -1,4 +1,4 @@
-# Saderat Quarterly Workbook Inspection — DB-STD-003
+# Saderat Fiscal-Year Periodic Financial Report Workbook Inspection — DB-STD-003
 
 ## 1. Executive summary
 
@@ -7,6 +7,12 @@
 The statement columns are not temporally uniform. Income, comprehensive income, and cash flows show the current six-month period, a restated corresponding six-month period, and a restated full-year comparative ended ۱۴۰۲/۰۹/۳۰, followed by a percentage-change column. The balance sheet instead compares three dates. Equity changes expose the fiscal-year opening date ۱۴۰۱/۱۰/۰۱, the year-end ۱۴۰۲/۰۹/۳۰, and the current six-month movement to ۱۴۰۳/۰۳/۳۱. This is strong evidence that the fiscal year begins ۱۴۰۱/۱۰/۰۱ and ends ۱۴۰۲/۰۹/۳۰ in the comparative cycle, but the report does not state a general fiscal calendar rule. No standalone-quarter amounts are explicitly labeled or separable from the reported six-month figures, so none are calculated.
 
 No code, schema, migration, test, monthly standard, master document, or source workbook was changed. Only this inspection report was created.
+
+## Terminology alignment with DB-STD-003
+
+This workbook is classified under **Fiscal-Year Periodic Financial Reports** (Persian: «گزارش‌های مالی دوره‌ای سال مالی (تجمعی)»). It is the six-month (۱۴۰۳/۰۳/۳۱) member of that reporting family. The family covers reports issued at fiscal-year checkpoints such as 3, 6, 9, and 12 months; the 12-month member is the annual report, not an interim report.
+
+“Cumulative/YTD” describes the temporal basis of applicable flow values (for example, income and cash flows), not every value in the workbook. Balance-sheet values remain point-in-time balances at their stated dates. A report’s periodic family classification therefore does not by itself determine the temporal meaning of each table column.
 
 ## 2. Workbook and worksheet inventory
 
