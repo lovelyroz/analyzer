@@ -98,7 +98,19 @@ Illustrative example only:
 01-01-02-0001.xlsx
 ```
 
-The industry-code catalogue is not yet locked. Company-code uniqueness is locked: codes are unique within an industry, and the pair `II-CC` identifies a company.
+The initial V1 industry-code catalogue is approved and fixed as follows:
+
+| Industry code | Industry key | Name |
+|---|---|---|
+| `01` | `BANK` | Bank |
+| `02` | `INVESTMENT` | Investment |
+| `03` | `PETROCHEMICAL` | Petrochemical |
+| `04` | `METALS` | Metals |
+| `05` | `CEMENT` | Cement |
+| `06` | `FOOD` | Food |
+| `07` | `PHARMACEUTICAL` | Pharmaceutical |
+
+These codes are stable identifiers and must not be renumbered if the catalogue is extended. A newly supported industry receives the next available two-digit code. Company-code uniqueness is also locked: codes are unique within an industry, and the pair `II-CC` identifies a company.
 
 The working numbering rule is an independent sequence for each company and report type. For example, a company's monthly sequence and quarterly sequence each start at `0001`. Sequence allocation is based on output files currently present: the utility must choose an available number and must never overwrite an existing output. If the user deletes processed outputs after database import, those numbers may be reused in a later run; output filenames are temporary processing identifiers, not permanent database identities.
 
@@ -274,7 +286,7 @@ Registry requirements:
 | ID | Question | Current status |
 |---|---|---|
 | PREP-OPEN-001 | Are company codes unique globally or only within an industry? | CLOSED — unique within each industry; `II-CC` identifies the company. |
-| PREP-OPEN-002 | What are the final two-digit industry codes for all supported industries? | OPEN |
+| PREP-OPEN-002 | What are the initial two-digit industry codes? | CLOSED — codes `01`–`07` assigned to BANK, INVESTMENT, PETROCHEMICAL, METALS, CEMENT, FOOD, PHARMACEUTICAL respectively; future additions receive the next available code and existing codes never change. |
 | PREP-OPEN-003 | What exact sorting rule is used for Persian/Unicode filenames and nested paths? | OPEN |
 | PREP-OPEN-004 | How are sequence numbers persisted and recovered after reruns? | CLOSED — no persistent sequence history; allocate around outputs currently present, and allow reuse after the user deletes outputs. |
 | PREP-OPEN-005 | Should a manifest map source hashes/paths to prior outputs to prevent duplicate processing? | CLOSED — no permanent manifest or cross-run content deduplication in V1; use temporary in-memory state and a per-run report only. |
@@ -308,7 +320,7 @@ Status legend:
 ### Phase A — Design
 
 - [~] PREP-001 — Record the owner's scope, folder, report-type, naming, and source-preservation decisions. The current packet records them; open details remain.
-- [~] PREP-002 — Finalize industry and company code policy. Company-code uniqueness is settled (unique within industry); final industry codes remain open.
+- [x] PREP-002 — Finalize industry and company code policy. Company codes are unique within industry; the initial seven industry codes are approved and stable.
 - [ ] PREP-003 — Finalize deterministic sorting and sequence allocation.
 - [x] PREP-004 — Finalize rerun/idempotency and manifest policy. No permanent manifest or cross-run deduplication; protect existing outputs, allocate available numbers, and produce a temporary per-run report.
 - [ ] PREP-005 — Select and validate the XLS-to-XLSX conversion approach.
