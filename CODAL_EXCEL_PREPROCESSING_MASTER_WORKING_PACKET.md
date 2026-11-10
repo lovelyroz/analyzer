@@ -71,7 +71,9 @@ The presence of monthly and quarterly source values within one workbook must not
 - If the selected company folder cannot be resolved unambiguously through the registry, processing must stop with a clear error.
 - Registry changes are manual and owner-controlled.
 
-The exact code uniqueness scope (globally unique company code versus unique within each industry) remains an open design decision and must be settled before implementation.
+Company codes are unique **within their industry**, not globally across all industries.
+- The company identity is therefore the combination of industry code and company code.
+- Example: company code `01` may be used by one bank and also by one cement company, because their industry codes differ.
 
 ### 3.4 Output naming convention
 
@@ -96,9 +98,9 @@ Illustrative example only:
 01-01-02-0001.xlsx
 ```
 
-The industry-code catalogue and final company-code allocation rules are not yet locked.
+The industry-code catalogue is not yet locked. Company-code uniqueness is locked: codes are unique within an industry, and the pair `II-CC` identifies a company.
 
-The working numbering rule is an independent sequence for each company and report type. For example, a company's monthly sequence and quarterly sequence each start at `0001`. The exact persistence and rerun behavior must be finalized before implementation.
+The working numbering rule is an independent sequence for each company and report type. For example, a company's monthly sequence and quarterly sequence each start at `0001`. Sequence allocation is based on output files currently present: the utility must choose an available number and must never overwrite an existing output. If the user deletes processed outputs after database import, those numbers may be reused in a later run; output filenames are temporary processing identifiers, not permanent database identities.
 
 ### 3.5 Input filenames and ordering
 
@@ -107,7 +109,7 @@ The working numbering rule is an independent sequence for each company and repor
 - The utility must enumerate all eligible workbooks under the supplied company folder and establish a deterministic order from their names/relative paths.
 - Output sequence numbers are assigned according to that deterministic processing order.
 - The exact cross-platform sorting rule, including Unicode normalization and tie-breaking for identical filenames in different subfolders, is an implementation specification item to finalize.
-- A failed conversion must not be recorded as a successfully created output or permanently consume a successful-output sequence number.
+- A failed conversion must not be recorded as a successfully created output or consume a sequence number within that run.
 
 ### 3.6 Output location and source preservation
 
@@ -126,6 +128,8 @@ processed/
 - The utility must not delete, move, rename, or modify original inputs.
 - The user manually deletes input files later, after checking the processed outputs.
 - Existing output files must never be overwritten silently.
+- The user manually deletes input and processed output files after checking/importing the data into the database.
+- No permanent processing history is required because the source and processed workbooks are temporary and are deleted by the user after successful import.
 
 ## 4. Proposed execution contract
 
@@ -186,23 +190,28 @@ The selected method must:
 
 ### 4.3 Output numbering and failure behavior
 
-The final allocation algorithm is still open. At minimum:
-- numbering must not collide with existing processed outputs;
-- monthly and quarterly sequences remain separate;
-- failed conversions do not create successful output records;
-- a partially written output must be cleaned up or clearly quarantined;
-- an existing output must not be overwritten;
-- the run report must identify every input as converted, skipped, or failed, with a reason.
+- Numbering is independent for each company and report type.
+- At the start of a run, the utility inspects the relevant processed-output directory and allocates available four-digit numbers without overwriting existing files.
+- Monthly and quarterly sequences remain separate.
+- Failed conversions do not consume a successful-output number.
+- A partially written output must be removed or clearly quarantined before the run continues.
+- An existing output must never be overwritten.
+- If the user has deleted all processed outputs after importing them into the database, numbering may start again at `0001` in a later run. The filename is a temporary processing identifier, not a permanent record identifier.
+- If the same source is processed again while its previous output still exists, the utility may produce another output under a different available number. V1 does not promise cross-run source-to-output deduplication.
 
-### 4.4 Rerun safety
+### 4.4 Run report and rerun behavior
 
-Rerun behavior must be designed before implementation. The utility must not generate a second identity for the same source merely because the user reruns the script before manually deleting the input files.
-
-A persistent processing manifest and/or source-content hash may be appropriate. The exact mechanism, location, and duplicate policy remain open.
+- No permanent `processing_manifest.json` is required in V1.
+- The utility may keep temporary run state in memory and produce a run report for the current execution.
+- The run report must identify every input as converted, skipped, or failed, with a reason, and should include the generated output filename where applicable.
+- The user may retain the run report temporarily for review and then delete it with the processed workbooks.
+- SHA-256 source hashing, duplicate-content detection, and persistent source-to-output history are out of scope for V1.
+- Rerun safety means preventing output overwrite and handling partial files safely; it does not mean guaranteeing that a source file will never be processed twice across separate executions.
+- If a run is interrupted, the next run inspects the output directory, avoids existing filenames, and allocates other available numbers. It does not attempt to reconstruct a permanent processing history.
 
 ## 5. Central registry — preliminary shape
 
-A JSON registry is approved in principle. The following is an illustrative shape only; code assignments and uniqueness rules are not yet finalized.
+A JSON registry is approved in principle. The following is an illustrative shape only; actual code assignments and the final industry catalogue are not yet finalized. Company codes are unique within each industry, while the industry/company code pair is unique across the registry.
 
 ```json
 {
@@ -228,7 +237,7 @@ A JSON registry is approved in principle. The following is an illustrative shape
 Registry requirements:
 - codes are strings, preserving leading zeroes;
 - industry and company codes must have exactly two decimal digits;
-- duplicate codes must be detected according to the final uniqueness policy;
+- duplicate industry codes must be rejected; company codes must be unique within their own industry, but may repeat in another industry;
 - unknown industries or companies must cause a clear stop, not an inferred default;
 - manual registry edits must be validated before processing;
 - registry format should include a schema/version field before it is treated as a production contract.
@@ -264,11 +273,11 @@ Registry requirements:
 
 | ID | Question | Current status |
 |---|---|---|
-| PREP-OPEN-001 | Are company codes unique globally or only within an industry? | OPEN |
+| PREP-OPEN-001 | Are company codes unique globally or only within an industry? | CLOSED — unique within each industry; `II-CC` identifies the company. |
 | PREP-OPEN-002 | What are the final two-digit industry codes for all supported industries? | OPEN |
 | PREP-OPEN-003 | What exact sorting rule is used for Persian/Unicode filenames and nested paths? | OPEN |
-| PREP-OPEN-004 | How are sequence numbers persisted and recovered after reruns? | OPEN |
-| PREP-OPEN-005 | Should a manifest map source hashes/paths to prior outputs to prevent duplicate processing? | OPEN |
+| PREP-OPEN-004 | How are sequence numbers persisted and recovered after reruns? | CLOSED — no persistent sequence history; allocate around outputs currently present, and allow reuse after the user deletes outputs. |
+| PREP-OPEN-005 | Should a manifest map source hashes/paths to prior outputs to prevent duplicate processing? | CLOSED — no permanent manifest or cross-run content deduplication in V1; use temporary in-memory state and a per-run report only. |
 | PREP-OPEN-006 | What should happen when an input is already XLSX rather than XLS? | OPEN |
 | PREP-OPEN-007 | Which conversion engine is reliable in the user's Windows environment, and what fidelity limits apply? | OPEN |
 | PREP-OPEN-008 | What exact CLI/user interaction supplies and validates the company-folder path? | OPEN |
@@ -299,9 +308,9 @@ Status legend:
 ### Phase A — Design
 
 - [~] PREP-001 — Record the owner's scope, folder, report-type, naming, and source-preservation decisions. The current packet records them; open details remain.
-- [ ] PREP-002 — Finalize industry and company code policy.
+- [~] PREP-002 — Finalize industry and company code policy. Company-code uniqueness is settled (unique within industry); final industry codes remain open.
 - [ ] PREP-003 — Finalize deterministic sorting and sequence allocation.
-- [ ] PREP-004 — Finalize rerun/idempotency and manifest policy.
+- [x] PREP-004 — Finalize rerun/idempotency and manifest policy. No permanent manifest or cross-run deduplication; protect existing outputs, allocate available numbers, and produce a temporary per-run report.
 - [ ] PREP-005 — Select and validate the XLS-to-XLSX conversion approach.
 - [ ] PREP-006 — Finalize the command-line/user interaction and execution report contract.
 - [ ] PREP-007 — Reconcile affected repository documentation.
@@ -315,7 +324,7 @@ Status legend:
 - [ ] PREP-103 — Implement monthly/quarterly path classification and deterministic ordering.
 - [ ] PREP-104 — Implement safe XLS-to-XLSX conversion.
 - [ ] PREP-105 — Implement identifier allocation, output naming, and collision protection.
-- [ ] PREP-106 — Implement rerun safety and processing manifest, if approved.
+- [ ] PREP-106 — Implement output-collision/partial-file safety and temporary per-run state/report; do not implement a permanent processing manifest in V1.
 - [ ] PREP-107 — Implement execution report and failure handling.
 
 ### Phase C — Verification (not authorized yet)
