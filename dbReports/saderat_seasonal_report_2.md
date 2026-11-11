@@ -4,7 +4,7 @@
 
 The current `excel/saderat_seasonal.xlsx` is an interim financial-report workbook whose filename suggests Saderat. The workbook itself does not identify the company by name; its metadata identifies a six-month report ending ۱۴۰۳/۰۶/۳۱; `Recovered_Sheet1!A262` begins the customer-deposit schedule, not a company identity field. No company name or ticker was found in the workbook content. The current-period columns are marked unaudited in the main income and cash-flow statements (`B11`, `B175`); comparative columns are marked audited. The sheet contains five main statement areas and extensive supplemental management schedules and narrative disclosures.
 
-Flow statements show a current period ending ۱۴۰۳/۰۶/۳۱, comparative values ending ۱۴۰۲/۰۶/۳۱, and a further comparison ending ۱۴۰۲/۱۲/۲۹. The corresponding-six-month and prior-full-year interpretations are supported by dates and roll-forward checks, though the C-column duration is not spelled out in its header. The balance sheet uses point-in-time dates. The comprehensive-income area contains an application error message at A58 and lacks extractable statement values. No standalone-quarter amounts are calculated. No DB-STD-003 standard is finalized here.
+Flow statements show a current six-month period ending ۱۴۰۳/۰۶/۳۱, a confirmed corresponding six-month comparative ending ۱۴۰۲/۰۶/۳۱, and a confirmed prior full-year comparison ending ۱۴۰۲/۱۲/۲۹. The owner confirmed these column interpretations. The balance sheet uses point-in-time dates. The comprehensive-income area contains an application error message at A58 and lacks extractable statement values. No standalone-quarter amounts are calculated. No DB-STD-003 standard is finalized here.
 
 ## Terminology alignment with DB-STD-003
 
@@ -25,10 +25,10 @@ This workbook is assessed under **Fiscal-Year Periodic Financial Reports** (Pers
 
 ## 3. Identity and period evidence
 
-- Company identity: not established inside workbook content. The filename suggests Saderat, but the metadata title names only six-month interim financial statements; A262 is the deposit schedule heading. No ticker was found.
+- Company identity: the owner confirmed that the workbook belongs to Bank Saderat Iran. The name and ticker are not stated inside the workbook; company identity is supplied by the user's selection/ingestion context, not inferred from an in-workbook name.
 - Current report: metadata title says six-month interim period. Current endpoint ۱۴۰۳/۰۶/۳۱ appears in `B10`, `B77`, and `B174`.
-- Audit status: current B column says unaudited at `B11` and `B175`; comparatives C/D say audited there. Other schedules may use different statuses; preserve their exact headers.
-- Fiscal evidence: the prior equity schedule opens at `A129` on  and its restated closing balance is at `A149` on . Current movements start under `A150` and end at ۱۴۰۳/۰۶/۳۱. This supports the prior-year range; the current opening date is not explicitly labeled and remains unknown.
+- Audit/restatement status in the main flow statements: B is unaudited and current; C and D are audited and marked restated. Other schedules may use different statuses; preserve their exact headers.
+- Fiscal year: the owner confirmed the company's fiscal year begins on ۱۴۰۳/۰۱/۰۱ and ends at the end of Esfand; the prior fiscal year ended on ۱۴۰۲/۱۲/۲۹. The report's exact Jalali dates remain authoritative for each period.
 - Comparative dates: flow headers `C10`/`C174` end ۱۴۰۲/۰۶/۳۱; D headers `D10`/`D174` end ۱۴۰۲/۱۲/۲۹. Balance sheet dates are in `B77:D77`: current date, restated year-end, and restated opening date. All dates are retained as presented.
 - No ticker or publication date appears in the inspected workbook metadata or visible sheet.
 
@@ -69,11 +69,11 @@ Appendix A inventories every nonempty string-valued cell in the sheet, with sour
 | Source header / address | Classification | Evidence and status |
 |---|---|---|
 | `B10` and `B174`, ending ۱۴۰۳/۰۶/۳۱ | Current six-month flow | Six-month metadata title and current equity movement schedule. Current columns are marked unaudited in rows 11 and 175. |
-| `C10` and `C174`, ending ۱۴۰۲/۰۶/۳۱ | Comparative flow, likely corresponding six months | Same Jalali month/day one year earlier; duration is a reasonable inference, not explicit in header. Comparative marked audited. |
-| `D10` and `D174`, ending ۱۴۰۲/۱۲/۲۹ | Prior-year flow | Prior year-end date; equity movement schedule covers year ending that date and cash reconciliation supports full-year interpretation. |
+| `C10` and `C174`, ending ۱۴۰۲/۰۶/۳۱ | Corresponding six-month comparative flow | Confirmed by owner; marked audited and restated. |
+| `D10` and `D174`, ending ۱۴۰۲/۱۲/۲۹ | Prior full-year flow | Confirmed by owner; marked audited and restated. |
 | `B77:D77` | Point-in-time balances | Explicit current, restated year-end, and restated opening dates. |
 | `E10`, `E77`, `E174` | Percentage change / derived measure | Main statement E values generally match B-versus-C percentage changes; not monetary. |
-| `A129`, `A132`; `A149`; `A150:A163` | Equity opening stock, restatement, movements, current closing stock | Dates and movement labels are row-based; current cycle start is not explicit. |
+| `A129`, `A132`; `A149`; `A150:A163` | Equity opening stock, restatement, movements, current closing stock | Dates and movement labels are row-based; the fiscal-year convention was confirmed by the owner. |
 | `B208:D210` | Opening cash, net cash change, closing cash | Each column reconciles arithmetically; cross-check details below. |
 | Schedules with headers such as row 264, 277, 295, 300, 311, 334, 351, 359, 376, 385, 394 and 403 | Mixed: historical annual, current six-month, dated balance, forecast, rate, count, or narrative | Interpret each header independently; Appendix A preserves exact wording. Do not apply a single temporal meaning to all columns. |
 
