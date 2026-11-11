@@ -1,10 +1,16 @@
-# Saderat Quarterly Workbook Inspection — DB-STD-003
+# Saderat Fiscal-Year Periodic Financial Report Workbook Inspection — DB-STD-003
 
 ## 1. Executive summary
 
 The current `excel/saderat_seasonal.xlsx` is an interim financial-report workbook whose filename suggests Saderat. The workbook itself does not identify the company by name; its metadata identifies a six-month report ending ۱۴۰۳/۰۶/۳۱; `Recovered_Sheet1!A262` begins the customer-deposit schedule, not a company identity field. No company name or ticker was found in the workbook content. The current-period columns are marked unaudited in the main income and cash-flow statements (`B11`, `B175`); comparative columns are marked audited. The sheet contains five main statement areas and extensive supplemental management schedules and narrative disclosures.
 
-Flow statements show a current period ending ۱۴۰۳/۰۶/۳۱, comparative values ending ۱۴۰۲/۰۶/۳۱, and a further comparison ending ۱۴۰۲/۱۲/۲۹. The corresponding-six-month and prior-full-year interpretations are supported by dates and roll-forward checks, though the C-column duration is not spelled out in its header. The balance sheet uses point-in-time dates. The comprehensive-income area contains an application error message at A58 and lacks extractable statement values. No standalone-quarter amounts are calculated. No quarterly standard is finalized here.
+Flow statements show a current period ending ۱۴۰۳/۰۶/۳۱, comparative values ending ۱۴۰۲/۰۶/۳۱, and a further comparison ending ۱۴۰۲/۱۲/۲۹. The corresponding-six-month and prior-full-year interpretations are supported by dates and roll-forward checks, though the C-column duration is not spelled out in its header. The balance sheet uses point-in-time dates. The comprehensive-income area contains an application error message at A58 and lacks extractable statement values. No standalone-quarter amounts are calculated. No DB-STD-003 standard is finalized here.
+
+## Terminology alignment with DB-STD-003
+
+This workbook is assessed under **Fiscal-Year Periodic Financial Reports** (Persian: «گزارش‌های مالی دوره‌ای سال مالی (تجمعی)»). It is a six-month interim report ending ۱۴۰۳/۰۶/۳۱. The reporting family covers fiscal-year checkpoints such as 3, 6, 9, and 12 months; the 12-month member is the annual report, not an interim report.
+
+“Cumulative/YTD” describes the temporal basis of applicable flow values, not every value in the workbook. Balance-sheet figures remain point-in-time balances at their stated dates. The periodic-report family classification therefore does not determine the temporal meaning of every table column.
 
 ## 2. Workbook inventory
 
