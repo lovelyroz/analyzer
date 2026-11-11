@@ -95,10 +95,10 @@ No standalone-quarter value is calculated. The main statements provide six-month
 - Supplemental schedules include nonfinancial counts (branches/workers), ratios, forecasts and narrative disclosures. Do not convert narrative forecasts into numeric metrics.
 - The comprehensive-income system error at A58 is a technical limitation, not a zero or an absent economic item.
 
-## 8. Ambiguities requiring clarification
+## 8. Remaining ambiguities requiring clarification
 
-1. Confirm C flow columns as corresponding six-month comparatives and D as prior full-year flows.
-2. Confirm the current fiscal-year start. The prior equity cycle is dated  through ; no explicit current opening date was found.
+The owner has confirmed the company identity (Bank Saderat Iran), fiscal-year start (۱۴۰۳/۰۱/۰۱; year-end at the end of Esfand), and the temporal meaning of columns B, C, and D in the main flow statements. These items are resolved and are not open questions.
+
 3. Recover the comprehensive-income table from the original filing or source export; A58 currently shows a system error.
 4. Explain why comparative amounts are marked restated and provide the absent explanation text in the merged reason-for-change blocks.
 5. Confirm forecast-period semantics: estimates include six-month periods ending . Preserve those source dates; do not infer whether they indicate a second-half forecast or a full-year horizon.
@@ -108,7 +108,7 @@ No standalone-quarter value is calculated. The main statements provide six-month
 
 ## 9. Recommended next inspection step
 
-Compare this workbook with the original published filing/export, especially the comprehensive-income error area, restatement notes, and multi-tier supplementary tables. Obtain owner confirmation for fiscal-year start and comparative duration before fixing temporal mappings. This is evidence for review and does not declare DB-STD-003 complete.
+Compare this workbook with the original published filing/export, especially the comprehensive-income error area, the reason/support for the restated comparative columns, and multi-tier supplementary tables. The owner confirmations for fiscal-year start and the meanings of columns B/C/D are complete; use them as fixed sample facts when drafting the temporal mapping. This is evidence for review and does not declare DB-STD-003 complete.
 
 ## Appendix A. Complete source string-cell inventory
 
