@@ -158,12 +158,37 @@ The logical period identity is the company plus the exact Jalali start date and 
 
 **Migration caution:** existing SQL `Date` values must be inspected before migration. Do not assume they represent Gregorian dates or Jalali dates and do not blindly convert them. Ambiguous/unresolvable records require an explicit migration report and safe resolution path.
 
-### Report / PIT
+### Report / ReportVersion / PIT
 
 - `reports`
 - `report_versions`
 
-`Report` identifies the logical report. `ReportVersion` identifies a published historical state. Publication datetime belongs to `ReportVersion`. Each version is a distinct source snapshot. The published company report is the authoritative financial source; application calculations must not be used to challenge, overwrite, or silently correct a value explicitly reported by the company. When the company publishes a correction or revised version of the same report, that newer version takes precedence over the earlier version for analyses whose PIT cutoff includes the correction publication. Earlier versions remain preserved and must continue to be selected for PIT cutoffs before the correction became available. A later correction must never be retroactively applied to an earlier PIT snapshot.
+**Report identity and scope**
+
+- `Report` identifies one logical company filing/disclosure, not an individual financial metric, statement line, or one of the report-information categories listed above.
+- The report's classification must preserve the existing report types (monthly and periodic) and the applicable industry-specific report category. This metadata must not create, remove, merge, or split the approved report categories.
+- A logical report must be tied to one company and its declared reporting period. Its identity must use a stable source identifier when the source provides one. If no stable source identifier exists, use a validated composite identity based on company, report classification/category, and the declared reporting period; titles alone are not a reliable identity.
+- A different reporting period is a different logical report. A correction or restatement of the same filing is not a new logical report; it is a new version of that report.
+
+**Report versions**
+
+- `ReportVersion` identifies one published state/snapshot of its parent `Report`. Every version belongs to exactly one logical report.
+- Publication datetime belongs to `ReportVersion`, not to `Report`. Preserve the source publication timestamp and any source version/revision identifier when available.
+- Each version is an immutable source snapshot. A later correction must create a new version; it must never overwrite or delete an earlier version.
+- A version must not silently change the parent report's company, report classification/category, or declared reporting period. If those identity attributes conflict, treat the source as a separate report or reject/quarantine it until its identity is resolved.
+
+**Financial-period linkage and comparative data**
+
+- A `Report` has one declared primary reporting period, represented by `FinancialPeriod`.
+- Each persisted financial fact must link to the exact `ReportVersion` from which it was extracted and to the `FinancialPeriod` that the particular value actually describes.
+- A single report version may contain values for more than one financial period, for example current-period and comparative prior-period figures. Those values remain attached to the same source `ReportVersion`, but each fact links to its own applicable `FinancialPeriod`. Do not force all facts in a filing into the report's primary period.
+- The published company report is the authoritative financial source. Application calculations must not challenge, overwrite, or silently correct a value explicitly reported by the company.
+
+**Point-in-time selection**
+
+- When the company publishes a correction or revised version of the same report, that newer version takes precedence only for analyses whose PIT cutoff includes the correction's publication datetime.
+- Earlier versions remain preserved and must continue to be selected for PIT cutoffs before the correction became available.
+- A later correction must never be retroactively applied to an earlier PIT snapshot. Version selection must be deterministic and based on publication availability at the requested cutoff; do not select a version merely because it is currently the latest.
 
 ### Financial fact and calculation contract — reviewed and approved
 
