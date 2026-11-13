@@ -576,7 +576,7 @@ The V1 FX input consists only of daily US dollar rates, with exactly two rate ty
 
 For each Jalali calendar day and each rate type, the source provides exactly **one rate value**. Separate buy and sell quotes are not part of this V1 input contract. No additional rate categories (including generic operational, official, estimated, or manual-operator types) are included in the confirmed V1 source catalog.
 
-The source quote unit is **Toman per one US dollar**. Preserve the numeric source value and its Toman quote basis; do not convert Toman to Rial, rescale, or otherwise transform the rate. The source is daily, and the observation date must be retained using Jalali calendar components.
+The source quote unit is **Toman per one US dollar**. At ingestion, the application must automatically convert the source rate to **Rial per one US dollar** using the exact factor `1 Toman = 10 Rial`. The canonical rate value used and persisted for analysis is in Rial. Retain the original source amount and its Toman unit/basis in provenance so the conversion is auditable. This Toman-to-Rial conversion is the sole owner-approved automatic unit conversion in the current V1 input scope; it does not authorize conversion or rescaling of CODAL, market-price, volume, transaction-value, or other inputs. The source is daily, and the observation date must be retained using Jalali calendar components.
 
 The logical record therefore identifies one USD rate by its Jalali date and rate type, with the rate value and minimal source provenance. For a given date, the FREE_MARKET and EXCHANGE_CENTER records are distinct and both may exist. Neither rate type may be silently substituted for the other.
 
@@ -590,15 +590,16 @@ This is an owner-approved logical input contract only. It does not authorize cha
 | `jalali_month` | INTEGER 1–12; source Jalali month |
 | `jalali_day` | INTEGER; source Jalali day |
 | `rate_type` | `FREE_MARKET` or `EXCHANGE_CENTER` |
-| `currency_from` / `currency_to` | USD quoted in Toman; quote basis must remain explicit |
-| `rate_value` | One integer-stored source rate value for the date/type |
+| `currency_from` / `currency_to` | USD quoted in Rial for the canonical stored value; source quote basis is Toman |
+| `rate_value` | One integer-stored canonical rate in Rial for the date/type |
+| source provenance | Original source rate in Toman and source unit, retained to audit the ×10 conversion |
 
 **Logical identity:** `(jalali_year, jalali_month, jalali_day, rate_type)`. There is at most one accepted rate for each date/type combination. If a source supplies duplicate or conflicting values for the same identity, ingestion must reject or explicitly resolve the conflict under a documented source rule; it must not silently choose one.
 
 ### Source-value fidelity and quote units
 
-- Persist the source quote unit/basis as Toman per one USD and store the numeric rate as an integer using the owner-approved ROUND_HALF_UP rule.
-- Do not convert Toman to Rial, rescale source units, interpolate, average, calculate a synthetic rate, or otherwise rewrite the source quote.
+- Preserve the original source quote as Toman per one USD in provenance. Convert it exactly once at ingestion to Rial per one USD by multiplying by 10; persist the canonical rate in Rial as an integer using the owner-approved ROUND_HALF_UP rule.
+- The ×10 Toman-to-Rial conversion is the only automatic unit conversion authorized by the owner in the current V1 input scope. Do not apply it to any other input domain. Do not interpolate, average, calculate a synthetic rate, or apply any other rescaling or rewriting.
 - Retain observation date, source identity/reference, and any source-specific timestamp needed to interpret the rate. Exact row/cell locators may be used transiently but are not mandatory persisted fields.
 - Unknown or ambiguous dates, rate types, quote units, or source values must not be guessed or admitted as valid observations.
 
@@ -615,7 +616,7 @@ This is an owner-approved logical input contract only. It does not authorize cha
 
 ### FX V1 owner decision record (2026-11-14)
 
-The V1 FX source contract was confirmed by the owner on 2026-11-14: daily USD rates, two types only (`FREE_MARKET` and `EXCHANGE_CENTER`), one value per date/type (no separate buy/sell values), quoted in Toman per USD, with Jalali observation dates. This decision narrows the older generic FX taxonomy above for V1. Legacy implementation compatibility is not implied; any required model/schema/migration alignment must be reviewed explicitly in DB-DES-004 / DB-MIG-001. Documentation-only decision; no code, ORM, schema, migration, data, or test changes.
+The V1 FX source contract was confirmed by the owner on 2026-11-14: daily USD rates, two types only (`FREE_MARKET` and `EXCHANGE_CENTER`), one value per date/type (no separate buy/sell values), source quote in Toman per USD, and Jalali observation dates. The owner further confirmed on 2026-11-14 that ingestion must automatically convert this FX quote to Rial using the exact factor ×10. The canonical persisted/analytical rate is in Rial; the original Toman source amount and unit must remain in provenance for auditability. This is the sole authorized automatic unit conversion in the current V1 input scope. This decision narrows the older generic FX taxonomy above for V1. Legacy implementation compatibility is not implied; any required model/schema/migration alignment must be reviewed explicitly in DB-DES-004 / DB-MIG-001. Documentation-only decision; no code, ORM, schema, migration, data, or test changes.
 
 ## 14. Ingestion Boundary (CHANGE-007)
 
