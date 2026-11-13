@@ -83,6 +83,43 @@ Market and FX foundations remain separate branches and are consumed by their app
 
 The current implementation contains `parent_industry_id`, but parent/child industry classification is not part of the approved V1 contract. Its removal or migration treatment must be handled during schema implementation review, not by silently assigning sub-industries.
 
+### Company master information — current scope
+
+The company master data needed for periodic-report organization includes:
+
+- `company_id`: unique internal company identifier.
+- `company_name`: official company name.
+- `ticker`: stock-market symbol, where applicable.
+- `industry_id`: the company's single assigned industry.
+- `company_type`: company type, such as bank, investment company, petrochemical company, etc.
+- `status`: company status, such as active or inactive.
+
+Each company belongs to exactly one industry, as specified by the company/industry contract above. This list records the current logical information requirements; it does not yet define physical table columns, constraints, or implementation details.
+
+### Periodic report category catalog — initial bank scope
+
+The following 17 categories are the initial category catalog identified for periodic bank reports, based on the Parsian Bank sample structure. They define the report-information categories to be represented by the database architecture; they are not a claim that every industry uses the same categories.
+
+1. صورت سود و زیان
+2. صورت سود و زیان جامع
+3. صورت وضعیت مالی
+4. صورت تغییرات در حقوق مالکانه
+5. صورت جریان‌های نقدی
+6. مانده تسهیلات اعطایی و ذخیره مطالبات مشکوک‌الوصول
+7. مانده سپرده‌های دریافتی از مشتریان
+8. اقلام زیر خط
+9. اطلاعات حق‌الوکاله و کفایت سرمایه
+10. درآمد حاصل از تسهیلات اعطایی و سپرده‌گذاری
+11. خالص سود (زیان) سرمایه‌گذاری‌ها
+12. سایر درآمدها و هزینه‌های عملیاتی
+13. خالص سایر درآمدها و هزینه‌ها
+14. هزینه‌های اداری و عمومی
+15. هزینه مالی
+16. برنامه شرکت در خصوص تقسیم سود
+17. وضعیت شرکت‌های سرمایه‌پذیر
+
+This is a logical category list only. Physical database tables, field-level layouts, extraction rules, and other industry-specific category catalogs are outside the scope of this recorded decision.
+
 ### FinancialPeriod — reviewed and approved contract
 
 A financial period describes the actual source reporting span, using Jalali calendar components. Do not use SQL/Gregorian `Date` fields as the authoritative financial-period dates.
