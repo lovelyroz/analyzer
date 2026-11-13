@@ -177,6 +177,15 @@ The logical period identity is the company plus the exact Jalali start date and 
 - Each version is an immutable source snapshot. A later correction must create a new version; it must never overwrite or delete an earlier version.
 - A version must not silently change the parent report's company, report classification/category, or declared reporting period. If those identity attributes conflict, treat the source as a separate report or reject/quarantine it until its identity is resolved.
 
+**Ingestion versus analytical version selection**
+
+- Ingestion must preserve every distinct, validly identified published version of a logical report, including original, corrected/restated, audited, and unaudited versions. The preference rules below must never be used to discard a valid source version during ingestion.
+- Each version's selected canonical facts must remain linked to that exact immutable `ReportVersion`; facts from different versions must not be merged into one indistinguishable set or overwrite one another.
+- Re-ingestion of the same source version must be idempotent: it may update ingestion audit state where appropriate, but must not create duplicate canonical facts or mutate the already captured source snapshot.
+- Version selection is an analytical operation performed after ingestion. For a requested PIT cutoff, the selector considers only versions published on or before that cutoff, then applies the approved audit/restatement preference. The selector must return the chosen version and enough selection metadata to explain why it was chosen.
+- If the selector cannot identify a version under the approved preference rules, it must return an explicit unresolved state; it must not silently fall back to whichever version happens to be latest or currently marked current.
+- A newer version becoming preferred for a later analysis must not change the version or facts selected for an earlier PIT cutoff.
+
 **Financial-period linkage and comparative data**
 
 - A `Report` has one declared primary reporting period, represented by `FinancialPeriod`.
