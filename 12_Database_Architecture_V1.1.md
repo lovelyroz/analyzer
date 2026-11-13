@@ -97,6 +97,42 @@ The company master data needed for periodic-report organization includes:
 
 Each company belongs to exactly one industry, as specified by the company/industry contract above. This list records the current logical information requirements; it does not yet define physical table columns, constraints, or implementation details.
 
+
+### Shared V1 master data — all industries
+
+The following logical master data and report-control entities are shared by all seven industries. They belong in one SQLite database and one common schema; V1 must not create a separate database or duplicate table family for each industry.
+
+#### Industry and company catalogs
+
+- Industry: stable internal ID, unique immutable code, display name, and active/inactive status. Initial codes: BANK, INVESTMENT, PETROCHEMICAL, METALS, CEMENT, FOOD, and PHARMACEUTICAL. The catalog is data-driven and extensible; codes are not recycled for a different meaning.
+- Company: stable company_id, official name, ticker where applicable, mandatory industry_id, and active/inactive status. An optional national identifier may support identity matching but never replaces company_id. Each company has exactly one industry assignment. No ticker-history table is introduced in V1.
+- A separate company_type field is not part of the V1 master contract because it would duplicate the industry classification. Add a distinct attribute only if a later requirement establishes a different meaning.
+
+#### Shared CODAL report-type catalog
+
+The common CODAL financial-report catalog contains exactly two report types across all industries:
+
+| Code | Meaning |
+|---|---|
+| MONTHLY_ACTIVITY | Monthly activity / sales report |
+| PERIODIC_FINANCIAL | Fiscal-year periodic financial report |
+
+The extraction standard and accepted financial items may differ by industry and report type; the report-type identity itself is shared. Three-, six-, nine-, and twelve-month periods are not separate report types. YTD versus standalone describes the temporal meaning of values/columns inside a report, not a third report type.
+
+#### Common report, period, provenance, and ingestion entities
+
+- Report: logical identity of a company's report, linked to the company and one of the shared report types.
+- ReportVersion: one distinct published source version of a logical report. It retains source identity/reference, valid publication time where available, and audit/restatement status as independent attributes. Earlier valid versions remain immutable and available for PIT selection.
+- FinancialPeriod: the actual Jalali start/end period described by a source value, with fiscal-year/quarter and temporal attributes such as duration and YTD/standalone. Period identity is not inferred from filename or publication date; one report may contain multiple comparative periods.
+- Source provenance: retain the source reference/identifier and a source artifact fingerprint or equivalent version identity. Workbook archival and permanent per-fact cell coordinates are not required.
+- IngestionRun: operational processing status, timestamps, counts, and concise errors/warnings. A failed run must not leave partial report or financial-input persistence.
+
+#### Shared foundation versus industry-specific standards
+
+These entities are common infrastructure, not a claim that all industries publish identical report layouts or financial items. Industry-specific workbook layouts, source headers, mapping rules, extraction standards, and eligible financial items remain separate standards associated with the relevant industry and report type.
+
+Do not predefine one universal metric catalog for all industries before reviewing real source examples. A metric may be shared only when its financial meaning is genuinely identical; otherwise it requires a distinct canonical identity. This section records the logical contract only and does not authorize ORM, schema, migration, data, or code changes.
+
 ### Periodic report category catalog — initial bank scope
 
 The following 17 categories are the initial category catalog identified for periodic bank reports, based on the Parsian Bank sample structure. They define the report-information categories to be represented by the database architecture; they are not a claim that every industry uses the same categories.
