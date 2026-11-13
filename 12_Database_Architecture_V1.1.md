@@ -12,6 +12,8 @@
 
 This document is reopened for review. The decisions explicitly recorded as reviewed/approved below are the current working contract; sections not yet audited remain provisional. Earlier V1 / V1.1 / V1.2 references are historical context and do not override the decisions recorded here. The database stores selected canonical financial inputs and minimal provenance, not raw financial statement rows; backend services own runtime calculations and analytical outputs. This contract supports Stages 2–9 without persisting calculated analytical results.
 
+**Global source-data fidelity rule — applies to every input domain:** Every selected value taken from a source report or market/FX/share file must be stored exactly as reported, without changing its numeric amount, scale, unit, currency, precision, sign, or reported representation. No automatic conversion (including ×10), rescaling, rounding, recalculation, adjustment, interpolation, replacement, or other value transformation is authorized during ingestion or persistence. Preserve the source's unit and basis as metadata. Any exception or required conversion must be identified and explicitly authorized by the user during implementation; it must never be inferred by the application or assumed by this architecture. This rule applies equally to financial statements, market prices, FX rates, share counts, and corporate-action inputs.
+
 ---
 
 ## 1. Purpose
@@ -398,7 +400,7 @@ Same calendar day may hold both FREE_MARKET and OPERATIONAL rows.
 
 - Persist the rate exactly as quoted by its source. Do not convert Toman to Rial, rescale, round, interpolate, average, or otherwise rewrite a source rate during ingestion.
 - Store the quote's unit/basis as explicit metadata (for example, IRR or Toman per one unit of `currency_from`). A numeric rate without an unambiguous quote unit is not admissible for analysis.
-- Any conversion to a common calculation unit, including Toman-to-Rial ×10, is runtime-only. The source value and its quote-unit metadata remain unchanged in storage.
+- No unit conversion is authorized by this architecture, including Toman-to-Rial ×10. If a conversion is later required, it must first be explicitly identified and authorized by the user during implementation; it must not be assumed or applied automatically.
 - Preserve the source rate type and currency pair. FREE_MARKET and OPERATIONAL must never be silently substituted.
 - Retain the observation date, source identity/reference, and any source-specific timestamp or locator needed to trace the rate. Unknown or ambiguous dates/units must not be guessed.
 
