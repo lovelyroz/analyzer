@@ -310,6 +310,31 @@ Additional rules:
 - Keep only minimal provenance with each persisted canonical input: at least the company/report identity, report version, financial period, and source locator sufficient to trace the value back to its origin (for example, source section/row for PDF or workbook/sheet/cell for Excel). Do not retain every original label, raw row payload, or unused source value merely for archival purposes.
 - Runtime calculation results must retain enough in-memory lineage to explain their inputs and formula where auditability requires it, but this does not authorize persistence of the calculated result.
 
+### Common source-provenance contract for persisted inputs — reviewed
+
+Every persisted source input must have a complete, traceable path to the exact source artifact and the exact location of the reported value. Provenance is identification and audit metadata only; it must never alter, normalize, convert, or replace the source-reported value.
+
+**Artifact-level provenance** should be recorded once at the appropriate parent/source-artifact level and referenced by its inputs, rather than copied into every fact:
+
+- Stable source owner/issuer identity (for company data, the validated `company_id`).
+- Source identity/reference, such as CODAL filing/document ID or URL, or the identity/reference of the market, FX, share-count, or corporate-action source file/feed.
+- Immutable artifact identity, preferably a cryptographic content fingerprint of the exact acquired file/snapshot. A filename or mutable URL alone is not sufficient to distinguish changed file contents.
+- Source publication datetime for report versions, or source observation/effective timestamp/date for market, FX, share-count, and corporate-action inputs, retaining the original source representation where available.
+- For CODAL reports, the artifact-level metadata already held by `ReportVersion` is authoritative. Do not duplicate it on every financial fact.
+- Capture/ingestion timestamp and the relevant `IngestionRun` reference belong to operational audit metadata; they must not substitute for source publication or observation time.
+
+**Input-level provenance** must identify the exact source location of each persisted value:
+
+- For Excel: source artifact/version reference plus worksheet name and exact cell address or range. A row number alone is insufficient when the value's column is not unambiguously identified.
+- For CSV: source artifact/version reference plus exact row and column/header (or equivalent stable field position).
+- For PDF, while the legacy adapter remains supported: source artifact/version reference plus page and the most precise available table/row/cell or section locator.
+- For API/feed inputs: source record/event identifier and field/path, or an equivalent stable locator supplied by that source.
+- If one stored input is sourced from a range or multiple cells, record the exact range/locations needed to identify the reported value; do not retain the copied raw row or cell payload merely to provide provenance.
+
+**Context linked by reference, not redundantly copied:** each financial fact must resolve through its `ReportVersion` to its `Report`, company, source artifact, and publication metadata, and must link directly to the actual `FinancialPeriod` it describes. Market/FX/share/corporate-action observations must similarly resolve to their source artifact and source observation/effective date. Metric classification, unit/currency/quote basis, and meaningful dimensions must be available wherever needed to interpret the input without changing its value. Comparative-period context remains governed by the comparative-data contract above.
+
+A persisted input is not admissible if its source artifact identity or exact value locator is missing or ambiguous. Do not guess a cell, row, sheet, period, timestamp, unit, or source. Resolve the source or reject/quarantine the candidate outside the analytical database. The database must not store a duplicate raw-value copy as a workaround for missing provenance.
+
 The existing raw_financial_facts table is incompatible with this target if it acts as a general raw-row archive. The existing normalized-input model may become the canonical persisted financial fact layer, but it must not duplicate a separate raw-value layer. Existing derived_financial_facts and derived_financial_fact_inputs are incompatible if they persist application-calculated financial values. Their future schema/migration treatment must inspect existing data first and be non-destructive until a safe migration is designed. Do not write new raw-row archives or calculated results during transition.
 
 ### Financial normalization and mapping
