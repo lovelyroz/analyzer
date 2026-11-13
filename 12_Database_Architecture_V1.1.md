@@ -36,13 +36,13 @@ It is not a replacement for KPI, scoring, trend, forecast, evaluation, valuation
 
 ```text
 External Sources
-  ├─ CODAL financial reports (current PDF path; Excel adapter planned)
+  ├─ CODAL financial reports (Excel — target input format)
   ├─ Daily market data (CSV / XLSX / …)
   └─ FX data — FREE_MARKET & OPERATIONAL (CSV / XLSX / …)
           ↓
 Format-specific acquisition / extraction adapters
-  ├─ CODAL PDF adapter (existing; retain during Excel transition)
-  ├─ CODAL Excel adapter (planned; emits the same common DTO contract)
+  ├─ Legacy CODAL PDF adapter (temporary transition path only)
+  ├─ CODAL Excel adapter (target adapter; emits the common DTO contract)
   ├─ OHLC parser → MarketDaily fields
   └─ FX parser → FxRateInput[]
           ↓
@@ -307,7 +307,7 @@ Additional rules:
 - Do not infer missing inputs, totals, quantities, rates, units, periods, or labels.
 - Persisted financial values must remain faithful to the source-reported input: do not recalculate, rebalance, round for convenience, fill blanks, replace values, or otherwise alter their financial amount. A new published correction/restatement is a separate immutable report version; it does not authorize editing the previously ingested version.
 - Calculated values are runtime-only. They must not be inserted into financial-input, normalized, derived, cache, or history tables.
-- Keep only minimal provenance with each persisted canonical input: at least the company/report identity, report version, financial period, and source locator sufficient to trace the value back to its origin (for example, source section/row for PDF or workbook/sheet/cell for Excel). Do not retain every original label, raw row payload, or unused source value merely for archival purposes.
+- Keep only minimal provenance with each persisted canonical input: at least the company/report identity, report version, financial period, and source locator sufficient to trace the value back to its origin (for Excel, workbook/source artifact, worksheet, and exact cell/range). Do not retain every original label, raw row payload, or unused source value merely for archival purposes.
 - Runtime calculation results must retain enough in-memory lineage to explain their inputs and formula where auditability requires it, but this does not authorize persistence of the calculated result.
 
 ### Common source-provenance contract for persisted inputs — reviewed
@@ -327,7 +327,6 @@ Every persisted source input must have a complete, traceable path to the exact s
 
 - For Excel: source artifact/version reference plus worksheet name and exact cell address or range. A row number alone is insufficient when the value's column is not unambiguously identified.
 - For CSV: source artifact/version reference plus exact row and column/header (or equivalent stable field position).
-- For PDF, while the legacy adapter remains supported: source artifact/version reference plus page and the most precise available table/row/cell or section locator.
 - For API/feed inputs: source record/event identifier and field/path, or an equivalent stable locator supplied by that source.
 - If one stored input is sourced from a range or multiple cells, record the exact range/locations needed to identify the reported value; do not retain the copied raw row or cell payload merely to provide provenance.
 
@@ -469,8 +468,8 @@ The intended direction is to replace CODAL PDF acquisition/extraction with Excel
 - Classify each source row during ingestion as a canonical metric, an OTHER_* bucket item, or discard/reject. Do not persist the original row merely because it exists in the workbook. Reproducible aggregates are calculated at runtime; miscellaneous amounts that matter only as broad totals are mapped into the relevant OTHER_* bucket. Application-generated calculations remain runtime-only.
 - Blank/unusable source input cells remain NULL/unknown, not zero. No synthetic fallback value (including zero) may be persisted for a missing source input. A valid source-reported product sales amount is retained as reported; when it is blank, quantity × selling rate may be calculated at runtime only if both inputs are valid and compatible.
 - Quarterly CODAL filings commonly report cumulative year-to-date values. Q1/Q2/Q3/Q4 source periods must follow the FinancialPeriod contract in Section 3. Standalone-quarter values are derived at runtime, using compatible report versions; they are not source facts to persist.
-- Do not remove or disable the existing PDF acquisition/extraction path until the Excel adapter has been implemented and passed end-to-end validation against representative reports. During transition, both adapters may coexist and feed the same common DTO/persistence path.
-- The current implementation uses PDF acquisition/extraction and `pypdf`; image-only/no-text PDFs are explicitly rejected and OCR is not silently substituted. This describes the current path, not the target format policy.
+- The existing PDF acquisition/extraction path is legacy-only and may remain temporarily during the Excel transition. It is not a target CODAL input format and must not be treated as part of the target source/provenance contract. Retire it after the Excel adapter has been implemented and passed end-to-end validation against representative reports. During the transition only, both adapters may feed the same common DTO/persistence path.
+- Historical implementation note: the existing legacy PDF path uses `pypdf`; image-only/no-text PDFs are rejected and OCR is not silently substituted. This note documents the temporary legacy path only; PDF is excluded from the target CODAL input architecture.
 
 ### OHLC / FX formats
 
