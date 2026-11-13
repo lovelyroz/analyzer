@@ -185,6 +185,9 @@ The logical period identity is the company plus the exact Jalali start date and 
 - Version selection is an analytical operation performed after ingestion. For a requested PIT cutoff, the selector considers only versions published on or before that cutoff, then applies the approved audit/restatement preference. The selector must return the chosen version and enough selection metadata to explain why it was chosen.
 - If the selector cannot identify a version under the approved preference rules, it must return an explicit unresolved state; it must not silently fall back to whichever version happens to be latest or currently marked current.
 - A newer version becoming preferred for a later analysis must not change the version or facts selected for an earlier PIT cutoff.
+- Select one `ReportVersion` for each logical `Report` at the requested PIT cutoff and apply that selection consistently to all facts sourced from that report version. Do not select different versions of the same report independently for different metrics or line items.
+- Do not fill a missing metric or line item in the selected version by silently borrowing it from another version of the same report. Preserve the missing/unavailable state; any future cross-version supplementation would require a separately defined and auditable policy.
+- This report-level rule does not prevent an analysis from using different selected versions for different logical reports (for example, distinct reporting periods or report categories). Each logical report is selected independently under the same PIT and preference rules.
 
 **Financial-period linkage and comparative data**
 
