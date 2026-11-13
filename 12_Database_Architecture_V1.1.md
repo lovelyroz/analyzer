@@ -266,6 +266,16 @@ At ingestion, each candidate item must receive one of these outcomes:
 3. **Discard** a source row that has no analytical use and is not needed for minimal provenance or audit.
 4. **Reject or quarantine before financial persistence** when a required identity, metric meaning, unit, period, or source attribution cannot be resolved safely. Do not guess.
 
+**Source-input fidelity and persistence boundary**
+
+The persisted financial amount/quantity/rate must remain exactly the value reported by the source. Ingestion may identify and classify an input, but must not alter its numeric value or manufacture a replacement.
+
+- Permitted supporting metadata is limited to what is necessary to identify, interpret, and trace the source input: company/report/report-version identity, the actual financial period, source-provided unit/currency and measure semantics, meaningful source dimensions, source publication metadata, and an exact source locator. Source artifact identity/fingerprint may be retained only to establish immutable version identity and idempotent ingestion.
+- Assigning a controlled canonical metric identifier is classification metadata. It must not change the source value, convert its unit/currency, recalculate it, round it, or replace its original meaning. If the source unit or meaning cannot be mapped without changing or guessing, do not persist the financial input until the mapping is resolved.
+- Source labels, extracted cell text, parser/adapter DTOs, intermediate extraction structures, debug artifacts, confidence scores, and application-generated reconciliation or calculation values are transient processing material, not additional financial inputs; do not persist them as financial data or as a general raw-data archive.
+- Do not persist a second copy of a source value in a raw table alongside its selected financial-input record. The selected input record and its minimal provenance are the sole persisted representation of that accepted financial input.
+- Technical schema-management metadata and the minimal ingestion audit record are operational controls, not financial inputs. They must not contain copied source rows, extracted financial values, or analytical results.
+
 **Source and period integrity for persisted financial facts**
 
 - Every persisted financial fact belongs to exactly one `ReportVersion`; it must never be linked only to the logical `Report` while leaving its source version ambiguous.
