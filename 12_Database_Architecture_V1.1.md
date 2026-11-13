@@ -150,25 +150,7 @@ For the usual cumulative quarterly filing pattern:
 
 Monthly source periods use `MONTH`, `months_length=1`, and `is_ytd=false`.
 
-Standalone-quarter amounts derived by differencing cumulative YTD reports are runtime calculations, not separate persisted source facts. The usual derivation is:
-
-- Q1 standalone = Q1 YTD (no subtraction).
-- Q2 standalone = Q2 YTD (six months) − Q1 YTD (three months).
-- Q3 standalone = Q3 YTD (nine months) − Q2 YTD (six months).
-- Q4 standalone = annual YTD (twelve months) − Q3 YTD (nine months).
-
-A differencing operation is permitted only when all of the following conditions are met:
-
-1. Both source values belong to the same company and fiscal year, and their Jalali period boundaries establish the required consecutive cumulative spans from the same actual fiscal-year start.
-2. Both values represent the same canonical metric, compatible unit/currency, sign convention, and identical meaningful dimensions (such as product, segment, or facility). Their YTD basis and measurement semantics must match.
-3. Each source value is taken from the `ReportVersion` selected for its own logical report under the same requested PIT cutoff. Neither version may have been published after that cutoff.
-4. The selected versions must be compatible for differencing. A known restatement, correction, accounting-basis change, or conflicting comparative disclosure affecting either cumulative amount must be resolved by source evidence or a validated reconciliation before subtraction. Merely being the latest version, having matching audit labels, or having different audit labels does not by itself prove compatibility or incompatibility.
-5. If the source versions cannot be shown to represent a consistent reporting basis, the derived standalone-quarter value is unavailable/unresolved. Do not mix values from different versions merely to produce a result, and do not substitute a value from another version without an explicit, auditable compatibility decision.
-
-Audit status is an independent assurance attribute, not a mathematical compatibility key. For example, an audited annual filing and an unaudited interim filing are not automatically incompatible; their figures may be differenced only when the metric, period, basis, and version compatibility conditions above are satisfied.
-
-The derived result must retain runtime lineage to both exact source facts, their `ReportVersion` identifiers, their `FinancialPeriod` identifiers, and the subtraction rule. Do not persist the derived result as a source financial fact.
-
+Standalone-quarter figures calculated from cumulative source periods are derived analytical results, not database inputs. This database architecture defines no standalone-quarter field, column, table, or stored record. The database retains the source-reported cumulative values and their source-period metadata exactly as admitted under the input/provenance rules. Any quarter-differencing logic belongs to the runtime analytical layer and is outside this database storage contract.
 `TTM` is not a source `FinancialPeriod` type. TTM is a derived analytical window and is computed at runtime.
 
 The logical period identity is the company plus the exact Jalali start date and end date. Enforce valid Jalali components, start date not after end date, quarter range 1–4, and consistency between dates, duration, period type, and YTD semantics. Reject unresolved or contradictory period metadata rather than guessing.
