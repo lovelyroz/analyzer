@@ -41,7 +41,6 @@ External Sources
   └─ FX data — FREE_MARKET & OPERATIONAL (CSV / XLSX / …)
           ↓
 Format-specific acquisition / extraction adapters
-  ├─ Legacy CODAL PDF adapter (temporary transition path only)
   ├─ CODAL Excel adapter (target adapter; emits the common DTO contract)
   ├─ OHLC parser → MarketDaily fields
   └─ FX parser → FxRateInput[]
@@ -193,10 +192,10 @@ Each version must preserve the following information. This is a logical contract
    - Ingestion/capture datetime belongs to ingestion audit metadata (for example, `IngestionRun`), not as a substitute for the source publication datetime.
 3. **Audit classification**
    - Normalized `audit_status`: `AUDITED`, `UNAUDITED`, or `UNKNOWN`.
-   - Preserve the exact original CODAL wording/code and its source location/evidence used for classification. Do not infer the status from the report title or another version.
+   - Preserve the exact original CODAL wording/code and the source evidence used for classification. Exact worksheet/cell coordinates may be used transiently when useful, but are not required as permanently stored per-fact provenance. Do not infer the status from the report title or another version.
 4. **Original/restated classification**
    - Normalized `revision_status`: `ORIGINAL`, `RESTATED`, or `UNKNOWN`.
-   - Preserve the exact original CODAL wording/code and its source location/evidence used for classification. Do not infer restatement merely because a version is newer or because its values differ.
+   - Preserve the exact original CODAL wording/code and the source evidence used for classification. Exact worksheet/cell coordinates may be used transiently when useful, but are not required as permanently stored per-fact provenance. Do not infer restatement merely because a version is newer or because its values differ.
 5. **Classification confidence and unresolved states**
    - A normalized status may be assigned only when the source evidence supports an unambiguous mapping. Otherwise retain `UNKNOWN` and the original source label/evidence.
    - The source label must not be discarded after normalization. This permits later correction of a mapping without losing what CODAL actually supplied.
@@ -272,7 +271,7 @@ At ingestion, each candidate item must receive one of these outcomes:
 
 The persisted financial amount/quantity/rate must remain exactly the value reported by the source. Ingestion may identify and classify an input, but must not alter its numeric value or manufacture a replacement.
 
-- Permitted supporting metadata is limited to what is necessary to identify, interpret, and trace the source input: company/report/report-version identity, the actual financial period, source-provided unit/currency and measure semantics, meaningful source dimensions, source publication metadata, and an exact source locator. Source artifact identity/fingerprint may be retained only to establish immutable version identity and idempotent ingestion.
+- Persisted supporting metadata must follow the owner's minimum-provenance decision: company identity, report type and logical report/report-version identity, actual financial period, canonical metric identity, extraction-standard version, source-provided unit/currency and measure semantics, meaningful source dimensions, and source publication metadata. For market/FX/share/corporate-action inputs, retain source identity, observation/effective date, and domain-specific interpretation metadata. A source artifact reference or fingerprint may be retained at report/version level when needed to identify an immutable published version and support idempotency; this does not require archiving the Excel file or attaching exact cell coordinates to every fact. Exact workbook/sheet/row/cell coordinates may be used transiently for extraction, mapping, debugging, or standard development, but are not generally required as permanently stored per-fact provenance.
 - Assigning a controlled canonical metric identifier is classification metadata. It must not change the source value, convert its unit/currency, recalculate it, round it, or replace its original meaning. If the source unit or meaning cannot be mapped without changing or guessing, do not persist the financial input until the mapping is resolved.
 - Source labels, extracted cell text, parser/adapter DTOs, intermediate extraction structures, debug artifacts, confidence scores, and application-generated reconciliation or calculation values are transient processing material, not additional financial inputs; do not persist them as financial data or as a general raw-data archive.
 - Do not persist a second copy of a source value in a raw table alongside its selected financial-input record. The selected input record and its minimal provenance are the sole persisted representation of that accepted financial input.
@@ -284,13 +283,13 @@ The persisted financial amount/quantity/rate must remain exactly the value repor
 - Every persisted financial fact belongs to exactly one `FinancialPeriod`, identifying the period the value actually describes. This may be the report's primary period or a comparative period included in the same filing.
 - The fact's `ReportVersion`, its parent `Report`, and its `FinancialPeriod` must resolve to the same company. A cross-company link is invalid and must be rejected.
 - The fact's period must be supported by the source filing. A comparative prior-period value must link to the corresponding prior-period record; the system must not assign the current report period merely because it is the primary period.
-- The source locator must identify the exact origin of the selected value within that specific report version (for Excel, workbook/sheet/cell or an equivalently precise locator). A locator from another version must not be reused as if it identified the current source.
-- Re-ingestion of the same source item from the same immutable `ReportVersion` must be idempotent. Identify that source item using its exact source locator together with the report version; validate its metric classification, financial period, unit/measure semantics, and meaningful dimensions. Re-ingestion must not create a second copy or mutate the previously captured value.
+- The source item must be attributable to its specific ReportVersion and the applicable extraction-standard version. Exact workbook/sheet/row/cell coordinates may help identify and validate an item during extraction, but they are not mandatory permanently stored locators for each canonical fact. A transient locator must never be reused across different source versions.
+- Re-ingestion of the same immutable ReportVersion under the same extraction-standard version must be idempotent. Identify accepted inputs using report-version identity together with canonical metric, financial period, unit/measure semantics, meaningful dimensions, and any additional stable source identity available under the approved contract. Numeric equality alone is never a duplicate key. If available identity cannot distinguish repeated observations safely, resolve the ambiguity during extraction or reject the affected report rather than guessing.
 - Do not identify duplicates by numeric equality alone. Equal amounts may describe different products, segments, periods, dimensions, or independently reported observations.
-- If the same metric, period, unit, and dimensions appear at different source locators within one report version, do not silently merge, overwrite, discard, or add the observations merely because their values are equal. Preserve their distinct source identities as separate source observations when each is a valid source input. Their analytical relationship (for example, repeated presentation of the same amount versus separate components) must be resolved from report structure and meaning before analysis; unresolved observations must not be summed or treated as independent economic amounts.
-- If the same source locator in the same report version is encountered with a different captured value or incompatible metadata, treat it as a source conflict. Do not overwrite the stored input; resolve whether the artifact/version identity is wrong before admitting a new snapshot.
+- If the same metric, period, unit, and dimensions appear more than once within one report version, do not silently merge, overwrite, discard, or add the observations merely because their values are equal. Determine from report structure and the extraction standard whether they are repeated presentations of one amount or distinct economic inputs. If their identity or analytical relationship cannot be resolved, ask for clarification or reject the report; do not invent a permanent locator or persist ambiguous duplicates.
+- If re-ingestion of the same immutable report version and extraction-standard version yields a different value or incompatible metadata for an already identified canonical input, treat it as a source/extraction conflict. Do not overwrite the stored input; resolve whether the source version, extraction standard, or prior ingestion identity is wrong before admitting a changed snapshot.
 - Do not impose a simplistic uniqueness rule on metric + period alone where the source legitimately reports multiple products, segments, or other dimensions.
-- A fact whose report version, company, financial period, metric meaning, unit, or source locator cannot be validated must not be persisted. Ingestion must not leave partial report/version/fact writes when validation fails.
+- A fact whose report version, company, report type, financial period, canonical metric, extraction-standard version, unit, or other required interpretation metadata cannot be validated must not be persisted. An exact cell/row locator is not a general admission requirement. Ingestion must not leave partial report/version/fact writes when validation fails.
 
 Additional rules:
 
@@ -307,34 +306,48 @@ Additional rules:
 - Do not infer missing inputs, totals, quantities, rates, units, periods, or labels.
 - Persisted financial values must remain faithful to the source-reported input: do not recalculate, rebalance, round for convenience, fill blanks, replace values, or otherwise alter their financial amount. A new published correction/restatement is a separate immutable report version; it does not authorize editing the previously ingested version.
 - Calculated values are runtime-only. They must not be inserted into financial-input, normalized, derived, cache, or history tables.
-- Keep only minimal provenance with each persisted canonical input: at least the company/report identity, report version, financial period, and source locator sufficient to trace the value back to its origin (for Excel, workbook/source artifact, worksheet, and exact cell/range). Do not retain every original label, raw row payload, or unused source value merely for archival purposes.
+- Keep only the owner's approved minimum provenance with each persisted canonical input: company identity, report type and logical report/report-version identity, actual financial period, canonical metric identity, and extraction-standard version. Preserve source publication metadata through the report version. Do not archive the Excel workbook or retain raw rows, unused source values, or exact cell coordinates as mandatory per-fact fields. Operational metadata such as IngestionRun identity, validation status, and error/warning summaries may be retained where useful.
 - Runtime calculation results must retain enough in-memory lineage to explain their inputs and formula where auditability requires it, but this does not authorize persistence of the calculated result.
 
-### Common source-provenance contract for persisted inputs — reviewed
+### Common source-provenance contract for persisted inputs — aligned with owner decision 3.11
 
-Every persisted source input must have a complete, traceable path to the exact source artifact and the exact location of the reported value. Provenance is identification and audit metadata only; it must never alter, normalize, convert, or replace the source-reported value.
+Provenance identifies the origin, meaning, and processing standard of a persisted input. It is metadata only and must never alter, normalize, convert, or replace the source-reported value. This section is governed by the owner's explicit minimum-provenance decision in Master Packet Section 3.11; it does not impose a permanent exact-cell locator or source-workbook archive.
 
-**Artifact-level provenance** should be recorded once at the appropriate parent/source-artifact level and referenced by its inputs, rather than copied into every fact:
+**Minimum provenance for CODAL financial inputs**
 
-- Stable source owner/issuer identity (for company data, the validated `company_id`).
-- Source identity/reference, such as CODAL filing/document ID or URL, or the identity/reference of the market, FX, share-count, or corporate-action source file/feed.
-- Immutable artifact identity, preferably a cryptographic content fingerprint of the exact acquired file/snapshot. A filename or mutable URL alone is not sufficient to distinguish changed file contents.
-- Source publication datetime for report versions, or source observation/effective timestamp/date for market, FX, share-count, and corporate-action inputs, retaining the original source representation where available.
-- For CODAL reports, the artifact-level metadata already held by `ReportVersion` is authoritative. Do not duplicate it on every financial fact.
-- Capture/ingestion timestamp and the relevant `IngestionRun` reference belong to operational audit metadata; they must not substitute for source publication or observation time.
+Each persisted canonical financial input must be connectable to, at minimum:
 
-**Input-level provenance** must identify the exact source location of each persisted value:
+- The validated company identity (company_id).
+- The report type/classification and logical Report identity.
+- The exact published ReportVersion containing the value, including its source publication metadata and available stable CODAL/source reference.
+- The actual FinancialPeriod described by the value, including primary/comparative context where required.
+- The canonical metric identity assigned during ingestion.
+- The version/identity of the extraction standard used to interpret and map the source report.
+- Source-provided unit, currency, measure semantics, and meaningful dimensions needed to interpret the value without changing it.
 
-- For Excel: source artifact/version reference plus worksheet name and exact cell address or range. A row number alone is insufficient when the value's column is not unambiguously identified.
-- For CSV: source artifact/version reference plus exact row and column/header (or equivalent stable field position).
-- For API/feed inputs: source record/event identifier and field/path, or an equivalent stable locator supplied by that source.
-- If one stored input is sourced from a range or multiple cells, record the exact range/locations needed to identify the reported value; do not retain the copied raw row or cell payload merely to provide provenance.
+The report version must preserve the source publication datetime and source version/revision identity when available. A source artifact reference or content fingerprint may be retained at report/version level when needed to identify an immutable published snapshot and support deterministic version identity or idempotent ingestion. This does not require retaining/archiving the Excel workbook, and does not require copying artifact fingerprints or file metadata onto every fact.
 
-**Context linked by reference, not redundantly copied:** each financial fact must resolve through its `ReportVersion` to its `Report`, company, source artifact, and publication metadata, and must link directly to the actual `FinancialPeriod` it describes. Market/FX/share/corporate-action observations must similarly resolve to their source artifact and source observation/effective date. Metric classification, unit/currency/quote basis, and meaningful dimensions must be available wherever needed to interpret the input without changing its value. Comparative-period context remains governed by the comparative-data contract above.
+**Extraction locators are not mandatory persisted fact fields**
 
-A persisted input is not admissible if its source artifact identity or exact value locator is missing or ambiguous. Do not guess a cell, row, sheet, period, timestamp, unit, or source. Resolve the source or reject/quarantine the candidate outside the analytical database. The database must not store a duplicate raw-value copy as a workaround for missing provenance.
+- Worksheet names, row/column numbers, cell addresses, ranges, and equivalent source coordinates may be used transiently during extraction, mapping, standard development, validation, or debugging when operationally useful.
+- Under the owner's Section 3.11 decision, an exact workbook/sheet/cell locator is not a general requirement for permanent storage with every canonical financial input.
+- The location of a value in a worksheet or cell does not itself establish the financial meaning of that value. Meaning must be resolved through the approved extraction standard and canonical metric mapping.
+- Do not archive the source workbook, raw worksheet rows, copied cell payloads, or unused source values as a workaround for the absence of permanent cell locators.
+- Any future requirement for stronger per-value audit location must be presented as a separate owner decision, taking into account that the source workbook is not archived.
 
-The existing raw_financial_facts table is incompatible with this target if it acts as a general raw-row archive. The existing normalized-input model may become the canonical persisted financial fact layer, but it must not duplicate a separate raw-value layer. Existing derived_financial_facts and derived_financial_fact_inputs are incompatible if they persist application-calculated financial values. Their future schema/migration treatment must inspect existing data first and be non-destructive until a safe migration is designed. Do not write new raw-row archives or calculated results during transition.
+**Market, FX, share-count, and corporate-action inputs**
+
+These inputs must retain their validated source identity/reference, source observation or effective date/time in the source's original calendar representation where applicable, the exact source-reported value, and the unit/basis or event semantics required to interpret it. Source publication/observation time must not be replaced by ingestion time. Exact row/cell/file coordinates may be used transiently where useful, but are not a universal mandatory persisted locator for every observation.
+
+**Operational ingestion audit**
+
+An IngestionRun identifier, processing timestamp, validation status, and concise error/warning information may be retained to support operational control and explain how an ingestion was handled. These operational fields do not substitute for source publication/observation metadata and must not contain copied source rows, raw financial payloads, or calculated analytical outputs.
+
+**Admission, identity, and fidelity**
+
+A persisted input is inadmissible when any required identity or interpretation metadata is missing or ambiguous: company, report type, report/version, actual financial period, canonical metric, extraction-standard version, unit/measure semantics, or relevant source identity/date for non-CODAL inputs. Do not guess these fields. Resolve ambiguity during extraction or reject the affected report/input before analytical persistence. The absence of an exact cell locator alone is not an admission failure.
+
+The source-reported amount, quantity, rate, sign, scale, unit, currency, precision, and representation remain exactly as supplied. Provenance metadata must not authorize transformations or substitutions. The existing raw_financial_facts table is incompatible with this target if it acts as a general raw-row archive. The existing normalized-input model may become the canonical persisted financial fact layer, but it must not duplicate a separate raw-value layer. Existing derived_financial_facts and derived_financial_fact_inputs are incompatible if they persist application-calculated financial values. Their future schema/migration treatment must inspect existing data first and remain non-destructive until a safe migration is designed. Do not write new raw-row archives or calculated results during transition.
 
 ### Financial normalization and mapping
 
@@ -370,7 +383,7 @@ Metric catalog, ingestion-time mapping, canonical selected-input facts, minimal 
 
 `market_daily` preserves source-reported OHLC values, including raw close and adjusted close, as separate inputs. Ingestion must not recalculate adjusted prices, apply corporate-action adjustments, rescale, round, or otherwise alter source-reported price values. Any analytical transformation is runtime-only.
 
-For market observations, retain the source date in its original calendar representation or unambiguous Jalali components, plus source identity/reference and the exact source locator where available. A date or price that cannot be resolved unambiguously must not be guessed or admitted as a valid dated observation.
+For market observations, retain the source date in its original calendar representation or unambiguous Jalali components, plus source identity/reference. Exact row/cell coordinates may be used transiently where useful but are not a mandatory persisted locator. A date or price that cannot be resolved unambiguously must not be guessed or admitted as a valid dated observation.
 
 Historical share-count observations must preserve the exact source-reported share count, its effective/as-of date or period, and provenance. Corporate-action records must preserve the source-reported event terms and effective date; adjusted share counts, restated historical series, and other derived values are runtime-only. Do not infer or manufacture share counts from corporate-action terms during ingestion.
 
@@ -460,15 +473,15 @@ DB foundation tables + IngestionRun
 The intended direction is to replace CODAL PDF acquisition/extraction with Excel acquisition/extraction, while preserving the common ingestion and persistence contract.
 
 - The Excel adapter must emit the same common financial input DTO contract consumed by `ingest_codal_report`; the existing downstream persistence boundary must remain format-independent.
-- Preserve the established `RawLineInput` semantics and compatibility. Any required Excel provenance extension (such as workbook/sheet/cell coordinates) must be additive and must not break existing PDF callers.
+- The Excel adapter must emit the common financial-input DTO contract required by the canonical ingestion boundary. DTO fields for transient extraction diagnostics may be added only when justified; permanent workbook/sheet/cell coordinates are not a required persisted contract. No compatibility requirement to preserve or maintain a PDF ingestion caller is imposed by V1.
 - Excel workbooks are heterogeneous. Do not assume fixed worksheet names, row numbers, column numbers, or identical layouts across companies or report types.
-- Use original source labels and raw numeric values transiently during extraction and mapping, but do not persist a general archive of them. Persist only the resolved canonical metric/bucket value and its minimal provenance. For Excel, the source locator should identify at least workbook/source identity, worksheet, and row/cell where available.
+- Use original source labels, worksheet structure, and raw numeric values transiently during extraction and mapping. Do not archive the workbook or persist a general archive of raw rows/labels. Persist only the resolved canonical metric/bucket value and the minimum provenance defined by owner decision 3.11: company, report type/version, actual period, canonical metric, and extraction-standard version. Exact workbook/sheet/row/cell coordinates may assist extraction and debugging but are not mandatory persisted per-fact fields.
 - Do not guess mappings, units, period boundaries, company identity, report type, or source attribution. Unresolved required metadata is an admission failure or must remain outside the analytical database until resolved.
 - Read cached formula results from the workbook; do not evaluate spreadsheet formulas in the extraction adapter. If a formula cell has no usable cached result, emit an explicit warning/rejection/unknown state; never fabricate a value.
 - Classify each source row during ingestion as a canonical metric, an OTHER_* bucket item, or discard/reject. Do not persist the original row merely because it exists in the workbook. Reproducible aggregates are calculated at runtime; miscellaneous amounts that matter only as broad totals are mapped into the relevant OTHER_* bucket. Application-generated calculations remain runtime-only.
 - Blank/unusable source input cells remain NULL/unknown, not zero. No synthetic fallback value (including zero) may be persisted for a missing source input. A valid source-reported product sales amount is retained as reported; when it is blank, quantity × selling rate may be calculated at runtime only if both inputs are valid and compatible.
 - Quarterly CODAL filings commonly report cumulative year-to-date values. Q1/Q2/Q3/Q4 source periods must follow the FinancialPeriod contract in Section 3. Standalone-quarter values are derived at runtime, using compatible report versions; they are not source facts to persist.
-- The existing PDF acquisition/extraction path is legacy-only and may remain temporarily during the Excel transition. It is not a target CODAL input format and must not be treated as part of the target source/provenance contract. Retire it after the Excel adapter has been implemented and passed end-to-end validation against representative reports. During the transition only, both adapters may feed the same common DTO/persistence path.
+- CODAL PDF acquisition/extraction is outside the V1 target scope and is not a supported input path or acceptance criterion. V1 requires neither creating nor preserving a PDF adapter, nor maintaining PDF compatibility during the Excel implementation. Any PDF-related code that remains in the repository is historical legacy implementation only; its continued existence must not create a transition dependency or additional maintenance requirement.
 - Historical implementation note: the existing legacy PDF path uses `pypdf`; image-only/no-text PDFs are rejected and OCR is not silently substituted. This note documents the temporary legacy path only; PDF is excluded from the target CODAL input architecture.
 
 ### OHLC / FX formats
