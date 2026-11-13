@@ -342,7 +342,11 @@ Metric catalog, ingestion-time mapping, canonical selected-input facts, minimal 
 
 ## 12. Market and Share Foundations
 
-`market_daily` preserves raw close and adjusted close separately.
+`market_daily` preserves source-reported OHLC values, including raw close and adjusted close, as separate inputs. Ingestion must not recalculate adjusted prices, apply corporate-action adjustments, rescale, round, or otherwise alter source-reported price values. Any analytical transformation is runtime-only.
+
+For market observations, retain the source date in its original calendar representation or unambiguous Jalali components, plus source identity/reference and the exact source locator where available. A date or price that cannot be resolved unambiguously must not be guessed or admitted as a valid dated observation.
+
+Historical share-count observations must preserve the exact source-reported share count, its effective/as-of date or period, and provenance. Corporate-action records must preserve the source-reported event terms and effective date; adjusted share counts, restated historical series, and other derived values are runtime-only. Do not infer or manufacture share counts from corporate-action terms during ingestion.
 
 ### Jalali components (CHANGE-005 / V1.2)
 
@@ -390,12 +394,14 @@ FREE_MARKET and OPERATIONAL must never be silently substituted for each other.
 
 Same calendar day may hold both FREE_MARKET and OPERATIONAL rows.
 
-### Unit storage policy (CHANGE-006)
+### Source-value fidelity and quote units
 
-- Persisted `rate` is always **IRR (Rial) per 1 unit of `currency_from`**.
-- Free-market sources quoted in **Toman** are converted ×10 at the **adapter** boundary (explicit flag, e.g. `rates_in_toman=True`).
-- Operational / NIMA rates already in Rial are stored as-is.
-- Downstream stages consume IRR rates only; they do not re-apply unit conversion.
+- Persist the rate exactly as quoted by its source. Do not convert Toman to Rial, rescale, round, interpolate, average, or otherwise rewrite a source rate during ingestion.
+- Store the quote's unit/basis as explicit metadata (for example, IRR or Toman per one unit of `currency_from`). A numeric rate without an unambiguous quote unit is not admissible for analysis.
+- Any conversion to a common calculation unit, including Toman-to-Rial ×10, is runtime-only. The source value and its quote-unit metadata remain unchanged in storage.
+- Preserve the source rate type and currency pair. FREE_MARKET and OPERATIONAL must never be silently substituted.
+- Retain the observation date, source identity/reference, and any source-specific timestamp or locator needed to trace the rate. Unknown or ambiguous dates/units must not be guessed.
+
 
 ### Conversion rules
 
