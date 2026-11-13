@@ -526,6 +526,13 @@ Metric catalog, ingestion-time mapping, canonical selected-input facts, minimal 
 
 ## 12. Market and Share Foundations
 
+### Market data database placement — owner decision (2026-11-14)
+
+All V1 application data, including CODAL financial inputs and market inputs, will be stored in **one shared SQLite database**. Market data will not use a separate database in V1. Market information remains logically separated from financial-report data through its own domain tables (for example, `market_daily`, `share_count_history`, and `corporate_actions`); sharing the database file does not mean combining these different data concepts into one table.
+
+This choice keeps company references and cross-domain analysis straightforward while retaining clear table-level separation. A separate market database may be reconsidered only if a future, evidenced scale or operational requirement justifies it; it is not part of the approved V1 design. This is a documentation-level owner decision and does not authorize code, ORM, schema, migration, data, or test changes.
+
+
 ### Market CSV acquisition and persistence — owner decision (2026-11-13)
 
 CSV is an acquisition/file format, not the permanent storage model. Market data downloaded as CSV is to be parsed, validated, and admitted as structured records in the appropriate database tables (for example, `market_daily` for daily OHLC observations), rather than kept only as CSV files for application use. Preserve source identity/reference, original date/calendar meaning, units, quote basis, and source-reported numeric meaning under the global numeric-storage policy. Do not silently admit malformed, ambiguous, duplicate, or unresolved observations.
