@@ -177,6 +177,38 @@ The logical period identity is the company plus the exact Jalali start date and 
 - Each version is an immutable source snapshot. A later correction must create a new version; it must never overwrite or delete an earlier version.
 - A version must not silently change the parent report's company, report classification/category, or declared reporting period. If those identity attributes conflict, treat the source as a separate report or reject/quarantine it until its identity is resolved.
 
+**ReportVersion metadata contract — logical requirements**
+
+Each version must preserve the following information. This is a logical contract, not a physical column layout; exact schema and storage types are deferred to implementation.
+
+1. **Version identity and source reference**
+   - Parent logical `report_id`.
+   - Stable CODAL/source version or revision identifier, when supplied.
+   - Original source document reference (such as the CODAL filing/document identifier or URL) when available.
+   - A content fingerprint (for example, a cryptographic hash of the acquired source file) to support duplicate detection and prove which exact source artifact was ingested. A fingerprint supplements source identity; it does not replace a stable source identifier.
+2. **Publication and ingestion timing**
+   - Source publication datetime, including its original source representation and a normalized timestamp suitable for deterministic PIT comparison.
+   - If publication datetime is absent, ambiguous, or cannot be reliably normalized, retain the source evidence but mark the version's PIT availability as unresolved. Do not substitute ingestion time, file-download time, report period end, or a guessed date for publication time; the version must not be selected for a PIT analysis until its publication time is resolved.
+   - Ingestion/capture datetime belongs to ingestion audit metadata (for example, `IngestionRun`), not as a substitute for the source publication datetime.
+3. **Audit classification**
+   - Normalized `audit_status`: `AUDITED`, `UNAUDITED`, or `UNKNOWN`.
+   - Preserve the exact original CODAL wording/code and its source location/evidence used for classification. Do not infer the status from the report title or another version.
+4. **Original/restated classification**
+   - Normalized `revision_status`: `ORIGINAL`, `RESTATED`, or `UNKNOWN`.
+   - Preserve the exact original CODAL wording/code and its source location/evidence used for classification. Do not infer restatement merely because a version is newer or because its values differ.
+5. **Classification confidence and unresolved states**
+   - A normalized status may be assigned only when the source evidence supports an unambiguous mapping. Otherwise retain `UNKNOWN` and the original source label/evidence.
+   - The source label must not be discarded after normalization. This permits later correction of a mapping without losing what CODAL actually supplied.
+   - Do not assume that a CODAL letter/code (including C or D) has a fixed meaning unless its meaning is established by authoritative source documentation or validated source metadata for that filing.
+
+**Version identity and duplicate handling**
+
+- Prefer the source's stable report-version/revision identifier to identify a published version.
+- If no stable version identifier exists, use a deterministic identity based on the parent report and the exact acquired source artifact fingerprint; retain publication datetime and original source reference as supporting evidence.
+- If the same version is downloaded or ingested again, recognize it as the same version and process it idempotently. If two different artifacts claim the same source version identifier, do not overwrite either silently; flag the conflict for resolution.
+- A changed content fingerprint without a source revision identifier is evidence of a potentially distinct source snapshot, not permission to overwrite an existing version. Resolve whether it is a new published version or a source replacement before admitting it as a new version.
+- Do not use a locally assigned ingestion sequence as evidence of CODAL publication order.
+
 **Ingestion versus analytical version selection**
 
 - Ingestion must preserve every distinct, validly identified published version of a logical report, including original, corrected/restated, audited, and unaudited versions. The preference rules below must never be used to discard a valid source version during ingestion.
