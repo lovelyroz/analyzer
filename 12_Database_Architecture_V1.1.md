@@ -38,7 +38,7 @@ It is not a replacement for KPI, scoring, trend, forecast, evaluation, valuation
 External Sources
   ├─ CODAL financial reports (Excel — target input format)
   ├─ Daily market data (CSV / XLSX / …)
-  └─ FX data — FREE_MARKET & OPERATIONAL (CSV / XLSX / …)
+  └─ Daily USD FX data — FREE_MARKET & EXCHANGE_CENTER (Toman; CSV / XLSX / …)
           ↓
 Format-specific acquisition / extraction adapters
   ├─ CODAL Excel adapter (target adapter; emits the common DTO contract)
@@ -567,37 +567,40 @@ Historical share counts and corporate actions are preserved so EPS comparability
 
 ## 13. FX Foundation (CHANGE-001 + CHANGE-006)
 
-### Rate types (locked)
+### V1 owner-confirmed FX input contract (2026-11-14)
 
-- `FREE_MARKET` — free-market dollar (e.g. دلار آزاد)
-- `OPERATIONAL` — exchange / NIMA / مبادله‌ای
-- `OFFICIAL`, `ESTIMATED`, `MANUAL_OPERATOR` — supporting types
+The V1 FX input consists only of daily US dollar rates, with exactly two rate types:
 
-FREE_MARKET and OPERATIONAL must never be silently substituted for each other.
+- `FREE_MARKET` — دلار آزاد
+- `EXCHANGE_CENTER` — دلار مرکز مبادله
+
+For each Jalali calendar day and each rate type, the source provides exactly **one rate value**. Separate buy and sell quotes are not part of this V1 input contract. No additional rate categories (including generic operational, official, estimated, or manual-operator types) are included in the confirmed V1 source catalog.
+
+The source quote unit is **Toman per one US dollar**. Preserve the numeric source value and its Toman quote basis; do not convert Toman to Rial, rescale, or otherwise transform the rate. The source is daily, and the observation date must be retained using Jalali calendar components.
+
+The logical record therefore identifies one USD rate by its Jalali date and rate type, with the rate value and minimal source provenance. For a given date, the FREE_MARKET and EXCHANGE_CENTER records are distinct and both may exist. Neither rate type may be silently substituted for the other.
+
+This is an owner-approved logical input contract only. It does not authorize changes to ORM models, physical schema, migrations, ingestion code, existing data, or tests. Any mismatch between this V1 contract and legacy implementation names/fields must be handled explicitly during DB-DES-004 / DB-MIG-001 review; do not silently reinterpret or migrate existing records.
 
 ### Jalali components and identity (CHANGE-006)
 
-| Column | Type | Role |
-|--------|------|------|
-| `jalali_year` | INTEGER nullable | Source Jalali year |
-| `jalali_month` | INTEGER nullable (1–12) | Source Jalali month |
-| `jalali_day` | INTEGER nullable | Source Jalali day |
-| `rate_date` | Date nullable | Gregorian; NULL for Jalali-sourced rows |
+| Logical attribute | Type / meaning |
+|--------|------|
+| `jalali_year` | INTEGER; source Jalali year |
+| `jalali_month` | INTEGER 1–12; source Jalali month |
+| `jalali_day` | INTEGER; source Jalali day |
+| `rate_type` | `FREE_MARKET` or `EXCHANGE_CENTER` |
+| `currency_from` / `currency_to` | USD quoted in Toman; quote basis must remain explicit |
+| `rate_value` | One integer-stored source rate value for the date/type |
 
-**Identity:**
-
-- Jalali-sourced: `(jalali_year, jalali_month, jalali_day, currency_from, currency_to, rate_type)`
-- Gregorian-only: `(rate_date, currency_from, currency_to, rate_type)`
-
-Same calendar day may hold both FREE_MARKET and OPERATIONAL rows.
+**Logical identity:** `(jalali_year, jalali_month, jalali_day, rate_type)`. There is at most one accepted rate for each date/type combination. If a source supplies duplicate or conflicting values for the same identity, ingestion must reject or explicitly resolve the conflict under a documented source rule; it must not silently choose one.
 
 ### Source-value fidelity and quote units
 
-- Persist the source quote unit/basis and meaning; store its numeric rate as an integer using the owner-approved ROUND_HALF_UP rule. Do not convert Toman to Rial, rescale source units, interpolate, average, or otherwise rewrite the rate.
-- Store the quote's unit/basis as explicit metadata (for example, IRR or Toman per one unit of `currency_from`). A numeric rate without an unambiguous quote unit is not admissible for analysis.
-- No unit conversion is authorized by this architecture, including Toman-to-Rial ×10. If a conversion is later required, it must first be explicitly identified and authorized by the user during implementation; it must not be assumed or applied automatically.
-- Preserve the source rate type and currency pair. FREE_MARKET and OPERATIONAL must never be silently substituted.
-- Retain the observation date, source identity/reference, and any source-specific timestamp needed to interpret the rate; exact row/cell locators may be used transiently but are not mandatory persisted fields. Unknown or ambiguous dates/units must not be guessed.
+- Persist the source quote unit/basis as Toman per one USD and store the numeric rate as an integer using the owner-approved ROUND_HALF_UP rule.
+- Do not convert Toman to Rial, rescale source units, interpolate, average, calculate a synthetic rate, or otherwise rewrite the source quote.
+- Retain observation date, source identity/reference, and any source-specific timestamp needed to interpret the rate. Exact row/cell locators may be used transiently but are not mandatory persisted fields.
+- Unknown or ambiguous dates, rate types, quote units, or source values must not be guessed or admitted as valid observations.
 
 
 ### Conversion rules
@@ -609,6 +612,10 @@ Same calendar day may hold both FREE_MARKET and OPERATIONAL rows.
 - MARKET_VALUE → same-date FREE_MARKET FX
 
 ---
+
+### FX V1 owner decision record (2026-11-14)
+
+The V1 FX source contract was confirmed by the owner on 2026-11-14: daily USD rates, two types only (`FREE_MARKET` and `EXCHANGE_CENTER`), one value per date/type (no separate buy/sell values), quoted in Toman per USD, with Jalali observation dates. This decision narrows the older generic FX taxonomy above for V1. Legacy implementation compatibility is not implied; any required model/schema/migration alignment must be reviewed explicitly in DB-DES-004 / DB-MIG-001. Documentation-only decision; no code, ORM, schema, migration, data, or test changes.
 
 ## 14. Ingestion Boundary (CHANGE-007)
 
