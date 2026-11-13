@@ -133,6 +133,31 @@ These entities are common infrastructure, not a claim that all industries publis
 
 Do not predefine one universal metric catalog for all industries before reviewing real source examples. A metric may be shared only when its financial meaning is genuinely identical; otherwise it requires a distinct canonical identity. This section records the logical contract only and does not authorize ORM, schema, migration, data, or code changes.
 
+
+### Final shared master-information taxonomy — owner-confirmed (2026-11-13)
+
+The following nine categories are the final V1 taxonomy for shared master and operational-control information across all seven industries:
+
+| # | Information category | Contract |
+|---|---|---|
+| 1 | Database | One shared SQLite database for all industries |
+| 2 | Industries | Seven-industry catalog with ID, code, name, and status |
+| 3 | Companies | Company identity and mandatory assignment to exactly one industry |
+| 4 | Report types | The two shared CODAL types: monthly activity and periodic financial |
+| 5 | Report | Logical identity of a company's report and report type |
+| 6 | Report version | Each valid publication, including independent audit/restatement status and source identity |
+| 7 | Financial period | Actual Jalali period and temporal attributes of the period/values |
+| 8 | Information provenance | Source reference/identifier and source-artifact fingerprint |
+| 9 | Ingestion run | Processing status, timestamps, counts, errors, and warnings |
+
+This taxonomy is final for shared master and operational-control information in V1. No additional category is to be added to this list without a subsequent explicit owner decision.
+
+The database itself is the shared storage container, not a data table. The nine categories do not imply nine physical tables; table boundaries and relationships are determined by logical and physical schema design.
+
+Persisted financial facts, industry-specific extraction standards, and independent market/FX input domains are specialized input content/contracts, not additional categories in this shared master-information taxonomy. They remain governed by their respective architecture sections and tasks.
+
+This is a documentation-level taxonomy decision only. It does not authorize code, ORM, schema, migration, or data changes.
+
 ### Periodic report category catalog — initial bank scope
 
 The following 17 categories are the initial category catalog identified for periodic bank reports, based on the Parsian Bank sample structure. They define the report-information categories to be represented by the database architecture; they are not a claim that every industry uses the same categories.
