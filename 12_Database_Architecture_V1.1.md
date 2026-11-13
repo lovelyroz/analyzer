@@ -104,7 +104,7 @@ The following logical master data and report-control entities are shared by all 
 
 #### Industry and company catalogs
 
-- Industry: stable internal ID, unique immutable code, display name, and active/inactive status. Initial codes: BANK, INVESTMENT, PETROCHEMICAL, METALS, CEMENT, FOOD, and PHARMACEUTICAL. The catalog is data-driven and extensible; codes are not recycled for a different meaning.
+- Industry: stable internal ID, unique immutable code, display name, and active/inactive status. Initial catalog: BANK — banking; INVESTMENT — investment; PETROCHEMICAL — petrochemical; METALS — metals; CEMENT — cement; FOOD — food; PHARMACEUTICAL — pharmaceuticals. The catalog is data-driven and extensible; codes are not recycled for a different meaning.
 - Company: stable company_id, official name, ticker where applicable, mandatory industry_id, and active/inactive status. An optional national identifier may support identity matching but never replaces company_id. Each company has exactly one industry assignment. No ticker-history table is introduced in V1.
 - A separate company_type field is not part of the V1 master contract because it would duplicate the industry classification. Add a distinct attribute only if a later requirement establishes a different meaning.
 
