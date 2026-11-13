@@ -190,6 +190,16 @@ The logical period identity is the company plus the exact Jalali start date and 
 - Earlier versions remain preserved and must continue to be selected for PIT cutoffs before the correction became available.
 - A later correction must never be retroactively applied to an earlier PIT snapshot. Version selection must be deterministic and based on publication availability at the requested cutoff; do not select a version merely because it is currently the latest.
 
+**Audited / restated version preference**
+
+- Preserve audit status and presentation/restatement status as separate, source-supported attributes of each `ReportVersion`. Retain the original CODAL labels or source evidence needed to explain how those attributes were classified.
+- For analysis, the preferred version is one that is both **audited** and **restated**.
+- If no audited-and-restated version is available within the requested PIT cutoff, the approved fallback is an **unaudited, original (not restated)** version.
+- Within the applicable preferred or fallback class, select the latest version published on or before the PIT cutoff. Never use a version published after the cutoff.
+- Do not infer audit or restatement status from the report title, publication order, or another version. If the source does not establish the status reliably, keep it unknown.
+- The preference above does not define an ordering for mixed or otherwise unclassified combinations (for example, audited-original or unaudited-restated) when neither approved combination is available. Do not silently promote one of those combinations to the preferred/fallback position; flag the selection as unresolved for an explicit policy decision rather than guessing.
+- Version preference affects which source version is selected for an analysis; it does not authorize deletion, overwriting, or loss of any published version. PIT history must remain reproducible.
+
 ### Financial fact and calculation contract — reviewed and approved
 
 The database does **not** retain raw financial statement rows or a general-purpose raw-fact archive. Every candidate item must be resolved at ingestion. The objective is an analysis-ready financial data foundation, not a reconstruction of each company's accounting ledger or a full copy of its statements.
