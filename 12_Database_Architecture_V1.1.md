@@ -349,6 +349,92 @@ A persisted input is inadmissible when any required identity or interpretation m
 
 The source-reported amount, quantity, rate, sign, scale, unit, currency, precision, and representation remain exactly as supplied. Provenance metadata must not authorize transformations or substitutions. The existing raw_financial_facts table is incompatible with this target if it acts as a general raw-row archive. The existing normalized-input model may become the canonical persisted financial fact layer, but it must not duplicate a separate raw-value layer. Existing derived_financial_facts and derived_financial_fact_inputs are incompatible if they persist application-calculated financial values. Their future schema/migration treatment must inspect existing data first and remain non-destructive until a safe migration is designed. Do not write new raw-row archives or calculated results during transition.
 
+### Canonical financial-input contract — DB-DES-001 (logical design)
+
+This section defines the logical target for persisted CODAL financial inputs. It is a design contract, not an ORM or migration instruction. Existing tables are not assumed to satisfy it, and no existing data may be deleted or rewritten merely to make the current schema appear compliant.
+
+**1. Canonical input record**
+
+The target is one long-form canonical input record per accepted metric, actual financial period, published report version, and approved value-defining dimensions. The logical record must be attributable to:
+
+- company_id — validated company identity; it must agree with the company referenced by the report and financial period.
+- report_version_id — the exact published ReportVersion containing the value. Report type/classification is obtained through its parent Report.
+- period_id — the actual FinancialPeriod described by this particular value, not a period inferred from the report title, publication date, column position, or another value.
+- metric_id — the stable canonical metric identity assigned after approved classification.
+- extraction_standard_version — the exact version of the approved extraction/interpretation standard used to produce the canonical input.
+- The source-reported value, its source unit/currency and measure basis, plus any approved value-defining dimensions required to distinguish genuinely separate inputs.
+- An explicit value state/origin sufficient to distinguish a source-reported value, a known blank/NULL, and the narrowly permitted ZERO_FALLBACK.
+- Operational ingestion_run_id may be linked for processing audit. It does not replace report publication metadata or the required provenance fields above.
+
+The logical company/report/version/period/metric/standard links are mandatory. Exact worksheet, row, column, cell, or range coordinates are not mandatory persisted fields. Source artifact reference and content fingerprint belong to ReportVersion, not to each fact. The Excel workbook itself and general raw-row payloads are not archived.
+
+**2. Metric catalog boundary**
+
+FinancialMetric is a controlled catalog of stable canonical financial input identities, not a copy of every source Header and not a store of calculated outputs.
+
+- A metric code is stable and unique. Its definition must describe the financial meaning sufficiently to prevent conflating different economic measures.
+- A metric's applicable value kind and interpretation metadata (such as currency amount, quantity, rate, ratio, flow/stock behavior, unit/basis, and applicable industry/report scope) must be explicit where relevant. These attributes describe interpretation; they do not authorize value conversion.
+- Metric identity is independent of report version, financial period, audit/restatement status, source Header wording, and source worksheet position.
+- Source Header → approved label/standard Header → canonical metric mapping boundaries are specified by DB-DES-002 and the report-family standards. This section does not authorize creating one metric for every raw Header.
+- Catalog entries and mapping/standard versions are controlled metadata. A metric must not be silently redefined in place in a way that changes the meaning of previously persisted inputs; a meaning change requires a new stable identity or an explicitly versioned compatibility decision.
+
+**3. OTHER_* handling**
+
+OTHER_* is an explicit, controlled canonical bucket mechanism for in-scope miscellaneous amounts whose meaning is sufficiently understood to be grouped under an approved broad concept but does not warrant a dedicated metric.
+
+- OTHER_* is not a catch-all for unknown, ambiguous, unmapped, or merely similar-looking source labels.
+- A source item may enter an OTHER_* bucket only when its report scope, economic meaning, period, unit, and mapping destination are resolved under an approved standard.
+- Items outside the approved extraction scope are discarded from financial persistence; unresolved in-scope items block/reject the report according to the applicable report-family admission rules.
+- The exact bucket codes, permitted parent/scope relationships, and mapping policy are deferred to DB-DES-002 and the relevant report standards. This task does not invent an expanded taxonomy.
+
+**4. Value, NULL, and ZERO_FALLBACK semantics**
+
+The canonical layer stores source-selected inputs, not recalculated amounts.
+
+- A usable source-reported value is authoritative and must be persisted exactly as reported, including its sign, scale, precision, and source unit/currency/basis. A reported zero is a genuine source value and remains distinguishable from a fallback.
+- A known blank/unusable source value is NULL/unknown; it must never be silently coerced to zero. If the canonical contract records an expected-but-blank input, its state must explicitly identify it as missing and its value must remain NULL.
+- ZERO_FALLBACK is the only approved synthetic-value exception and is restricted to product sales amount under Master Packet Section 3.5. It resolves to numeric zero only under the exact approved conditions and must carry a distinct origin/state plus an ingestion warning. It must not be generalized to other metrics.
+- Quantity × selling rate, totals, subtotals, ratios, adjusted values, and all other application calculations remain runtime-only. A runtime calculation must not be persisted as a source-reported or canonical input.
+- The current fixed Numeric(30,4) / value_irr shape is not an acceptable target contract: it imposes a four-decimal scale and assumes IRR. The persisted representation must preserve the exact source decimal value and scale without binary floating-point loss or forced rescaling. The physical SQLite/SQLAlchemy representation (for example, a lossless decimal-text representation with validated Decimal parsing) must be selected and round-trip tested during DB-MIG-001; this logical contract does not prescribe a migration or silently rewrite existing values.
+- Unit and currency remain explicit source metadata. No automatic Toman/Rial, unit, currency, scale, or sign conversion is authorized.
+
+**5. Uniqueness and duplicate identity**
+
+The logical uniqueness key is:
+
+(report_version_id, period_id, metric_id, approved_dimension_identity)
+
+where the dimension component is empty for a non-dimensional input and represents only approved value-defining dimensions when they are genuinely required. The exact dimension model/key is coordinated with DB-DES-002 and DB-DES-003.
+
+- A ReportVersion may contain the same metric for multiple actual periods, such as comparative columns; those are distinct inputs.
+- The same metric and period may appear in different ReportVersions; those are distinct immutable source observations and must be retained.
+- If one ReportVersion contains repeated occurrences of the same metric/period, they must not be summed, overwritten, or deduplicated by numeric equality. Their meaning and dimensional identity must be resolved before persistence; otherwise reject the ambiguous report/input.
+- Source cell coordinates, raw Header strings, ingestion timestamps, and numeric equality are not substitutes for canonical identity and must not be used as the permanent uniqueness key.
+- Company consistency is a required integrity invariant even though company identity is also reachable through ReportVersion and FinancialPeriod. The database/service design must prevent a fact from linking a report from one company to a period belonging to another.
+
+**6. Immutable report-version and PIT behavior**
+
+- Every valid, distinct published ReportVersion is retained with its own canonical inputs. Re-ingestion of the same source version under the same extraction-standard version is idempotent; it must not create duplicate facts or mutate previously accepted values.
+- A correction/restatement is a new ReportVersion. It never overwrites facts belonging to an earlier version.
+- A comparative value is attached to the ReportVersion that actually contains/publishes it, while its period_id identifies the comparative financial period it describes. It does not automatically replace the primary fact for that period from another ReportVersion.
+- All source versions remain available to PIT queries. A version is ineligible before its source publication time. The approved audit/restatement quality ranking and tie-break rules are applied by the analysis/version-selection layer after the PIT cutoff; they do not erase or rewrite stored versions.
+- Audit status and restatement status remain independent attributes at their approved source scope. They must not be collapsed into a generic fact-quality flag or inferred from each other.
+- RESTATED, ESTIMATED, and UNMAPPED are not interchangeable value states: restatement belongs to report/version or source-value status as explicitly defined by the approved report contract; calculated/estimated outputs are runtime-only; unresolved/unmapped inputs are not admitted to canonical persistence.
+
+**7. Separation of canonical input, mapping, and operational audit**
+
+- The canonical input layer must not depend on a persisted raw-row archive. A mandatory raw_fact_id foreign key is therefore incompatible with the target contract.
+- Mapping/extraction standards are versioned metadata used to make classification reproducible. DB-DES-002 defines whether compact mapping decisions/rules need their own persisted records; no per-source-row mapping archive is required by this task.
+- normalized_financial_fact_inputs is not a required bridge to raw rows. Retain a relationship only if a concrete approved use case proves it necessary without reintroducing raw-row archival or exact-cell locator requirements.
+- derived_financial_facts and derived_financial_fact_inputs must not be used to persist application-calculated financial amounts or analytical outputs. Any retirement/migration must be handled separately and non-destructively after inspecting existing data.
+- IngestionRun may retain processing status, timestamps, counts, and concise errors/warnings. Failed ingestion may retain operational audit but must not leave partial ReportVersion/canonical-input writes.
+
+**8. Logical acceptance criteria for DB-DES-001**
+
+The design is acceptable only when the final model can demonstrate all of the following: one canonical long-form input contract; stable metric identity separated from source Header mapping; controlled OTHER_* behavior; exact source value/scale/unit fidelity; explicit NULL versus genuine zero versus the approved ZERO_FALLBACK; uniqueness that permits multiple periods and immutable versions without duplicate/ambiguous observations; immutable correction/comparative version behavior compatible with PIT; minimum owner-approved provenance without mandatory cell locators; and no raw-row archive or persisted calculated facts.
+
+Physical ORM constraints, the final dimension identity, exact metric/OTHER_* catalog contents, mapping-rule schema, and migration of existing tables remain coordinated follow-on work under DB-DES-002, DB-DES-003, DB-MIG-001, and DB-ING-002. DB-DES-001 does not authorize code, schema, migration, or data changes.
+
 ### Financial normalization and mapping
 
 - `financial_metrics` is the small, controlled catalog of canonical analysis metrics and OTHER_* buckets; it is metadata, not a repository of calculated results.
