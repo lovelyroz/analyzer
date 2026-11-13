@@ -201,6 +201,17 @@ At ingestion, each candidate item must receive one of these outcomes:
 3. **Discard** a source row that has no analytical use and is not needed for minimal provenance or audit.
 4. **Reject or quarantine before financial persistence** when a required identity, metric meaning, unit, period, or source attribution cannot be resolved safely. Do not guess.
 
+**Source and period integrity for persisted financial facts**
+
+- Every persisted financial fact belongs to exactly one `ReportVersion`; it must never be linked only to the logical `Report` while leaving its source version ambiguous.
+- Every persisted financial fact belongs to exactly one `FinancialPeriod`, identifying the period the value actually describes. This may be the report's primary period or a comparative period included in the same filing.
+- The fact's `ReportVersion`, its parent `Report`, and its `FinancialPeriod` must resolve to the same company. A cross-company link is invalid and must be rejected.
+- The fact's period must be supported by the source filing. A comparative prior-period value must link to the corresponding prior-period record; the system must not assign the current report period merely because it is the primary period.
+- The source locator must identify the exact origin of the selected value within that specific report version (for Excel, workbook/sheet/cell or an equivalently precise locator). A locator from another version must not be reused as if it identified the current source.
+- Re-ingesting the same report version must not create duplicate copies of the same canonical input. Duplicate detection must account for the metric, financial period, unit/measure semantics, and any meaningful dimensions required to distinguish separate values. Do not impose a simplistic uniqueness rule on metric + period alone where the source legitimately reports multiple products, segments, or other dimensions.
+- If two candidate values cannot be distinguished or reconciled safely under the defined metric and dimension semantics, quarantine/reject them rather than choosing one arbitrarily or silently overwriting an existing fact.
+- A fact whose report version, company, financial period, metric meaning, unit, or source locator cannot be validated must not be persisted. Ingestion must not leave partial report/version/fact writes when validation fails.
+
 Additional rules:
 
 - Persist independently meaningful inputs required for analysis, such as production quantity, sales quantity, selling rate, cost inputs, and other selected canonical measures, only after their meaning, unit, period, and provenance are resolved.
