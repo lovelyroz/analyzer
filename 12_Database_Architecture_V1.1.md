@@ -355,7 +355,7 @@ The source-reported amount, quantity, rate, sign, scale, unit, currency, precisi
 - Ingestion-time mapping resolves source labels into canonical metrics or OTHER_* buckets before persistence. Unresolved mappings must not silently enter the financial-input tables.
 - `mapping_rules` may retain concise, versioned mapping metadata needed to make this classification repeatable. Per-source-row raw mapping archives are not a target requirement.
 - The target financial fact table is the canonical selected-input layer (the existing `normalized_financial_facts` is a candidate for redesign as that layer). It stores one resolved value per accepted metric/period/report version, with minimal provenance; it is not a second copy of raw facts.
-- `normalized_financial_fact_inputs` is not automatically required; retain a composition/provenance relationship only if a concrete analysis or audit requirement cannot be met by the minimal source locator.
+- `normalized_financial_fact_inputs` is not automatically required; retain a composition/provenance relationship only if a concrete analysis or audit requirement cannot be met by the owner's approved minimum provenance.
 - Mapping and normalization must not silently create or persist calculated financial amounts.
 
 ### Market / FX / ownership
@@ -439,7 +439,7 @@ Same calendar day may hold both FREE_MARKET and OPERATIONAL rows.
 - Store the quote's unit/basis as explicit metadata (for example, IRR or Toman per one unit of `currency_from`). A numeric rate without an unambiguous quote unit is not admissible for analysis.
 - No unit conversion is authorized by this architecture, including Toman-to-Rial ×10. If a conversion is later required, it must first be explicitly identified and authorized by the user during implementation; it must not be assumed or applied automatically.
 - Preserve the source rate type and currency pair. FREE_MARKET and OPERATIONAL must never be silently substituted.
-- Retain the observation date, source identity/reference, and any source-specific timestamp or locator needed to trace the rate. Unknown or ambiguous dates/units must not be guessed.
+- Retain the observation date, source identity/reference, and any source-specific timestamp needed to interpret the rate; exact row/cell locators may be used transiently but are not mandatory persisted fields. Unknown or ambiguous dates/units must not be guessed.
 
 
 ### Conversion rules
@@ -457,7 +457,7 @@ Same calendar day may hold both FREE_MARKET and OPERATIONAL rows.
 ### Layering
 
 ```text
-Source file / PDF / Excel / API
+Source file / Excel / API
         ↓
 Format-specific acquisition and extraction adapter
         ↓
@@ -482,7 +482,7 @@ The intended direction is to replace CODAL PDF acquisition/extraction with Excel
 - Blank/unusable source input cells remain NULL/unknown, not zero. No synthetic fallback value (including zero) may be persisted for a missing source input. A valid source-reported product sales amount is retained as reported; when it is blank, quantity × selling rate may be calculated at runtime only if both inputs are valid and compatible.
 - Quarterly CODAL filings commonly report cumulative year-to-date values. Q1/Q2/Q3/Q4 source periods must follow the FinancialPeriod contract in Section 3. Standalone-quarter values are derived at runtime, using compatible report versions; they are not source facts to persist.
 - CODAL PDF acquisition/extraction is outside the V1 target scope and is not a supported input path or acceptance criterion. V1 requires neither creating nor preserving a PDF adapter, nor maintaining PDF compatibility during the Excel implementation. Any PDF-related code that remains in the repository is historical legacy implementation only; its continued existence must not create a transition dependency or additional maintenance requirement.
-- Historical implementation note: the existing legacy PDF path uses `pypdf`; image-only/no-text PDFs are rejected and OCR is not silently substituted. This note documents the temporary legacy path only; PDF is excluded from the target CODAL input architecture.
+- Historical implementation note only: legacy PDF-related code may exist in the repository, but it is outside the V1 supported input architecture and creates no requirement to preserve, maintain, or validate that path.
 
 ### OHLC / FX formats
 
@@ -536,4 +536,4 @@ Database owns selected canonical financial inputs, minimal provenance, controlle
 
 Overall Analyzer architecture remains **V1** with exactly nine analytical stages.
 
-Approved/reviewed decisions recorded in this revision: company/industry admission contract; FinancialPeriod Jalali/YTD contract; selected canonical-input persistence without raw financial-row retention, simple OTHER_* buckets, minimal provenance, and runtime calculation policy; Excel adapter direction with common DTO/persistence boundary and safe PDF transition; migration history corrected through version 8. CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007 remain historical amendment references pending a complete section-by-section audit.
+Approved/reviewed decisions recorded in this revision: company/industry admission contract; FinancialPeriod Jalali/YTD contract; selected canonical-input persistence without raw financial-row retention, simple OTHER_* buckets, minimal provenance, and runtime calculation policy; Excel adapter direction with common DTO/persistence boundary and Excel-only input scope and exclusion of PDF; migration history corrected through version 8. CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007 remain historical amendment references pending a complete section-by-section audit.
