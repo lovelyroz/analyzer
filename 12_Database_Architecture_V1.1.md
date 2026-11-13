@@ -228,6 +228,18 @@ Each version must preserve the following information. This is a logical contract
 - A single report version may contain values for more than one financial period, for example current-period and comparative prior-period figures. Those values remain attached to the same source `ReportVersion`, but each fact links to its own applicable `FinancialPeriod`. Do not force all facts in a filing into the report's primary period.
 - The published company report is the authoritative financial source. Application calculations must not challenge, overwrite, or silently correct a value explicitly reported by the company.
 
+**Comparative-period data contract**
+
+- A value shown in a comparative column or comparative section is a fact reported by the current `ReportVersion`; it is not a fact from the earlier report version that originally reported that period.
+- Store each comparative value against (a) the exact `ReportVersion` that contains it and (b) the `FinancialPeriod` it actually describes. Its availability for PIT analysis begins at the publication datetime of the containing `ReportVersion`, not at the end date of the comparative financial period.
+- Preserve the distinction between the report's primary-period facts and comparative-period facts. Record the source-indicated period context (at minimum: `PRIMARY`, `COMPARATIVE`, or `UNKNOWN`) where it cannot be derived unambiguously from the report's primary period and source structure. Do not guess the period context.
+- Comparative values must not overwrite, merge with, or be relabeled as primary-period facts from a separate logical report. Preserve both source observations and their separate provenance, even when they describe the same metric and financial period.
+- By default, the selected version of the logical report whose primary period is being analyzed supplies that period's canonical analytical inputs. Comparative disclosures in another report are retained as separately attributable comparative observations; they are not silently substituted for or used to fill missing primary-period values.
+- If a later filing presents a comparative value as restated, preserve that value and the containing version's audit/restatement metadata. It does not automatically revise the earlier period's canonical inputs. Any future policy that elects to use such a comparative restatement as the analytical value for the earlier period must explicitly define source precedence, PIT behavior, and conflict handling before implementation.
+- When primary and comparative observations exist for the same metric and period, do not count both as separate economic amounts. They are alternative source observations for comparison/validation, not additive facts.
+- Comparisons are valid only when metric meaning, unit, dimensions, currency, and period basis (including YTD versus standalone period) are compatible. If they differ or cannot be established, do not reconcile or compare them automatically.
+- Conflicting primary and comparative values must both remain traceable. Do not average, overwrite, or silently choose one to conceal a discrepancy.
+
 **Point-in-time selection**
 
 - When the company publishes a correction or revised version of the same report, that newer version takes precedence only for analyses whose PIT cutoff includes the correction's publication datetime.
