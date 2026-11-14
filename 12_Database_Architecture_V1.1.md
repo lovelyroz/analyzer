@@ -460,15 +460,18 @@ This record contract applies to CODAL financial facts only. Market prices, FX ra
 
 Exact worksheet, row, column, cell, or range coordinates are not mandatory persisted fields. Source artifact reference and content fingerprint belong to ReportVersion, not to each fact. The Excel workbook itself and general raw-row payloads are not archived.
 
-**2. Metric catalog boundary**
+**2. FinancialMetric catalog and source-label mapping boundary**
 
-FinancialMetric is a controlled catalog of stable canonical financial input identities, not a copy of every source Header and not a store of calculated outputs.
+FinancialMetric is a controlled catalog of stable canonical financial input identities. It is not a copy of every source Header, a prebuilt inventory of every possible industry metric, or a store of calculated outputs.
 
-- A metric code is stable and unique. Its definition must describe the financial meaning sufficiently to prevent conflating different economic measures.
-- A metric's applicable value kind and interpretation metadata (such as currency amount, quantity, rate, ratio, flow/stock behavior, unit/basis, and applicable industry/report scope) must be explicit where relevant. These attributes describe interpretation; they do not authorize value conversion.
-- Metric identity is independent of report version, financial period, audit/restatement status, source Header wording, and source worksheet position.
-- Source Header → approved label/standard Header → canonical metric mapping boundaries are specified by DB-DES-002 and the report-family standards. This section does not authorize creating one metric for every raw Header.
-- Catalog entries and mapping/standard versions are controlled metadata. A metric must not be silently redefined in place in a way that changes the meaning of previously persisted inputs; a meaning change requires a new stable identity or an explicitly versioned compatibility decision.
+- The catalog is built incrementally. Only metrics whose financial meaning has been sufficiently defined and approved are admitted. Completing all seven industry standards is not a prerequisite for establishing or using the shared database core.
+- Each metric has a stable, unique code and a definition precise enough to distinguish economically different measures. For example, a sales amount and a sales quantity are separate metrics even when they appear in the same source table.
+- A metric's value kind and interpretation properties must be explicit where relevant, including whether it represents an amount, quantity, rate, ratio, flow, or stock. Applicable unit/currency and measurement-basis expectations must be defined sufficiently to validate interpretation. These properties do not authorize automatic conversion or rescaling.
+- The source unit, currency, and measurement basis actually reported remain attached to the accepted fact. The metric definition may specify compatible expectations or validation rules, but must not silently replace the source unit or imply an unapproved canonical conversion.
+- Metric identity is independent of report version, financial period, audit/restatement status, source Header wording, and worksheet position. A metric may be used by more than one industry or report family when the underlying economic meaning is genuinely the same; industry/report applicability and source-specific recognition belong to the approved, versioned mapping/standard context.
+- Source Header → approved label/standard Header → canonical metric is a controlled, versioned mapping path defined by DB-DES-002 and the relevant report-family/industry standards. Mapping must consider sufficient context (including company industry, report family, table/section, period or column meaning where relevant); matching Header text alone is not proof of equivalent financial meaning.
+- A source label that is unknown, ambiguous, or not covered by an approved mapping must not be assigned to the nearest-looking metric. It remains unresolved and is handled by the applicable admission/rejection rules until its meaning and mapping are approved.
+- Catalog entries and mapping/standard versions are controlled metadata. A metric must not be silently redefined in place in a way that changes the meaning of previously persisted inputs. A genuinely different meaning requires a new stable metric identity; any compatibility or mapping change must be explicitly versioned and must not reinterpret previously persisted facts silently.
 
 **3. OTHER_* handling**
 
