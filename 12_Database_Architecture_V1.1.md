@@ -439,20 +439,26 @@ Source-reported amount, quantity, rate, sign, unit, currency, and measurement ba
 
 This section defines the logical target for persisted CODAL financial inputs. It is a design contract, not an ORM or migration instruction. Existing tables are not assumed to satisfy it, and no existing data may be deleted or rewritten merely to make the current schema appear compliant.
 
-**1. Canonical input record**
+**1. Canonical CODAL financial-input record**
 
-The target is one long-form canonical input record per accepted metric, actual financial period, published report version, and approved value-defining dimensions. The logical record must be attributable to:
+The canonical financial fact represents one accepted financial input reported by a company through CODAL. It is not a generic container for every kind of database input. The target is one long-form record per accepted canonical metric, actual financial period, published report version, and approved value-defining dimensions.
 
-- company_id — validated company identity; it must agree with the company referenced by the report and financial period.
-- report_version_id — the exact published ReportVersion containing the value. Report type/classification is obtained through its parent Report.
+Each logical record must be attributable to:
+
+- company identity — the validated company to which the fact belongs. It must agree with the company referenced by the ReportVersion. The physical model may obtain this identity through ReportVersion rather than duplicate it as a stored fact column, provided company consistency is enforced.
+- report_version_id — the exact published ReportVersion that contains/publishes the value. Report type/classification is obtained through its parent Report.
 - period_id — the actual FinancialPeriod described by this particular value, not a period inferred from the report title, publication date, column position, or another value.
 - metric_id — the stable canonical metric identity assigned after approved classification.
 - extraction_standard_version — the exact version of the approved extraction/interpretation standard used to produce the canonical input.
-- The source-reported value, its source unit/currency and measure basis, plus any approved value-defining dimensions required to distinguish genuinely separate inputs.
-- An explicit value state/origin sufficient to distinguish a source-reported value, a known blank/NULL, and the narrowly permitted ZERO_FALLBACK.
-- Operational ingestion_run_id may be linked for processing audit. It does not replace report publication metadata or the required provenance fields above.
+- source-reported value, source unit/currency and measurement basis, plus only those approved value-defining dimensions needed to distinguish genuinely separate inputs.
+- explicit value state/origin sufficient to distinguish a source-reported value, a known blank/NULL, and the narrowly permitted ZERO_FALLBACK.
+- optional operational IngestionRun link for processing audit. It does not replace report publication metadata or required source provenance.
 
-The logical company/report/version/period/metric/standard links are mandatory. Exact worksheet, row, column, cell, or range coordinates are not mandatory persisted fields. Source artifact reference and content fingerprint belong to ReportVersion, not to each fact. The Excel workbook itself and general raw-row payloads are not archived.
+The logical company, report-version, actual-period, metric, and extraction-standard identities are mandatory. A physical implementation need not duplicate an identity already unambiguously reachable through a required relationship, but it must enforce the corresponding consistency invariant.
+
+This record contract applies to CODAL financial facts only. Market prices, FX rates, share-count observations, and corporate actions are separate input domains with their own temporal and source semantics; they must not be forced into FinancialFact. Their logical domains were established in the initial database scope and will be designed under their respective contracts.
+
+Exact worksheet, row, column, cell, or range coordinates are not mandatory persisted fields. Source artifact reference and content fingerprint belong to ReportVersion, not to each fact. The Excel workbook itself and general raw-row payloads are not archived.
 
 **2. Metric catalog boundary**
 
