@@ -65,6 +65,33 @@ Market and FX foundations remain separate branches and are consumed by their app
 
 ## 3. Core Domains
 
+### Initial shared-core scope — owner decision (2026-11-14)
+
+V1 will establish a shared, extensible database core before every industry-specific input standard is fully known. The core is expanded incrementally from real, reviewed source examples. Incomplete industry standards do not block core design; however, unknown or unapproved data must not be ingested by guessing.
+
+The initial **logical domains** are:
+
+| Logical domain | Responsibility in the initial core |
+|---|---|
+| Industry | Controlled industry catalog; initial seven industries, extensible without reusing existing codes |
+| Company | Stable company identity and mandatory link to exactly one industry |
+| ReportType | The two approved CODAL report families |
+| Report | Logical identity of a company's report |
+| ReportVersion | Each distinct publication/version, including independent audit and restatement attributes, publication identity and provenance |
+| FinancialPeriod | Actual Jalali period described by each fact |
+| FinancialFact | Canonical persisted financial input linked to company, report version, period, metric and applicable extraction/mapping standard |
+| MarketDaily | Daily OHLC, raw close, adjusted close, volume and traded value |
+| ShareCountHistory | Issued-share count history with its own effective date/validity and provenance |
+| CorporateAction | Dated, sourced capital events when reliable event data is available |
+| FXRate | Daily free-market and exchange-center USD rates; source Toman converted to canonical Rial under the approved FX exception |
+| DataDictionary / IndustryStandard | Versioned definitions and mappings for source headers, metrics and input standards; industry-specific content grows incrementally |
+| IngestionRun | Operational record of ingestion and validation status, counts, errors and warnings |
+
+This list defines logical scope, **not final physical table names, columns, keys, constraints or a one-domain/one-table mapping**. Physical decomposition is determined during DB-DES design. Some logical domains may require multiple physical tables, and implementation details must preserve their distinct meanings.
+
+The core must support controlled extension: new industries, source headers, metrics and event types are introduced through explicit catalog/standard updates and controlled migrations. Existing identifiers must not be repurposed, and persisted historical data must not be silently rewritten. Industry-specific tables and exhaustive metric catalogs are deferred until supported by real requirements.
+
+
 ### Entity
 
 - `industries`
