@@ -1,6 +1,5 @@
-
 {
-  "version": "1.0",
+  "version": "1.1",
   "report_type": "periodic",
   "industry": "banking",
   "headers": [
@@ -98,6 +97,12 @@
       "standard_header": "اقلام زیر خط",
       "raw_headers": [
         "اقلام زیر خط:"
+      ]
+    },
+    {
+      "standard_header": "وضعیت شرکت‌های سرمایه‌پذیر",
+      "raw_headers": [
+        "وضعیت شرکتهای سرمایه پذیر"
       ]
     }
   ]
