@@ -528,11 +528,13 @@ where the dimension component is empty for a non-dimensional input and represent
 
 **7. Separation of canonical input, mapping, and operational audit**
 
-- The canonical input layer must not depend on a persisted raw-row archive. A mandatory raw_fact_id foreign key is therefore incompatible with the target contract.
-- Mapping/extraction standards are versioned metadata used to make classification reproducible. DB-DES-002 defines whether compact mapping decisions/rules need their own persisted records; no per-source-row mapping archive is required by this task.
+- The canonical input layer must not depend on a persisted raw-row archive. A mandatory raw_fact_id foreign key is therefore incompatible with the target contract. Accepted canonical facts must be understandable from their canonical identities, source/report provenance, source unit/measurement semantics, and the applicable approved standard; a raw source row is not a required parent record.
+- Mapping/extraction standards are controlled, versioned metadata used to make classification reproducible. A standard version used by accepted facts must remain identifiable and its historical meaning must not be silently edited. A change that alters interpretation requires a new version. DB-DES-002 defines whether compact mapping decisions/rules need their own persisted records; no per-source-row mapping archive is required by this task.
+- The standard/catalog layer stores definitions and rules, not company financial observations. The canonical input layer stores accepted observations, not copies of the standard text or raw source rows. Facts must reference the applicable standard version through a stable identity.
 - normalized_financial_fact_inputs is not a required bridge to raw rows. Retain a relationship only if a concrete approved use case proves it necessary without reintroducing raw-row archival or exact-cell locator requirements.
 - derived_financial_facts and derived_financial_fact_inputs must not be used to persist application-calculated financial amounts or analytical outputs. Any retirement/migration must be handled separately and non-destructively after inspecting existing data.
-- IngestionRun may retain processing status, timestamps, counts, and concise errors/warnings. Failed ingestion may retain operational audit but must not leave partial ReportVersion/canonical-input writes.
+- IngestionRun is operational audit, not financial provenance and not a raw-data archive. It may retain run identity, processing status, start/end timestamps, concise counts, and concise error/warning summaries. Logs and error details must not become a dumping ground for copied workbook rows, full cell payloads, or calculated analytical results. Source publication time and source artifact identity remain with ReportVersion; they must not be replaced by run timestamps.
+- A failed ingestion may retain its failed IngestionRun and concise diagnostics, but must not leave partial ReportVersion/canonical-input writes. Report/version and accepted facts for a single ingestion unit must be committed atomically after validation; if validation or persistence fails, the unit is rolled back. A retry must be safe and idempotent for the same source version and standard version.
 
 **8. Logical acceptance criteria for DB-DES-001**
 
