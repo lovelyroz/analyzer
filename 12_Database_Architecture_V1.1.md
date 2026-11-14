@@ -475,12 +475,14 @@ FinancialMetric is a controlled catalog of stable canonical financial input iden
 
 **3. OTHER_* handling**
 
-OTHER_* is an explicit, controlled canonical bucket mechanism for in-scope miscellaneous amounts whose meaning is sufficiently understood to be grouped under an approved broad concept but does not warrant a dedicated metric.
+OTHER_* is a controlled classification option for in-scope miscellaneous financial amounts whose economic meaning is understood well enough to assign them to an approved broad category, but for which a dedicated canonical metric is not justified. It is not a temporary holding area for incomplete classification.
 
-- OTHER_* is not a catch-all for unknown, ambiguous, unmapped, or merely similar-looking source labels.
-- A source item may enter an OTHER_* bucket only when its report scope, economic meaning, period, unit, and mapping destination are resolved under an approved standard.
-- Items outside the approved extraction scope are discarded from financial persistence; unresolved in-scope items block/reject the report according to the applicable report-family admission rules.
-- The exact bucket codes, permitted parent/scope relationships, and mapping policy are deferred to DB-DES-002 and the relevant report standards. This task does not invent an expanded taxonomy.
+- OTHER_* must never be used as a catch-all for unknown, ambiguous, unmapped, or merely similar-looking source labels. Lack of a dedicated metric alone does not make an item eligible.
+- Admission to an OTHER_* bucket requires an approved, versioned rule that identifies the permitted report/industry scope and broad economic concept. The source item's economic meaning, actual period, amount nature, unit/currency, measurement basis, and any value-defining dimensions must be sufficiently resolved and compatible with that bucket.
+- Items with materially different economic meanings, units, or measurement bases must not be combined merely because they lack dedicated metrics. An OTHER_* classification does not authorize aggregation, netting, unit conversion, or loss of source distinctions.
+- A source item that is outside the approved extraction scope may be excluded from canonical financial persistence under the applicable report standard. An in-scope item whose meaning or destination remains unresolved must not be persisted; it must be surfaced as an ingestion issue and handled under the applicable report-family admission rules. It must not be silently discarded or assigned to OTHER_*.
+- Whether an OTHER_* bucket is permitted, its stable code, parent/category relationship, and precise scope are controlled by DB-DES-002 and the relevant report standards. This logical contract does not predefine bucket codes or create a universal miscellaneous bucket.
+- If later evidence justifies a dedicated metric, that metric and its mapping are introduced through a controlled, versioned catalog/standard change. Previously persisted OTHER_* facts must not be silently reinterpreted or rewritten.
 
 **4. Value, NULL, and ZERO_FALLBACK semantics**
 
