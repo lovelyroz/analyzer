@@ -542,6 +542,60 @@ The design is acceptable only when the final model can demonstrate all of the fo
 
 Physical ORM constraints, the final dimension identity, exact metric/OTHER_* catalog contents, mapping-rule schema, and migration of existing tables remain coordinated follow-on work under DB-DES-002, DB-DES-003, DB-MIG-001, and DB-ING-002. DB-DES-001 does not authorize code, schema, migration, or data changes.
 
+### Financial-item identity and mapping contract — DB-DES-002 (logical design, in progress)
+
+This section establishes the logical distinctions and admission rules for classifying CODAL Excel content into canonical FinancialFact records. It does not define physical tables, ORM relationships, complete industry catalogs, or final mappings for every report family. Those require reviewed source standards and follow-on design.
+
+**1. Distinct concepts — do not conflate Header, Label, and Metric**
+
+- **Source Header / source label:** the literal text observed in a workbook, interpreted only with its surrounding report, table, row, column, and temporal context. It is an input to classification, not a stable financial identity. Raw workbook labels and general raw rows are not permanently archived merely to support mapping.
+- **Standard Database Header:** a controlled, versioned identity for a report statement, table, or section where the relevant report-family standard requires one. It describes document structure, not necessarily an individual economic measure. The 16 entries in the current bank periodic-report dictionary are Standard Database Headers for statements/sections; they must not be treated as 16 FinancialMetrics merely because they have stable names.
+- **Label / category:** a higher-level classification assigned under a particular taxonomy. The approved six-category BANK taxonomy applies only to monthly bank activity reports. It is not the taxonomy for periodic financial reports and is not itself a FinancialMetric.
+- **FinancialMetric:** a stable canonical identity for one economically meaningful reported measure that may be persisted as a FinancialFact. A metric describes what the value means, not where it appeared or what its source column was called.
+- **Mapping rule:** a controlled, versioned rule that interprets source structure and context and resolves it to the appropriate standard header, label/category, metric and approved dimensions, or to an explicit out-of-scope/reject outcome. These targets are not interchangeable.
+
+**2. FinancialMetric identity**
+
+- Create a FinancialMetric only when the economic meaning of the measure is sufficiently understood and approved. Do not create one metric per source Header, row label, workbook column, bank, or industry by default.
+- Distinct economic measures require distinct metric identities even when they appear in the same table or share similar wording. For example, sales amount and sales quantity are different metrics.
+- A metric identity must remain stable across report versions, periods, source wording, and worksheet positions. It may be reused across industries or report families only when the underlying economic meaning is genuinely the same and the applicable standards explicitly permit that use.
+- The metric definition and its applicable standard must specify enough semantic information to validate interpretation, including value kind (for example amount, quantity, rate, ratio, stock, or flow), expected unit/currency and measurement basis where relevant. These properties are not permission to convert or rescale source values.
+- Unit differences alone must not be hidden by relabeling a source value. If two values have different economic meanings or incompatible measurement bases, they must not share a metric merely because their labels are similar.
+- A metric's meaning must never be silently changed in place. A materially different meaning requires a new stable metric identity and a versioned mapping/standard change. Existing facts are not silently reclassified.
+
+**3. Contextual mapping path**
+
+- Classification is based on the combination of company industry, selected ReportType, applicable report-family/industry standard version, source Header, table/section identity, row/column role, temporal meaning, and any other approved value-defining context. Header-text similarity alone is insufficient.
+- A report-family standard may use a Standard Database Header as an intermediate structural classification. Where that layer is not part of the approved standard, it must not be invented.
+- A Standard Database Header may contain multiple FinancialMetrics; conversely, different source Headers may map to the same FinancialMetric when their economic meaning and measurement basis are demonstrably equivalent.
+- A single source Header must not be assumed to represent exactly one metric if its rows or columns contain multiple measures. The extraction standard must resolve each candidate value using its actual row/column/table context.
+- For monthly bank activity reports, the approved six-category taxonomy classifies each in-scope Header into exactly one of its six categories. This classification does not automatically create a distinct metric for that Header; the measure-level metric, if needed for canonical persistence, is determined separately from the economic meaning of each accepted value.
+- For periodic bank reports, the current 16-entry dictionary maps observed Raw Headers to Standard Database Headers. Those 16 structural identities are not a substitute for metric-level classification of values within their statements/tables. The periodic-report standard remains separate from the monthly six-category taxonomy.
+- Other industries and report families may define their own structural or category layers when supported by reviewed source evidence. The shared core must support such extension without assuming that every industry uses the bank taxonomy or the same intermediate Header layer.
+
+**4. Mapping outcomes and admission gate**
+
+Every in-scope candidate value must resolve under an approved, versioned standard before it can become a canonical FinancialFact:
+- **Accepted mapping:** the economic meaning, actual period, value kind, unit/basis, and approved dimensions are sufficiently resolved; persist only the canonical fact and minimum required provenance.
+- **Explicitly out of scope:** the applicable approved standard identifies the item as outside extraction scope; it may be excluded from canonical financial persistence under that rule.
+- **Unknown, ambiguous, or unmapped in-scope item:** do not guess a nearest metric, assign a catch-all category, or silently discard it. Stop processing and request clarification where the owner/user can resolve it. If the ambiguity is not resolved, reject the entire report; partial report persistence and a Quarantine state are not part of the approved V1 admission contract.
+- An OTHER_* metric/category is permissible only under the restricted DB-DES-001 rules and an explicitly approved, versioned scope. It is not a generic unknown/unmapped destination.
+
+**5. Double-counting and source hierarchy**
+
+- Mapping must distinguish detail rows from subtotals, totals, summaries, and control/reconciliation rows. A total and its component details must not both be treated as additive inputs to the same economic measure.
+- A summary/control value may be retained only where an approved standard identifies a distinct purpose and canonical identity; it must not be added to its underlying details or silently replace them.
+- Do not infer a metric from sign, numeric shape, row position, or a familiar word alone. If the source evidence does not establish meaning, use the unresolved admission path above.
+- The same canonical identity collision rules in DB-DES-001 apply after mapping. Multiple source occurrences must not be summed, overwritten, or selected by worksheet position to force a unique fact.
+
+**6. Versioning, provenance, and persistence boundary**
+
+- Mapping rules and the standards/catalogs that define their scope are controlled, versioned metadata. An accepted fact must reference the exact extraction/interpretation standard version used, as required by DB-DES-001.
+- A change in source aliases, structural recognition, category assignment, or metric interpretation that can affect accepted values requires a controlled standard version change. Historical standard versions remain identifiable; they must not be silently edited to reinterpret prior facts.
+- Persist canonical metric identity and only the approved value-defining dimensions with the FinancialFact. Do not persist a permanent copy of every source Header, every workbook row, or a per-cell mapping archive.
+- Compact mapping metadata may be persisted where required for repeatable execution and controlled administration. Its physical representation and minimum fields remain subject to the later mapping/standard schema design.
+- This contract is logical only. Exact metric codes/catalog contents, mapping-rule schema, dimension model, and physical constraints remain open until supported by the relevant report-family standards and DB-DES-003.
+
 ### Financial normalization and mapping
 
 - `financial_metrics` is the small, controlled catalog of canonical analysis metrics and OTHER_* buckets; it is metadata, not a repository of calculated results.
