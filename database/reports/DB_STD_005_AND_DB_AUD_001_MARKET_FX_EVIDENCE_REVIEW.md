@@ -400,3 +400,49 @@ Migrationها به‌صورت توابع Python در یک فایل `src/migratio
 **محدودیت دامنه:** این بخش مرور هدفمند 9 فایل downstream و مدل‌های مرتبط است؛ نه inventory کامل تمام queryها، call-siteها یا تمام 128 فایل Python. فایل‌های XLSX/CSV منبع و دیتابیس عملیاتی بررسی نشده‌اند. در نتیجه دربارهٔ داده‌های واقعی، وضعیت تاریخی نسخه‌ها یا صحت مقادیر منبع ادعایی نمی‌شود.
 
 **وضعیت DB-AUD-001:** PARTIAL. این مرحله مصرف‌کنندگان اصلی Forecast/Market/Valuation/Decision و helper PIT را در سطح فایل‌های مشخص بررسی کرد و چند مغایرت مهم با DB-DES-001/003/004 ثبت شد. هنوز inventory کامل همهٔ readerها و writerها، تطبیق schema واقعی DB، و بررسی تمام call-siteهای Session باقی است. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+
+## 12. مرور تکمیلی Stage 2 KPI، Stage 5 Share PIT و مرزهای runtime — 2026-11-15
+
+### 12.1 Forecast و دادهٔ سهام: مغایرت PIT تأییدشده در query، builder و تست
+
+فایل‌های `src/forecast/queries.py`، `src/forecast/builder.py`، `src/forecast/service.py` و بخش‌های مرتبط `src/tests/test_stage5_forecast.py` بررسی شدند.
+
+1. `load_share_history()` تاریخ cutoff را با `normalize_datetime(cutoff).date()` به Gregorian تبدیل می‌کند و برای `ShareCountHistory` فقط `effective_date <= cutoff_date` را اعمال می‌کند. هیچ publication/availability timestamp برای ShareCountHistory در این مدل/فیلتر دیده نشد؛ تاریخ اثر، زمان آگاهی از داده را ثابت نمی‌کند.
+2. برای CorporateAction، query از `coalesce(announcement_date, cutoff_date) <= cutoff_date` استفاده می‌کند؛ مقدار اعلان تهی عملاً با خود cutoff جایگزین و واجد شرایط می‌شود.
+3. `build_weighted_average_shares()` نیز فقط وقتی اقدام را رد می‌کند که `announcement_date` یک `date` باشد و بعد از cutoff قرار گیرد. مقدار None رد نمی‌شود.
+4. نکتهٔ مهم‌تر: تست `test_null_announcement_action_is_treated_as_knowable_in_production_path` این رفتار را صریحاً تأیید می‌کند و انتظار دارد اقدام شرکتی بدون announcement date در EPS اعمال شود. این تست صرفاً پوشش ناکافی نیست؛ رفتار مغایر با اصل PIT fail-closed را به‌عنوان رفتار مطلوب تثبیت کرده است.
+5. این رفتار با قرارداد مصوب DB-DES-001/003 و قاعدهٔ DB-DES-004 که زمان انتشار/قابل‌دسترس‌شدن نامعلوم را برای PIT تاریخی غیرواجدشرایط می‌داند، ناسازگار است. تا زمانی که مالک قاعدهٔ معتبر دیگری تصویب نکند، missing announcement/publication باید از PIT تاریخی حذف شود؛ نباید تاریخ cutoff به‌عنوان زمان انتشار فرض شود.
+6. `build_weighted_average_shares()` تاریخ‌های `date` را به‌صورت عمومی می‌پذیرد و معنای تقویم را در type/argument مشخص نمی‌کند. اتصال آن به مدل‌های Share/Action فعلی که Gregorian Date دارند با قرارداد Jalali-native هدف نیازمند تعیین تکلیف صریح است.
+
+### 12.2 Stage 2 KPI و محاسبات دوره‌ای
+
+- `src/kpi/engine.py`، `industry.py` و `schema.py` در مسیر بررسی‌شده موتورهای pure هستند: دادهٔ مالی و `period_id` را از caller می‌گیرند؛ Session یا query ندارند و persistence مشاهده نشد. بنابراین اعتبار زمانی/نسخه‌ای دادهٔ ورودی مسئولیت caller است و از خود KPI engine تضمین نمی‌شود.
+- `KPIResult` فقط `company_id`، `period_id`، کد، مقدار، واحد، quality و calculation timestamp دارد؛ cutoff، report_version provenance، دورهٔ دقیق یا temporal basis در خود نتیجه دیده نشد.
+- `src/kpi/period_utils.py::calculate_ttm()` صرفاً چهار مقدار آخر فهرست را جمع می‌کند و نوع دوره، پیوستگی فصل‌ها، YTD در برابر standalone، تاریخ پایان، یا duplicate/missing quarter را کنترل نمی‌کند. این تابع با قرارداد TTM runtime-only تناقضی از نظر persistence ندارد، اما ورودی‌های آن باید از caller به‌صورت چهار جریان فصلی مستقل و معتبر آماده شوند؛ استفادهٔ مستقیم از چهار YTD یا چهار مقدار غیرمتوالی نتیجهٔ نادرست می‌دهد.
+- در فایل‌های KPI بررسی‌شده، اتصال مستقیم به FinancialFact/ReportVersion یا selector PIT یافت نشد. این امر به معنی نبود چنین اتصال در کل repository نیست؛ تنها مسیرهای خوانده‌شده pure و caller-fed هستند.
+- زمان محاسبهٔ KPI در `industry.py` با UTC تولید و timezone آن حذف می‌شود. این timestamp محاسبه است، نه publication/availability time داده و نباید جای cutoff یا provenance منبع استفاده شود.
+
+### 12.3 مرز سرویس و persistence خروجی‌ها
+
+- `forecast/service.py` صریحاً Session را از caller می‌گیرد و commit نمی‌کند؛ queryها خواندنی‌اند و ForecastResult در runtime برگردانده می‌شود.
+- `valuation/service.py` قیمت را از MarketDaily می‌خواند، نتیجهٔ Valuation را در حافظه می‌سازد و provenance قیمت را در metadata خروجی می‌گذارد؛ write/commit مشاهده نشد.
+- `market/service.py` تاریخچهٔ Jalali را به MarketEngine می‌دهد و persistence ندارد.
+- `decision/service.py` Forecast، FundamentalScore و MarketSignal را orchestrate می‌کند؛ identity شرکت/دوره را برای برخی ورودی‌ها کنترل می‌کند، اما هیچ cutoff یا availability timestamp مشترک را در خود اشیای ورودی تطبیق نمی‌دهد.
+- `models/forecast.py` هنوز مدل‌های جداگانهٔ LegacyForecast را در `LegacyForecastBase` تعریف می‌کند، درحالی‌که migrationهای بررسی‌شده جدول‌های forecast legacy را در نسخهٔ 8 حذف می‌کنند. در مسیرهای سرویس Stage 5 که اینجا بررسی شدند، استفاده از این مدل legacy مشاهده نشد؛ inventory import/reference کل repository برای تعیین اینکه آیا کد مرده یا وابستگی پنهان باقی مانده، هنوز کامل نیست.
+
+### 12.4 شواهد تست و اقدام‌های ضروری
+
+| موضوع | شاهد | نتیجهٔ ممیزی | اقدام لازم |
+|---|---|---|---|
+| Announcement تهی | query coalesce + builder شرطی + تست `test_null_announcement_action_is_treated_as_knowable_in_production_path` | رفتار صریحاً PIT را با فرض دسترس‌پذیری نامعلوم نقض می‌کند | تغییر سیاست به fail-closed؛ بازنگری تست و مدل metadata |
+| PIT ShareCountHistory | فقط effective_date فیلتر می‌شود | دادهٔ backdated می‌تواند look-ahead ایجاد کند | publication/availability timestamp اجباری و فیلتر پیش از انتخاب |
+| تقویم Share/Action | Gregorian Date و `date()` cutoff | با Jalali-native هدف ناهم‌راستا | تعیین مدل تاریخ canonical و migration strategy؛ بدون تبدیل ضمنی |
+| TTM | جمع چهار عدد آخر بدون temporal metadata | خطر جمع YTD، فصل نامتوالی یا دوره‌های نامتجانس | ورودی چهارتایی با quarter identity/standalone basis معتبر یا helper سخت‌گیرتر |
+| KPI provenance | خروجی فقط period_id و calculation timestamp دارد | قابلیت بازسازی PIT از KPIResult به‌تنهایی کافی نیست | انتقال provenance/cutoff در runtime result یا قرارداد صریح caller |
+| Legacy Forecast ORM | `LegacyForecastBase` در برابر migration حذف جدول | احتمال مدل بلااستفاده یا reference باقی‌مانده | inventory تمام importها و references پیش از حذف/تغییر |
+
+**محدودیت دامنه:** این مرحله فقط فایل‌های مشخص‌شده و تست مرتبط Stage 5 را مرور کرد؛ تستی اجرا نشد. هیچ XLSX/CSV منبع، دیتابیس عملیاتی، یا تمام import/referenceهای repository بررسی نشده است. بنابراین دربارهٔ داده‌های واقعی یا نبود قطعی استفاده از LegacyForecast در کل برنامه ادعایی نمی‌شود.
+
+**وضعیت DB-AUD-001:** PARTIAL. این مرحله مغایرت PIT در اقدام شرکتی بدون تاریخ اعلان را با شاهد query، builder و تست مشخص کرد و محدودیت‌های دوره‌ای KPI/TTM را ثبت کرد. inventory کامل read/write و importها، schema واقعی DB، و مسیر migration ایمن همچنان باز است. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
