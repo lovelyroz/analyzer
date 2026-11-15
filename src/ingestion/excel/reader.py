@@ -27,6 +27,7 @@ from src.ingestion.excel.dto import (
     ColumnObservation,
     Diagnostic,
     DiagnosticDetail,
+    DiagnosticSeverity,
     DeclaredTableObservation,
     MetadataItem,
     ReaderProvenance,
