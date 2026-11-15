@@ -446,3 +446,46 @@ Migrationها به‌صورت توابع Python در یک فایل `src/migratio
 **محدودیت دامنه:** این مرحله فقط فایل‌های مشخص‌شده و تست مرتبط Stage 5 را مرور کرد؛ تستی اجرا نشد. هیچ XLSX/CSV منبع، دیتابیس عملیاتی، یا تمام import/referenceهای repository بررسی نشده است. بنابراین دربارهٔ داده‌های واقعی یا نبود قطعی استفاده از LegacyForecast در کل برنامه ادعایی نمی‌شود.
 
 **وضعیت DB-AUD-001:** PARTIAL. این مرحله مغایرت PIT در اقدام شرکتی بدون تاریخ اعلان را با شاهد query، builder و تست مشخص کرد و محدودیت‌های دوره‌ای KPI/TTM را ثبت کرد. inventory کامل read/write و importها، schema واقعی DB، و مسیر migration ایمن همچنان باز است. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+## 13. ردیابی مدل‌های نرمال‌شده، مسیر CODAL و مدل‌های Legacy Forecast — 2026-11-15
+
+### 13.1 مسیر واقعی CODAL در برابر مصرف‌کنندهٔ Stage 5
+
+فایل‌های `src/ingestion/service.py`، `src/forecast/queries.py`، `src/models/normalized.py` و تست معماری Stage 1 بررسی شدند.
+
+1. مسیر خواندن Stage 5 در `forecast/queries.py` مستقیماً از `NormalizedFinancialFact` به‌همراه `FinancialMetric`، `FinancialPeriod` و `ReportVersion` می‌خواند؛ فیلتر `publication_datetime <= cutoff` پیش از انتخاب اعمال می‌شود. این مسیر به `RawFinancialFact` متصل نیست.
+2. مسیر CODAL در `ingestion/service.py::ingest_codal_report` (تابع persistence گزارش CODAL) یک `ReportVersion` و مجموعه‌ای از `RawFinancialFact` ایجاد می‌کند. در همین تابع، ایجاد `MappingDecision`، ساخت `NormalizedFinancialFact` یا ایجاد bridgeهای `NormalizedFinancialFactInput` مشاهده نشد.
+3. بنابراین در مسیر بررسی‌شده، خروجی ingestion مستقیماً به ورودی Stage 5 تبدیل نمی‌شود. تست `test_stage1_database_architecture.py` ساخت دستی Raw facts، MappingDecision و Normalized fact را برای آزمون مدل نشان می‌دهد؛ این تست مسیر production end-to-end را اثبات نمی‌کند.
+4. تابع CODAL برای tracking ID و publication datetime یکسان، وجود ReportVersion را بررسی می‌کند و سپس شمارش RawFinancialFactهای آن را در `records_updated` می‌گذارد و COMPLETED برمی‌گرداند؛ مقایسهٔ payload ورودی با payload ذخیره‌شده در این شاخه دیده نشد. این رفتار با DB-DES-001/005 که identical replay را unchanged/no-op و payload متعارض را reject می‌کند، هم‌راستا نیست.
+5. همین تابع پس از exception، transaction را rollback و یک IngestionRun جدید FAILED می‌سازد؛ بنابراین STARTED audit اولیه حفظ نمی‌شود. این مورد با یافته‌های بخش 9 دربارهٔ lifecycle ناسازگار Run سازگار است.
+
+### 13.2 تعارض مدل‌های ORM با قرارداد منطقی
+
+- `RawFinancialFact` ستون‌های raw label، unit، currency و حتی source_row/source_column را در مدل دائمی نگه می‌دارد. قرارداد منطقی فعلی DB-DES-001/002 می‌گوید raw Excel rows و locatorهای دقیق جزو canonical persistence نیستند. باید روشن شود این جدول legacy/موقت است یا هنوز بخشی از طرح فعال؛ این ممیزی به‌تنهایی حذف فیزیکی آن را تجویز نمی‌کند.
+- `NormalizedFinancialFact` مقدار را در `Numeric(30,4)` با نام `value_irr` ذخیره می‌کند، درحالی‌که قرارداد جدید canonical input بر SQLite INTEGER، حفظ unit/basis منبع و هویت کلید شامل ReportVersion + period + metric + approved dimensions تأکید دارد. مدل فعلی unique key شامل company/period/metric/source version است و هیچ approved dimension identity در آن دیده نشد؛ precision و naming نیز با قرارداد جدید هم‌راستا نیست.
+- `DerivedFinancialFact` و `DerivedFinancialFactInput` جداول persistence برای خروجی محاسبه و lineage مشتق دارند؛ این با تصمیم runtime-only بودن محاسبات/خروجی‌ها تعارض دارد. پیش از migration باید مصرف‌کنندگان و دادهٔ موجود مشخص شوند؛ این گزارش وضعیت DB واقعی را بررسی نکرده است.
+- `MappingRule` و `MappingDecision` نسخه و وضعیت review دارند، اما مدل نشان‌داده‌شده به‌تنهایی تضمین نمی‌کند هر Fact به نسخهٔ دقیق IndustryStandard/ExtractionStandard متصل باشد. `normalization_rule_id` نیز Integer nullable بدون FK قابل مشاهده است.
+- `ReportVersion` publication datetime و is_restated دارد، اما audit status موردنیاز اولویت چهارگانه در مدل بررسی‌شده وجود ندارد؛ بخش 11 این محدودیت انتخاب PIT را نیز ثبت کرده است.
+- `FinancialPeriod` از Gregorian SQL Date و انواع MONTH/QUARTER/SEMI_ANNUAL/NINE_MONTH/ANNUAL/TTM استفاده می‌کند؛ با DB-DES-003 که Jalali-native، INSTANT/DURATION و TTM runtime-only را می‌خواهد، نیازمند بازطراحی/مهاجرت است. این مشاهده مدل ORM است، نه بررسی مقادیر واقعی DB.
+
+### 13.3 مدل‌های Forecast قدیمی
+
+- `src/models/forecast.py`، `ForecastVersion` و `ForecastInputRefModel` را در `LegacyForecastBase` مجزا تعریف می‌کند و docstring می‌گوید این metadata برای اجرای migration تاریخی 7 است؛ migration 8 جداول forecast را حذف می‌کند.
+- در مسیرهای Stage 5 service بررسی‌شده، import یا query این ORMها مشاهده نشد. اما inventory کامل تمام importها/references در کل repository در این مرحله انجام نشده؛ بنابراین حکم حذف قطعی یا dead code صادر نمی‌شود.
+
+### 13.4 ماتریس شکاف و اقدام لازم
+
+| شکاف | شاهد مستقیم | پیامد | اقدام بعدی |
+|---|---|---|---|
+| CODAL فقط Raw می‌نویسد | `ingest_codal_report` و Stage 5 query | Stage 5 مصرف‌کنندهٔ مستقیم خروجی CODAL نیست | طراحی/پیاده‌سازی pipeline استخراج، mapping و canonical validation مطابق DB-DES-001/002 |
+| replay CODAL به‌عنوان update | شاخهٔ existing ReportVersion | مغایر idempotency و conflict policy | fingerprint/payload identity و source revision؛ duplicate unchanged، conflict reject |
+| raw rows دائمی | RawFinancialFact ORM و writer | تعارض با حداقل canonical persistence | تعیین نقش legacy/staging و طرح گذار؛ بدون حذف شتاب‌زده |
+| normalized fact schema | Numeric value_irr و unique key فاقد dimensions | عدم انطباق با INTEGER، unit/basis و uniqueness contract | طراحی physical schema/migration پس از تکمیل استانداردها |
+| derived facts persisted | DerivedFinancialFact tables | تعارض با runtime-only outputs | inventory مصرف‌کننده و migration/deprecation plan |
+| FinancialPeriod و ReportVersion | Gregorian dates، TTM type، نبود audit status | عدم انطباق زمانی و version ranking | physical design منطبق با DB-DES-001/003 |
+| LegacyForecast ORM | isolated metadata و migration 7/8 | احتمال import/reference باقی‌مانده | inventory کامل import/reference قبل از پاک‌سازی |
+
+**محدودیت دامنه:** این مرحله مسیر CODAL، Stage 5 query، مدل‌های ORM منتخب و یک تست معماری را بررسی کرد. تمام import/referenceهای repository، migrationهای اجرایی روی DB واقعی، محتوای دیتابیس عملیاتی و فایل‌های XLSX/CSV بررسی نشده‌اند. هیچ نتیجه‌ای دربارهٔ نبود قطعی استفاده از LegacyForecast یا وضعیت داده‌های موجود اعلام نمی‌شود.
+
+**وضعیت DB-AUD-001:** PARTIAL. یک شکاف اتصال مهم بین CODAL raw persistence و Stage 5 normalized reader، به‌علاوهٔ تعارض‌های مدل ORM با قراردادهای جدید ثبت شد. inventory کامل read/write/importها، تطبیق schema واقعی، و طرح migration هنوز باز است. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
