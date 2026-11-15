@@ -1,8 +1,8 @@
 """Immutable, transient DTOs for CODAL Excel source observations.
 
-The V1 source-workbook contract is text-only: populated cells must contain
-literal text. Non-text cells are preserved as unexpected observations and
-reported; they are never silently coerced into text or canonical numbers.
+V1 source cells must contain literal values, not formulas. Literal text and
+literal numeric values are preserved in their native observed forms; unsupported
+cell kinds are reported rather than coerced. These DTOs are not persistence models.
 These DTOs are not persistence models.
 """
 
@@ -39,6 +39,7 @@ class StructureStatus(StrEnum):
 
 class CellValueKind(StrEnum):
     PRESENT_TEXT = "PRESENT_TEXT"
+    PRESENT_NUMBER = "PRESENT_NUMBER"
     BLANK = "BLANK"
     UNEXPECTED_NON_TEXT = "UNEXPECTED_NON_TEXT"
     ERROR_VALUE = "ERROR_VALUE"
@@ -285,6 +286,7 @@ class CellObservation:
     value_kind: CellValueKind
     data_type: str
     text_value: str | None = None
+    numeric_value: int | float | None = None
     unexpected_value: ScalarValue = None
     number_format: str | None = None
     style_id: int | None = None
@@ -299,8 +301,13 @@ class CellObservation:
             raise ValueError("PRESENT_TEXT cells must retain their literal text value.")
         if self.value_kind is not CellValueKind.PRESENT_TEXT and self.text_value is not None:
             raise ValueError("Only PRESENT_TEXT cells may carry text_value.")
-        if self.value_kind in (CellValueKind.PRESENT_TEXT, CellValueKind.BLANK) and self.unexpected_value is not None:
-            raise ValueError("Text and blank cells cannot carry unexpected_value.")
+        if self.value_kind is CellValueKind.PRESENT_NUMBER:
+            if isinstance(self.numeric_value, bool) or not isinstance(self.numeric_value, (int, float)):
+                raise ValueError("PRESENT_NUMBER cells must retain a literal int or float value.")
+        elif self.numeric_value is not None:
+            raise ValueError("Only PRESENT_NUMBER cells may carry numeric_value.")
+        if self.value_kind in (CellValueKind.PRESENT_TEXT, CellValueKind.PRESENT_NUMBER, CellValueKind.BLANK) and self.unexpected_value is not None:
+            raise ValueError("Present literal and blank cells cannot carry unexpected_value.")
         if self.value_kind is CellValueKind.UNEXPECTED_NON_TEXT and self.unexpected_value is None:
             raise ValueError("Unexpected non-text cells must retain their observed scalar value.")
         if self.value_kind is CellValueKind.ERROR_VALUE and not isinstance(self.unexpected_value, str):
