@@ -586,6 +586,14 @@ This section establishes the logical distinctions and admission rules for classi
 - Exact metric codes, metric definitions, dimension identities, and row/column-level mapping rules are not invented from the 17 section titles. They are specified only when supported by reviewed workbook evidence or a concrete implementation requirement, and are coordinated with DB-DES-003 for temporal interpretation.
 - Other industries and report families may define their own structural or category layers incrementally, when supported by reviewed source evidence or when a specific standard is required during implementation. Do not pre-build catalogs for all companies/industries merely for completeness. The shared core must support such extension without assuming that every industry uses the bank periodic-report categories or the monthly bank taxonomy.
 
+**Bank periodic Metric/Dimension design and reported Forecast/Plan values — 2026-11-15**
+
+The initial provisional semantic grouping of all 17 bank periodic Standard Database Headers, candidate FinancialMetrics and value-defining dimensions, temporal/value roles, and double-counting risks is documented in `dbReports/BANK_PERIODIC_METRIC_DIMENSION_MAPPING_PROPOSAL.md`. That proposal is based on the available Markdown inspection report for the Parsian sample; it is not a claim of direct XLSX inspection, a finalized Metric catalog, or executable mapping rules.
+
+Owner clarification (2026-11-15): numerical Forecast or Plan values published within any of the 17 in-scope periodic-bank Standard Database Headers are report-sourced financial inputs and are eligible for canonical persistence. They must retain an explicit temporal/status distinction (`FORECAST` or `PLAN`) and the relevant period/horizon, and must never be conflated with actuals. Forecast/Plan values outside the 17 headers are outside this sample standard's extraction scope. Narrative-only commentary is not a FinancialFact. This does not authorize persistence of application-generated forecasts or analytical outputs, which remain runtime-only.
+
+The seven semantic groupings are provisional. Exact metric identities, dimensions, temporal mapping, overlap/reconciliation rules, and row/column mappings remain open where source evidence is insufficient. DB-DES-002 therefore remains PARTIAL.
+
 **4. Mapping outcomes and admission gate**
 
 Every in-scope candidate value must resolve under an approved, versioned standard before it can become a canonical FinancialFact:
