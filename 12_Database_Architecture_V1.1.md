@@ -858,6 +858,10 @@ The detailed logical contract is maintained in `database/reports/DB_DES_005_INGE
 - DB-DES-006 PARTIAL است؛ مدل فیزیکی، migration، mapping واقعی workbook، fingerprint/revision identity و تطبیق reader/writerها در Taskهای مستقل باقی می‌مانند. هیچ حذف/تغییر legacy مجاز نیست مگر پس از audit داده و طرح migration غیرمخرب.
 
 
+### Excel observation DTO evidence-fit — DB-AUD-007
+
+گزارش `database/reports/DB_AUD_007_EXCEL_OBSERVATION_DTO_EVIDENCE_FIT.md` قرارداد DB-DES-007 را در برابر الگوهای مستندشدهٔ چهار workbook ارزیابی می‌کند. نتیجه نشان می‌دهد DTO باید headerها را به‌صورت محورهای مستقل گروه‌بندی، معیار/اندازه، زمان، qualifier ارائه و ساختار سطر حفظ کند؛ مسیر خطی یا رشتهٔ ادغام‌شده به‌تنهایی کافی نیست. همچنین context سطر، ستون، جدول و caption باید جدا بمانند تا تاریخ ویژگی شرکت سرمایه‌پذیر یا footnote به‌اشتباه دورهٔ FinancialFact نشود. این refinement در DB-DES-007 اعمال شد. ارزیابی فقط بر DB-AUD-002 Markdown متکی است؛ هیچ XLSX در این مرحله بازبینی نشده است.
+
 ### Excel source observation DTO contract — DB-DES-007
 
 قرارداد تفصیلی DTO موقت adapter اکسل در `database/reports/DB_DES_007_EXCEL_SOURCE_OBSERVATION_DTO_CONTRACT.md` ثبت شده است.
