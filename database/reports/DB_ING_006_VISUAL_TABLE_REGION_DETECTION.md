@@ -1,0 +1,85 @@
+# DB-ING-006 — Conservative Visual Table-Region Detection
+
+**Date:** 2026-11-15  
+**Task:** 033  
+**Status:** PARTIAL — first implementation and owner-run test module authored; owner validation and representative-workbook review pending.  
+**Related:** DB-ING-004 / Task 031; DB-ING-005 / Task 032; DB-DES-007; DB-AUD-007; DB-AUD-008.
+
+## 1. Scope and boundary
+
+This increment adds a separate visual table-region candidate detector over the transient `WorkbookObservation` produced by the Excel source reader.
+
+The detector is structural only. It does not:
+- assign Metric, FinancialPeriod, Unit, currency, dimension, stock/flow, YTD, subtotal, total, forecast, or other financial meaning;
+- classify a row as header/detail/total;
+- normalize or parse source text;
+- persist observations or alter ORM/schema/migrations;
+- convert a candidate into a resolved table.
+
+Declared Excel structured tables remain the only `RESOLVED` table structures. Visual regions are emitted as `CANDIDATE` or `AMBIGUOUS`.
+
+## 2. Implementation
+
+Files added/updated:
+- `src/ingestion/excel/table_detector.py` — `detect_visual_table_candidates(observation)`.
+- `src/ingestion/excel/__init__.py` — exports the detector.
+- `src/tests/test_excel_table_detector.py` — owner-run tests.
+- This report.
+
+The function is pure with respect to its input: it returns a new immutable `WorkbookObservation`; source cells and the input observation are not mutated.
+
+## 3. Conservative detection rules — version 1
+
+1. Only populated literal-text cells participate in visual occupancy. Blank observations, including merged placeholders, are not treated as populated values.
+2. A visual candidate must contain at least two occupied rows, at least two occupied columns, and at least three populated text cells. Single-row captions, notes, and labels are not promoted to tables.
+3. A fully empty row or column is a segmentation signal. Occupied row/column bands are grouped deterministically; separate bands can produce multiple candidates in one worksheet.
+4. A single blank row or column is a weak separator, not proof that two independent tables exist. Candidates adjacent to such a separator receive `AMBIGUOUS` status and `EXCEL_TABLE_SINGLE_BLANK_SEPARATOR`.
+5. A merged range that crosses a proposed candidate boundary causes `AMBIGUOUS` status and `EXCEL_TABLE_BOUNDARY_CROSSED_BY_MERGE`.
+6. A nearby merged heading (up to two rows above a candidate, overlapping its columns) may be retained in `title_fragments` as source evidence. It does not expand the table bounds and is not asserted to be a caption.
+7. Candidate bounds are the occupied text-cell extents. Row/column references preserve occupied indexes; no missing cell values are synthesized.
+8. A visual candidate overlapping an already declared structured table is suppressed to avoid duplicate or conflicting structures.
+9. Stable ordering follows worksheet order, then row/column position. Detection method/version are `conservative_blank_band_v1` / `1`.
+
+## 4. Candidate status interpretation
+
+| Status | Meaning | Downstream rule |
+|---|---|---|
+| `CANDIDATE` | Structural evidence meets the conservative minimum and no known boundary ambiguity was detected | Still requires later table/header interpretation; never treated as semantically resolved |
+| `AMBIGUOUS` | A weak one-cell-wide separator or a merged range makes the proposed boundary uncertain | Must not be silently promoted; requires stronger evidence or review |
+| `RESOLVED` | Reserved for explicit structured Excel tables currently observed by the reader | No visual detector output is marked resolved |
+
+The detector intentionally does not emit `UNSUPPORTED` in this increment; unsupported workbook constructs remain the reader/contract layer's responsibility.
+
+## 5. Owner-run tests authored
+
+`src/tests/test_excel_table_detector.py` covers:
+- two vertically separated candidate regions;
+- side-by-side regions separated by an empty column;
+- nearby merged caption evidence without expanding bounds;
+- a merged range crossing a proposed boundary;
+- rejection of single-row captions/notes as table candidates;
+- repeatability and input immutability;
+- a stronger separator consisting of two blank rows.
+
+The assistant did not run tests. Owner command:
+
+```powershell
+pytest src/tests/test_excel_observation_dto.py src/tests/test_excel_source_reader.py src/tests/test_excel_table_detector.py -q
+```
+
+## 6. Known limitations and validation required
+
+- Blank-band segmentation is a deliberately narrow first-pass heuristic. A genuinely blank row/column inside one logical table may split it; a one-cell gap is therefore marked ambiguous, but multiple blank rows/columns are treated as stronger separators. Real workbooks must validate whether this is sufficiently conservative.
+- Tables with fewer than two occupied rows or columns, or fewer than three populated text cells, are not emitted as candidates. This avoids promoting captions/notes but can miss very small legitimate tables.
+- Sparse regions whose internal empty rows/columns resemble separators can be fragmented; the current detector does not attempt to infer continuity from formatting, borders, styles, formulas, or numeric patterns.
+- Merged title evidence is captured only for nearby merged headings overlapping the candidate columns. Unmerged captions and more distant contextual notes are not attached in V1.
+- No real XLSX workbook was inspected by the assistant. The owner must validate the candidate bounds/statuses against the source workbooks and Markdown audits before treating the heuristic as accepted for production ingestion.
+
+## 7. Acceptance status
+
+Implementation and test definitions are present. Task 033 remains PARTIAL until:
+1. the owner-run test command passes and any defects are corrected;
+2. the owner checks the output against representative real source workbooks, including multiple tables, captions, merged headers, sparse layouts, and blank gaps;
+3. any false split, missed table, or wrongly certain boundary is corrected or explicitly documented as a V1 limitation.
+
+No tests were run by the assistant. No ORM, schema, migration, database data, or dependency was changed.
