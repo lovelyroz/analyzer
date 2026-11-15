@@ -72,8 +72,8 @@ def test_blank_cell_is_not_zero_or_empty_text():
     assert cell.unexpected_value is None
 
 
-@pytest.mark.parametrize("value,data_type", [(123, "n"), (12.5, "n"), (True, "b"), ("=A1+B1", "f")])
-def test_non_text_populated_cell_is_explicitly_unexpected(value, data_type):
+@pytest.mark.parametrize("value,data_type", [(True, "b"), ("=A1+B1", "f")])
+def test_unsupported_populated_cell_is_explicitly_unexpected(value, data_type):
     cell = CellObservation(
         cell_ref=_cell_ref(),
         value_kind=CellValueKind.UNEXPECTED_NON_TEXT,
@@ -86,11 +86,24 @@ def test_non_text_populated_cell_is_explicitly_unexpected(value, data_type):
     assert cell.text_value is None
 
 
+@pytest.mark.parametrize("value", [123, 12.5, -4, 0])
+def test_present_number_preserves_literal_numeric_value(value):
+    cell = CellObservation(
+        cell_ref=_cell_ref(),
+        value_kind=CellValueKind.PRESENT_NUMBER,
+        data_type="n",
+        numeric_value=value,
+    )
+    assert cell.numeric_value == value
+    assert cell.text_value is None
+    assert cell.unexpected_value is None
+
+
 def test_error_cell_preserves_error_token_and_diagnostic():
     diagnostic = Diagnostic(
-        code="EXCEL_TEXT_ONLY_ERROR_CELL",
+        code="EXCEL_UNSUPPORTED_ERROR_CELL",
         severity=DiagnosticSeverity.ERROR,
-        message="Excel error cells are not supported by the V1 text-only contract.",
+        message="Excel error cells are unsupported literal source values.",
         cell_ref=_cell_ref(),
     )
     cell = CellObservation(
@@ -102,7 +115,7 @@ def test_error_cell_preserves_error_token_and_diagnostic():
     )
 
     assert cell.unexpected_value == "#VALUE!"
-    assert cell.diagnostics[0].code == "EXCEL_TEXT_ONLY_ERROR_CELL"
+    assert cell.diagnostics[0].code == "EXCEL_UNSUPPORTED_ERROR_CELL"
 
 
 def test_cell_observation_rejects_non_string_present_text():
