@@ -1,4 +1,4 @@
-"""Owner-run tests for the text-only openpyxl source reader.
+"""Owner-run tests for the literal-value openpyxl source reader.
 
 The assistant authors these tests but does not execute them.
 """
