@@ -150,6 +150,15 @@ The synthetic fixture observations include:
 
 The full owner-provided output is retained in repository-root `reply.md` as execution evidence. The assistant did not execute the utility or any tests.
 
+
+## 7.4 Date-system and repeatability observations added to the utility (not yet executed)
+
+The utility was extended to generate two additional synthetic workbooks containing the same calendar date (2024-01-01), one using the Excel 1900 date system and one using the 1904 date system. For each workbook it reports the workbook epoch, the decoded calendar value, and the raw numeric date serial read from worksheet XML; it also reports whether the decoded dates match and whether the serials differ. This is intended to verify that the date-system offset is preserved as workbook metadata rather than being mistaken for a change in the calendar date.
+
+The utility also now loads the exact same immutable synthetic XLSX bytes twice in independent formula and cached-value views. It compares a stable observation projection (epoch, sheet states, merged ranges, table names/ranges, formula/cache values, numeric scalar, and non-empty coordinates), records the input SHA-256 for both reads, and reports whether both the input fingerprint and observation projection match. This tests repeatability of reading identical bytes within one execution and one reader version; it does not prove cross-version or cross-process reproducibility.
+
+These are source-level additions only. The enhanced utility has not yet been run by the owner or assistant. The JSON fields `date_epoch_comparison` and `repeatability` must be reviewed from the next owner-run output before any empirical conclusion is recorded. Large-sheet performance/memory, Calamine comparison, and source-workbook validation remain open. No tests were run.
+
 ## 8. Sources
 
 - openpyxl tutorial and workbook loading options: https://openpyxl.readthedocs.io/en/stable/tutorial.html
