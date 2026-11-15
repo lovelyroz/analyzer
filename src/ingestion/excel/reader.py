@@ -26,10 +26,12 @@ from src.ingestion.excel.dto import (
     Diagnostic,
     DiagnosticDetail,
     DiagnosticSeverity,
+    DeclaredTableObservation,
     MetadataItem,
     ReaderProvenance,
     RowObservation,
     SourceArtifactObservation,
+    StructureStatus,
     TableObservation,
     WorkbookDateSystem,
     WorkbookMetadataObservation,
@@ -354,6 +356,8 @@ def read_excel_source(
                         workbook_diagnostics.append(diagnostic)
 
             used_range = None
+            for merged in merged_ranges:
+                populated_bounds.extend(((merged.min_row, merged.min_column), (merged.max_row, merged.max_column)))
             if populated_bounds:
                 used_range = _cell_range(
                     min(row for row, _ in populated_bounds),
@@ -387,7 +391,7 @@ def read_excel_source(
                         bounds=bounds,
                         detection_method="excel_structured_table",
                         detection_version="1",
-                        status=__import__("src.ingestion.excel.dto", fromlist=["StructureStatus"]).StructureStatus.RESOLVED,
+                        status=StructureStatus.RESOLVED,
                         header_rows=(bounds.min_row,),
                         row_refs=tuple(range(bounds.min_row, bounds.max_row + 1)),
                         column_refs=tuple(range(bounds.min_column, bounds.max_column + 1)),
@@ -421,9 +425,7 @@ def read_excel_source(
                     used_range=used_range,
                     merged_ranges=merged_ranges,
                     declared_tables=tuple(
-                        __import__("src.ingestion.excel.dto", fromlist=["DeclaredTableObservation"]).DeclaredTableObservation(
-                            name=name, display_name=display_name, bounds=bounds
-                        )
+                        DeclaredTableObservation(name=name, display_name=display_name, bounds=bounds)
                         for name, display_name, bounds in declared_tables
                     ),
                     candidate_table_ordinals=tuple(worksheet_table_ordinals),
