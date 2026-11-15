@@ -312,6 +312,12 @@ class CellObservation:
             raise ValueError("Unexpected non-text cells must retain their observed scalar value.")
         if self.value_kind is CellValueKind.ERROR_VALUE and not isinstance(self.unexpected_value, str):
             raise ValueError("Excel error cells must retain their literal error token.")
+        for name in ("border_top", "border_bottom", "border_left", "border_right", "fill_type"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, str):
+                raise TypeError(f"{name} must be a string or None.")
+        if self.font_bold is not None and not isinstance(self.font_bold, bool):
+            raise TypeError("font_bold must be a bool or None.")
         if not isinstance(self.diagnostics, tuple):
             raise TypeError("Cell diagnostics must be an immutable tuple.")
 
