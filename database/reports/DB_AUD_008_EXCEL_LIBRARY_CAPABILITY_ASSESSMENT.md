@@ -195,3 +195,14 @@ These are single-run observations from the owner's environment, not a performanc
 ---
 
 **Execution note:** The standalone synthetic spike utility was executed by the owner in their environment; its JSON output is retained in repository-root `reply.md` and summarized in section 7.3. The assistant did not execute the utility or any tests. No source XLSX was directly inspected, no package was installed or upgraded, no production ingestion code/DTO/ORM/schema/migration/data was changed, and no tests were run.
+
+
+## 7.6 Conditional same-file Calamine benchmark prepared
+
+The standalone utility now includes an optional python-calamine large-sheet benchmark alongside the existing openpyxl benchmark. When --benchmark-rows N is supplied, both readers are measured against the **same generated XLSX file**. Calamine loads the workbook through CalamineWorkbook.from_path(path), obtains LargeSheet, and traverses its native iter_rows() iterator while counting non-empty scalar values. The report includes load time, load-plus-traversal time, observed range bounds, Python-tracked current/peak memory, and the installed distribution version.
+
+If python_calamine is not importable, the utility emits calamine_large_sheet_benchmark.enabled: false with an explicit reason and continues normally; it does not install packages or fail solely because the optional reader is absent. If import succeeds but the comparative read fails, the failure is captured as an error observation.
+
+**Comparison caveat:** both readers use the same generated file and count non-empty values, but their internal representations and allocation strategies differ. tracemalloc does not reliably account for native Rust allocations, so the memory values are not total process-memory measurements and must not be interpreted as a strict memory winner. This is a controlled indicative comparison, not a production acceptance test. The utility has only been edited; it has not been executed by the assistant or owner after this change. The current owner-reported environment previously lacked python-calamine, so the first rerun may report the optional comparison as unavailable until the owner makes that package available in the intended interpreter.
+
+The public package usage reviewed for this implementation documents CalamineWorkbook.from_path(path), sheet_names, get_sheet_by_name(name), and sheet row iteration; see the [python-calamine package documentation](https://pypi.org/project/python-calamine/) and [Python API type declarations](https://github.com/dimastbk/python-calamine/blob/master/python/python_calamine/_python_calamine.pyi). No dependency declaration or installation was changed.
