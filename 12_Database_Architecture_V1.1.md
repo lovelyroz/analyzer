@@ -17,7 +17,7 @@ All supporting database-design documents, audit reports, working checklists, dic
 
 This document is reopened for review. The decisions explicitly recorded as reviewed/approved below are the current working contract; sections not yet audited remain provisional. Earlier V1 / V1.1 / V1.2 references are historical context and do not override the decisions recorded here. The database stores selected canonical financial inputs and minimal provenance, not raw financial statement rows; backend services own runtime calculations and analytical outputs. This contract supports Stages 2–9 without persisting calculated analytical results.
 
-**Global source-data fidelity rule — applies to every input domain:** Preserve source identity, economic meaning, sign, unit, currency, quote/measurement basis, calendar representation, and publication/observation metadata. Owner numeric-storage decision (2026-11-13) is the sole V1 precision exception: all persisted numeric inputs are stored as SQLite INTEGER after parsing the source numeric text with decimal arithmetic and applying ROUND_HALF_UP to the nearest integer (ties away from zero). Do not use binary floating point. This deliberate loss of fractional precision applies consistently to financial statements, market prices, FX rates, share counts, and corporate-action numeric terms. No other conversion is authorized: in particular, do not convert Toman/Rial, rescale source units, change sign, recalculate, interpolate, replace, or adjust values. Keep source unit/basis metadata explicit; NULL, genuine zero, and ZERO_FALLBACK remain distinct.
+**Global source-data fidelity rule — applies to every input domain:** Preserve source identity, economic meaning, sign, unit, currency, quote/measurement basis, calendar representation, and publication/observation metadata. Owner numeric-storage decision (2026-11-13) is the sole V1 precision exception: all persisted numeric inputs are stored as SQLite INTEGER after parsing the source numeric text with decimal arithmetic and applying ROUND_HALF_UP to the nearest integer (ties away from zero). Do not use binary floating point. This deliberate loss of fractional precision applies consistently to financial statements, market prices, FX rates, share counts, and corporate-action numeric terms. No other conversion is authorized: except for the explicitly approved FX source conversion from Toman to Rial, do not convert units/currencies, rescale source units, change sign, recalculate, interpolate, replace, or adjust source values. Keep source unit/basis metadata explicit; NULL, genuine zero, and ZERO_FALLBACK remain distinct.
 
 ---
 
@@ -763,7 +763,26 @@ This is an owner-approved logical input contract only. It does not authorize cha
 
 The V1 FX source contract was confirmed by the owner on 2026-11-14: daily USD rates, two types only (`FREE_MARKET` and `EXCHANGE_CENTER`), one value per date/type (no separate buy/sell values), source quote in Toman per USD, and Jalali observation dates. The owner further confirmed on 2026-11-14 that ingestion must automatically convert this FX quote to Rial using the exact factor ×10. The canonical persisted/analytical rate is in Rial; the original Toman source amount and unit must remain in provenance for auditability. This is the sole authorized automatic unit conversion in the current V1 input scope. This decision narrows the older generic FX taxonomy above for V1. Legacy implementation compatibility is not implied; any required model/schema/migration alignment must be reviewed explicitly in DB-DES-004 / DB-MIG-001. Documentation-only decision; no code, ORM, schema, migration, data, or test changes.
 
-## 14. Ingestion Boundary (CHANGE-007)
+## 14. Market / FX / Share / CorporateAction — DB-DES-004 (logical contract)
+
+The detailed contract is maintained in [DB_DES_004_MARKET_FX_SHARE_CONTRACT.md](database/reports/DB_DES_004_MARKET_FX_SHARE_CONTRACT.md). The following rules are normative:
+
+- MarketDaily, FXRate, ShareCountHistory and CorporateAction are separate input domains, not FinancialFact. All remain in the shared SQLite database.
+- MarketDaily represents one source-reported observation per company and Jalali trading date. Its logical identity is company plus Jalali year/month/day. OHLC, raw close, source-adjusted close, volume and traded value retain their source meaning, units and basis. Raw and adjusted close are separate source inputs; the application never recalculates adjusted prices or applies corporate-action adjustments.
+- FXRate accepts only daily USD rates of type FREE_MARKET or EXCHANGE_CENTER, one value per Jalali date/type. Its logical identity is Jalali date plus rate type. Source values are Toman/USD; canonical values are Rial/USD, computed by multiplying the source Decimal by exactly 10 and then applying ROUND_HALF_UP once. Original Toman amount/unit remain in provenance. No other domain receives automatic unit conversion.
+- ShareCountHistory is a source-reported share-count observation with its own effective/as-of Jalali date, source basis and provenance. CorporateAction is a separately sourced event with distinct announcement/approval/effective dates where supplied. Neither domain is synthesized from the other.
+- All persisted numeric inputs use SQLite INTEGER, Decimal parsing and one ROUND_HALF_UP operation; NULL, source zero and missing values remain distinct. No interpolation, synthetic observations, implicit unit conversion, or silent fallback is permitted.
+- Duplicate re-imports are idempotent. Conflicting values for the same logical identity are rejected unless an explicit, versioned source/revision rule resolves them. No last-write-wins. Source revisions must remain traceable; ingestion time is not a substitute for source publication/availability time.
+- PIT selection uses source publication/availability time before revision selection. Missing/ambiguous source availability time makes a record ineligible for historical PIT reconstruction; economic date, effective date and publication time remain separate.
+- FX conversion rules are versioned runtime metadata: FLOW uses period-average FX; STOCK uses period-end FX; MARKET_VALUE uses same-date FREE_MARKET. No interpolation or implicit carry-forward; unresolved rate selection means no conversion.
+- CSV/XLSX are adapter formats only. Validated canonical records and minimum provenance are persisted; raw files need not be archived. Exact file-column requirements remain DB-STD-005; transaction/atomicity details remain DB-DES-005.
+- This logical contract does not approve physical columns/constraints, ORM changes, migrations, data changes, code or tests. Legacy SQL Date fields and existing data must not be converted without an explicit migration plan.
+
+DB-DES-004 remains PARTIAL pending source-file review, full model/read/write and consumer audit, publication/revision evidence, FX period-end selection policy, and migration/implementation alignment.
+
+---
+
+## 15. Ingestion Boundary (CHANGE-007)
 
 ### Layering
 
