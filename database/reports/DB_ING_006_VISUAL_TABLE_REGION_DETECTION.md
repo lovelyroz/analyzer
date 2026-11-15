@@ -187,3 +187,18 @@ Most preview regions are ambiguous because of single-blank separators and/or mer
 4. After the contract is settled and a valid full observation is available, revisit table segmentation against the real workbooks. Do not treat the present diagnostic preview as acceptance evidence.
 
 Task 033 remains PARTIAL. The automated test result remains owner-reported as 33 passed; the real-workbook validation is not complete. The assistant did not inspect XLSX files or run tests.
+
+
+### 8.6 Owner clarification supersedes the earlier text-only interpretation — 2026-11-15
+
+The owner clarified that "text" in the earlier decision meant direct literal cell content (which may be numbers, alphabetic text, and permitted characters), not Excel's string storage type. The original intent was **no formulas**, not "all cells must have Excel data_type='s'". The prior conclusion that the 5,182 numeric-typed cells violated the owner's contract was incorrect and is withdrawn.
+
+The owner-run counts in Section 8.5 remain factual evidence of the five workbook cell types, but they are not contract violations. The 5,182 cells are numeric literals and should be accepted by the Reader. The 77-region diagnostic previews in Section 8.5 are superseded and must not be used for table-detector acceptance because they excluded numeric cells.
+
+Corrective implementation now in progress:
+- DTO adds `PRESENT_NUMBER` and `numeric_value` for literal numeric cells.
+- Reader accepts native numeric int/float cells without stringification or parsing; formulas remain rejected.
+- Visual detector counts both `PRESENT_TEXT` and `PRESENT_NUMBER` for occupancy; merged title fragments remain text-only.
+- Boolean/date-typed and Excel error cells remain unsupported pending explicit scope confirmation if encountered.
+
+The owner must rerun the updated review utility on all five source workbooks. The expected outcome is that ordinary numeric cells no longer reject the workbook; any remaining rejection must identify the actual unsupported cell kind (for example formula, Boolean, date-typed, or Excel error). Once the reader accepts a workbook, its full detector output—not the old text-only preview—can be reviewed against the workbook evidence. Task 033 remains PARTIAL until that full validation and any required detector corrections are complete. The assistant did not inspect XLSX files or run tests.
