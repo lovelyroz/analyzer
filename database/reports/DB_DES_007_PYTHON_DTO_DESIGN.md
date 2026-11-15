@@ -210,3 +210,16 @@ The owner executed the combined DTO/reader suite and reported **21 passed, 5 fai
 ### 10.2 Final owner-run validation — Task 032 complete (2026-11-15)
 
 Following the missing `DiagnosticSeverity` import correction, the owner reran the combined DTO/reader test suite and reported **26 passed in 1.35s**. Task 032 / DB-ING-005 is complete. This confirms the tested reader and DTO contracts, but does not implement visual financial table-region detection; that remains the separate Task 033 / DB-ING-006. The assistant did not execute tests.
+
+
+## 11. Corrected owner intent — literal values, no formulas (2026-11-15)
+
+The previous "text-only" wording was an assistant interpretation error. The owner's intent is not restricted to Excel string-typed cells. Populated source cells may contain literal text or literal numeric values; formulas are prohibited.
+
+The DTO/reader contract therefore distinguishes:
+- `PRESENT_TEXT`: exact literal string;
+- `PRESENT_NUMBER`: literal numeric int/float as exposed by openpyxl, without stringification, parsing, rounding, or semantic interpretation;
+- `BLANK`: no value, distinct from zero and empty text;
+- `UNEXPECTED_NON_TEXT` / `ERROR_VALUE`: unsupported kinds or Excel errors, rejected with diagnostics.
+
+Boolean and date-typed values are not accepted by this correction; they remain a separate explicit decision if encountered in an approved input. Formula cells remain rejected. The table detector must treat both PRESENT_TEXT and PRESENT_NUMBER as populated cells, while only text values may be retained as literal header/title fragments.
