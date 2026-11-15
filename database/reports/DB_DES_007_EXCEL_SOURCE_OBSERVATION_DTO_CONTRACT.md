@@ -91,6 +91,20 @@ Do not concatenate levels irreversibly. A derived display path may be provided i
 
 Row-axis labels and column-axis headers are distinct. A source Header mapped to a Standard Database Header does not by itself identify the Metric represented by each numeric cell.
 
+### 4.3.1 Orthogonal header axes — evidence-driven refinement
+
+DB-AUD-007 shows that a single linear header path is insufficient as the only representation for complex tables. Preserve these header dimensions independently, while retaining their structural relationships and source references:
+
+- **Group hierarchy:** parent headers grouping one or more leaf columns, whether merged or unmerged.
+- **Measure hierarchy:** quantity, rate, amount, count, percentage change, balance, and other literal measure labels.
+- **Temporal hierarchy:** date/date-range phrases, fiscal-year labels, cumulative/standalone wording, and comparative qualifiers.
+- **Presentation qualifiers:** actual, forecast, plan, correction, restatement, estimate, and other literal qualifiers.
+- **Row-axis hierarchy:** row labels, category groups, unit labels, and entity attributes.
+
+A leaf cell may inherit fragments from multiple axes. Keep literal fragments and their source references separate; a derived display path is optional and must not replace the original fragments. Dates found in row-level investee attributes, captions, or footnotes are not automatically column-period descriptors.
+
+Temporal, measure, and presentation evidence are orthogonal. The adapter must not collapse them into one semantic header string or resolve their economic meaning.
+
 ### 4.4 RowObservation
 
 Required logical attributes:
