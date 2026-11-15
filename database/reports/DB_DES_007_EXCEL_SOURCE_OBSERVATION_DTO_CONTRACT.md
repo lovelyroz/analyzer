@@ -276,3 +276,17 @@ The logical contract is now accompanied by `reports/DB_DES_007_PYTHON_DTO_DESIGN
 The reader profile is selected separately in DB-AUD-008: openpyxl normal mode plus a narrow read-only OOXML numeric-token sidecar. The DTO design remains transient and does not authorize raw-row persistence.
 
 **Status remains PARTIAL:** the design is complete, but DTO/reader implementation, table-region candidate detection, additional authorized source evidence, and user-run acceptance tests remain open. No production code or tests were changed/run in this design step.
+
+
+## 14. Owner-confirmed text-only V1 input amendment (2026-11-15)
+
+The owner confirms that CODAL XLSX inputs contain no formulas and that all populated cells are stored as text. This is now the normative V1 source contract and supersedes formula/cache and native numeric-cell assumptions in earlier sections:
+
+- Populated cells must be text cells; preserve literal text exactly.
+- Blank remains distinct from text and from zero.
+- Numeric-looking/date-looking strings are not parsed or normalized by the reader; parsing occurs in the interpretation/validation layer.
+- Numeric-typed, boolean, date-typed, formula, or Excel error cells violate the contract. The reader emits a stable error diagnostic and the whole report is rejected; no coercion or cached-value fallback is allowed.
+- Formula expression/cache fields and raw OOXML numeric-token extraction are removed from the V1 DTO/reader boundary.
+- openpyxl normal mode remains the selected reader; one structural/text pass is sufficient.
+
+The companion concrete DTO design is `reports/DB_DES_007_PYTHON_DTO_DESIGN.md`; initial immutable runtime types now exist in `src/ingestion/excel/dto.py`. Implementation of the structural/text reader, table-region detection, and owner-run validation remains open. Raw observations remain transient and are never persisted.
