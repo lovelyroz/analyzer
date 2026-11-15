@@ -1,7 +1,7 @@
 # DB-AUD-008 — Excel Library Capability Assessment
 
 **Date:** 2026-11-15  
-**Status:** PARTIAL — repository inventory, documentation comparison, synthetic fixture observations, 1900/1904 epoch comparison, and same-input repeatability have been demonstrated by the owner in their environment. Large-sheet performance/memory, Calamine comparison, and source-workbook validation remain open.  
+**Status:** COMPLETE for V1 reader-profile assessment — repository inventory, owner-run synthetic observations/benchmarks, and source-workbook evidence crosswalk from five Markdown audit reports are complete. The V1 baseline profile is selected below; Calamine comparison is optional and not a release prerequisite.  
 **Scope:** Excel reader selection for the CODAL Excel ingestion V1 and the logical observation contract in DB-DES-007. This report is not an implementation approval.
 
 ## 1. Executive decision
@@ -12,7 +12,7 @@
 
 **Not recommended as the primary observation adapter: pandas.** Its Excel interface is designed to materialize tabular DataFrames. That is useful after structural interpretation, but is not the appropriate first boundary for preserving merged headers, sparse coordinates, cell-level states, formulas, and row/column hierarchy.
 
-No library is approved unconditionally. A small, controlled feature spike is still required before implementing the Python DTO or adapter.
+The V1 baseline reader profile is selected in Section 7.8. The assessment does not approve a Python DTO/API, production adapter implementation, ORM/schema/migration changes, or data persistence design.
 
 ## 2. Repository inventory
 
@@ -113,8 +113,8 @@ The first owner-run execution exposed an `openpyxl` API compatibility issue: in 
 
 ## 7. Decision status
 
-- `openpyxl`: **provisional primary candidate**.
-- `python-calamine`: **secondary candidate requiring feature spike**.
+- `openpyxl` normal mode: **selected V1 baseline observation reader**.
+- `python-calamine`: **not selected for V1**; optional future comparison only if measured performance or format coverage creates a concrete need.
 - `pandas`: **not selected as the observation adapter**; may be considered downstream only after structural interpretation.
 - Production dependency changes, Python DTO classes, production adapter code, ORM/schema/migrations, and data changes: **not authorized or performed by this assessment**. The standalone spike utility is diagnostic-only.
 
@@ -261,7 +261,7 @@ This section evaluates the source-workbook evidence already transcribed in repos
 
 The five documented workbook patterns strengthen the case for **openpyxl normal (non-read-only) mode as the V1 baseline observation reader**. The common observed complexity is not multi-sheet or formula-heavy content; it is dense merged headers and many semantically independent tables within one worksheet. openpyxl's cell-addressable model and merged-range support align directly with that observed shape.
 
-This is a bounded profile decision, not a claim that the library alone detects or interprets tables. The adapter/observation layer must still preserve multiple candidate table regions, row and column axes, local captions, merged-cell inheritance, cell coordinates, and unresolved ambiguity. It must not assign FinancialPeriod, metric, unit, or issuer identity.
+This is an approved bounded V1 reader-profile decision, not a claim that the library alone detects or interprets tables. The adapter/observation layer must still preserve multiple candidate table regions, row and column axes, local captions, merged-cell inheritance, cell coordinates, and unresolved ambiguity. It must not assign FinancialPeriod, metric, unit, or issuer identity.
 
 The existing evidence does **not** justify switching to Calamine or adding it as a production dependency. Its benchmark remains optional and has not run because the owner's reported interpreter did not have `python_calamine`. Nor does the evidence justify selecting openpyxl read-only mode; its structural coverage remains unproven for this DTO.
 
@@ -270,8 +270,22 @@ The existing evidence does **not** justify switching to Calamine or adding it as
 ### 7.8.4 Scope and completion status
 
 - Source evidence validation against the existing Markdown reports: **completed for the five documented examples**, subject to the reports' own accuracy and without direct XLSX reinspection.
-- Baseline reader recommendation: **openpyxl normal mode, provisionally selected for the first adapter implementation**.
-- Calamine comparative benchmark: not run; optional owner decision/environment setup remains.
+- Baseline reader profile: **openpyxl normal mode + read-only OOXML numeric-token sidecar**.
+- Calamine comparative benchmark: not required for V1; revisit only if representative production-scale measurements or format requirements justify it.
 - Multi-sheet, formula-cache, hidden-content, and structured-table behavior: not evidenced by the five source workbooks; retain synthetic coverage and explicit diagnostics.
-- Numeric XML lexical fidelity: unresolved requirement decision.
+- Numeric XML lexical fidelity: **resolved — preserve transiently; do not persist raw rows**.
 - No production adapter, Python DTO, ORM, schema, migration, or data was changed. No package was installed. No test or benchmark was run by the assistant.
+
+
+### 7.8.5 Final V1 profile decision
+
+**Selected profile:**
+
+1. Use `openpyxl` in normal (non-read-only) mode as the primary workbook/worksheet/cell reader.
+2. Read formula and cached-value views from the same immutable input bytes when formulas are present; never calculate formulas.
+3. Preserve workbook epoch, worksheet order/state, merged ranges, cell coordinates, cell types, number formats, and explicit structural diagnostics.
+4. Add a narrow read-only OOXML pass to obtain original numeric `<v>` tokens keyed by worksheet and cell coordinate. Use these tokens as the exact lexical input for Decimal parsing where applicable; retain the typed openpyxl value as a parallel observation. This sidecar must not become a general raw-row archive.
+5. Keep table segmentation, header-axis construction, semantic interpretation, temporal resolution, and admission outside the library reader.
+6. Do not add `python-calamine` or `pandas` as V1 observation dependencies. Reconsider only with measured need.
+
+**Task 030 completion:** the reader capability assessment and bounded profile selection are complete. This does not authorize production adapter/DTO implementation; those remain governed by their own tasks and contracts.
