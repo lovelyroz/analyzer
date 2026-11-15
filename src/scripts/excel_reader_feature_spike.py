@@ -141,6 +141,114 @@ def _cell_observation(cell) -> dict:
     }
 
 
+
+def _date_epoch_observations(root: Path) -> dict:
+    """Compare the same calendar date stored under both Excel date systems."""
+    observations = {}
+    for label, epoch in (
+        ("1900", None),
+        ("1904", CALENDAR_MAC_1904),
+    ):
+        path = root / f"date_system_{label}.xlsx"
+        workbook = Workbook()
+        if epoch is not None:
+            workbook.epoch = epoch
+        sheet = workbook.active
+        sheet.title = "DateSystem"
+        sheet["A1"] = datetime(2024, 1, 1)
+        workbook.save(path)
+        workbook.close()
+
+        loaded = load_workbook(path, data_only=False, read_only=False)
+        observations[label] = {
+            "workbook_epoch": loaded.epoch.isoformat(),
+            "cell_value": loaded["DateSystem"]["A1"].value.isoformat(),
+        }
+        loaded.close()
+    observations["same_calendar_value"] = (
+        observations["1900"]["cell_value"] == observations["1904"]["cell_value"]
+    )
+    observations["serials_differ"] = (
+        observations["1900"]["workbook_epoch"] != observations["1904"]["workbook_epoch"]
+    )
+    return observations
+
+
+def _repeatability_observation(path: Path, expected: dict) -> dict:
+    """Read identical immutable XLSX bytes twice and compare stable observations."""
+    raw_bytes = path.read_bytes()
+    fingerprint_first = hashlib.sha256(raw_bytes).hexdigest()
+    first = load_workbook(path, data_only=False, read_only=False)
+    first_cached = load_workbook(path, data_only=True, read_only=False)
+    first_projection = {
+        "epoch": first.epoch.isoformat(),
+        "sheet_states": [
+            (sheet.title, sheet.sheet_state) for sheet in first.worksheets
+        ],
+        "merged_ranges": sorted(str(item) for item in first["Main"].merged_cells.ranges),
+        "table_names_and_refs": sorted(
+            (
+                name,
+                first["Main"].tables[name].ref
+                if hasattr(first["Main"].tables[name], "ref")
+                else str(first["Main"].tables[name]),
+            )
+            for name in first["Main"].tables
+        ),
+        "formula": first["Main"]["D2"].value,
+        "cached_value": first_cached["Main"]["D2"].value,
+        "formula_without_cache": first_cached["Main"]["H2"].value,
+        "numeric_value": first["Main"]["C2"].value,
+        "coordinates": sorted(
+            cell.coordinate
+            for row in first["Main"].iter_rows()
+            for cell in row
+            if cell.value is not None
+        ),
+    }
+    first.close()
+    first_cached.close()
+
+    fingerprint_second = hashlib.sha256(path.read_bytes()).hexdigest()
+    second = load_workbook(path, data_only=False, read_only=False)
+    second_cached = load_workbook(path, data_only=True, read_only=False)
+    second_projection = {
+        "epoch": second.epoch.isoformat(),
+        "sheet_states": [
+            (sheet.title, sheet.sheet_state) for sheet in second.worksheets
+        ],
+        "merged_ranges": sorted(str(item) for item in second["Main"].merged_cells.ranges),
+        "table_names_and_refs": sorted(
+            (
+                name,
+                second["Main"].tables[name].ref
+                if hasattr(second["Main"].tables[name], "ref")
+                else str(second["Main"].tables[name]),
+            )
+            for name in second["Main"].tables
+        ),
+        "formula": second["Main"]["D2"].value,
+        "cached_value": second_cached["Main"]["D2"].value,
+        "formula_without_cache": second_cached["Main"]["H2"].value,
+        "numeric_value": second["Main"]["C2"].value,
+        "coordinates": sorted(
+            cell.coordinate
+            for row in second["Main"].iter_rows()
+            for cell in row
+            if cell.value is not None
+        ),
+    }
+    second.close()
+    second_cached.close()
+
+    return {
+        "same_input_sha256": fingerprint_first == fingerprint_second,
+        "input_sha256": fingerprint_first,
+        "same_observation_projection": first_projection == second_projection,
+        "reader_version": expected["openpyxl_version"],
+        "comparison_scope": "two independent loads of the same immutable synthetic XLSX bytes",
+    }
+
 def run_spike() -> dict:
     with tempfile.TemporaryDirectory(prefix="excel-reader-spike-") as temp_dir:
         root = Path(temp_dir)
@@ -170,6 +278,8 @@ def run_spike() -> dict:
                     break
 
         reader_packages = _installed_reader_packages()
+        date_epoch_comparison = _date_epoch_observations(root)
+        repeatability = _repeatability_observation(patched, {"openpyxl_version": reader_packages["openpyxl"]["version"] or "unknown"})
         openpyxl_version = reader_packages["openpyxl"]["version"] or "unknown"
         calamine_available = reader_packages["python_calamine"]["import_module_available"]
 
@@ -177,6 +287,8 @@ def run_spike() -> dict:
             "utility": "excel_reader_feature_spike",
             "workbook_sha256": fingerprint,
             "workbook_epoch": formula_book.epoch.isoformat(),
+            "date_epoch_comparison": date_epoch_comparison,
+            "repeatability": repeatability,
             "openpyxl_version": openpyxl_version,
             "python_calamine_installed": calamine_available,
             "reader_package_inventory": reader_packages,
@@ -227,6 +339,8 @@ def run_spike() -> dict:
                 "No formula was calculated; cached value was injected into synthetic XLSX XML.",
                 "Raw numeric token is read from worksheet XML for comparison with the library scalar.",
                 "This utility reports observations; it does not assert pass/fail or modify project data.",
+                "1900/1904 comparison uses separate synthetic workbooks with the same calendar date.",
+                "Repeatability compares two independent loads of the same immutable synthetic XLSX bytes.",
             ],
         }
 
