@@ -131,3 +131,17 @@ def test_detector_is_repeatable_and_does_not_change_source_cells():
     assert first == second
     assert first.cells == source.cells
     assert source.tables == ()
+
+
+def test_numeric_literal_cells_participate_in_visual_table_detection():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["شرح", "مقدار"])
+    sheet.append(["فروش", 1250])
+    sheet.append(["تعداد", 0])
+
+    result = detect_visual_table_candidates(_observation(workbook))
+
+    assert len(result.tables) == 1
+    assert result.tables[0].bounds.a1_range == "A1:B3"
+    assert result.tables[0].column_refs == (1, 2)
