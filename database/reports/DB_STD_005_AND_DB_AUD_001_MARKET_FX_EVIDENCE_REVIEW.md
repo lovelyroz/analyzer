@@ -349,3 +349,54 @@ Migrationها به‌صورت توابع Python در یک فایل `src/migratio
 این مرحله یک مرور هدفمند از فایل‌های اجرایی و تست‌های مرتبط با DB/ingestion بود، نه ادعای اثبات نبود هر commit یا query در کل مخزن. GitHub tree شامل 128 فایل Python در `src/` است؛ همهٔ آن‌ها از نظر تمام read/write call-siteها خط‌به‌خط ممیزی نشده‌اند. همچنین هیچ فایل DB واقعی، XLSX یا CSV منبع بررسی نشده است. برای تکمیل قطعی inventory باید همهٔ مسیرهای فراخوانی Session در سرویس‌ها و مصرف‌کنندگان و schema واقعی DBهای عملیاتی جداگانه بررسی شوند.
 
 **وضعیت DB-AUD-001:** PARTIAL. مرور هدفمند transaction entry points، seed script، readerهای مشخص و تست‌های مرتبط اضافه شد. شکاف‌های مهم قرارداد با تست‌های فعلی شناسایی و اولویت‌بندی شدند؛ اما inventory کامل تمام 128 فایل، تمام readerها و schema واقعی DB هنوز باز است. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+
+## 11. مرور هدفمند مصرف‌کنندگان downstream و انتخاب PIT — 2026-11-15
+
+### 11.1 مسیرهای خواندن مالی و انتخاب نسخه
+
+فایل‌های `src/forecast/queries.py`، `src/core/point_in_time.py`، مدل‌های `report.py`، `normalized.py` و `period.py` مستقیماً خوانده شدند.
+
+1. **PIT مالی در Forecast:** تابع `_period_rows()` در `forecast/queries.py` شرط `ReportVersion.publication_datetime <= cutoff` را پیش از گروه‌بندی اعمال می‌کند؛ بنابراین در همین query نسخه‌های منتشرشده بعد از cutoff وارد نمی‌شوند. این نکته مثبت است، اما ترتیب انتخاب نسخه با قرارداد چهارسطحی DB-DES-001 منطبق نیست.
+2. **اولویت نسخه:** `_latest_per_metric()` برای هر Metric و Period صرفاً بیشترین `publication_datetime` را انتخاب می‌کند. `ReportVersion` دارای `is_restated` است، اما مدل مشاهده‌شده فیلد وضعیت حسابرسی ندارد؛ query نیز هیچ رتبه‌بندی AUDITED/UNAUDITED و RESTATED/ORIGINAL انجام نمی‌دهد. در نتیجه «جدیدترین انتشار» ممکن است بر نسخه‌ای با اولویت قراردادی پایین‌تر غلبه کند. این مغایرت در انتخاب نسخهٔ Forecast مشاهده شد؛ رفتار نهایی باید با چهار سطح مصوب و قواعد tie-break همسو شود.
+3. **ترتیب Period:** `load_financial_fact_periods()` دوره‌ها را با `sorted(period_id)` مرتب می‌کند و `load_financial_facts()` آخرین عضو فهرست را به‌عنوان آخرین دوره برمی‌دارد. قرارداد DB-DES-003 ترتیب واقعی زمانی/تقویم مالی شرکت را می‌خواهد؛ شناسهٔ افزایشی به‌تنهایی شاهد ترتیب زمانی نیست. باید ترتیب بر اساس تاریخ پایان واقعی و قواعد دورهٔ شرکت باشد و ابهام/تعارض دوره‌ها fail-closed شود.
+4. **انتخاب عمومی ReportVersion:** `src/core/point_in_time.py::select_report_version()` نسخه‌ها را فقط با `publication_datetime DESC` و سپس `version_number DESC` مرتب می‌کند؛ چهار سطح اولویت مصوب را اعمال نمی‌کند. این helper در فایل‌های بررسی‌شده call-site downstream مشخصی نداشت؛ وجود helper به‌تنهایی اثبات استفاده در همهٔ مسیرها نیست.
+5. **دامنهٔ Fact:** query Forecast از `NormalizedFinancialFact.company_id` و `ReportVersion` استفاده می‌کند، اما در این query سازگاری company گزارش/نسخه با company fact و period با شرکت/گزارش به‌صورت join condition یا assertion مستقل بررسی نمی‌شود. این invariant باید در schema/service/query enforce شود؛ این مرور فقط نبود کنترل صریح در همین مسیر را ثبت می‌کند.
+
+### 11.2 Share/CorporateAction و PIT
+
+- `load_share_history()` cutoff را با `normalize_datetime(cutoff).date()` به تاریخ Gregorian تبدیل می‌کند و آن را با `effective_date` در مدل‌های Share/Action مقایسه می‌کند؛ این با قرارداد Jalali-native DB-DES-003/004 سازگار نیست، مگر آنکه قرارداد مستقل و معتبر برای همین ستون‌ها اثبات شود.
+- مدل‌های `ShareCountHistory` و `CorporateAction` که خوانده شدند، `effective_date` دارند اما timestamp انتشار/اعلان قابل اتکای PIT و revision metadata ندارند. در CorporateAction، `announcement_date` از نوع Date و nullable است، نه publication timestamp.
+- شرط `coalesce(CorporateAction.announcement_date, cutoff_date) <= cutoff_date` مقدار announcement_date تهی را به cutoff جاری تبدیل می‌کند؛ در نتیجه ردیفی با زمان اعلان نامعلوم از فیلتر زمانی عبور می‌کند. این دقیقاً fail-closed نیست و می‌تواند اطلاعاتی را که زمان در دسترس‌شدنش معلوم نیست در محاسبه وارد کند.
+- Share history نیز فقط بر اساس effective_date فیلتر می‌شود؛ تاریخ اثر اقتصادی، زمان انتشار/قابل‌دسترس‌شدن اطلاعات را اثبات نمی‌کند. بدون publication/availability metadata، PIT تاریخی قابل تضمین نیست.
+
+### 11.3 Market، Valuation و Decision
+
+- `ingestion/market/queries.py` قیمت و تاریخچه را با اجزای Jalali و شرط on-or-before انتخاب می‌کند؛ duplicate Jalali date را صریحاً رد می‌کند و adjusted close را در صورت وجود بر close ترجیح می‌دهد. این read-side با تقویم Jalali سازگار است.
+- بااین‌حال، `MarketDaily` در مدل بررسی‌شده timestamp انتشار/قابل‌دسترس‌شدن منبع یا revision ندارد. انتخاب Market بر اساس تاریخ معامله/مشاهدهٔ Jalali است، نه زمان انتشار داده؛ بنابراین انتخاب تاریخیِ «آنچه در cutoff واقعاً در دسترس بوده» هنوز قابل اثبات نیست. این محدودیت جدا از شرط trade-date <= as-of است.
+- `valuation/service.py` از `select_market_price_as_of()` استفاده می‌کند و Jalali as-of/source date و price basis را در metadata خروجی نگه می‌دارد؛ ولی helper بازار، مطابق قرارداد موجود، آخرین قیمت dated on-or-before را برمی‌گزیند و publication-time PIT ندارد.
+- `decision/service.py` تطابق company و period بین Forecast و FundamentalScore و تطابق company در MarketResult را بررسی می‌کند؛ اما timestamp/cutoff و as-of Jalali مشترک میان MarketResult، Forecast، Score و Valuation را در این boundary تطبیق نمی‌دهد. این orchestration boundary به‌تنهایی تضمین نمی‌کند ورودی‌هایش از یک PIT snapshot مشترک آمده باشند.
+
+### 11.4 ماژول‌های محاسباتی pure/in-memory
+
+- `trend/engine.py` تصریح می‌کند که caller باید سری دادهٔ PIT-filtered را تحویل دهد؛ engine خود query یا فیلتر انتشار انجام نمی‌دهد.
+- `scoring/engine.py` و `market/engine.py` موتورهای محاسباتی‌اند و persistence ندارند. `market/service.py` تاریخچه را از query Jalali می‌گیرد و آن را به engine می‌دهد.
+- `evaluation/pipeline.py` داده‌های Forecast/Actual را از ورودی‌های از پیش آماده‌شده دریافت می‌کند و منطق selection/validation داخلی Stage 6 خودش را دارد؛ این مسیر جایگزین ReportVersion selector مالی DB-DES-001 نیست و نباید قواعد outcome publication آن با PIT ورودی‌های Forecast یکی فرض شود.
+- در فایل‌های مصرف‌کنندهٔ بررسی‌شده write/commit دیتابیسی مشاهده نشد؛ این نتیجه محدود به همین فایل‌هاست، نه تمام 128 فایل Python.
+
+### 11.5 جمع‌بندی مغایرت‌ها و اقدام بعدی
+
+| موضوع | شاهد مستقیم | اثر/ریسک | اقدام لازم |
+|---|---|---|---|
+| رتبه‌بندی نسخهٔ مالی | `_latest_per_metric()` و `select_report_version()` فقط جدیدترین publication را می‌گیرند | عدم رعایت چهار سطح AUDITED/RESTATED | تعریف یک selector مشترک، fail-closed برای status نامعلوم و tie-break مصوب |
+| وضعیت حسابرسی | `ReportVersion` فیلد `is_restated` دارد اما audit status مشاهده نشد | اجرای اولویت چهارگانه با مدل فعلی کامل نیست | تعیین منبع/فیلد وضعیت حسابرسی در مدل هدف؛ بدون حدس از نبود فیلد |
+| آخرین Period | مرتب‌سازی `period_id` | انتخاب اشتباه آخرین دوره در صورت عدم تطابق ID و chronology | مرتب‌سازی بر تاریخ/تقویم واقعی و enforce هویت دوره |
+| PIT سهام/اقدام شرکتی | Gregorian cutoff در برابر Dateهای مدل؛ announcement تهی با coalesce پذیرفته می‌شود | look-ahead یا تقویم ناسازگار | Jalali-native effective dates و publication/availability timestamp اجباری؛ missing = ineligible |
+| PIT بازار | MarketDaily فاقد publication timestamp در مدل بررسی‌شده | تاریخ معامله، زمان دسترسی تاریخی را ثابت نمی‌کند | ثبت source availability/publication metadata یا محدودکردن صریح ادعای PIT |
+| هم‌ترازی Stage 9 | کنترل identity دارد، نه cutoff/as-of مشترک | ترکیب خروجی‌های متعلق به زمان‌های متفاوت | قرارداد snapshot/cutoff مشترک در boundary |
+| Trend/Scoring engines | caller-owned PIT filtering | امکان ورودی ناسازگار در caller | audit call-siteهای باقی‌مانده و تست مرزی در implementation |
+
+**محدودیت دامنه:** این بخش مرور هدفمند 9 فایل downstream و مدل‌های مرتبط است؛ نه inventory کامل تمام queryها، call-siteها یا تمام 128 فایل Python. فایل‌های XLSX/CSV منبع و دیتابیس عملیاتی بررسی نشده‌اند. در نتیجه دربارهٔ داده‌های واقعی، وضعیت تاریخی نسخه‌ها یا صحت مقادیر منبع ادعایی نمی‌شود.
+
+**وضعیت DB-AUD-001:** PARTIAL. این مرحله مصرف‌کنندگان اصلی Forecast/Market/Valuation/Decision و helper PIT را در سطح فایل‌های مشخص بررسی کرد و چند مغایرت مهم با DB-DES-001/003/004 ثبت شد. هنوز inventory کامل همهٔ readerها و writerها، تطبیق schema واقعی DB، و بررسی تمام call-siteهای Session باقی است. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
