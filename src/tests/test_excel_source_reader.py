@@ -64,13 +64,12 @@ def test_reader_preserves_worksheet_order_visibility_and_merged_ranges():
 @pytest.mark.parametrize(
     "value,data_type,expected_kind",
     [
-        (123, "n", CellValueKind.UNEXPECTED_NON_TEXT),
         (True, "b", CellValueKind.UNEXPECTED_NON_TEXT),
         ("=1+1", "f", CellValueKind.UNEXPECTED_NON_TEXT),
         ("#VALUE!", "e", CellValueKind.ERROR_VALUE),
     ],
 )
-def test_reader_rejects_entire_workbook_for_populated_non_text_cells(value, data_type, expected_kind):
+def test_reader_rejects_entire_workbook_for_unsupported_populated_cell_kinds(value, data_type, expected_kind):
     workbook = Workbook()
     sheet = workbook.active
     sheet["A1"] = "valid text"
@@ -88,19 +87,37 @@ def test_reader_rejects_entire_workbook_for_populated_non_text_cells(value, data
     assert observation.diagnostics[0].cell_ref.coordinate == "B2"
 
 
-def test_reader_collects_all_contract_violations_before_rejecting():
+def test_reader_preserves_literal_numeric_cells_without_rejection():
     workbook = Workbook()
     sheet = workbook.active
     sheet["A1"] = 1
-    sheet["B2"] = True
-    sheet["C3"] = "bad formula"
-    sheet["C3"].data_type = "f"
+    sheet["B2"] = -12.5
+    sheet["C3"] = 0
+
+    result = read_excel_source(_xlsx_bytes(workbook))
+
+    numeric = {cell.cell_ref.coordinate: cell for cell in result.cells}
+    assert numeric["A1"].value_kind is CellValueKind.PRESENT_NUMBER
+    assert numeric["A1"].numeric_value == 1
+    assert numeric["B2"].value_kind is CellValueKind.PRESENT_NUMBER
+    assert numeric["B2"].numeric_value == -12.5
+    assert numeric["C3"].value_kind is CellValueKind.PRESENT_NUMBER
+    assert numeric["C3"].numeric_value == 0
+    assert result.diagnostics == ()
+
+
+def test_reader_collects_all_unsupported_cells_before_rejecting():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet["A1"] = True
+    sheet["B2"] = "bad formula"
+    sheet["B2"].data_type = "f"
 
     with pytest.raises(ExcelSourceContractError) as caught:
         read_excel_source(_xlsx_bytes(workbook))
 
     assert [item.cell_ref.coordinate for item in caught.value.observation.diagnostics] == [
-        "A1", "B2", "C3"
+        "A1", "B2"
     ]
 
 
