@@ -1,5 +1,10 @@
 # Analyzer V1 — Database Architecture V1.3
 
+
+## Database Documentation Index
+
+All supporting database-design documents, audit reports, working checklists, dictionaries, and evidence files are centralized under [database/](database/README.md). The directory index identifies each document and its role. The primary database work tracker is [database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md](database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md). This Architecture document remains the normative architecture entry point; supporting documents do not override approved decisions recorded here.
+
 ## Status
 
 **UNDER REVIEW — DATABASE CONTRACT V1.3 (REOPENED FOR ARCHITECTURAL REVIEW)**
@@ -246,7 +251,7 @@ The logical period identity is the company plus period shape/type (`INSTANT` or 
 
 ### DB-DES-003 — consolidated multi-period interpretation rules
 
-The detailed logical contract is maintained in `dbReports/DB_DES_003_REPORT_PERIOD_CONTRACT.md`. The following rules are normative and clarify this section:
+The detailed logical contract is maintained in `database/reports/DB_DES_003_REPORT_PERIOD_CONTRACT.md`. The following rules are normative and clarify this section:
 
 - **Period shape:** distinguish `INSTANT` observations (stock/balance at a date) from `DURATION` observations (flow over a date range). A point-in-time balance uses the same Jalali date as start and end, `period_type=INSTANT`, `months_length=0`, and no YTD flag. Duration periods retain exact start/end dates and their source-supported duration.
 - **YTD applicability:** `is_ytd` applies to duration-based flow values only. It is not a property to apply to stock/instant values. Rates/ratios follow the source-defined instant or duration basis.
@@ -591,7 +596,7 @@ This section establishes the logical distinctions and admission rules for classi
  
 **Operational mapping rules for the initial periodic-bank sample**
 
-- The authoritative initial dictionary is `dbDics/header_dictionary.json` version `1.1`, scoped to `report_type=periodic` and `industry=banking`. It contains exactly 17 Standard Database Headers. This is a documentation-level sample standard; its presence in the repository does not by itself mean that ingestion support is implemented or enabled.
+- The authoritative initial dictionary is `database/dictionaries/header_dictionary.json` version `1.1`, scoped to `report_type=periodic` and `industry=banking`. It contains exactly 17 Standard Database Headers. This is a documentation-level sample standard; its presence in the repository does not by itself mean that ingestion support is implemented or enabled.
 - The dictionary performs one structural mapping only: an observed Raw Header (or an explicitly reviewed and approved raw-header variant) maps to one Standard Database Header. It does not directly assign a FinancialMetric, economic category, unit, period, or dimension.
 - A raw-header variant may be added only after its meaning and role as the same report section have been reviewed. Text similarity or a shared word is not sufficient evidence. Do not silently fuzzy-match an unknown heading to the nearest dictionary entry.
 - A matched Standard Database Header identifies the report section/table family, not the meaning of every value inside it. Each candidate value still requires interpretation from its actual row, column, table hierarchy, temporal role, unit, and measurement basis before it can map to a canonical FinancialMetric and approved dimensions.
@@ -605,7 +610,7 @@ This section establishes the logical distinctions and admission rules for classi
 
 **Bank periodic Metric/Dimension design and reported Forecast/Plan values — 2026-11-15**
 
-The initial provisional semantic grouping of all 17 bank periodic Standard Database Headers, candidate FinancialMetrics and value-defining dimensions, temporal/value roles, and double-counting risks is documented in `dbReports/BANK_PERIODIC_METRIC_DIMENSION_MAPPING_PROPOSAL.md`. That proposal is based on the available Markdown inspection report for the Parsian sample; it is not a claim of direct XLSX inspection, a finalized Metric catalog, or executable mapping rules.
+The initial provisional semantic grouping of all 17 bank periodic Standard Database Headers, candidate FinancialMetrics and value-defining dimensions, temporal/value roles, and double-counting risks is documented in `database/reports/BANK_PERIODIC_METRIC_DIMENSION_MAPPING_PROPOSAL.md`. That proposal is based on the available Markdown inspection report for the Parsian sample; it is not a claim of direct XLSX inspection, a finalized Metric catalog, or executable mapping rules.
 
 Owner clarification (2026-11-15): numerical Forecast or Plan values published within any of the 17 in-scope periodic-bank Standard Database Headers are report-sourced financial inputs and are eligible for canonical persistence. They must retain an explicit temporal/status distinction (`FORECAST` or `PLAN`) and the relevant period/horizon, and must never be conflated with actuals. Forecast/Plan values outside the 17 headers are outside this sample standard's extraction scope. Narrative-only commentary is not a FinancialFact. This does not authorize persistence of application-generated forecasts or analytical outputs, which remain runtime-only.
 
