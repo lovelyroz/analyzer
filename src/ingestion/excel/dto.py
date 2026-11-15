@@ -290,6 +290,12 @@ class CellObservation:
     unexpected_value: ScalarValue = None
     number_format: str | None = None
     style_id: int | None = None
+    border_top: str | None = None
+    border_bottom: str | None = None
+    border_left: str | None = None
+    border_right: str | None = None
+    fill_type: str | None = None
+    font_bold: bool | None = None
     merged_range: CellRange | None = None
     merged_anchor: CellRef | None = None
     diagnostics: tuple[Diagnostic, ...] = ()
