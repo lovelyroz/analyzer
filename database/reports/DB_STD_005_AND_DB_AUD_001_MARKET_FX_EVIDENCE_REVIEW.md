@@ -302,3 +302,50 @@ Migrationها به‌صورت توابع Python در یک فایل `src/migratio
 6. بررسی تست‌های موجود به‌صورت ایستا و تدوین ماتریس تست؛ تست‌ها اجرا نشدند.
 
 **وضعیت DB-AUD-001:** PARTIAL. Migration runner نسخه‌های 1–8 و چند مرز تراکنش مهم مستقیماً بررسی شدند؛ اما inventory کامل call-siteها، schema واقعی پایگاه‌های موجود، تمام readerها و تست‌ها هنوز بسته نشده‌اند. هیچ XLSX/CSV منبعی بررسی نشد. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+## 10. مرور ایستای call-siteهای تکمیلی و تست‌های موجود — 2026-11-15
+
+### 10.1 Session lifecycle و write entry points تکمیلی
+
+- `src/scripts/seed_data.py` تنها مصرف مستقیم `SessionLocal` در فایل‌های اجرایی تکمیلیِ این مرحله بود: یک Session می‌سازد، صنایع و Metricهای پایه را با check-before-insert اضافه می‌کند، در پایان یک `commit()` دارد، در exception یک `rollback()` انجام می‌دهد و در `finally` می‌بندد. این الگو برای seed یک batch واحد است، اما مدیریت خطا exception را پس از rollback جذب و فقط چاپ می‌کند؛ بنابراین caller ممکن است از شکست seed با exit status موفق مطلع نشود.
+- `src/scripts/init_db.py` از نظر call-site صریح commit/rollback ندارد؛ migration را از مسیر runner انجام می‌دهد.
+- `src/scripts/migrate_db.py` صرفاً `MigrationRunner.upgrade()` را فراخوانی می‌کند و transaction دیگری در خود script ندارد.
+- در فایل‌های `forecast/queries.py`، readهای مستقیم با `session.execute()` برای queryهای history/share/action مشاهده شدند؛ این مسیرها read-only هستند و transaction write در آن‌ها مشاهده نشد. وجود read call-siteهای دیگر در تمام forecast/market/valuation و سایر 128 فایل هنوز به‌صورت exhaustively خط‌به‌خط بسته نشده است.
+- فایل‌های `src/ingestion/fx/ingestion.py` و `src/ingestion/market/queries.py` در بررسی صریح این مرحله commit/rollback نداشتند؛ writer FX در `src/ingestion/service.py` و writer Market در `src/ingestion/market/ingestion.py` قرار دارند.
+- helperهای `src/ingestion/common/idempotency.py` و `identity.py` در نسخه‌های بررسی‌شده transaction boundary ندارند؛ identity helpers queryهای موجود را پیدا می‌کنند و خودشان commit نمی‌کنند.
+
+### 10.2 شواهد تستیِ ناسازگار با قرارداد جدید
+
+تست‌ها اجرا نشدند؛ فقط source آن‌ها خوانده شد.
+
+| تست/فایل | رفتاری که تست فعلی تثبیت می‌کند | ارزیابی در برابر DB-DES-005 |
+|---|---|---|
+| `test_ingestion_fx.py::test_fx_idempotent_upsert_jalali` | ارسال دوبارهٔ همان هویت با نرخ متفاوت باید رکورد قبلی را overwrite کند و `records_updated=1` شود | این رفتار last-write-wins است و با duplicate/conflict و immutable revision ناسازگار است |
+| `test_ingestion_fx.py::test_invalid_rate_type_and_non_positive_rate_fail_explicitly` | از چهار ردیف، سه ردیف نامعتبر می‌شوند اما یک ردیف معتبر commit می‌شود؛ status همچنان COMPLETED است | صریحاً partial acceptance را به‌عنوان رفتار مورد انتظار تثبیت می‌کند؛ باید در بازطراحی تست به رد کل batch تبدیل شود |
+| `test_ingestion_ohlc.py::test_ingest_ohlc_idempotent` | اجرای دوبارهٔ همان CSV رکوردها را update می‌کند؛ تعداد ردیف ثابت می‌ماند | idempotency با overwrite پیاده شده، نه unchanged/no-op برای payload یکسان و conflict برای payload متفاوت |
+| `test_codal_extraction.py` | acquisition/extraction failure بدون Report/RawFinancialFact را می‌سنجد؛ نسخهٔ دوم با publication date متفاوت، ReportVersion جدید می‌سازد | پوشش PDF legacy است؛ fingerprint/replay یک source revision یکسان با payload متفاوت، atomicity چند fact در failure میانی و حفظ همان Run در FAILED را کامل نمی‌آزماید |
+| `test_stage1_database_integrity.py` | migration از صفر به نسخهٔ 8 و اجرای مجدد بدون تغییر نسخه را بررسی می‌کند؛ Migration 8 جدول‌های legacy forecast را حذف می‌کند و برخی داده‌های دیگر را حفظ می‌کند | happy-path/idempotent upgrade را پوشش می‌دهد؛ crash بین DDL و version marker، migration نیمه‌اعمال‌شده، اجرای هم‌زمان و recovery/backup آزموده نشده‌اند |
+| `test_stage1_database_architecture.py` | ساخت دادهٔ normalized و روابط provenance را با commit مستقیم در تست انجام می‌دهد | تست integrity دامنه‌ای است، نه آزمون transaction boundary سرویس ingestion |
+
+**نتیجهٔ تستی:** بخشی از تست‌های فعلی نه‌فقط فاقد پوشش قرارداد جدیدند، بلکه رفتارهای قدیمیِ partial acceptance و overwrite را به‌عنوان انتظار صحیح ثبت کرده‌اند. این تست‌ها هنگام اجرای مرحلهٔ implementation باید بازنویسی شوند؛ در این مرحله هیچ تستی تغییر یا اجرا نشد.
+
+### 10.3 ماتریس مغایرت اجراییِ فعلی با DB-DES-005
+
+| الزام قرارداد | وضعیت مشاهده‌شده | اولویت پیگیری |
+|---|---|---|
+| یک Ingestion Unit اتمیک؛ hard error کل batch را رد کند | Market و FX ردیف‌های نامعتبر را کنار می‌گذارند و بقیه را commit می‌کنند | بحرانی |
+| identical identity + identical payload = no-op | Market/FX در اجرای مجدد شمارندهٔ updated دارند؛ FX تست مقدار را overwrite می‌کند | بحرانی |
+| identical identity + different payload = conflict؛ بدون overwrite | Market/FX مقدار موجود را بازنویسی می‌کنند | بحرانی |
+| audit STARTED/COMPLETED/FAILED برای همان Run | مسیرهای اصلی در rollback رکورد STARTED را از دست می‌دهند و FAILED جدید می‌سازند؛ tracker نیز fail_run را جداگانه commit می‌کند | بالا |
+| audit metadata شامل source fingerprint/revision و standard/adapter version | مدل فعلی این فیلدها را ندارد | بالا |
+| شمارنده‌های دقیق inserted/updated/unchanged/rejected/out_of_scope | مدل فعلی فقط found/inserted/updated/failed دارد؛ معنای updated در CODAL نیز برای replay به‌کار رفته است | متوسط |
+| migration و version marker با recovery امن | migration runner این دو را در تراکنش واحد تضمین نمی‌کند؛ crash recovery و concurrency coverage وجود ندارد | بالا |
+| caller واحد مالک transaction باشد | writerها خودشان commit/rollback می‌کنند؛ helperهای audit مرز یکنواخت ندارند | بالا |
+| تست‌های failure injection، rollback و retry | در تست‌های بررسی‌شده پوشش کافی مشاهده نشد؛ تست‌ها اجرا نشده‌اند | بالا |
+
+### 10.4 حدود نتیجه‌گیری و موارد باز
+
+این مرحله یک مرور هدفمند از فایل‌های اجرایی و تست‌های مرتبط با DB/ingestion بود، نه ادعای اثبات نبود هر commit یا query در کل مخزن. GitHub tree شامل 128 فایل Python در `src/` است؛ همهٔ آن‌ها از نظر تمام read/write call-siteها خط‌به‌خط ممیزی نشده‌اند. همچنین هیچ فایل DB واقعی، XLSX یا CSV منبع بررسی نشده است. برای تکمیل قطعی inventory باید همهٔ مسیرهای فراخوانی Session در سرویس‌ها و مصرف‌کنندگان و schema واقعی DBهای عملیاتی جداگانه بررسی شوند.
+
+**وضعیت DB-AUD-001:** PARTIAL. مرور هدفمند transaction entry points، seed script، readerهای مشخص و تست‌های مرتبط اضافه شد. شکاف‌های مهم قرارداد با تست‌های فعلی شناسایی و اولویت‌بندی شدند؛ اما inventory کامل تمام 128 فایل، تمام readerها و schema واقعی DB هنوز باز است. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
