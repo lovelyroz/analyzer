@@ -244,3 +244,61 @@
 **نتیجه DB-STD-005:** PARTIAL/BLOCKED در سطح Feed profile باقی می‌ماند؛ کد فعلی adapterها، نمونهٔ واقعی feed یا سند منبع محسوب نمی‌شود و header/واحد/scale را برای منبع ناشناخته تصویب نمی‌کند.
 
 هیچ فایل XLSX/CSV منبعی بازبینی نشد. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+## 9. ممیزی مستقیم Migration Runner و مرزهای تراکنش — 2026-11-15
+
+**دامنهٔ بررسی مستقیم:** `src/migrations/runner.py`، `src/core/database.py`، `src/models/audit.py`، `src/ingestion/common/run_tracker.py`، `src/ingestion/codal/ingestion.py`، `src/ingestion/codal/pipeline.py`، مسیرهای CODAL و FX در `src/ingestion/service.py` و `src/ingestion/market/ingestion.py` خوانده شدند. این بررسی، inventory کامل تمام 128 فایل Python یا تمام callerهای Session نیست؛ فقط call-siteهای صریحاً بررسی‌شده در زیر مبنای نتیجه‌اند. هیچ migration یا تستی اجرا نشد.
+
+### 9.1 Migration Runner — نسخه‌های 1 تا 8
+
+Migrationها به‌صورت توابع Python در یک فایل `src/migrations/runner.py` تعریف شده‌اند؛ فایل مستقل migration برای هر نسخه در tree جاری دیده نشد. فهرست اجرایی:
+
+| Version | Name | رفتار مشاهده‌شده |
+|---|---|---|
+| 1 | `baseline_schema` | `Base.metadata.create_all(bind=engine)` |
+| 2 | `mapping_and_derived_schema` | چند `ALTER TABLE` از طریق helperهای جداگانه و سپس `create_all` برای چهار جدول |
+| 3 | `normalized_fact_multi_source_provenance` | `create_all` برای جدول provenance |
+| 4 | `one_current_report_version` | بررسی duplicate در connection و سپس ساخت partial unique index در `engine.begin()` |
+| 5 | `market_daily_jalali_components` | افزودن سه ستون Jalali به‌صورت additive |
+| 6 | `fx_rates_jalali_components` | افزودن سه ستون Jalali به‌صورت additive |
+| 7 | `forecast_version_repository` | ساخت دو جدول legacy forecast |
+| 8 | `remove_forecast_output_persistence` | حذف دو جدول forecast با `DROP TABLE IF EXISTS` |
+
+**یافته‌های تراکنشی مهم:**
+
+1. `MigrationRunner.upgrade()` هر migration را اجرا می‌کند و پس از بازگشت تابع `apply`، رکورد `schema_migrations` را در یک `engine.begin()` جداگانه درج می‌کند. بنابراین تغییر schema و ثبت شمارهٔ migration یک تراکنش واحد نیستند. اگر DDL موفق شود ولی درج version marker شکست بخورد، اجرای بعدی ممکن است migration را دوباره اجرا کند؛ idempotency برخی عملیات این خطر را کاهش می‌دهد، اما atomicity کلی را تضمین نمی‌کند.
+2. Migration 2 چند عملیات مستقل دارد: هر `_add_column_if_missing` در تراکنش جداگانه اجرا می‌شود و سپس `create_all` انجام می‌شود. شکست میانی می‌تواند schema نیمه‌اعمال‌شده باقی بگذارد، درحالی‌که version هنوز ثبت نشده است.
+3. Migration 4 بررسی duplicate را خارج از تراکنش ساخت index انجام می‌دهد. این جدایی، فاصله‌ای میان precondition check و enforce شدن قید ایجاد می‌کند.
+4. Migration 1 و برخی `create_all`ها در سطح فراخوانی `engine.begin()` واحد با درج version marker قرار ندارند.
+5. Migration 8 حذف جدول انجام می‌دهد؛ این تغییر از نظر داده برگشت‌پذیر نیست مگر backup/restore یا بازسازی داده از منبع موجود باشد. وجود آن در تاریخچه، نیاز به backup/rollback strategy پیش از اجرای محیط واقعی را برجسته می‌کند.
+6. Runner نسخه‌ها را به‌ترتیب اجرا می‌کند و در پایان شمارهٔ آخر را برمی‌گرداند؛ اما سازوکار ثبت checksum، قفل اجرای هم‌زمان migration، downgrade یا rollback عملیاتی در فایل بررسی‌شده مشاهده نشد. نبود آن‌ها در این فایل به‌تنهایی اثبات نبود در کل سامانه نیست.
+
+### 9.2 Session و IngestionRun
+
+- `SessionLocal` با `autocommit=False` و `autoflush=False` ساخته شده است؛ در فایل `src/core/database.py` وابستگی/مدیریت چرخهٔ عمر Session یا context manager مخصوص ingestion دیده نشد.
+- مدل `IngestionRun` فقط `source`، زمان شروع/پایان، status، شمارنده‌های found/inserted/updated/failed و `error_log` را دارد. fingerprint منبع، source revision، adapter/profile/standard version، شمارندهٔ unchanged/out_of_scope/rejected و ساختار خطا در مدل مشاهده نشد.
+- `start_run()` در `run_tracker.py` فقط add و flush می‌کند و commit نمی‌کند؛ `complete_run()` فقط فیلدها را تغییر می‌دهد و commit نمی‌کند؛ اما `fail_run()` خودش commit می‌کند. این APIها مرز تراکنش یکنواختی ندارند.
+- مقدار `finished_at` در برخی مسیرها با `datetime.utcnow()` و در مسیرهای دیگر با UTC-aware سپس حذف timezone ساخته می‌شود؛ قرارداد زمانی و convention باید یکسان شود.
+
+### 9.3 Call-siteهای تراکنش که مستقیماً مشاهده شدند
+
+| مسیر | رفتار مشاهده‌شده | مغایرت با DB-DES-005 |
+|---|---|---|
+| `service.py::ingest_codal_report` | STARTED با flush؛ ساخت Report/ReportVersion/Facts؛ COMPL​ETED و canonical writes با یک commit؛ در exception rollback و سپس FAILED در commit جداگانه | الگوی کلی به atomicity نزدیک است؛ اما Run شروع‌شده در rollback از بین می‌رود و به‌جای update همان Run، رکورد FAILED جدید ساخته می‌شود. مسیر idempotent موجود بر اساس tracking ID و publication datetime، payload را مقایسه نمی‌کند و در صورت یافتن نسخه، شمارنده را در `records_updated` ثبت می‌کند |
+| `service.py::ingest_fx_rates` | STARTED با flush؛ ردیف‌های نامعتبر فقط به شمارنده اضافه و از حلقه عبور می‌کنند؛ ردیف‌های معتبر upsert می‌شوند؛ در پایان COM​PLETED با commit؛ exception باعث rollback و درج FAILED جداگانه می‌شود | batch دارای ردیف نامعتبر همچنان با status=COMPLETED و بخشی از داده commit می‌شود؛ برخلاف رد کامل Ingestion Unit. تعارض موجود نیز overwrite می‌شود |
+| `market/ingestion.py::ingest_ohlc_csv` | STARTED با flush؛ خطاهای parse/validation/company به شمارنده افزوده و ادامه می‌یابد؛ رکوردهای موجود overwrite می‌شوند؛ در پایان COMPLETED و داده با هم commit می‌شوند؛ exception rollback و FAILED جدید | پذیرش جزئی در حضور خطای ردیف؛ overwrite بدون revision/conflict؛ خطای empty/invalid CSV نیز FAILED را commit می‌کند ولی `records_failed=0` ثبت می‌شود |
+| `codal/ingestion.py::ingest_codal_pdf` و `codal/pipeline.py` | در خطای acquisition/extraction/validation، rollback و سپس درج FAILED و commit؛ مسیر PDF legacy است | audit شکست مستقل است، اما مسیر جاری V1 نیست و نباید مبنای قرارداد Excel تلقی شود |
+
+**نتیجه:** مسیر CODAL service از نظر یک commit برای Report/Version/Facts و FAILED audit جداگانه، به الگوی منطقی نزدیک‌تر است؛ اما lifecycle و idempotency آن کامل نیست. مسیرهای FX و Market صریحاً پذیرش جزئی و overwrite دارند و با DB-DES-005 ناسازگارند. این ناسازگاری‌ها فعلاً یافتهٔ ممیزی‌اند، نه مجوز اصلاح خودکار کد.
+
+### 9.4 شکاف‌های مهم برای بستن ممیزی
+
+1. تکمیل inventory تمام callerهای Session و همهٔ `commit()`/`rollback()` در کل `src/`، به‌ویژه seed، scripts، forecast و سایر سرویس‌های مصرف‌کننده.
+2. تطبیق تمام مدل‌ها و ORM metadata با migration history و schema واقعی دیتابیس‌های موجود؛ این مرحله به دسترسی و snapshot از DB واقعی نیاز دارد و با خواندن کد جایگزین نمی‌شود.
+3. تعیین راهبرد atomicity برای خود migrationها: transaction-per-migration شامل DDL و version marker در حد پشتیبانی SQLite، قفل اجرای هم‌زمان، تشخیص migration نیمه‌اعمال‌شده و backup/restore.
+4. بازطراحی IngestionRun و tracker برای lifecycle واحد STARTED→COMPLETED/FAILED، حفظ audit شکست بدون partial canonical writes و ثبت metadata لازم.
+5. حذف row-level partial acceptance در Market/FX و پیاده‌سازی duplicate/conflict/revision مطابق DB-DES-005.
+6. بررسی تست‌های موجود به‌صورت ایستا و تدوین ماتریس تست؛ تست‌ها اجرا نشدند.
+
+**وضعیت DB-AUD-001:** PARTIAL. Migration runner نسخه‌های 1–8 و چند مرز تراکنش مهم مستقیماً بررسی شدند؛ اما inventory کامل call-siteها، schema واقعی پایگاه‌های موجود، تمام readerها و تست‌ها هنوز بسته نشده‌اند. هیچ XLSX/CSV منبعی بررسی نشد. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
