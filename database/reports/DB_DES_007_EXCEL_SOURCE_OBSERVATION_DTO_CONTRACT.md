@@ -298,3 +298,11 @@ Initial DTO implementation and owner-run test definitions are now present in `sr
 ## 15. DTO implementation validation (2026-11-15)
 
 The immutable text-only DTO implementation and package exports for DB-ING-004 / Task 031 are complete. The owner ran `pytest src/tests/test_excel_observation_dto.py -q` and reported **13 passed in 2.49s**. The assistant did not execute tests. This validates the DTO-level invariants covered by that test module; it does not validate XLSX reading, workbook structure extraction, table-region detection, or whole-file rejection behavior. Those remain in the next implementation task (DB-ING-005 / Task 032).
+
+## 16. Structural/text reader implementation increment (2026-11-15)
+
+The first implementation of the V1 openpyxl reader is available in `src/ingestion/excel/reader.py`, with public exports in `src/ingestion/excel/__init__.py`. It produces the transient `WorkbookObservation`, records source SHA-256 and reader provenance, preserves worksheet order/visibility, used ranges, merged ranges, sparse text/blank cells, and row/column references. Declared Excel structured tables are observed as explicit table structures.
+
+A populated numeric, boolean, date-typed, formula, or error cell produces a stable error diagnostic. After scanning all worksheets, the reader raises `ExcelSourceContractError` with the complete observation so the ingestion unit can reject the whole report. No text normalization, numeric/date parsing, semantic mapping, formula evaluation, or persistence is performed.
+
+Owner-run tests are authored in `src/tests/test_excel_source_reader.py`; the assistant did not execute them. Visual financial table segmentation is not inferred by this reader and is tracked separately as DB-ING-006 / Task 033. Implementation details, provisional resource limits, and acceptance status are recorded in `reports/DB_ING_005_EXCEL_SOURCE_READER_IMPLEMENTATION.md`. Task 032 remains PARTIAL pending owner-run validation.
