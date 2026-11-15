@@ -261,3 +261,12 @@ Paste the complete output into reply.md.
 **V2 design gate:** do not split tables merely because style_id, font, fill, or border changes. Style IDs are workbook-local and may differ because of number formats or presentation choices. The next detector design must evaluate combinations of independent evidence, establish deterministic thresholds against actual source files, and keep uncertain boundaries AMBIGUOUS. In particular, investigate the documented Parsian adjacent pairs around rows 295/300, 309/334, 358/359, and 405/406. A formatting boundary is a structural signal, not proof by itself that two financial tables are independent.
 
 Task 033 remains PARTIAL. No table segmentation behavior was changed in this increment. The assistant did not run tests or inspect the XLSX workbooks directly.
+
+
+### 8.9 Owner-run validation and Reader formatting-evidence fix — 2026-11-15
+
+The owner ran the combined regression command and reported **37 passed, 1 failed**. The single failure was `test_reader_captures_cell_border_fill_font_and_style_evidence`: the fixture defined only a bottom border, while openpyxl exposes an unset border side as `None`; the Reader incorrectly dereferenced `.style` on that absent side and wrapped the resulting AttributeError as `EXCEL_WORKBOOK_STRUCTURE_UNREADABLE`.
+
+The Reader was corrected to read each border side defensively, returning `None` when that side is absent. This preserves the intended optional formatting-evidence contract and does not change cell-value acceptance, table detection, or financial semantics. The fix is committed in `src/ingestion/excel/reader.py` (commit `7a67f02b77cc5ba9b79c8681257a8cdd5ba9dd01`).
+
+**Required owner action:** rerun the same combined regression command. The structural boundary audit output was not present in this `reply.md` result, so after the tests pass, run the audit command from section 8.8 and place its complete output in `reply.md`. Task 033 remains PARTIAL. The assistant did not run tests or inspect XLSX files directly.
