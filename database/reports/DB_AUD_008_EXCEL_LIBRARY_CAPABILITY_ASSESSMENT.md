@@ -19,7 +19,7 @@ No library is approved unconditionally. A small, controlled feature spike is sti
 - `requirements.txt` currently lists `openpyxl` alongside SQLAlchemy, pytest, pypdf, and jdatetime.
 - No `pyproject.toml` or `setup.py` was found at the repository root in this review.
 - `python-calamine` is not listed in the reviewed requirements file.
-- The existing dependency is evidence of project availability, not proof that all required Excel observations are currently implemented.
+- The existing dependency is evidence of project declaration, not a complete inventory of the active Python environment. Packages installed manually and omitted from requirements.txt may still be available to the user running the utility.
 - The four workbook patterns discussed in DB-AUD-002 and DB-AUD-007 are represented here only through their Markdown audit reports. The XLSX files were not directly opened during this task.
 
 ## 3. Capability comparison
@@ -100,7 +100,13 @@ The next bounded spike should use synthetic workbooks created specifically for v
 
 No source workbook should be changed. No formula should be executed. No test suite was run as part of this documentation assessment.
 
-## 7.1 Spike utility prepared (not executed)\n\nA standalone opt-in utility was added at `src/scripts/excel_reader_feature_spike.py`. It generates a temporary synthetic workbook and emits JSON observations for worksheet visibility, merged ranges, structured tables on multiple sheets, formula-expression versus cached-value views (including a formula without a cache), cell types, 1904 epoch, hidden rows/columns, coordinates, a raw XML numeric token, and a SHA-256 fingerprint. The fixture injects a cached formula result into its own generated XLSX package; it does not calculate a formula. It also reports whether `python_calamine` is installed, but does not import or benchmark it.\n\nThe utility is deliberately not a pytest test and was not run in this task. The current fixture does not yet compare 1900 and 1904 workbooks, benchmark large-sheet memory/time, establish repeatability across separate runs, or validate Calamine behavior. Those remain open evidence items.\n\n## 7. Decision status
+## 7.1 Spike utility prepared (not executed)
+
+A standalone opt-in utility was added at `src/scripts/excel_reader_feature_spike.py`. It generates a temporary synthetic workbook and emits JSON observations for worksheet visibility, merged ranges, structured tables on multiple sheets, formula-expression versus cached-value views (including a formula without a cache), cell types, 1904 epoch, hidden rows/columns, coordinates, a raw XML numeric token, and a SHA-256 fingerprint. The fixture injects a cached formula result into its own generated XLSX package; it does not calculate a formula. It now reports installed distribution versions and import-module availability for `openpyxl`, `python-calamine`, `pandas`, `xlrd`, `pyxlsb`, `odfpy`, and `fastexcel`. This runtime inventory is read from the Python interpreter executing the utility, so manually installed packages absent from `requirements.txt` can be detected. The utility still does not import or benchmark Calamine.
+
+The utility is deliberately not a pytest test and was not run in this task. Static review also corrected malformed literal newline escapes in the script source. The current fixture does not yet compare 1900 and 1904 workbooks, benchmark large-sheet memory/time, establish repeatability across separate runs, or validate Calamine behavior. Those remain open evidence items.
+
+## 7. Decision status
 
 - `openpyxl`: **provisional primary candidate**.
 - `python-calamine`: **secondary candidate requiring feature spike**.
@@ -120,4 +126,4 @@ No source workbook should be changed. No formula should be executed. No test sui
 
 ---
 
-**Execution note:** The assessment report and a standalone synthetic spike utility were added. The utility was not executed. No source XLSX was directly inspected, no package was installed or upgraded, no production ingestion code/DTO/ORM/schema/migration/data was changed, and no tests were run.
+**Execution note:** The assessment report and a standalone synthetic spike utility were added and then statically corrected/extended with a runtime package inventory. The utility was not executed. No source XLSX was directly inspected, no package was installed or upgraded, no production ingestion code/DTO/ORM/schema/migration/data was changed, and no tests were run.
