@@ -147,3 +147,43 @@ python src/scripts/excel_table_detector_review.py excel/cheshme.xlsx excel/fzar.
 If more examples are needed, increase the sample limit with `--sample-limit 30`. Paste the compact output into `reply.md`.
 
 **Important decision gate:** do not relax the text-only contract and do not coerce numbers/dates into strings. First inspect the reported coordinates and determine whether these are genuinely numeric/date/formula cells or whether the source-generation/export process has changed. If they are genuine non-text populated cells, the owner must explicitly revise the input contract before any Reader behavior is changed. Task 033 remains PARTIAL, and Reader contract alignment is now a separate issue to resolve before production acceptance.
+
+
+### 8.5 Owner-run validation results — 2026-11-15
+
+The owner reran the review utility against all five representative workbooks and supplied the complete output in repository `reply.md`.
+
+**Reader contract outcome:** all five workbooks were rejected. Every reported violation is `UNEXPECTED_NON_TEXT` with Excel `data_type='n'`; no formula or error-cell violations were reported in this run.
+
+| Workbook | Observed cells | Numeric-type contract violations |
+|---|---:|---:|
+| `cheshme.xlsx` | 2,153 | 928 |
+| `fzar.xlsx` | 953 | 384 |
+| `fzar2.xlsx` | 6,063 | 2,036 |
+| `samanBank.xlsx` | 2,753 | 914 |
+| `parsian_periodic.xlsx` | 2,183 | 920 |
+| **Total** | **14,105** | **5,182** |
+
+The samples include ordinary positive, negative, and zero numeric values with number formats such as `[$-3000401]#,##0` and `[$-3000401]0`. This is evidence of literal numeric-typed Excel cells, not evidence that those cells contain formulas. It conflicts with the currently approved *text-typed cell* input contract. The distinction must be resolved explicitly by the owner; the reader must not stringify or otherwise coerce these values under the current contract.
+
+**Diagnostic-preview outcome:** because the reader rejected each workbook, all detector output below is diagnostic-only and is based on the literal-text subset, not the complete worksheet contents.
+
+| Workbook | Preview regions | CANDIDATE | AMBIGUOUS |
+|---|---:|---:|---:|
+| `cheshme.xlsx` | 9 | 0 | 9 |
+| `fzar.xlsx` | 4 | 0 | 4 |
+| `fzar2.xlsx` | 33 | 0 | 33 |
+| `samanBank.xlsx` | 16 | 2 | 14 |
+| `parsian_periodic.xlsx` | 15 | 1 | 14 |
+| **Total** | **77** | **3** | **74** |
+
+Most preview regions are ambiguous because of single-blank separators and/or merged ranges crossing proposed boundaries. These counts do not validate the detector against the complete numeric-containing workbooks. In addition, the previously documented adjacent-table false-merge risk remains unresolved: a text-only preview cannot establish whether the detector correctly separates all independent financial tables.
+
+**Decision gate / next action:**
+
+1. The owner must clarify whether the normative source contract means (A) every populated cell must have Excel string type, or (B) populated cells may be literal text *or literal numeric values*, while formulas remain prohibited.
+2. If (A), the five current source workbooks are invalid under the approved contract and must be regenerated/exported as text-typed workbooks upstream; Reader behavior remains unchanged.
+3. If (B), this is an explicit contract revision. Before changing the Reader, define the exact numeric observation representation, precision/round-trip guarantees, treatment of dates and booleans, and whether preserving the numeric value exposed by openpyxl is sufficient. Do not silently stringify numbers or infer numeric semantics at the reader layer.
+4. After the contract is settled and a valid full observation is available, revisit table segmentation against the real workbooks. Do not treat the present diagnostic preview as acceptance evidence.
+
+Task 033 remains PARTIAL. The automated test result remains owner-reported as 33 passed; the real-workbook validation is not complete. The assistant did not inspect XLSX files or run tests.
