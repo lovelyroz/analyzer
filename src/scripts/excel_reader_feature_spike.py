@@ -62,7 +62,7 @@ def _make_synthetic_workbook(path: Path) -> None:
     main = workbook.active
     main.title = "Main"
     main.append(["Metric", "Zero", "NumericToken", "Formula", "Date", "Error", "Boolean"])
-    main.append(["Revenue", 0, 123.45, "=B2+1", datetime(2024, 1, 1), "#N/A", True])
+    main.append(["Revenue", 0, 123.45, "=B2+1", datetime(2024, 1, 1), "#N/A", True, "=B2+2"])
     main["F2"].data_type = "e"
     main.merge_cells("A4:B4")
     main["A4"] = "Merged multi-level header"
@@ -81,7 +81,7 @@ def _make_synthetic_workbook(path: Path) -> None:
 
     hidden = workbook.create_sheet("HiddenSheet")
     hidden.sheet_state = "hidden"
-    hidden["A1"] = "hidden content"
+    hidden.append(["Metric", "Value"])\n    hidden.append(["HiddenMetric", 7])\n    hidden_table = Table(displayName="HiddenSheetFacts", ref="A1:B2")\n    hidden.add_table(hidden_table)
 
     very_hidden = workbook.create_sheet("VeryHiddenSheet")
     very_hidden.sheet_state = "veryHidden"
@@ -149,7 +149,7 @@ def run_spike() -> dict:
                 name: table.ref for name, table in main.tables.items()
             },
             "formula_view": _cell_observation(formula_cell),
-            "cached_value_view": _cell_observation(cached_cell),
+            "cached_value_view": _cell_observation(cached_cell),\n            "formula_without_cache": {\n                "formula": main["H2"].value,\n                "cached_value": cached_main["H2"].value,\n            },
             "formula_cache_pair": {
                 "formula": formula_cell.value,
                 "cached_value": cached_cell.value,
