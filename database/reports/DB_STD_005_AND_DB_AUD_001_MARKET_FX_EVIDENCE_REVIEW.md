@@ -173,3 +173,74 @@
 **نتیجه بخش Market/FX از DB-AUD-001:** PARTIAL. دو شکاف روشن در unique constraintهای فعلی MarketDaily و FXRate و چند شکاف در مسیرهای Share/CorporateAction ثبت شده‌اند. این گزارش جایگزین ممیزی مستقیم کد و schema نیست.
 
 هیچ XLSX/CSV منبعی بازبینی نشد. هیچ کد، ORM، schema، migration، داده یا تستی تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+## 8. تکمیل ممیزی مستقیم کد — 2026-11-15
+
+**دامنهٔ بررسی مستقیم:** مدل‌های ORM و مسیرهای فعال زیر در شاخهٔ جاری خوانده شدند:
+- `src/models/market.py`, `src/models/fx.py`, `src/models/share_action.py`
+- `src/ingestion/market/adapter.py`, `src/ingestion/market/ingestion.py`, `src/ingestion/market/queries.py`
+- `src/ingestion/fx/adapter.py`, `src/ingestion/fx/ingestion.py`, بخش `ingest_fx_rates` در `src/ingestion/service.py`
+- `src/ingestion/common/identity.py`, `src/ingestion/common/validation.py`, `src/ingestion/common/parsing.py`
+- `src/forecast/queries.py::load_share_history`
+
+این مرور، کدهای فوق را مستقیماً بررسی می‌کند؛ اما هنوز inventory همهٔ migrationها، همهٔ call-siteها، queryهای FX و تمام تست‌ها نیست. هیچ تستی اجرا نشد.
+
+### 8.1 یافته‌های قطعی مدل‌ها و قیود
+
+| دامنه | وضعیت فعلی مشاهده‌شده | مغایرت/ریسک نسبت به قرارداد |
+|---|---|---|
+| MarketDaily | `trade_date` nullable؛ سه جزء Jalali nullable؛ unique فقط روی `(company_id, trade_date)` | برای رکوردهای Jalali با trade_date=NULL یکتایی روز/شرکت enforce نمی‌شود؛ اجزای تاریخ نیز constraint کامل/اجباری ندارند |
+| MarketDaily numeric | قیمت‌ها و value از نوع Numeric؛ volume و trade_count از نوع Integer | با قرارداد persistence عددی INTEGER برای همهٔ ورودی‌های عددی هم‌راستا نیست |
+| FXRate | `rate_date` nullable؛ Jalali components nullable؛ unique روی `(rate_date,currency_from,currency_to,rate_type)` | برای نرخ‌های Jalali با rate_date=NULL یکتایی روز/نوع/جفت ارز enforce نمی‌شود |
+| FXRate rate types | CheckConstraint شامل FREE_MARKET و چهار نوع قدیمی دیگر است | EXCHANGE_CENTER در constraint مدل وجود ندارد و انواع خارج از قرارداد V1 هنوز مجازند |
+| FXRate numeric/provenance | `rate` از نوع Numeric؛ فقط source label ذخیره می‌شود | INTEGER canonical و نگهداری مقدار/واحد Toman منبع و publication/availability metadata در مدل دیده نمی‌شود |
+| ShareCountHistory | effective_date از نوع SQL Date؛ unique روی company_id/effective_date؛ shares_outstanding Integer و capital Numeric | تقویم/معنای تاریخ با قرارداد Jalali تطبیق ندارد؛ basis شمارش در هویت/مدل نیست؛ provenance و publication time موجود نیست |
+| CorporateAction | announcement_date/effective_date از نوع SQL Date؛ unique روی company_id/effective_date/action_type | شناسهٔ پایدار منبع، approval date، revision/status و publication/availability metadata در مدل دیده نمی‌شود؛ دو رویداد هم‌نوع در یک تاریخ ممکن است به‌اشتباه یکی فرض شوند |
+
+### 8.2 Market adapter و writer
+
+1. `load_ohlc_csv_rows` فقط وجود ستون تاریخ و ticker را الزامی می‌کند؛ واحد، scale و basis ستون‌های عددی در adapter احراز نمی‌شود.
+2. ستون تعدیل‌شدهٔ منبع با aliasهایی مانند `final`/`adjclose` خوانده می‌شود؛ اگر مقدار آن خالی باشد، adapter مقدار `close` را به‌عنوان `adjusted_close` کپی می‌کند. این fallback، دو ورودی مستقل را مخلوط می‌کند و با قرارداد منبع‌محور adjusted close ناسازگار است.
+3. `to_int` مقدار Decimal را با `int(...)` تبدیل می‌کند؛ بخش اعشاری truncate می‌شود، نه اینکه ROUND_HALF_UP مصوب اعمال شود.
+4. writer شرکت را با ticker جست‌وجو می‌کند و در رکورد موجود، تمام مقادیر و source را بی‌قیدوشرط overwrite می‌کند. منبع متفاوت، revision، publication time و conflict بررسی نمی‌شوند؛ این رفتار last-write-wins است.
+5. فایل دارای خطاهای ردیفی می‌تواند با رکوردهای معتبر دیگر commit شود؛ بنابراین writer فعلی برای یک batch mixed-validity رفتار all-or-nothing ندارد.
+6. writer یک IngestionRun را STARTED می‌کند و در exception rollback کرده و یک FAILED run تازه ثبت می‌کند؛ این الگو از باقی‌ماندن canonical writes در exception جلوگیری می‌کند، اما خطاهای ردیفیِ جمع‌آوری‌شده مانع commit بقیهٔ ردیف‌ها نیستند.
+
+### 8.3 FX adapter و writer
+
+1. adapter فعلی ورودی XLSX دو ستونی (تاریخ و نرخ) است؛ این با قرارداد سطح دامنه‌ای CSV/XLSX قابل‌تعویض تعارض ندارد، اما Feed profile واقعی هنوز اثبات نشده است.
+2. `rates_in_toman=True` مقدار نرخ را در adapter در ۱۰ ضرب می‌کند؛ DTO فقط `rate` canonical را حمل می‌کند و مقدار خام Toman/واحد آن را جداگانه حفظ نمی‌کند. بنابراین provenance تبدیل طبق قرارداد جدید کامل نیست.
+3. FX DTO و adapter فقط rate_type را از whitelist فعلی می‌پذیرند؛ whitelist فعلی FREE_MARKET، OPERATIONAL، OFFICIAL، ESTIMATED و MANUAL_OPERATOR است و EXCHANGE_CENTER را نمی‌پذیرد. این با دو نوع مصوب V1 وارونه/ناسازگار است.
+4. writer برای Jalali components یا Gregorian rate_date هویت می‌سازد، اما تاریخ Gregorian را برای Jalali row NULL می‌گذارد؛ این با unique constraint فعلی مشکل بند 5.2 را ایجاد می‌کند.
+5. در صورت یافتن رکورد موجود، rate و source بدون بررسی مقدار متعارض، منبع یا revision overwrite می‌شوند؛ رفتار last-write-wins است.
+6. آیتم‌های نامعتبر به failed count افزوده می‌شوند، ولی سایر آیتم‌ها commit می‌شوند؛ batch all-or-nothing نیست.
+7. FXConversionRule model نیز rate_typeهای قدیمی را در CheckConstraint مجاز می‌داند و EXCHANGE_CENTER را در فهرست ندارد.
+8. زمان انتشار/دسترس‌پذیری منبع و مقدار خام Toman در مدل/DTO بررسی‌شده مشاهده نشد.
+
+### 8.4 Share / CorporateAction و مصرف‌کننده
+
+1. در مدل‌های بررسی‌شده، ShareCountHistory و CorporateAction تعریف شده‌اند؛ در مسیرهای ingestion بررسی‌شده writer فعال برای آن‌ها مشاهده نشد. این نتیجه محدود به مسیرهای بررسی‌شده است و ادعای نبود writer در کل repository نیست.
+2. `load_share_history` در `src/forecast/queries.py` تاریخ cutoff را با `normalize_datetime(cutoff).date()` به Gregorian date تبدیل می‌کند و با `effective_date` و `announcement_date` مقایسه می‌کند.
+3. فیلتر CorporateAction از `coalesce(announcement_date, cutoff_date) <= cutoff_date` استفاده می‌کند؛ وقتی announcement_date NULL است، شرط عملاً آن رویداد را صرفاً بر اساس effective_date عبور می‌دهد. این رفتار با قاعدهٔ PIT قرارداد DB-DES-004 که زمان انتشار/دسترس‌پذیری نامعلوم را برای historical PIT غیرواجد شرایط می‌داند، سازگار نیست.
+4. این consumer هنوز بر SQL Date تکیه دارد؛ تا تعیین طرح تاریخ Jalali و publication-time، تبدیل یا مهاجرت دادهٔ موجود نباید حدس زده شود.
+
+### 8.5 شکاف‌های اولویت‌دار برای طراحی/اصلاح بعدی
+
+| اولویت | شکاف | تصمیم/کار لازم |
+|---|---|---|
+| P0 | کلید یکتای Jalali در MarketDaily و FXRate | طراحی constraint/index و تطبیق با NULLها و legacy rows در DB-MIG-001؛ پیش از آن upsert قابل اتکا نیست |
+| P0 | overwrite تعارض در Market و FX | قرارداد revision/source precedence و conflict handling؛ ممنوعیت last-write-wins |
+| P0 | FX type catalog ناسازگار | هم‌راستاسازی constraint، validator، DTO و adapter با FREE_MARKET و EXCHANGE_CENTER |
+| P0 | adjusted_close fallback به close | حذف fallback معنایی؛ NULL مستقل بماند مگر منبع adjusted close داده باشد |
+| P1 | عددهای Numeric و truncation | پیاده‌سازی INTEGER + Decimal + ROUND_HALF_UP در مرز persistence و طرح migration |
+| P1 | نبود provenance منبع FX و publication time | DTO/model contract برای source amount/unit و availability time |
+| P1 | Share/Action تاریخ Gregorian و نبود PIT metadata | تعیین ورودی/تقویم/زمان انتشار و سپس طراحی migration و consumer |
+| P1 | batch partial commit در Market/FX | هماهنگی transaction boundary و atomicity در DB-DES-005 |
+| P2 | coverage کامل readerها/writerها/migrations/tests | ادامهٔ inventory repository و مقایسهٔ schema migration با ORM |
+
+**نتیجهٔ به‌روزشدهٔ بخش Market/FX از DB-AUD-001:** PARTIAL. این گزارش اکنون یافته‌های مستقیم مدل‌ها و مسیرهای فوق را ثبت می‌کند؛ inventory کامل migrationها، همهٔ call-siteها، queryهای FX، schema واقعی DB و تست‌ها هنوز انجام نشده است.
+
+**نتیجه DB-STD-005:** PARTIAL/BLOCKED در سطح Feed profile باقی می‌ماند؛ کد فعلی adapterها، نمونهٔ واقعی feed یا سند منبع محسوب نمی‌شود و header/واحد/scale را برای منبع ناشناخته تصویب نمی‌کند.
+
+هیچ فایل XLSX/CSV منبعی بازبینی نشد. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
