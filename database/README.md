@@ -31,6 +31,7 @@
 | [DB_DES_004_MARKET_FX_SHARE_CONTRACT.md](reports/DB_DES_004_MARKET_FX_SHARE_CONTRACT.md) | قرارداد منطقی بازار، FX، تعداد سهام و رویدادهای سرمایه‌ای |
 | [DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md](reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md) | قرارداد IngestionRun، مرز تراکنش و اتمیک بودن ورود داده |
 | [DB_DES_006_CODAL_CANONICAL_INGESTION_PIPELINE.md](reports/DB_DES_006_CODAL_CANONICAL_INGESTION_PIPELINE.md) | قرارداد منطقی مسیر CODAL Excel تا FinancialFact canonical |
+| [DB_DES_007_EXCEL_SOURCE_OBSERVATION_DTO_CONTRACT.md](reports/DB_DES_007_EXCEL_SOURCE_OBSERVATION_DTO_CONTRACT.md) | قرارداد DTO موقت مشاهدهٔ ساختار و مقادیر workbookهای Excel |
 | [DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md](reports/DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md) | مرور شواهد ورودی بازار/FX و شکاف‌های ممیزی ORM/مسیرها |
 | [DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md](reports/DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md) | ممیزی آمادگی مسیر CODAL برای پیاده‌سازی canonical |
 | [findingSubheaders.md](reports/findingSubheaders.md) | بررسی زیرعنوان‌ها و ساختار گزارش |
