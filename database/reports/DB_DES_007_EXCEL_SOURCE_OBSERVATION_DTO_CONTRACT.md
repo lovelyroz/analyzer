@@ -293,3 +293,8 @@ The companion concrete DTO design is `reports/DB_DES_007_PYTHON_DTO_DESIGN.md`; 
 
 
 Initial DTO implementation and owner-run test definitions are now present in `src/ingestion/excel/dto.py`, `src/ingestion/excel/__init__.py`, and `src/tests/test_excel_observation_dto.py`. The tests are authored but have not been run by the assistant. The structural/text reader and table-region detector remain separate implementation work.
+
+
+## 15. DTO implementation validation (2026-11-15)
+
+The immutable text-only DTO implementation and package exports for DB-ING-004 / Task 031 are complete. The owner ran `pytest src/tests/test_excel_observation_dto.py -q` and reported **13 passed in 2.49s**. The assistant did not execute tests. This validates the DTO-level invariants covered by that test module; it does not validate XLSX reading, workbook structure extraction, table-region detection, or whole-file rejection behavior. Those remain in the next implementation task (DB-ING-005 / Task 032).
