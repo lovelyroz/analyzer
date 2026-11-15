@@ -1,7 +1,7 @@
 # DB-AUD-008 — Excel Library Capability Assessment
 
 **Date:** 2026-11-15  
-**Status:** PARTIAL — repository inventory, documentation comparison, and a synthetic openpyxl probe utility are in place; the utility has not been executed, Calamine comparison and source-workbook validation remain open.  
+**Status:** PARTIAL — repository inventory, documentation comparison, and the synthetic openpyxl probe have been run by the owner in their environment; basic fixture observations and runtime package inventory are recorded. Epoch 1900 comparison, repeatability, large-sheet performance/memory, Calamine comparison, and source-workbook validation remain open.  
 **Scope:** Excel reader selection for the CODAL Excel ingestion V1 and the logical observation contract in DB-DES-007. This report is not an implementation approval.
 
 ## 1. Executive decision
@@ -118,6 +118,38 @@ The first owner-run execution exposed an `openpyxl` API compatibility issue: in 
 - `pandas`: **not selected as the observation adapter**; may be considered downstream only after structural interpretation.
 - Production dependency changes, Python DTO classes, production adapter code, ORM/schema/migrations, and data changes: **not authorized or performed by this assessment**. The standalone spike utility is diagnostic-only.
 
+
+## 7.3 Successful owner-run synthetic probe and environment inventory
+
+The owner reran the corrected utility and placed its complete JSON output in repository-root `reply.md`. The run completed and emitted the expected JSON; the earlier `TableList.items()` compatibility failure did not recur. This is owner-provided execution evidence, not an assistant-run test.
+
+Observed in the owner's executing interpreter:
+
+| Distribution / import module | Installed / available | Version |
+|---|---:|---:|
+| `openpyxl` | Yes | 3.1.5 |
+| `xlrd` | Yes | 2.0.2 |
+| `python-calamine` / `python_calamine` | No | — |
+| `pandas` | No | — |
+| `pyxlsb` | No | — |
+| `odfpy` | No | — |
+| `fastexcel` | No | — |
+
+The synthetic fixture observations include:
+
+- Worksheet states `visible`, `hidden`, and `veryHidden` were emitted for Main, HiddenSheet, and VeryHiddenSheet.
+- Merged range `A4:B4`, hidden row 6, and hidden column H were observed.
+- Structured table `SyntheticFacts` was reported over `A1:G2`.
+- At coordinate `D2`, the formula view returned `=B2+1` and the data-only view returned cached value `1`; the paired coordinate matched. A separate formula `=B2+2` had no cached value.
+- Cell observations distinguished text, zero, numeric, date, error, and boolean values.
+- Workbook epoch was `1904-01-01T00:00:00`.
+- The library scalar for the numeric cell was `123.45`, while the raw worksheet XML token was `123.4500`; ordinary cell-value access therefore does not preserve the lexical trailing-zero representation.
+- The fixture emitted SHA-256 `ef710da9f73f90e0b2c825bd7b254cdd9aad06f378f9410ad84b0bb3cda56758`.
+
+**Interpretation and limits:** this confirms the corrected utility can complete against its synthetic fixture in the owner's environment and records the environment-specific package inventory. It does not establish behavior on CODAL source workbooks, compare the 1900 date system, demonstrate repeatability across independent runs, benchmark large-sheet time or memory, or compare Calamine. The output reports observations rather than pass/fail assertions; no formula was calculated, and no source workbook was opened.
+
+The full owner-provided output is retained in repository-root `reply.md` as execution evidence. The assistant did not execute the utility or any tests.
+
 ## 8. Sources
 
 - openpyxl tutorial and workbook loading options: https://openpyxl.readthedocs.io/en/stable/tutorial.html
@@ -131,4 +163,4 @@ The first owner-run execution exposed an `openpyxl` API compatibility issue: in 
 
 ---
 
-**Execution note:** The assessment report and a standalone synthetic spike utility were added and then statically corrected/extended with a runtime package inventory. The utility was not executed. No source XLSX was directly inspected, no package was installed or upgraded, no production ingestion code/DTO/ORM/schema/migration/data was changed, and no tests were run.
+**Execution note:** The standalone synthetic spike utility was executed by the owner in their environment; its JSON output is retained in repository-root `reply.md` and summarized in section 7.3. The assistant did not execute the utility or any tests. No source XLSX was directly inspected, no package was installed or upgraded, no production ingestion code/DTO/ORM/schema/migration/data was changed, and no tests were run.
