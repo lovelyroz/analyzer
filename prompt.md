@@ -1,205 +1,230 @@
-# Task: Inspect Parsian Quarterly Financial Report — DB-STD-003
+# Task: Extract and Inventory All Bordered Tables from Parsian Excel Sample
 
-You are working in the repository:
+You are working on the CODAL financial-data project:
 
 `analyzer`
 
-## Objective
+## 1. Task Type
 
-Inspect the local Excel workbook:
+**REPORT ONLY — NO CODE CHANGES**
+
+Your task is to inspect the prepared Excel workbook and produce a complete, auditable inventory of all tables and their cell contents.
+
+Do not modify application code, database schemas, project documentation, or the original Excel workbook.
+
+Do not perform data cleaning, normalization, financial interpretation, or data transformation.
+
+## 2. Input Workbook
+
+Locate the prepared workbook:
 
 `excel/parsian_periodic.xlsx`
 
-This is the second real sample for designing the **Quarterly Financial Report Standard (DB-STD-003)**.
+The workbook has been manually annotated to identify its table structures.
 
-The purpose is to extract and document the workbook's actual structure, financial statement layout, headers, period definitions, and data characteristics so ChatGPT can review the evidence and decide the standard.
+Inspect the actual workbook and determine the relevant worksheet(s). Do not assume worksheet names or fixed cell coordinates without verifying them.
 
-**This is an inspection and evidence-reporting task only. Do not implement code, modify database schemas, create migrations, or finalize the standard.**
+## 3. Manually Defined Visual Markers
 
-## Mandatory project constraints
+The workbook uses the following conventions:
 
-1. There are exactly two report types in the current project:
-   - Monthly Activity Reports
-   - Quarterly Financial Reports
+### A. Table boundaries — Borders
 
-2. YTD/cumulative values and standalone-quarter values are temporal properties of data within a quarterly report. They are NOT separate report types.
+Every table that must be extracted has been marked with borders.
 
-3. Do not apply the monthly activity report standard to this quarterly report.
+Use the cell border properties to identify the exact table boundaries.
 
-4. Do not automatically apply the Bank Master five-label taxonomy to quarterly financial statements. That taxonomy was defined for classifying bank-specific monthly-report Headers. Quarterly financial statements require their own evidence-based review.
+Do not assume that every bordered region is necessarily a separate table. Inspect the complete border structure and identify each distinct table.
 
-5. Do not create a separate canonical Metric merely because a source Header exists.
+For every table, determine:
+- Top-left cell coordinate.
+- Bottom-right cell coordinate.
+- Exact row and column boundaries.
+- Number of rows and columns.
+- Whether the table contains merged cells.
 
-6. Do not infer a Header's financial nature from its title alone. Consider its position, table context, notes, units, period columns, and relationships with other items.
+### B. Main category marker — Red cell
 
-7. If the nature or meaning of an item cannot be established from the workbook, mark it as requiring clarification. Do not guess.
+A red-filled cell is placed two rows above each table.
 
-8. Preserve Persian/Jalali date information as presented. Do not convert dates or assume a Gregorian fiscal year.
+This cell identifies one of the 16 main report categories previously selected for extraction.
 
-## Inspection scope
+For every table:
+- Locate the red marker associated with it.
+- Record its exact cell coordinate.
+- Record its raw cell value.
+- Preserve the original Persian text.
+- Associate the table with this category.
 
-Inspect the entire workbook, including all worksheets, hidden worksheets if accessible, and relevant workbook metadata.
+Do not infer or invent a category if the marker is missing or ambiguous. Report the problem explicitly.
 
-### 1. Workbook inventory
+### C. Subheaders — Green cells
 
-Report:
-- File name and workbook format.
-- Number of worksheets.
-- Worksheet names and order.
-- Hidden/visible status of each worksheet.
-- Used range and approximate data dimensions of each worksheet.
-- Merged cells, formulas, named ranges, and other structural features relevant to interpretation.
-- Whether the workbook appears to contain one report or multiple reports/statements.
+One or more green-filled cells may exist inside each table.
 
-### 2. Report identity and period
+These cells represent Sub Headers.
 
-Identify evidence for:
-- Company name and ticker, if present.
-- Report type and reporting period.
-- Fiscal year, if identifiable.
-- Fiscal-year start and end, if identifiable.
-- Whether the report is quarterly, interim, or another type.
-- Whether the workbook contains comparative periods.
+For each green cell, record:
+- Exact cell coordinate.
+- Raw cell value.
+- Whether it is merged.
+- Its position within the table.
 
-Do not use the phrase «دوره منتهی به» alone as proof of a particular period interpretation.
+Do not decide whether a Sub Header is financially valid. That decision will be made later.
 
-### 3. Table and statement inventory
+### D. Column headers — Blue cells
 
-Identify every financial statement and major table.
+Blue-filled cells represent table column headers.
 
-For each one, report:
-- Worksheet and exact location.
-- Table title, if present.
-- Row and column structure.
-- Header rows and data rows.
-- Units and scaling (e.g. ریال، میلیون ریال، هزار ریال).
-- Whether the table contains monetary, quantity, ratio, descriptive, or other data.
-- Relevant footnotes and explanatory text.
+For each blue cell, record:
+- Exact cell coordinate.
+- Raw cell value.
+- Whether it is merged.
+- Its position within the table.
 
-Do not omit tables simply because they are small or appear supplementary.
+Preserve all column headers, including multi-level headers.
 
-### 4. Source Header inventory
+## 4. Extraction Requirements
 
-Create a complete inventory of actual source Headers.
+Extract **ALL cells inside every identified table boundary**, not just cells containing financial numbers.
 
-For every Header, record:
-- Exact Persian source text.
-- Worksheet and cell/range location.
-- Table/statement to which it belongs.
-- Whether it is a row Header, column Header, subheader, unit Header, or descriptive label.
-- Associated unit, where available.
-- Relevant notes or contextual evidence.
-- Any ambiguity that prevents reliable interpretation.
-
-Preserve the original spelling and wording. Do not normalize or rename source Headers.
-
-### 5. Temporal classification — critical
-
-For every numeric value column or group of columns, determine whether it represents:
-
-- Standalone quarter (only the three-month period).
-- Year-to-date / cumulative period from fiscal-year start.
-- Point-in-time balance at the reporting date.
-- Prior-period comparative value.
-- Opening balance.
-- Closing balance.
-- Other temporal meaning.
-- Unknown / requires clarification.
-
-Do not assume that all columns in one statement have the same temporal meaning.
-
-For each classification, provide the exact source Header and supporting evidence.
-
-Where a value is cumulative, do not calculate standalone-quarter values. Merely document the evidence and the possible relationship.
-
-If the workbook does not clearly distinguish standalone-quarter from cumulative figures, explicitly report the ambiguity.
-
-### 6. Financial nature and structure
-
-Identify, without imposing a final taxonomy:
-- Revenue/income items.
-- Expense items.
-- Assets, liabilities, and equity items.
-- Cash-flow items.
-- Quantity/operational items.
-- Ratios and per-share data.
-- Other disclosures.
-
-For each item, distinguish between:
-- Flow during a period.
-- Stock/balance at a point in time.
-- Ratio or derived measure.
-- Descriptive/informational disclosure.
-
-Pay special attention to:
-- Summary versus detail rows.
-- Parent/child row relationships.
+This includes:
+- Column headers.
+- Subheaders.
+- Data rows.
+- Descriptive text.
 - Totals and subtotals.
-- Duplicate presentations of the same economic item.
-- Potential double-counting risks.
-- Restated or reclassified comparative figures.
-- Notes that explain inclusions/exclusions.
+- Empty cells.
+- Cells containing zero.
+- Merged cells.
+- Any other content inside the table boundaries.
 
-Do not assume that a total should be stored independently if it can be calculated from detail rows. Just document the structure and evidence.
+For each cell, preserve:
 
-### 7. Fiscal-year and comparative-period issues
+1. Cell coordinate (e.g. A15).
+2. Raw value.
+3. Data type.
+4. Formula, if present.
+5. Number format.
+6. Fill color information.
+7. Border information.
+8. Merged-cell membership, if applicable.
 
-Determine whether:
-- The fiscal year starts in January or another month.
-- Period labels are Jalali/Persian, Gregorian, or another representation.
-- Comparative figures use the same duration and fiscal-year basis.
-- The workbook includes prior-year cumulative figures or prior-year standalone-quarter figures.
-- Any comparative value is restated or reclassified.
+Important:
 
-If any of these cannot be determined, state exactly what is missing.
+- Do not remove spaces.
+- Do not normalize Persian characters.
+- Do not convert Persian digits to English digits.
+- Do not change date formats.
+- Do not interpret numbers or financial values.
+- Do not remove duplicate rows.
+- Do not remove apparently irrelevant text.
+- Do not fill empty cells.
+- Do not calculate totals.
+- Do not correct spelling or formatting.
 
-## Required output
+The objective is to preserve the original workbook information as faithfully as possible.
 
-Create or update:
+## 5. Table Structure and Relationships
 
-`dbReports/parsian_persidic_report_1.md`
+For every table, provide:
 
-Append a clearly titled section:
+- A unique table ID.
+- Worksheet name.
+- Main category name and red marker coordinate.
+- Exact table range.
+- Row and column counts.
+- All green Sub Header cells.
+- All blue column-header cells.
+- Merged ranges.
+- A complete cell-by-cell extraction.
 
-`Parsian Quarterly Workbook Inspection — DB-STD-003`
+Preserve the original row and column positions.
 
-The report must include:
+Do not flatten the table into a list that loses its two-dimensional structure.
 
-1. Executive summary.
-2. Workbook/worksheet inventory.
-3. Report identity and period evidence.
-4. Financial statement and table inventory.
-5. Complete source Header inventory.
-6. Temporal classification matrix.
-7. Financial nature and row-hierarchy analysis.
-8. Summary/detail and double-counting observations.
-9. Ambiguities requiring ChatGPT/user clarification.
-10. Recommended next inspection step.
+Where a cell is merged, preserve the original merged range and the actual value location. Do not duplicate its value into other cells.
 
-Use tables where they make the evidence easier to review.
+## 6. Validation
 
-Every important conclusion must cite the relevant worksheet and cell/range. Include exact source text where useful.
+Perform the following checks:
 
-If the workbook contains too many Headers for a concise report, do not silently omit them. Include the complete inventory in the report or a clearly referenced supplementary section.
+1. Every identified table must have a valid bordered range.
+2. Every table should be associated with its red category marker.
+3. Verify that the red marker is located two rows above the table, according to the prepared convention.
+4. Identify all green cells inside each table.
+5. Identify all blue cells inside each table.
+6. Check for overlapping table ranges.
+7. Check for adjacent tables that may have been incorrectly combined.
+8. Check for tables that may have been missed.
+9. Check whether any bordered cells or regions could not be classified confidently.
 
-## Restrictions
+Do not silently resolve ambiguous cases. Report them separately.
 
-- Do not edit `WORKFLOW_RULES.md`.
-- Do not edit the master packet or Bank Master documents.
-- Do not edit any existing monthly-report standards.
-- Do not change source Excel files.
-- Do not implement code or tests.
-- Do not make database/schema/migration changes.
-- Do not declare DB-STD-003 complete.
-- Do not make unresolved assumptions into facts.
+## 7. Required Output Files
 
-## Final response
+Create these two new files:
 
-After completing the inspection:
-- List the files you read.
-- List the files you changed.
-- Confirm that no code, schema, migration, or source workbook was modified.
-- Summarize the main findings and unresolved questions.
-- Report any technical limitations encountered.
+### A. `dbReports/parsian_table_inventory.md`
 
-Do not run the test suite; this task does not involve code changes.
+A readable report containing:
+
+1. Workbook and worksheet information.
+2. Total number of tables identified.
+3. A summary table listing all tables.
+4. For each table:
+   - Table ID.
+   - Main category.
+   - Red marker coordinate and value.
+   - Table range.
+   - Dimensions.
+   - Green Sub Headers.
+   - Blue column headers.
+   - Merged cells.
+   - Complete cell-by-cell contents in a readable matrix.
+5. Validation results.
+6. Ambiguous or unresolved cases.
+
+### B. `dbReports/parsian_table_inventory.json`
+
+A machine-readable representation of the same inventory.
+
+Requirements:
+- Preserve original cell coordinates.
+- Preserve raw values and data types.
+- Preserve row and column positions.
+- Preserve merged ranges.
+- Preserve style and border metadata where available.
+- Use valid JSON.
+- Represent empty cells explicitly as null.
+- Do not lose any information that exists in the Markdown report.
+
+## 8. Important Restrictions
+
+- Do not modify `parsian_periodic.xlsx`.
+- Do not modify existing project files.
+- Do not modify application code.
+- Do not create or modify database tables.
+- Do not run data-cleaning operations.
+- Do not decide which Sub Headers are valid.
+- Do not assume that all tables have identical dimensions.
+- Do not assume fixed row numbers or column numbers.
+- Do not use financial meaning to override the manually defined visual markers.
+
+If a visual marker or border is ambiguous, report it rather than guessing.
+
+## 9. Final Response
+
+When finished, report:
+
+1. Number of worksheets inspected.
+2. Number of tables identified.
+3. Number of tables successfully associated with a red category marker.
+4. Number of green Sub Header cells.
+5. Number of blue column-header cells.
+6. Number of merged ranges.
+7. Any unresolved or ambiguous cases.
+8. Exact paths of the two output files.
+9. Confirmation that no original project files or workbook contents were modified.
+
+Do not claim complete extraction unless every identified table has been accounted for.
