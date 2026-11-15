@@ -857,6 +857,20 @@ The detailed logical contract is maintained in `database/reports/DB_DES_005_INGE
 - این قرارداد مسیر هدف را تعریف می‌کند و به معنی انطباق implementation فعلی نیست. ممیزی DB-AUD-001 نشان داده مسیر CODAL بررسی‌شده RawFinancialFact می‌نویسد و اتصال production بین mapping و NormalizedFinancialFact در مسیر بررسی‌شده اثبات نشده است.
 - DB-DES-006 PARTIAL است؛ مدل فیزیکی، migration، mapping واقعی workbook، fingerprint/revision identity و تطبیق reader/writerها در Taskهای مستقل باقی می‌مانند. هیچ حذف/تغییر legacy مجاز نیست مگر پس از audit داده و طرح migration غیرمخرب.
 
+
+### Excel source observation DTO contract — DB-DES-007
+
+قرارداد تفصیلی DTO موقت adapter اکسل در `database/reports/DB_DES_007_EXCEL_SOURCE_OBSERVATION_DTO_CONTRACT.md` ثبت شده است.
+
+- خروجی Excel adapter یک envelope مشاهدهٔ workbook است که worksheet، table، row، column، header hierarchy و cell observations را بدون flatten کردن ساختار حفظ می‌کند.
+- Source Header، row label، column header، مقدار سلول و context زمانی هر candidate جدا باقی می‌مانند؛ یک workbook ممکن است چند جدول و چند FinancialPeriod داشته باشد.
+- هر candidate مقدار، context زمانی و presentation خودش را دارد. تخصیص period در سطح workbook یا فرض یک period_id برای کل فایل مجاز نیست.
+- DTO وضعیت blank، explicit numeric zero، formula cached result، formula without cache، text و error cell را از هم تفکیک می‌کند. Adapter فرمول را اجرا نمی‌کند و فقط cached result را در صورت وجود مشاهده می‌کند.
+- Adapter هیچ Metric، Dimension، واحد canonical، ReportType، FinancialPeriod یا scope نهایی را حدس نمی‌زند؛ این موارد در لایهٔ interpretation با استاندارد نسخه‌دار resolve می‌شوند.
+- source observations و cell coordinates فقط موقت/تشخیصی‌اند و archive دائمی raw rows یا locator اجباری per-fact ایجاد نمی‌کنند.
+- این قرارداد logical است و کتابخانهٔ Excel، Python DTO class، الگوریتم table detection، ORM، schema یا migration را تعیین نمی‌کند.
+- DB-DES-007 PARTIAL است تا با workbookهای واقعی، ساختارهای merged/multi-level، چندجدولی، formula cache، comparative/YTD/standalone و blank/error validation شود. هیچ adapter یا DTO کدی از این Task نتیجه نمی‌شود.
+
 ## 15. Migration Policy
 
 `Base.metadata.create_all()` is permitted only for an empty development/bootstrap database.
