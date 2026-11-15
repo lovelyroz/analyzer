@@ -305,3 +305,23 @@ Stop-Transcript
 Place the resulting `targeted_row_audit.txt` content in `reply.md`. If the first worksheet is not the intended source sheet, the utility supports `--sheet-ordinal 2`; row windows can be overridden with `--ranges "START:END,START:END"`.
 
 **Current disposition:** this is evidence collection only. No V2 split rule or threshold has been adopted. Task 033 remains PARTIAL until the actual cell content/merged topology is reviewed and any detector change is supported by regression tests and owner-run validation. The assistant did not run tests or inspect the XLSX workbook directly.
+
+
+### 8.11 Targeted content and merged-range review — 2026-11-15
+
+The owner supplied the complete output of `src/scripts/excel_table_targeted_row_audit.py` in `reply.md` for Parsian worksheet 1 (`Recovered_Sheet1`). The audit reports workbook cells through the Reader; the assistant did not open the XLSX directly.
+
+The observed rows support the following boundaries and internal structure:
+
+| Rows | Observed structure | Finding |
+|---|---|---|
+| 295–300 | Row 295 is a one-cell section title; rows 297–299 form a four-column employee/branch table; row 300 is a new one-cell title, followed by a unit note and a four-cell header on row 302. | Two adjacent tables are supported. |
+| 309–334 | Row 309 is a section heading; row 310 contains a merged heading/line; row 311 is the facility-income table title; row 312 is a unit note; row 313 is a six-column all-text header followed by data rows 314–332. Row 334 starts another titled table, with a unit note on 335 and a four-cell header on 336. | The broad region contains multiple structural sections and at least two separate tabular blocks. Row 314 is a one-cell subsection label inside the first table, so a one-cell-row split rule would be unsafe. |
+| 358–359 | Rows 355–358 are populated investment rows; row 359 is a one-cell title, followed by a unit note and a three-cell all-text header on row 361. | A new table begins after row 358. |
+| 405–406 | Row 405 contains five numeric values; row 406 is a one-cell section title, followed by a period/description row and a blank row. | A section boundary is visible, but this excerpt does not establish a following table start. |
+
+**Important structural distinction:** one-cell text rows occur both as table/section titles (for example rows 300, 311, 334 and 359) and as in-table subsection labels (row 314). Therefore, neither one-cell occupancy nor merged-range presence is a sufficient split criterion. A potentially useful *candidate pattern* is a title-like single-cell row followed by an optional one-cell note and then a multi-cell all-text row, but it is not yet an approved rule. The same pattern must be checked against counterexamples and the other representative workbooks before implementation. The detector must not infer financial meaning from Persian label text.
+
+**Next action:** run a cross-workbook structural-pattern audit that enumerates, without splitting, rows matching combinations of (a) one-cell literal text rows, (b) nearby one-cell text rows, (c) multi-cell all-text rows, and (d) subsequent mixed text/numeric rows. Include neighboring row coordinates, occupancy, cell value kinds, and merged-range geometry. Use the result to test the proposed pattern across all five workbooks and identify false positives such as row 314. No detector behavior is changed in this increment.
+
+Task 033 remains PARTIAL. Do not promote AMBIGUOUS regions or feed them to semantic extraction. The assistant did not run tests or inspect XLSX files directly.
