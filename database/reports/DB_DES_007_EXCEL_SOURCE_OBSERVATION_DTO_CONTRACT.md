@@ -316,3 +316,20 @@ The owner-run combined DTO/reader suite returned **21 passed, 5 failed**. Each f
 ### 16.2 Final reader validation (2026-11-15)
 
 After the reader import correction, the owner reran the combined DTO and reader tests and reported **26 passed in 1.35s**. Task 032 / DB-ING-005 is complete. Visual financial table-region detection remains outside this reader and is tracked as Task 033 / DB-ING-006. The assistant did not execute tests.
+
+
+## 17. Clarification of the owner-confirmed literal-value contract (2026-11-15)
+
+The earlier wording in Section 14 ("text-only") was an imprecise interpretation of the owner's intent and is superseded by this clarification.
+
+The owner's intended rule is that populated cells contain **direct literal values, not formulas**. "Text" was used in the everyday sense of cell content, not as a requirement that Excel's storage type be string.
+
+Normative interpretation for the V1 reader:
+- Literal text cells are accepted and preserved exactly.
+- Literal numeric cells (including positive, negative, integer, decimal, and zero values) are accepted and preserved in their observed numeric type/value. The reader must not stringify, parse, round, normalize, or infer financial meaning.
+- Blank remains distinct from empty text and numeric zero.
+- Formula cells are prohibited and must cause whole-workbook rejection with deterministic diagnostics. Formula expressions/cached results are not evaluated or used.
+- Excel error cells and unsupported cell kinds remain rejected. Boolean and date-typed cell handling is not broadened by this clarification; if representative inputs require those cell types, obtain an explicit owner decision before accepting them.
+- Formula/cache dual-pass handling and the OOXML numeric-token sidecar remain out of V1 scope. Numeric observations use the value exposed by the selected openpyxl reader profile; precision/semantic interpretation belongs to later validation and interpretation, not this structural reader.
+
+The implementation uses distinct DTO states `PRESENT_TEXT` and `PRESENT_NUMBER`, with `numeric_value` retaining the observed int/float. The visual table detector counts both states as populated literal cells. This clarification corrects the earlier misunderstanding; it is **not a change to the owner's original intent**.
