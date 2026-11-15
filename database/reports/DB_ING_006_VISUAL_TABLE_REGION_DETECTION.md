@@ -386,3 +386,47 @@ The audit confirms useful but non-conclusive structural signatures:
 **Next technical step:** inspect and model the *header structure itself* as a distinct structural signal, including multi-row headers, merged-cell coverage, populated-column footprint, and the transition from header rows to subsequent data rows. Any proposed combination must be evaluated against the in-table subsection-label examples above and the incomplete Fzar2 coverage. Do not use Persian label meaning or financial semantics in this structural phase. Before implementation, obtain complete Fzar2 anchor coverage (for example, rerun with `--max-per-sheet 200`) and define exact positive/negative regression fixtures from the owner-provided evidence.
 
 Task 033 remains PARTIAL. The owner has not yet rerun tests for a new Detector implementation because no implementation change is made in this increment. The assistant did not run tests or inspect XLSX files directly.
+
+
+
+### 8.14 Completion of Fzar2 coverage and Cheshmeh follow-up — 2026-11-15
+
+The owner supplied a full Fzar2-only run of the corrected physical-row audit with `--max-per-sheet 200`, then a separate Cheshmeh-only run. The assistant reviewed the Markdown transcripts in the conversation; it did not inspect XLSX files directly.
+
+The Fzar2 worksheet contains 162 single-cell literal-text anchors. The full 200-context run classified them as follows:
+
+| Pattern | Count |
+|---|---:|
+| No match in next 2 physical rows | 75 |
+| Direct next row all-text | 34 |
+| Direct next row mixed | 33 |
+| Single-text note, then all-text row | 20 |
+| **Total** | **162** |
+
+The separate Cheshmeh run was complete (33 anchors): 19 no-match, 9 direct-all-text, 5 direct-mixed, and 0 note-then-all-text. Its observed examples reinforce that all-text rows can be multi-level headers (e.g. rows 9–10, 44–45, 107–109, 160–161, 194–196), while one-cell rows followed by mixed rows can be in-table section labels (e.g. rows 11–12 and 162–163). The Cheshmeh output contains no demonstrated one-blank-row-then-all-text case.
+
+This closes the previously noted Fzar2 coverage gap. The earlier five-workbook aggregate table in section 8.13 remains a snapshot of the 100-context run and should not be used as the complete Fzar2 counts. The completed Fzar2 counts above supersede that partial Fzar2 row for any further aggregate analysis.
+
+**Decision unchanged:** no generic split rule is supported. A multi-cell all-text row is a useful header-structure candidate, not proof of a table boundary. Adjacent all-text rows may form a multi-level header, and merged ranges may span several header rows. One-cell section labels can occur within existing data tables.
+
+### 8.15 Header-band structural audit utility — 2026-11-15
+
+Added read-only utility `src/scripts/excel_table_header_band_audit.py`. It groups physically adjacent rows containing at least two populated literal-text cells and no numeric/other populated cells, then prints:
+- the complete physical row band;
+- configurable physical context before and after the band, including explicit empty rows;
+- populated column footprints;
+- literal cell values and merged-range geometry.
+
+It does not call these bands confirmed headers, infer financial meaning, split regions, mutate workbooks, or alter Detector output. The purpose is to inspect multi-row header topology and the transition from text-only header-like rows to mixed data rows, including cases where the title row is not a single-cell anchor.
+
+Owner-run command:
+
+```powershell
+Start-Transcript -Path "D:\\Winprojects\\analyzer\\header_band_audit.txt" -Force
+python src/scripts/excel_table_header_band_audit.py --max-bands 200 excel/cheshme.xlsx excel/fzar.xlsx excel/fzar2.xlsx excel/samanBank.xlsx excel/parsian_periodic.xlsx
+Stop-Transcript
+```
+
+Place the complete transcript in `reply.md`. Review must identify positive header-band examples and counterexamples (narrative/all-text rows, notes, and in-table section labels) before any Detector rule or regression fixture is approved.
+
+Task 033 remains PARTIAL. No tests were run by the assistant, and XLSX files were not directly inspected.
