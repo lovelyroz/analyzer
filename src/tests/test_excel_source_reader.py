@@ -104,6 +104,23 @@ def test_reader_collects_all_contract_violations_before_rejecting():
     ]
 
 
+def test_reader_materializes_blank_cells_inside_merged_ranges():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet["A1"] = "merged heading"
+    sheet.merge_cells("A1:C1")
+
+    result = read_excel_source(_xlsx_bytes(workbook))
+
+    merged_blanks = [
+        cell for cell in result.cells
+        if cell.cell_ref.coordinate in ("B1", "C1")
+    ]
+    assert len(merged_blanks) == 2
+    assert all(cell.value_kind is CellValueKind.BLANK for cell in merged_blanks)
+    assert all(cell.merged_anchor.coordinate == "A1" for cell in merged_blanks)
+
+
 def test_reader_keeps_blank_cells_out_of_sparse_cell_observations():
     workbook = Workbook()
     sheet = workbook.active
