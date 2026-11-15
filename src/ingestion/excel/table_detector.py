@@ -153,6 +153,14 @@ def detect_visual_table_candidates(observation: WorkbookObservation) -> Workbook
                 is_ambiguous = bool(crossing_merges) or has_weak_separator
                 status = StructureStatus.AMBIGUOUS if is_ambiguous else StructureStatus.CANDIDATE
                 diagnostics: list[Diagnostic] = []
+                if has_weak_separator:
+                    diagnostics.append(Diagnostic(
+                        code="EXCEL_TABLE_SINGLE_BLANK_SEPARATOR",
+                        severity=DiagnosticSeverity.WARNING,
+                        message="A single blank row or column is a weak separator and does not prove an independent table boundary.",
+                        worksheet_ordinal=sheet.ordinal,
+                        table_ordinal=next_ordinal,
+                    ))
                 if crossing_merges:
                     diagnostics.append(Diagnostic(
                         code="EXCEL_TABLE_BOUNDARY_CROSSED_BY_MERGE",
