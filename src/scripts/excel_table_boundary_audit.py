@@ -39,48 +39,64 @@ def _ranges(values: set[int]) -> str:
 def _row_profiles(observation: WorkbookObservation, worksheet_ordinal: int):
     rows: dict[int, list[object]] = defaultdict(list)
     for cell in observation.cells:
+        has_formatting = (
+            cell.style_id is not None
+            or any((
+                cell.border_top, cell.border_bottom, cell.border_left,
+                cell.border_right, cell.fill_type, cell.font_bold,
+            ))
+        )
+        is_literal = cell.value_kind in (
+            CellValueKind.PRESENT_TEXT, CellValueKind.PRESENT_NUMBER
+        )
         if (
             cell.cell_ref.worksheet_ordinal == worksheet_ordinal
-            and cell.value_kind in (CellValueKind.PRESENT_TEXT, CellValueKind.PRESENT_NUMBER)
+            and (is_literal or has_formatting)
         ):
             rows[cell.cell_ref.row_index].append(cell)
 
     profiles = {}
-    for row_index, cells in rows.items():
-        columns = {cell.cell_ref.column_index for cell in cells}
-        styles = {cell.style_id for cell in cells if cell.style_id is not None}
+    for row_index, observed_cells in rows.items():
+        literal_cells = [
+            cell for cell in observed_cells
+            if cell.value_kind in (
+                CellValueKind.PRESENT_TEXT, CellValueKind.PRESENT_NUMBER
+            )
+        ]
+        columns = {cell.cell_ref.column_index for cell in literal_cells}
+        styles = {cell.style_id for cell in observed_cells if cell.style_id is not None}
         bottom = {
-            cell.cell_ref.column_index for cell in cells
+            cell.cell_ref.column_index for cell in observed_cells
             if cell.border_bottom is not None
         }
         top = {
-            cell.cell_ref.column_index for cell in cells
+            cell.cell_ref.column_index for cell in observed_cells
             if cell.border_top is not None
         }
         left = {
-            cell.cell_ref.column_index for cell in cells
+            cell.cell_ref.column_index for cell in observed_cells
             if cell.border_left is not None
         }
         right = {
-            cell.cell_ref.column_index for cell in cells
+            cell.cell_ref.column_index for cell in observed_cells
             if cell.border_right is not None
         }
         profiles[row_index] = {
-            "cells": cells,
+            "cells": literal_cells,
             "columns": columns,
             "styles": styles,
             "bottom": bottom,
             "top": top,
             "left": left,
             "right": right,
-            "text": sum(cell.value_kind is CellValueKind.PRESENT_TEXT for cell in cells),
-            "numeric": sum(cell.value_kind is CellValueKind.PRESENT_NUMBER for cell in cells),
-            "bold": sum(cell.font_bold is True for cell in cells),
-            "filled": sum(cell.fill_type is not None for cell in cells),
-            "style_counts": Counter(cell.style_id for cell in cells if cell.style_id is not None),
+            "text": sum(cell.value_kind is CellValueKind.PRESENT_TEXT for cell in literal_cells),
+            "numeric": sum(cell.value_kind is CellValueKind.PRESENT_NUMBER for cell in literal_cells),
+            "bold": sum(cell.font_bold is True for cell in observed_cells),
+            "filled": sum(cell.fill_type is not None for cell in observed_cells),
+            "style_counts": Counter(cell.style_id for cell in observed_cells if cell.style_id is not None),
             "border_tokens": sorted({
                 f"{cell.cell_ref.coordinate}:{edge}={value}"
-                for cell in cells
+                for cell in observed_cells
                 for edge, value in (
                     ("T", cell.border_top), ("B", cell.border_bottom),
                     ("L", cell.border_left), ("R", cell.border_right),
@@ -89,7 +105,6 @@ def _row_profiles(observation: WorkbookObservation, worksheet_ordinal: int):
             }),
         }
     return profiles
-
 
 def _audit_sheet(observation: WorkbookObservation, worksheet_ordinal: int, limit: int) -> None:
     sheet = next(item for item in observation.worksheets if item.ordinal == worksheet_ordinal)
