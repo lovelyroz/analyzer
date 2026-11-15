@@ -1,8 +1,8 @@
 """Owner-run Markdown review of visual table candidates in representative XLSX files.
 
 This utility is diagnostic only. It never changes source workbooks or persists
-observations. A text-contract-invalid workbook is still rejected for ingestion,
-but its literal-text cells may be used for a clearly labelled detector preview.
+observations. A literal-value-contract-invalid workbook is still rejected for ingestion,
+but its literal text and numeric cells may be used for a clearly labelled detector preview.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _print_contract_violations(observation: object, sample_limit: int) -> None:
             CellValueKind.ERROR_VALUE,
         )
     ]
-    print(f"- Text-only contract violations: **{len(invalid_cells)} cells**")
+    print(f"- Unsupported-cell contract violations: **{len(invalid_cells)} cells**")
 
     by_sheet = Counter(cell.cell_ref.worksheet_ordinal for cell in invalid_cells)
     for worksheet_ordinal, count in sorted(by_sheet.items()):
@@ -95,13 +95,13 @@ def _print_workbook(path: Path, sample_limit: int) -> None:
         observation = read_excel_file(path)
     except ExcelSourceContractError as exc:
         observation = exc.observation
-        print("- Reader result: **REJECTED** — text-only source contract violation.")
+        print("- Reader result: **REJECTED** — literal-value source contract violation.")
         print(f"- Source SHA-256: {observation.source.sha256}")
         print(f"- Observed cells: {len(observation.cells)}")
         _print_contract_violations(observation, sample_limit)
         print(
             "- Detector result: **DIAGNOSTIC PREVIEW ONLY**. "
-            "The preview uses literal-text cells from a rejected workbook; "
+            "The preview uses literal text and numeric cells from a rejected workbook; "
             "it does not make the workbook eligible for ingestion."
         )
         _print_candidates(observation)
