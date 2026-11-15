@@ -40,12 +40,12 @@
   "hidden_row_6": true,
   "large_sheet_benchmark": {
     "enabled": true,
-    "load_and_scan_current_tracemalloc_bytes": 46269931,
-    "load_and_scan_elapsed_seconds": 6.769802,
-    "load_and_scan_peak_tracemalloc_bytes": 47889981,
-    "load_current_tracemalloc_bytes": 46093935,
-    "load_elapsed_seconds": 6.545057,
-    "load_peak_tracemalloc_bytes": 47889981,
+    "load_and_scan_current_tracemalloc_bytes": 46269749,
+    "load_and_scan_elapsed_seconds": 6.451097,
+    "load_and_scan_peak_tracemalloc_bytes": 47889753,
+    "load_current_tracemalloc_bytes": 46093753,
+    "load_elapsed_seconds": 6.243078,
+    "load_peak_tracemalloc_bytes": 47889753,
     "memory_measurement": "Python allocations tracked by tracemalloc; native allocations outside Python's allocator may not be fully represented.",
     "observed_max_column": 6,
     "observed_max_row_including_header": 20001,
@@ -53,7 +53,7 @@
     "reader_mode": "normal",
     "reader_version": "3.1.5",
     "requested_data_rows": 20000,
-    "xlsx_file_size_bytes": 588827
+    "xlsx_file_size_bytes": 588829
   },
   "merged_ranges": [
     "A4:B4"
@@ -127,7 +127,7 @@
   },
   "repeatability": {
     "comparison_scope": "two independent loads of the same immutable synthetic XLSX bytes",
-    "input_sha256": "4fd53807f15ef3c3d3fd40ebebdd9747546703f67e189f3fa945948fa2205086",
+    "input_sha256": "34dc345ab94ac615708c9ae992879d382c59d6610194eff01c0c28c3c3be5a57",
     "reader_version": "3.1.5",
     "same_input_sha256": true,
     "same_observation_projection": true
@@ -189,4 +189,4 @@
   },
   "utility": "excel_reader_feature_spike",
   "workbook_epoch": "1904-01-01T00:00:00",
-  "workbook_sha256": "4fd53807f15ef3c3d3fd40ebebdd9747546703f67e189f3fa945948fa2205086"
+  "workbook_sha256": "34dc345ab94ac615708c9ae992879d382c59d6610194eff01c0c28c3c3be5a57"
