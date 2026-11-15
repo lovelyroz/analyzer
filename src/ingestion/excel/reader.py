@@ -332,7 +332,7 @@ def read_excel_source(
                             cell_ref=cell_ref,
                             value_kind=CellValueKind.ERROR_VALUE,
                             data_type=cell.data_type,
-                            unexpected_value=value if isinstance(value, str) else _diagnostic_scalar(value),
+                            unexpected_value=value if isinstance(value, str) else str(_diagnostic_scalar(value)),
                             number_format=cell.number_format,
                             style_id=cell.style_id,
                             merged_range=merged_range,
