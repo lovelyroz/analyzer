@@ -536,3 +536,22 @@ Using the targeted Parsian row audit (section 8.11), the row-pattern audits (sec
 **Next technical step:** add a read-only boundary-signature audit that prints configurable physical context *before and after* every all-text band, identifies only structural row classes (empty / single-cell literal text / multi-cell all-text / mixed or numeric-populated), and flags occurrences of the compound sequence without deciding or splitting. Run it across all five workbooks. Review every flagged occurrence and a sample of unflagged known boundaries, narrative bands, and subsection labels. Only if false positives and false negatives are understood should this signature be considered for exact regression fixtures and a conservative candidate-boundary rule. Until then, Task 033 remains PARTIAL and AMBIGUOUS regions remain excluded from semantic extraction.
 
 No code or Detector behavior changed in this increment. The assistant did not run tests or inspect XLSX files directly.
+
+
+### 8.20 Compound boundary-signature audit utility — 2026-11-15
+
+Added read-only utility `src/scripts/excel_table_boundary_signature_audit.py` (verified blob SHA `cffc854b46b95c73b31b3c6ffc3a90300683085b`). It groups the same physically adjacent multi-cell all-text bands used by the prior header audits, then prints configurable physical context before and after every band (default six rows on each side).
+
+Each physical row is classified only by observed cell kinds: `EMPTY`, `SINGLE_TEXT`, `MULTI_TEXT`, `MIXED_NUMERIC`, or `OTHER`. It flags `COMPOUND_CANDIDATE` only when its bounded context contains (a) a prior mixed/numeric-populated row followed by one or more single-text rows before the all-text band, and (b) a subsequent mixed/numeric-populated row after the band with only single-text/empty rows intervening. This is deliberately a broad structural flag, not a header classifier or boundary decision. Output includes physical context, literal cell coordinates/values, merged ranges, and per-sheet candidate counts. It does not split regions, mutate workbooks, or change Detector behavior.
+
+Owner-run command:
+
+```powershell
+Start-Transcript -Path "D:\\Winprojects\\analyzer\\boundary_signature_audit.txt" -Force
+python src/scripts/excel_table_boundary_signature_audit.py --max-bands 200 --context-before 6 --context-after 6 excel/cheshme.xlsx excel/fzar.xlsx excel/fzar2.xlsx excel/samanBank.xlsx excel/parsian_periodic.xlsx
+Stop-Transcript
+```
+
+Commit the complete transcript in `reply.md`. Review every flagged occurrence against known adjacent-table cases and in-table subsection/narrative counterexamples; also inspect unflagged known boundaries for false negatives. A candidate count is not a table count and must not be treated as detector accuracy.
+
+Task 033 remains PARTIAL. No tests were run by the assistant, no XLSX files were directly inspected, and no Detector behavior changed.
