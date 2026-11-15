@@ -1,7 +1,7 @@
 # DB-DES-007A — Python DTO Design for Excel Source Observations
 
 **Date:** 2026-11-15  
-**Status:** DTO runtime types created; structural reader, table-region detection, and owner-run validation remain open.  
+**Status:** DTO runtime types and the initial openpyxl structural/text reader are implemented; owner-run reader validation and visual table-region detection remain open.  
 **Related contracts:** `DB_DES_007_EXCEL_SOURCE_OBSERVATION_DTO_CONTRACT.md`, `DB_AUD_008_EXCEL_LIBRARY_CAPABILITY_ASSESSMENT.md`, DB-DES-006.  
 **Scope:** Transient CODAL Excel observations V1. This is not an ORM model, persistence schema, or migration.
 
@@ -185,3 +185,18 @@ The immutable DTO definitions and package exports have been created in:
 
 The implementation follows the text-only value model and contains no formula/cache fields or numeric XML sidecar. Owner-run tests in `src/tests/test_excel_observation_dto.py` cover literal text, blank/non-text/error states, immutability, tuple-only collections, and worksheet ordering. The owner reported `pytest src/tests/test_excel_observation_dto.py -q` → `13 passed in 2.49s`; the assistant did not run tests. DB-ING-004 / Task 031 is complete. The next implementation increment is DB-ING-005 / Task 032: the openpyxl structural/text reader and deterministic diagnostics, with table-region detection kept conservative and ambiguity explicit.
 
+
+
+## 10. Reader implementation increment — DB-ING-005 / Task 032
+
+The first read-only adapter is implemented in `src/ingestion/excel/reader.py` and exported through `src/ingestion/excel/__init__.py`.
+
+- Public entry points: `read_excel_source` and `read_excel_file`.
+- Uses openpyxl normal mode over one immutable byte sequence; computes SHA-256 and records reader/profile provenance.
+- Captures worksheet order/name/visibility, merged ranges, bounded used ranges, sparse cell observations, row/column references, workbook date-system metadata, and declared structured tables.
+- Preserves populated text exactly. Numeric, boolean, date-typed, formula, and error cells are diagnostic contract violations; the reader scans all worksheets and raises `ExcelSourceContractError` with the complete transient observation.
+- No numeric/date parsing, normalization, formula execution, semantic mapping, or persistence occurs.
+- Configurable defaults are 25 MiB source bytes, 500,000 total rectangular scan cells, and 100 worksheets; package preflight additionally limits ZIP members and uncompressed package size. These are provisional guardrails pending owner-run validation against representative source files.
+- Visual financial table segmentation is intentionally not inferred in this reader. Only declared Excel structured tables are resolved; visual table-region detection is a separate next increment.
+
+Owner-run reader tests have been added in `src/tests/test_excel_source_reader.py`; they have not been executed by the assistant. The exact command is `pytest src/tests/test_excel_source_reader.py -q`. Task 032 remains PARTIAL until owner validation passes. See `reports/DB_ING_005_EXCEL_SOURCE_READER_IMPLEMENTATION.md`.
