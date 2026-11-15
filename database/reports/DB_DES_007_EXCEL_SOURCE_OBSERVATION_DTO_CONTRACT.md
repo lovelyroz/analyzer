@@ -1,7 +1,7 @@
 # DB-DES-007 — Excel Source Observation DTO Contract
 
 **Date:** 2026-11-15  
-**Status:** PARTIAL — logical DTO boundary defined; workbook evidence, approved extraction standards, and implementation remain open.  
+**Status:** PARTIAL — logical DTO boundary and companion Python DTO design are defined; production implementation, additional source evidence, and user-run validation remain open.  
 **Scope:** CODAL Excel ingestion V1. This is a logical contract, not a Python API, ORM model, physical schema, or migration specification.
 
 ## 1. Purpose and boundary
@@ -240,8 +240,8 @@ Explicitly out-of-scope content may be skipped only under a versioned approved s
 
 This contract does not select or mandate:
 
-- a Python dataclass/Pydantic/TypedDict implementation;
-- a specific Excel library;
+- production Python DTO/reader implementation (the companion design selects immutable standard-library dataclasses);
+- a specific Excel library (selected separately by DB-AUD-008);
 - exact table-detection algorithms;
 - physical ORM classes, database tables, columns, or migrations;
 - permanent raw staging or workbook archival;
@@ -267,3 +267,12 @@ DB-DES-007 is PARTIAL until all of the following are satisfied:
 10. Implementation and user-run tests demonstrate deterministic extraction and rejection behavior.
 
 **Current result:** logical DTO contract drafted; no adapter, DTO code, ORM, schema, migration, data, or tests changed. Tests were not run.
+
+
+## 13. Companion Python DTO design
+
+The logical contract is now accompanied by `reports/DB_DES_007_PYTHON_DTO_DESIGN.md`, which specifies the concrete immutable Python observation types, stable transient references, orthogonal header axes, value/formula states, OOXML numeric-token sidecar, diagnostic model, and reader/interpretation boundary. The design uses Python 3.12 standard-library frozen/slots dataclasses and immutable tuples; it does not introduce Pydantic or a new dependency.
+
+The reader profile is selected separately in DB-AUD-008: openpyxl normal mode plus a narrow read-only OOXML numeric-token sidecar. The DTO design remains transient and does not authorize raw-row persistence.
+
+**Status remains PARTIAL:** the design is complete, but DTO/reader implementation, table-region candidate detection, additional authorized source evidence, and user-run acceptance tests remain open. No production code or tests were changed/run in this design step.
