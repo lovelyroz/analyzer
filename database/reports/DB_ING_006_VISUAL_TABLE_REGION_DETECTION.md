@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-15  
 **Task:** 033  
-**Status:** PARTIAL — first implementation and owner-run test module authored; owner validation and representative-workbook review pending.  
+**Status:** PARTIAL — implementation and owner-run automated tests passed; representative-workbook review remains pending.  
 **Related:** DB-ING-004 / Task 031; DB-ING-005 / Task 032; DB-DES-007; DB-AUD-007; DB-AUD-008.
 
 ## 1. Scope and boundary
@@ -61,7 +61,7 @@ The detector intentionally does not emit `UNSUPPORTED` in this increment; unsupp
 - repeatability and input immutability;
 - a stronger separator consisting of two blank rows.
 
-The assistant did not run tests. Owner command:
+Owner-run validation result: `33 passed in 1.47s` for the combined DTO, reader, and detector suite. The assistant did not run tests. Owner command:
 
 ```powershell
 pytest src/tests/test_excel_observation_dto.py src/tests/test_excel_source_reader.py src/tests/test_excel_table_detector.py -q
@@ -78,8 +78,8 @@ pytest src/tests/test_excel_observation_dto.py src/tests/test_excel_source_reade
 ## 7. Acceptance status
 
 Implementation and test definitions are present. Task 033 remains PARTIAL until:
-1. the owner-run test command passes and any defects are corrected;
+1. **DONE:** the owner-run combined test command passed (`33 passed in 1.47s`);
 2. the owner checks the output against representative real source workbooks, including multiple tables, captions, merged headers, sparse layouts, and blank gaps;
 3. any false split, missed table, or wrongly certain boundary is corrected or explicitly documented as a V1 limitation.
 
-No tests were run by the assistant. No ORM, schema, migration, database data, or dependency was changed.
+Tests were run by the owner only; the assistant did not run tests. No ORM, schema, migration, database data, or dependency was changed.
