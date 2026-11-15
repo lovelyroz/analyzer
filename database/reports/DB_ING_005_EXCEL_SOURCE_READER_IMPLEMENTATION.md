@@ -1,7 +1,7 @@
 # DB-ING-005 — Excel Source Reader Implementation
 
 **Date:** 2026-11-15  
-**Status:** PARTIAL — first reader implementation and owner-run test definitions are present; owner validation remains pending.  
+**Status:** DONE — implementation and owner-run DTO/reader validation passed.  
 **Task:** 032  
 **Related:** DB-ING-004 / Task 031; DB-DES-007; DB-AUD-008; DB-DES-006.
 
@@ -155,3 +155,16 @@ pytest src/tests/test_excel_observation_dto.py src/tests/test_excel_source_reade
 Result: **21 passed, 5 failed**. All five failures shared one root cause: `DiagnosticSeverity` was referenced while creating non-text/error diagnostics in `reader.py`, but the enum had not been imported from the DTO module. This raised `NameError` before the intended whole-workbook contract exception could be constructed; the tests therefore exposed a real implementation defect in the rejection/diagnostic path, not five independent behavioral defects.
 
 **Correction applied:** added the missing `DiagnosticSeverity` import to `src/ingestion/excel/reader.py`. No behavior or contract was otherwise changed. Task 032 remains PARTIAL until the owner reruns the same combined command and reports a clean result. The assistant did not execute tests.
+
+
+## 8. Final owner-run validation (2026-11-15)
+
+After the missing `DiagnosticSeverity` import was corrected, the owner reran:
+
+```powershell
+pytest src/tests/test_excel_observation_dto.py src/tests/test_excel_source_reader.py -q
+```
+
+**Result: 26 passed in 1.35s.** This validates the DTO and reader behaviors covered by the combined test modules, including the diagnostic/rejection path that previously failed. Task 032 / DB-ING-005 is DONE. The assistant did not execute tests. Validation against additional real source workbooks and possible later tuning of provisional resource limits remain broader workflow checks; they do not block completion of this implementation increment.
+
+**Next task:** Task 033 / DB-ING-006 — conservative visual financial table-region detection within a worksheet.
