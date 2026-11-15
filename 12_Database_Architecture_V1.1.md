@@ -843,6 +843,20 @@ The detailed logical contract is maintained in `database/reports/DB_DES_005_INGE
 - Only explicitly out-of-scope items under a versioned standard may be skipped. Unknown/ambiguous or invalid required rows fail the entire unit.
 - DB-DES-005 is a logical contract only; service/ORM/migration/test alignment remains a follow-up and no implementation is implied.
 
+### CODAL canonical ingestion pipeline — DB-DES-006
+
+قرارداد تفصیلی مسیر هدف در `database/reports/DB_DES_006_CODAL_CANONICAL_INGESTION_PIPELINE.md` نگهداری می‌شود.
+
+- مسیر هدف CODAL Excel از acquisition/adapter و source observations موقت، به resolution شرکت/صنعت/ReportType، structural Header interpretation، semantic Metric/Dimension mapping، temporal interpretation، value validation و admission کامل می‌رسد.
+- Adapter فقط parse می‌کند؛ raw source observations فقط تا پایان interpretation در حافظه می‌مانند. RawFinancialFact نباید archive دائمی ردیف‌های Excel باشد.
+- Source Header، Standard Database Header، FinancialMetric، approved dimensions، temporal meaning و value semantics هویت‌های جدا هستند. هیچ mapping حدسی/fuzzy یا fallback عمومی مجاز نیست.
+- هر FinancialFact باید به ReportVersion منتشرکننده، FinancialPeriod واقعی، Metric، dimensions مصوب (در صورت وجود) و exact extraction/mapping standard version متصل باشد. ReportVersion ممکن است چند دوره داشته باشد.
+- Actual/Forecast/Plan، INSTANT/DURATION، YTD، unit/basis، NULL/zero/ZERO_FALLBACK و Decimal→INTEGER/ROUND_HALF_UP طبق قراردادهای DB-DES-001/002/003 تفسیر می‌شوند؛ derived standalone و TTM در runtime باقی می‌مانند.
+- کل فایل پیش از persistence اعتبارسنجی می‌شود. unknown/ambiguous in-scope candidate، temporal ambiguity، value/mapping conflict یا duplicate identity با payload متفاوت، کل واحد را رد می‌کند؛ فقط out-of-scope صریح و نسخه‌دار قابل صرف‌نظر است.
+- ReportVersion، تمام FinancialFacts، provenance لازم و COMPLETED status همان Run در یک transaction ثبت می‌شوند؛ rollback باید همان Run را در transaction مستقل FAILED کند.
+- این قرارداد مسیر هدف را تعریف می‌کند و به معنی انطباق implementation فعلی نیست. ممیزی DB-AUD-001 نشان داده مسیر CODAL بررسی‌شده RawFinancialFact می‌نویسد و اتصال production بین mapping و NormalizedFinancialFact در مسیر بررسی‌شده اثبات نشده است.
+- DB-DES-006 PARTIAL است؛ مدل فیزیکی، migration، mapping واقعی workbook، fingerprint/revision identity و تطبیق reader/writerها در Taskهای مستقل باقی می‌مانند. هیچ حذف/تغییر legacy مجاز نیست مگر پس از audit داده و طرح migration غیرمخرب.
+
 ## 15. Migration Policy
 
 `Base.metadata.create_all()` is permitted only for an empty development/bootstrap database.
