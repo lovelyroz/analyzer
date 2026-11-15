@@ -142,3 +142,16 @@ pytest src/tests/test_excel_observation_dto.py -q
 **Current Task 032 status: PARTIAL.** Do not mark complete until the owner-run reader tests pass and any failures are resolved. Task 033 is the next independent increment for visual table-region detection.
 
 No tests were run by the assistant. No dependency was installed or changed. No ORM/schema/migration/data was modified.
+
+
+## 7. Owner-run validation result and corrective change (2026-11-15)
+
+The owner ran the combined command:
+
+```powershell
+pytest src/tests/test_excel_observation_dto.py src/tests/test_excel_source_reader.py -q
+```
+
+Result: **21 passed, 5 failed**. All five failures shared one root cause: `DiagnosticSeverity` was referenced while creating non-text/error diagnostics in `reader.py`, but the enum had not been imported from the DTO module. This raised `NameError` before the intended whole-workbook contract exception could be constructed; the tests therefore exposed a real implementation defect in the rejection/diagnostic path, not five independent behavioral defects.
+
+**Correction applied:** added the missing `DiagnosticSeverity` import to `src/ingestion/excel/reader.py`. No behavior or contract was otherwise changed. Task 032 remains PARTIAL until the owner reruns the same combined command and reports a clean result. The assistant did not execute tests.
