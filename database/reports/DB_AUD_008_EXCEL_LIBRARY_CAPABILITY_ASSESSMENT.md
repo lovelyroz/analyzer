@@ -225,3 +225,53 @@ The owner supplied a second execution in repository-root `reply.md`, again using
 The two observations are close in this owner's environment. They provide a modest repeat-run consistency check for this specific synthetic value-only workbook and openpyxl version; they do not establish a general performance distribution, a production capacity limit, or behavior on CODAL source workbooks. The one-byte file-size difference also indicates the generated XLSX package is not byte-identical between runs, so the earlier repeatability finding remains correctly scoped to two loads of the same immutable bytes within one run, not byte-for-byte deterministic fixture generation across runs.
 
 The optional Calamine section reports `enabled: false` because `python_calamine` remains unavailable in the executing interpreter. Thus no comparative timing or memory result exists. The owner has not been asked to change project dependency declarations; package availability remains an optional environment decision. The source-workbook validation gap also remains open. These results were supplied by the owner in `reply.md`; the assistant did not execute the utility, benchmark, or tests.
+
+
+## 7.8 Source-workbook evidence crosswalk (Markdown audit reports only)
+
+This section evaluates the source-workbook evidence already transcribed in repository reports. The assistant did **not** open or inspect any XLSX file. The observations below are attributed to the existing audit reports, principally `DB-AUD-002_REAL_EXCEL_TEMPORAL_AUDIT.md` and `parsian_periodic_report_1.md`.
+
+### 7.8.1 Evidence inventory
+
+| Workbook evidence documented in Markdown | Reported structure | Reader implications |
+|---|---|---|
+| `cheshme.xlsx` | One visible worksheet; used range A1:V222; 76 merged ranges; no formulas, hidden rows/columns, or structured tables. Multiple portfolio, dividend, income, and investment tables coexist. | Must expose merged ranges and preserve local table/caption context; a worksheet is not equivalent to one table or one period. |
+| `fzar.xlsx` | One visible worksheet; A1:Z63; 36 merged ranges; no formulas, hidden rows/columns, or structured tables. Production/sales, purchases, energy, and currency blocks use different grouped column layouts. | Must preserve multi-row merged headers and column coordinates; grouped measure and temporal labels must not be flattened or globally inherited. |
+| `fzar2.xlsx` | One visible worksheet; A1:Z874; 168 merged ranges; no formulas, hidden rows/columns, or structured tables. Formal statements and appended schedules coexist; period labels differ between local tables. | Must support a large used range, multiple independent tables, and local temporal context; workbook-title period must not override table-local headers. |
+| `samanBank.xlsx` | One visible worksheet; A1:M489; 103 merged ranges; no formulas, hidden rows/columns, or structured tables. Many independent tables include repeated date pairs, balance/flow/forecast labels, and row-level investee dates. | Must preserve row/column axes and distinguish dates in row attributes from column-period evidence. |
+| `excel/parsian_periodic.xlsx` as described in `parsian_periodic_report_1.md` | One visible worksheet named `Recovered_Sheet1`; A1:L411; 101 merged ranges; no formulas, hidden rows/columns, structured tables, charts, images, or comments reported. Multiple formal statements and management schedules coexist. | Adds a formal interim financial-report example with dense merged headers and multiple statement/schedule contexts; supports the same normal-mode structural requirements. |
+
+**Evidence boundary:** the first four workbook descriptions come from DB-AUD-002, while the Parsian example comes from its separate Markdown inspection report. These are report-derived observations, not a fresh independent inspection in DB-AUD-008. The Parsian report itself notes that the workbook body does not conclusively identify the reporting entity; the filename must not be used as issuer proof.
+
+### 7.8.2 Capability fit against observed source patterns
+
+| Observed requirement | openpyxl normal mode | Assessment |
+|---|---|---|
+| One worksheet containing many independent table regions | Cell-addressable worksheet model | Suitable as the low-level reader; table segmentation remains a separate deterministic layer, not a library feature to assume. |
+| Merged and multi-level headers (present in all five documented examples) | Worksheet merged-range metadata and cell coordinates | Direct fit; preserve anchor/inherited relationships in the observation DTO. |
+| Different period structures within one worksheet | Cell-level values, coordinates, and local ranges | Suitable to expose evidence; temporal interpretation remains outside the reader. |
+| Sparse cells, row/column labels, and row-level dates | Cell-oriented access | Suitable; do not infer semantic role from cell type or date formatting. |
+| Formula expression and cached value | Coordinated `data_only=False` and `data_only=True` views | Required by DTO even though none of these five reports records formula cells. |
+| Hidden worksheets/rows/columns and structured tables | Workbook/worksheet metadata and table APIs | Required defensive capability; the five source reports do not demonstrate these features. Synthetic owner-run fixture observations provide limited library-level evidence. |
+| Workbook date epoch | Workbook epoch metadata | Required technical context; the owner-run synthetic comparison covered 1900 and 1904 epochs, not the source reports' Jalali period semantics. |
+| Exact numeric XML lexical token | Ordinary `cell.value` is not sufficient | Open issue: synthetic evidence showed `123.45` as the library scalar while the worksheet XML token was `123.4500`. If exact lexical representation is required, add a narrow read-only XML-token observation alongside openpyxl; do not infer it from number format. |
+| Large worksheet behavior | Normal-mode synthetic benchmark only | Two owner runs at 20,000 rows were close, but do not establish source-workbook capacity or a general performance guarantee. |
+
+### 7.8.3 Reader-profile conclusion
+
+The five documented workbook patterns strengthen the case for **openpyxl normal (non-read-only) mode as the V1 baseline observation reader**. The common observed complexity is not multi-sheet or formula-heavy content; it is dense merged headers and many semantically independent tables within one worksheet. openpyxl's cell-addressable model and merged-range support align directly with that observed shape.
+
+This is a bounded profile decision, not a claim that the library alone detects or interprets tables. The adapter/observation layer must still preserve multiple candidate table regions, row and column axes, local captions, merged-cell inheritance, cell coordinates, and unresolved ambiguity. It must not assign FinancialPeriod, metric, unit, or issuer identity.
+
+The existing evidence does **not** justify switching to Calamine or adding it as a production dependency. Its benchmark remains optional and has not run because the owner's reported interpreter did not have `python_calamine`. Nor does the evidence justify selecting openpyxl read-only mode; its structural coverage remains unproven for this DTO.
+
+**Remaining technical qualification:** decide whether raw worksheet XML numeric tokens (including trailing zeros) are part of the required transient observation contract. If yes, implement a small, read-only OOXML supplement keyed by worksheet and cell coordinate; keep openpyxl as the primary workbook model. This is not authorization to change production code or the DTO now.
+
+### 7.8.4 Scope and completion status
+
+- Source evidence validation against the existing Markdown reports: **completed for the five documented examples**, subject to the reports' own accuracy and without direct XLSX reinspection.
+- Baseline reader recommendation: **openpyxl normal mode, provisionally selected for the first adapter implementation**.
+- Calamine comparative benchmark: not run; optional owner decision/environment setup remains.
+- Multi-sheet, formula-cache, hidden-content, and structured-table behavior: not evidenced by the five source workbooks; retain synthetic coverage and explicit diagnostics.
+- Numeric XML lexical fidelity: unresolved requirement decision.
+- No production adapter, Python DTO, ORM, schema, migration, or data was changed. No package was installed. No test or benchmark was run by the assistant.
