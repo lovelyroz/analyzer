@@ -6,6 +6,20 @@
     "number_format": "General",
     "value": 1
   },
+  "date_epoch_comparison": {
+    "1900": {
+      "cell_value": "2024-01-01T00:00:00",
+      "raw_date_serial": "45292",
+      "workbook_epoch": "1899-12-30T00:00:00"
+    },
+    "1904": {
+      "cell_value": "2024-01-01T00:00:00",
+      "raw_date_serial": "43830",
+      "workbook_epoch": "1904-01-01T00:00:00"
+    },
+    "same_calendar_value": true,
+    "serials_differ": true
+  },
   "dependency_inventory_note": "Reflects the interpreter running this utility; packages installed manually and absent from requirements.txt are reported when present.",
   "formula_cache_pair": {
     "cached_value": 1,
@@ -49,7 +63,9 @@
     "Synthetic fixture only; no source workbook was opened.",
     "No formula was calculated; cached value was injected into synthetic XLSX XML.",
     "Raw numeric token is read from worksheet XML for comparison with the library scalar.",
-    "This utility reports observations; it does not assert pass/fail or modify project data."
+    "This utility reports observations; it does not assert pass/fail or modify project data.",
+    "1900/1904 comparison uses separate synthetic workbooks with the same calendar date.",
+    "Repeatability compares two independent loads of the same immutable synthetic XLSX bytes."
   ],
   "numeric_library_value": 123.45,
   "openpyxl_version": "3.1.5",
@@ -91,6 +107,13 @@
       "import_module_available": true,
       "version": "2.0.2"
     }
+  },
+  "repeatability": {
+    "comparison_scope": "two independent loads of the same immutable synthetic XLSX bytes",
+    "input_sha256": "fe97a73c7be51170e068ef9ae7671868b6ad54933078f2070764a3ef95f9ac2b",
+    "reader_version": "3.1.5",
+    "same_input_sha256": true,
+    "same_observation_projection": true
   },
   "sample_cells": {
     "A2": {
@@ -149,6 +172,4 @@
   },
   "utility": "excel_reader_feature_spike",
   "workbook_epoch": "1904-01-01T00:00:00",
-  "workbook_sha256": "ef710da9f73f90e0b2c825bd7b254cdd9aad06f378f9410ad84b0bb3cda56758"
-}
-
+  "workbook_sha256": "fe97a73c7be51170e068ef9ae7671868b6ad54933078f2070764a3ef95f9ac2b"
