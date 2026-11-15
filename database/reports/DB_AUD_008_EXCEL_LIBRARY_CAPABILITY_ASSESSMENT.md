@@ -106,6 +106,11 @@ A standalone opt-in utility was added at `src/scripts/excel_reader_feature_spike
 
 The utility is deliberately not a pytest test and was not run in this task. Static review also corrected malformed literal newline escapes in the script source. The current fixture does not yet compare 1900 and 1904 workbooks, benchmark large-sheet memory/time, establish repeatability across separate runs, or validate Calamine behavior. Those remain open evidence items.
 
+
+## 7.2 Compatibility correction from owner-run execution
+
+The first owner-run execution exposed an `openpyxl` API compatibility issue: in the installed version, `main.tables.items()` yielded table references as strings, while the utility assumed each value was a `Table` object and accessed `.ref`. The utility was corrected to iterate table names and resolve each entry through `main.tables[name]`, accepting either a table object with `.ref` or a string-like reference. This is a source-level correction only; the corrected utility has not been executed by the assistant. The owner should rerun it and provide the resulting JSON so the next environment-specific issue, if any, can be assessed.
+
 ## 7. Decision status
 
 - `openpyxl`: **provisional primary candidate**.
