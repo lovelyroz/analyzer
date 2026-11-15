@@ -228,3 +228,36 @@ Across 94 preview regions, only 3 were `CANDIDATE`; 91 were `AMBIGUOUS`. Ambigui
 Most importantly, the Parsian output contains broad merged regions in worksheet 1, including `A294:F341`, `A350:J363`, and `A365:C367` through `A403:E407`. Earlier Markdown evidence identifies independent adjacent tables inside some of these broad areas (for example the employee/branch-status and agency-fee/capital-adequacy tables, and the strategy/facility-income and investment-profit/loss tables). Therefore the present blank-band segmentation cannot reliably separate adjacent tables without a stronger boundary signal. This is an observed mismatch between the candidate output and documented workbook structure; it is not evidence that the XLSX itself was directly inspected by the assistant.
 
 **Disposition:** DTO and Reader validation are complete. DB-ING-006 remains `PARTIAL`. Do not treat `AMBIGUOUS` regions as accepted table bounds or proceed to semantic extraction from them. The next detector increment must investigate structural signals beyond blank bands (for example cell styles/borders, merged-range topology, repeated header geometry, and row/column density transitions), define deterministic evidence thresholds, and add regression fixtures for adjacent tables, merged headings, sparse layouts, and true single-table regions. Any style/border signal must remain structural evidence only; it must not infer financial meaning. The assistant did not run tests or directly inspect XLSX files.
+
+
+### 8.8 Structural-formatting evidence collection for detector V2 — 2026-11-15
+
+The V1 owner-run output confirms that blank-band segmentation alone cannot separate some adjacent independent tables. The next increment is therefore an evidence-collection step, not an unvalidated automatic split rule.
+
+**Observation contract extension:** CellObservation now optionally preserves:
+- workbook-local style_id;
+- top, bottom, left, and right border style names;
+- fill pattern type;
+- bold-font flag.
+
+The Reader captures these attributes for observed populated cells and styled blank cells. These fields are structural formatting evidence only. They do not assign header, detail, subtotal, metric, period, unit, or any other financial meaning. Literal cell values remain untouched. The DTO additions are optional and do not change the literal-value acceptance contract.
+
+**New owner-run audit utility:** src/scripts/excel_table_boundary_audit.py. It reports row-level literal occupancy and formatting signatures, plus transitions between consecutive populated/styled rows. It includes column-set similarity, style-ID similarity, matching bottom/top border columns, and border locations. Styled blank cells are included in border/style evidence, but they do not count as occupied literal values. The utility is read-only and does not split regions or promote any boundary to a table boundary.
+
+Run the combined regression suite:
+
+```powershell
+pytest src/tests/test_excel_observation_dto.py src/tests/test_excel_source_reader.py src/tests/test_excel_table_detector.py -q
+```
+
+Then run the structural audit:
+
+```powershell
+python src/scripts/excel_table_boundary_audit.py --limit-per-sheet 100 excel/cheshme.xlsx excel/fzar.xlsx excel/fzar2.xlsx excel/samanBank.xlsx excel/parsian_periodic.xlsx
+```
+
+Paste the complete output into reply.md.
+
+**V2 design gate:** do not split tables merely because style_id, font, fill, or border changes. Style IDs are workbook-local and may differ because of number formats or presentation choices. The next detector design must evaluate combinations of independent evidence, establish deterministic thresholds against actual source files, and keep uncertain boundaries AMBIGUOUS. In particular, investigate the documented Parsian adjacent pairs around rows 295/300, 309/334, 358/359, and 405/406. A formatting boundary is a structural signal, not proof by itself that two financial tables are independent.
+
+Task 033 remains PARTIAL. No table segmentation behavior was changed in this increment. The assistant did not run tests or inspect the XLSX workbooks directly.
