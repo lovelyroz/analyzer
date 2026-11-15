@@ -190,7 +190,12 @@ def run_spike() -> dict:
             ],
             "merged_ranges": sorted(str(item) for item in main.merged_cells.ranges),
             "tables": {
-                name: table.ref for name, table in main.tables.items()
+                name: (
+                    main.tables[name].ref
+                    if hasattr(main.tables[name], "ref")
+                    else str(main.tables[name])
+                )
+                for name in main.tables
             },
             "formula_view": _cell_observation(formula_cell),
             "cached_value_view": _cell_observation(cached_cell),
