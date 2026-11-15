@@ -829,6 +829,20 @@ The intended direction is to replace CODAL PDF acquisition/extraction with Excel
 - NULL ≠ 0 is mandatory. Synthetic financial values are prohibited except for the narrowly approved `ZERO_FALLBACK` for product sales amount under Master Packet Section 3.5, and only under its specified conditions with a distinct origin/state and ingestion warning. For every other metric, zero may be stored only when the source explicitly reports a valid zero.
 - Validation must distinguish a known-but-blank source value from an unknown label, unknown unit, unresolved period, or unresolved company/industry. The latter cases must be rejected or quarantined outside the analytical database until resolved.
 
+
+### Ingestion transaction and atomicity — DB-DES-005
+
+The detailed logical contract is maintained in `database/reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md`.
+
+- An Ingestion Unit is one independently identified source file/feed batch; for CODAL it is one ReportVersion and all facts belonging to it. A batch is not split after an error to permit partial acceptance.
+- Parsing and full-unit validation occur before canonical persistence. Any hard admission, identity, mapping, unit, period, duplicate-conflict, FK, uniqueness, or persistence error fails the whole unit.
+- One service/use-case boundary owns the transaction. Adapters parse only; repositories/helpers do not commit. All canonical writes for the unit and the successful COMPLETED status of its IngestionRun commit atomically.
+- A durable STARTED audit record precedes persistence. On validation or persistence failure, canonical writes are absent/rolled back and the Run is marked FAILED in a separate transaction. Failure audit must not retain raw source payloads.
+- Exact replay of the same source revision is idempotent. Conflicting values for one logical identity are rejected unless an explicit source revision and approved supersession/preference rule resolve them. Last-write-wins is prohibited.
+- Database unique constraints are required to protect logical identity under concurrent ingestion. Application-level checks alone are insufficient.
+- Only explicitly out-of-scope items under a versioned standard may be skipped. Unknown/ambiguous or invalid required rows fail the entire unit.
+- DB-DES-005 is a logical contract only; service/ORM/migration/test alignment remains a follow-up and no implementation is implied.
+
 ## 15. Migration Policy
 
 `Base.metadata.create_all()` is permitted only for an empty development/bootstrap database.
