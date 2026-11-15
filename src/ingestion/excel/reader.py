@@ -7,12 +7,14 @@ raw observations.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 from typing import TypeAlias
 import zipfile
 
+import openpyxl
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.datetime import CALENDAR_MAC_1904, CALENDAR_WINDOWS_1900
@@ -25,7 +27,6 @@ from src.ingestion.excel.dto import (
     ColumnObservation,
     Diagnostic,
     DiagnosticDetail,
-    DiagnosticSeverity,
     DeclaredTableObservation,
     MetadataItem,
     ReaderProvenance,
@@ -84,6 +85,14 @@ class ExcelSourceContractError(ExcelSourceReadError):
             "EXCEL_TEXT_ONLY_CONTRACT_VIOLATION",
             "The workbook contains one or more populated non-text or error cells.",
         )
+
+
+def _diagnostic_scalar(value: object) -> str | int | float | bool | date | datetime | time | timedelta:
+    """Retain supported scalar values; label unexpected library objects deterministically."""
+    if isinstance(value, (str, int, float, bool, date, datetime, time, timedelta)):
+        return value
+    value_type = type(value)
+    return f"<unsupported:{value_type.__module__}.{value_type.__qualname__}>"
 
 
 def _read_source(
@@ -323,7 +332,7 @@ def read_excel_source(
                             cell_ref=cell_ref,
                             value_kind=CellValueKind.ERROR_VALUE,
                             data_type=cell.data_type,
-                            unexpected_value=value if isinstance(value, str) else str(value),
+                            unexpected_value=value if isinstance(value, str) else _diagnostic_scalar(value),
                             number_format=cell.number_format,
                             style_id=cell.style_id,
                             merged_range=merged_range,
@@ -354,7 +363,7 @@ def read_excel_source(
                             cell_ref=cell_ref,
                             value_kind=CellValueKind.UNEXPECTED_NON_TEXT,
                             data_type=cell.data_type or "n",
-                            unexpected_value=value,
+                            unexpected_value=_diagnostic_scalar(value),
                             number_format=cell.number_format,
                             style_id=cell.style_id,
                             merged_range=merged_range,
@@ -463,7 +472,7 @@ def read_excel_source(
             ),
             reader=ReaderProvenance(
                 reader_name="openpyxl",
-                reader_version=__import__("openpyxl").__version__,
+                reader_version=openpyxl.__version__,
                 profile_name=settings.profile_name,
                 profile_version=settings.profile_version,
                 dto_schema_version=settings.dto_schema_version,
