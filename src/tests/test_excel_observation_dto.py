@@ -1,4 +1,4 @@
-"""Tests for immutable, text-only Excel observation DTOs.
+"""Tests for immutable Excel literal-value observation DTOs.
 
 These tests are provided for owner-run validation; they were not executed
 by the assistant.
@@ -42,7 +42,7 @@ def _reader() -> ReaderProvenance:
     return ReaderProvenance(
         reader_name="openpyxl",
         reader_version="3.1.5",
-        profile_name="codal-text-only",
+        profile_name="codal-literal-values",
         profile_version="1",
         dto_schema_version="1",
     )
