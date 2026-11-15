@@ -913,3 +913,18 @@ Database owns selected canonical financial inputs, minimal provenance, controlle
 Overall Analyzer architecture remains **V1** with exactly nine analytical stages.
 
 Approved/reviewed decisions recorded in this revision: company/industry admission contract; FinancialPeriod Jalali/YTD contract; selected canonical-input persistence without raw financial-row retention, simple OTHER_* buckets, minimal provenance, and runtime calculation policy; Excel adapter direction with common DTO/persistence boundary and Excel-only input scope and exclusion of PDF; migration history corrected through version 8. CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007 remain historical amendment references pending a complete section-by-section audit.
+
+
+## 15. CODAL Excel literal-value input contract — owner clarification (2026-11-15)
+
+The owner's use of "text" refers to literal cell content, not Excel's string storage type. The normative V1 requirement is that populated cells contain direct literal values and **must not contain formulas**.
+
+- Literal text is accepted and preserved exactly.
+- Literal numeric values (including positive, negative, decimal, integer, and zero) are accepted as native numeric observations. The structural reader must not stringify, parse, round, normalize, or infer financial meaning.
+- Blank remains distinct from empty text and numeric zero.
+- Formula cells are prohibited. The reader must reject them deterministically and must never evaluate formulas or substitute cached formula results.
+- Boolean, date-typed, and Excel error cells remain unsupported unless a separate owner decision explicitly admits them.
+- Formula/cache DTO fields and the OOXML numeric-token sidecar remain outside V1. Numeric values are retained as exposed by the selected openpyxl profile; later numeric interpretation/validation handles financial parsing rules.
+- The transient DTO distinguishes `PRESENT_TEXT` and `PRESENT_NUMBER`. Structural table detection treats both as populated literal cells, while header/title text fragments remain text-only.
+
+This section supersedes any earlier wording in this document or supporting reports that says all populated cells must be Excel string-typed or that numeric-typed cells violate the source contract. This is a clarification of the original owner intent, not a new relaxation of the requirement.
