@@ -6,7 +6,7 @@
 
 ## 1. Executive decision
 
-**Provisional primary choice: `openpyxl`.** It is already present in `requirements.txt` and its object model exposes the workbook, worksheet, cell, merged-range, style/number-format, formula, and worksheet structure needed by the observation DTO. Its `data_only` option provides access to the last cached value stored for formula cells, while the default mode exposes formula expressions. These are separate views and should be read in coordinated passes when formula cells are encountered.
+**Selected primary choice: `openpyxl` normal mode.** It is already present in `requirements.txt` and its object model exposes the workbook, worksheet, cell, merged-range, style/number-format, formula, and worksheet structure needed by the observation DTO. Its `data_only` option provides access to the last cached value stored for formula cells, while the default mode exposes formula expressions. These are separate views and should be read in coordinated passes when formula cells are encountered.
 
 **Alternative to benchmark: `python-calamine`.** It offers a Rust-backed reader, broad format support, worksheet metadata including visibility, merged ranges, and row iteration. Its documented Python surface is more value/table-oriented; the reviewed API does not establish a complete formula-expression plus cached-result pair, nor the same breadth of cell-level style/number-format inspection needed by DB-DES-007. It remains a candidate if performance or additional file formats become material.
 
@@ -289,3 +289,20 @@ The existing evidence does **not** justify switching to Calamine or adding it as
 6. Do not add `python-calamine` or `pandas` as V1 observation dependencies. Reconsider only with measured need.
 
 **Task 030 completion:** the reader capability assessment and bounded profile selection are complete. This does not authorize production adapter/DTO implementation; those remain governed by their own tasks and contracts.
+
+
+### 7.9 Owner-confirmed text-only V1 source contract (2026-11-15)
+
+The owner confirms that all CODAL XLSX input files contain no formulas and that every populated cell is text-only. This confirmation supersedes the formula/cache and numeric-typed-cell assumptions in the earlier feature inventory and profile notes.
+
+**Final V1 reader profile:**
+
+- `openpyxl` normal mode, one structural/text observation pass.
+- Preserve each populated cell's literal string exactly; do not normalize Persian/Arabic digits, separators, whitespace, signs, or punctuation in the reader.
+- Preserve blanks as blanks; never coerce blank to zero or empty string.
+- A populated non-text cell, formula, or Excel error is a contract violation: emit an error diagnostic and reject the report; do not coerce or read cached formula values.
+- No formula/cache dual pass and no OOXML numeric-token sidecar.
+- Parse numeric-looking/date-looking strings only in the later interpretation/validation layer using approved rules.
+- Retain merged ranges, worksheet visibility/order, cell coordinates, and structural diagnostics. Table segmentation remains a separate deterministic layer.
+
+The previously documented synthetic formula/cache and XML numeric-token spike remains historical capability evidence only; those capabilities are not part of the V1 reader contract. No additional package is required. This amendment does not authorize production persistence changes.
