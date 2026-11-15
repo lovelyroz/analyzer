@@ -1,8 +1,8 @@
-"""Read-only, text-only CODAL XLSX observation adapter (V1).
+"""Read-only literal-value CODAL XLSX observation adapter (V1).
 
-This module observes workbook structure and literal cell content only. It does
-not normalize text, parse numbers/dates, infer financial semantics, or persist
-raw observations.
+This module observes workbook structure and literal cell content only. It accepts
+literal text and numeric cells, rejects formulas and unsupported cell kinds, and
+does not normalize, parse, infer financial semantics, or persist observations.
 """
 from __future__ import annotations
 
@@ -323,9 +323,9 @@ def read_excel_source(
                         )
                     elif cell.data_type == "e":
                         diagnostic = Diagnostic(
-                            code="EXCEL_TEXT_ONLY_ERROR_CELL",
+                            code="EXCEL_UNSUPPORTED_ERROR_CELL",
                             severity=DiagnosticSeverity.ERROR,
-                            message="Excel error cells violate the V1 text-only source contract.",
+                            message="Excel error cells are unsupported literal source values.",
                             worksheet_ordinal=worksheet_ordinal,
                             cell_ref=cell_ref,
                         )
@@ -351,11 +351,22 @@ def read_excel_source(
                             merged_range=merged_range,
                             merged_anchor=merged_anchor,
                         )
+                    elif isinstance(value, (int, float)) and not isinstance(value, bool) and cell.data_type == "n":
+                        observation = CellObservation(
+                            cell_ref=cell_ref,
+                            value_kind=CellValueKind.PRESENT_NUMBER,
+                            data_type=cell.data_type,
+                            numeric_value=value,
+                            number_format=cell.number_format,
+                            style_id=cell.style_id,
+                            merged_range=merged_range,
+                            merged_anchor=merged_anchor,
+                        )
                     else:
                         diagnostic = Diagnostic(
-                            code="EXCEL_TEXT_ONLY_NON_TEXT_CELL",
+                            code="EXCEL_UNSUPPORTED_CELL_VALUE",
                             severity=DiagnosticSeverity.ERROR,
-                            message="Populated non-text cells violate the V1 text-only source contract.",
+                            message="This populated cell kind is not an accepted literal text or numeric value; formulas are prohibited.",
                             worksheet_ordinal=worksheet_ordinal,
                             cell_ref=cell_ref,
                             details=(DiagnosticDetail("data_type", str(cell.data_type)),),
