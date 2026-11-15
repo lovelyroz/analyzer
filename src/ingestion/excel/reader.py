@@ -102,7 +102,15 @@ def _read_source(
     if path.suffix.lower() != ".xlsx":
         raise ExcelSourceReadError("EXCEL_UNSUPPORTED_EXTENSION", "V1 reader accepts .xlsx files only.")
     try:
+        size = path.stat().st_size
+        if size > max_file_bytes:
+            raise ExcelSourceReadError(
+                "EXCEL_FILE_SIZE_LIMIT_EXCEEDED",
+                f"XLSX source is {size} bytes; configured limit is {max_file_bytes}.",
+            )
         payload = path.read_bytes()
+    except ExcelSourceReadError:
+        raise
     except OSError as exc:
         raise ExcelSourceReadError("EXCEL_SOURCE_UNREADABLE", f"Cannot read source file: {exc}") from exc
     return payload, file_name or path.name, str(path)
@@ -270,7 +278,8 @@ def read_excel_source(
                     value = cell.value
                     has_literal = value is not None
                     has_style = bool(getattr(cell, "has_style", False))
-                    if not has_literal and not has_style:
+                    in_merged_range = (cell.row, cell.column) in merged_by_coordinate
+                    if not has_literal and not has_style and not in_merged_range:
                         continue
                     if has_literal or has_style:
                         populated_bounds.append((cell.row, cell.column))
@@ -470,6 +479,13 @@ def read_excel_source(
         if workbook_diagnostics:
             raise ExcelSourceContractError(observation)
         return observation
+    except ExcelSourceReadError:
+        raise
+    except Exception as exc:
+        raise ExcelSourceReadError(
+            "EXCEL_WORKBOOK_STRUCTURE_UNREADABLE",
+            f"Workbook structure could not be observed reliably: {exc}",
+        ) from exc
     finally:
         workbook.close()
 
