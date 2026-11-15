@@ -1,10 +1,16 @@
 (analyzer) PS D:\Winprojects\analyzer> python src/scripts/excel_reader_feature_spike.py --benchmark-rows 20000
 {
+  "benchmark_comparison_note": "Both readers are measured against the same generated XLSX file. Traversal counts non-empty values, but reader internals and native memory accounting differ; compare as indicative, not as a strict like-for-like production benchmark.",
   "cached_value_view": {
     "coordinate": "D2",
     "data_type": "n",
     "number_format": "General",
     "value": 1
+  },
+  "calamine_large_sheet_benchmark": {
+    "enabled": false,
+    "reason": "python_calamine import module is unavailable in this interpreter.",
+    "requested_data_rows": 20000
   },
   "date_epoch_comparison": {
     "1900": {
@@ -40,12 +46,12 @@
   "hidden_row_6": true,
   "large_sheet_benchmark": {
     "enabled": true,
-    "load_and_scan_current_tracemalloc_bytes": 46269749,
-    "load_and_scan_elapsed_seconds": 6.451097,
-    "load_and_scan_peak_tracemalloc_bytes": 47889753,
-    "load_current_tracemalloc_bytes": 46093753,
-    "load_elapsed_seconds": 6.243078,
-    "load_peak_tracemalloc_bytes": 47889753,
+    "load_and_scan_current_tracemalloc_bytes": 46269959,
+    "load_and_scan_elapsed_seconds": 6.679082,
+    "load_and_scan_peak_tracemalloc_bytes": 47890009,
+    "load_current_tracemalloc_bytes": 46094009,
+    "load_elapsed_seconds": 6.462552,
+    "load_peak_tracemalloc_bytes": 47890009,
     "memory_measurement": "Python allocations tracked by tracemalloc; native allocations outside Python's allocator may not be fully represented.",
     "observed_max_column": 6,
     "observed_max_row_including_header": 20001,
@@ -53,7 +59,7 @@
     "reader_mode": "normal",
     "reader_version": "3.1.5",
     "requested_data_rows": 20000,
-    "xlsx_file_size_bytes": 588829
+    "xlsx_file_size_bytes": 588828
   },
   "merged_ranges": [
     "A4:B4"
@@ -127,7 +133,7 @@
   },
   "repeatability": {
     "comparison_scope": "two independent loads of the same immutable synthetic XLSX bytes",
-    "input_sha256": "34dc345ab94ac615708c9ae992879d382c59d6610194eff01c0c28c3c3be5a57",
+    "input_sha256": "d5797fa3518c937f20a46dee21ca30a6587f1434c05dd47a5d9ddc391cd09ab0",
     "reader_version": "3.1.5",
     "same_input_sha256": true,
     "same_observation_projection": true
@@ -189,4 +195,4 @@
   },
   "utility": "excel_reader_feature_spike",
   "workbook_epoch": "1904-01-01T00:00:00",
-  "workbook_sha256": "34dc345ab94ac615708c9ae992879d382c59d6610194eff01c0c28c3c3be5a57"
+  "workbook_sha256": "d5797fa3518c937f20a46dee21ca30a6587f1434c05dd47a5d9ddc391cd09ab0"
