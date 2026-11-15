@@ -124,3 +124,26 @@ The Markdown review is complete, but it is not a substitute for running the dete
 5. accidental splitting of a single logical table.
 
 No tests or XLSX inspection were performed by the assistant. No ORM, schema, migration, database data, or dependency was changed.
+
+
+### 8.4 Reader contract violations observed during owner validation attempt
+
+The owner reported that the initial utility output was dominated by repeated `EXCEL_TEXT_ONLY_NON_TEXT_CELL` diagnostics. This means the Reader rejected the workbooks before the original utility could print detector candidates. It does **not** indicate a table-detector failure; it indicates that the actual cell storage types in at least some source workbooks differ from the confirmed V1 text-only contract.
+
+The review utility was updated to keep the evidence useful without weakening ingestion rules:
+- summarize the total number of contract-violating cells, counts by worksheet, and counts by cell kind / Excel data type;
+- print only a bounded sample of offending coordinates (default 12 per workbook), including data type, number format, and a shortened observed value;
+- run the detector over literal-text observations in the rejected workbook as a clearly labelled **DIAGNOSTIC PREVIEW ONLY**;
+- continue to mark the Reader result as REJECTED. This preview must never be interpreted as admission or permission to ingest a contract-invalid workbook.
+
+Updated utility: `src/scripts/excel_table_detector_review.py`.
+
+Owner command (same workbook paths; compact output):
+
+```powershell
+python src/scripts/excel_table_detector_review.py excel/cheshme.xlsx excel/fzar.xlsx excel/fzar2.xlsx excel/samanBank.xlsx excel/parsian_periodic.xlsx
+```
+
+If more examples are needed, increase the sample limit with `--sample-limit 30`. Paste the compact output into `reply.md`.
+
+**Important decision gate:** do not relax the text-only contract and do not coerce numbers/dates into strings. First inspect the reported coordinates and determine whether these are genuinely numeric/date/formula cells or whether the source-generation/export process has changed. If they are genuine non-text populated cells, the owner must explicitly revise the input contract before any Reader behavior is changed. Task 033 remains PARTIAL, and Reader contract alignment is now a separate issue to resolve before production acceptance.
