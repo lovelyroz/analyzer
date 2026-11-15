@@ -9,11 +9,14 @@ It never opens or modifies CODAL/source workbooks and never calculates formulas.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import importlib.metadata
 import importlib.util
 import json
 import tempfile
+import time
+import tracemalloc
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
@@ -258,7 +261,71 @@ def _repeatability_observation(path: Path, expected: dict) -> dict:
         "comparison_scope": "two independent loads of the same immutable synthetic XLSX bytes",
     }
 
-def run_spike() -> dict:
+def _make_large_synthetic_workbook(path: Path, row_count: int) -> None:
+    """Create a deterministic, value-only workbook for an opt-in load benchmark."""
+    workbook = Workbook(write_only=True)
+    sheet = workbook.create_sheet("LargeSheet")
+    sheet.append(["row_id", "metric", "value", "period", "flag", "description"])
+    for row_number in range(1, row_count + 1):
+        sheet.append([
+            row_number,
+            "Revenue" if row_number % 2 else "Cost",
+            row_number * 1.25,
+            "1405/01",
+            row_number % 2 == 0,
+            f"Synthetic benchmark row {row_number}",
+        ])
+    workbook.save(path)
+
+
+def _large_sheet_benchmark(root: Path, row_count: int) -> dict:
+    """Measure normal-mode openpyxl load time and Python-tracked peak memory."""
+    path = root / f"large_sheet_{row_count}_rows.xlsx"
+    _make_large_synthetic_workbook(path, row_count)
+    file_size_bytes = path.stat().st_size
+
+    tracemalloc.start()
+    started = time.perf_counter()
+    workbook = load_workbook(path, data_only=False, read_only=False)
+    loaded_at = time.perf_counter()
+    current_after_load, peak_after_load = tracemalloc.get_traced_memory()
+
+    sheet = workbook["LargeSheet"]
+    non_empty_cells = sum(
+        1
+        for row in sheet.iter_rows()
+        for cell in row
+        if cell.value is not None
+    )
+    scanned_at = time.perf_counter()
+    current_after_scan, peak_after_scan = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    result = {
+        "enabled": True,
+        "requested_data_rows": row_count,
+        "observed_max_row_including_header": sheet.max_row,
+        "observed_max_column": sheet.max_column,
+        "observed_non_empty_cells": non_empty_cells,
+        "xlsx_file_size_bytes": file_size_bytes,
+        "load_elapsed_seconds": round(loaded_at - started, 6),
+        "load_peak_tracemalloc_bytes": peak_after_load,
+        "load_current_tracemalloc_bytes": current_after_load,
+        "load_and_scan_elapsed_seconds": round(scanned_at - started, 6),
+        "load_and_scan_peak_tracemalloc_bytes": peak_after_scan,
+        "load_and_scan_current_tracemalloc_bytes": current_after_scan,
+        "memory_measurement": (
+            "Python allocations tracked by tracemalloc; native allocations outside "
+            "Python's allocator may not be fully represented."
+        ),
+        "reader_mode": "normal",
+        "reader_version": importlib.metadata.version("openpyxl"),
+    }
+    workbook.close()
+    return result
+
+
+def run_spike(benchmark_rows: int = 0) -> dict:
     with tempfile.TemporaryDirectory(prefix="excel-reader-spike-") as temp_dir:
         root = Path(temp_dir)
         generated = root / "generated.xlsx"
@@ -289,6 +356,11 @@ def run_spike() -> dict:
         reader_packages = _installed_reader_packages()
         date_epoch_comparison = _date_epoch_observations(root)
         repeatability = _repeatability_observation(patched, {"openpyxl_version": reader_packages["openpyxl"]["version"] or "unknown"})
+        large_sheet_benchmark = (
+            _large_sheet_benchmark(root, benchmark_rows)
+            if benchmark_rows > 0
+            else {"enabled": False, "reason": "Pass --benchmark-rows to opt in."}
+        )
         openpyxl_version = reader_packages["openpyxl"]["version"] or "unknown"
         calamine_available = reader_packages["python_calamine"]["import_module_available"]
 
@@ -298,6 +370,7 @@ def run_spike() -> dict:
             "workbook_epoch": formula_book.epoch.isoformat(),
             "date_epoch_comparison": date_epoch_comparison,
             "repeatability": repeatability,
+            "large_sheet_benchmark": large_sheet_benchmark,
             "openpyxl_version": openpyxl_version,
             "python_calamine_installed": calamine_available,
             "reader_package_inventory": reader_packages,
@@ -359,4 +432,19 @@ def run_spike() -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps(run_spike(), ensure_ascii=False, indent=2, sort_keys=True))
+    parser = argparse.ArgumentParser(description="Run the synthetic Excel reader feature spike.")
+    parser.add_argument(
+        "--benchmark-rows",
+        type=int,
+        default=0,
+        help="Opt in to a synthetic large-sheet load benchmark with this many data rows.",
+    )
+    arguments = parser.parse_args()
+    if arguments.benchmark_rows < 0:
+        parser.error("--benchmark-rows must be zero (disabled) or a positive integer.")
+    print(json.dumps(
+        run_spike(benchmark_rows=arguments.benchmark_rows),
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
+    ))
