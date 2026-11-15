@@ -199,3 +199,21 @@ def test_workbook_observation_requires_ordered_unique_worksheets():
             metadata=WorkbookMetadataObservation(),
             worksheets=(second, first),
         )
+
+
+
+def test_cell_observation_preserves_optional_formatting_evidence():
+    cell = CellObservation(
+        cell_ref=_cell_ref(),
+        value_kind=CellValueKind.PRESENT_TEXT,
+        data_type="s",
+        text_value="Header",
+        style_id=4,
+        border_bottom="thin",
+        fill_type="solid",
+        font_bold=True,
+    )
+    assert cell.style_id == 4
+    assert cell.border_bottom == "thin"
+    assert cell.fill_type == "solid"
+    assert cell.font_bold is True
