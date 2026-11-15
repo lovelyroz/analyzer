@@ -206,3 +206,22 @@ If python_calamine is not importable, the utility emits calamine_large_sheet_ben
 **Comparison caveat:** both readers use the same generated file and count non-empty values, but their internal representations and allocation strategies differ. tracemalloc does not reliably account for native Rust allocations, so the memory values are not total process-memory measurements and must not be interpreted as a strict memory winner. This is a controlled indicative comparison, not a production acceptance test. The utility has only been edited; it has not been executed by the assistant or owner after this change. The current owner-reported environment previously lacked python-calamine, so the first rerun may report the optional comparison as unavailable until the owner makes that package available in the intended interpreter.
 
 The public package usage reviewed for this implementation documents CalamineWorkbook.from_path(path), sheet_names, get_sheet_by_name(name), and sheet row iteration; see the [python-calamine package documentation](https://pypi.org/project/python-calamine/) and [Python API type declarations](https://github.com/dimastbk/python-calamine/blob/master/python/python_calamine/_python_calamine.pyi). No dependency declaration or installation was changed.
+
+
+## 7.7 Second owner-run benchmark and repeatability of performance observations
+
+The owner supplied a second execution in repository-root `reply.md`, again using `--benchmark-rows 20000` and `openpyxl 3.1.5`. The second run observed the same dimensions and non-empty cell count as the first run: 20,000 data rows, one header row, six columns, and 120,006 non-empty cells.
+
+| Observation | First run | Second run |
+|---|---:|---:|
+| XLSX file size | 588,827 bytes | 588,828 bytes |
+| Normal-mode load | 6.545057 s | 6.462552 s |
+| Load plus full traversal | 6.769802 s | 6.679082 s |
+| Peak `tracemalloc` after load | 47,889,981 bytes | 47,890,009 bytes |
+| Current `tracemalloc` after load | 46,093,935 bytes | 46,094,009 bytes |
+| Current `tracemalloc` after traversal | 46,269,931 bytes | 46,269,959 bytes |
+| Peak `tracemalloc` after traversal | 47,889,981 bytes | 47,890,009 bytes |
+
+The two observations are close in this owner's environment. They provide a modest repeat-run consistency check for this specific synthetic value-only workbook and openpyxl version; they do not establish a general performance distribution, a production capacity limit, or behavior on CODAL source workbooks. The one-byte file-size difference also indicates the generated XLSX package is not byte-identical between runs, so the earlier repeatability finding remains correctly scoped to two loads of the same immutable bytes within one run, not byte-for-byte deterministic fixture generation across runs.
+
+The optional Calamine section reports `enabled: false` because `python_calamine` remains unavailable in the executing interpreter. Thus no comparative timing or memory result exists. The owner has not been asked to change project dependency declarations; package availability remains an optional environment decision. The source-workbook validation gap also remains open. These results were supplied by the owner in `reply.md`; the assistant did not execute the utility, benchmark, or tests.
