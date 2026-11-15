@@ -1,7 +1,7 @@
 # DB-DES-007A — Python DTO Design for Excel Source Observations
 
 **Date:** 2026-11-15  
-**Status:** DTO runtime types and the initial openpyxl structural/text reader are implemented; owner-run reader validation and visual table-region detection remain open.  
+**Status:** DTO runtime types and the openpyxl structural/text reader are implemented and owner-run validated; visual table-region detection remains open.  
 **Related contracts:** `DB_DES_007_EXCEL_SOURCE_OBSERVATION_DTO_CONTRACT.md`, `DB_AUD_008_EXCEL_LIBRARY_CAPABILITY_ASSESSMENT.md`, DB-DES-006.  
 **Scope:** Transient CODAL Excel observations V1. This is not an ORM model, persistence schema, or migration.
 
@@ -205,3 +205,8 @@ Owner-run reader tests have been added in `src/tests/test_excel_source_reader.py
 ### 10.1 Owner-run validation correction (2026-11-15)
 
 The owner executed the combined DTO/reader suite and reported **21 passed, 5 failed**. All five failures had the same root cause: `DiagnosticSeverity` was used by the reader but missing from its DTO imports, causing a `NameError` when non-text/error diagnostics were constructed. The missing import was added to `src/ingestion/excel/reader.py`. The reader acceptance status remains pending rerun by the owner; the assistant did not execute tests.
+
+
+### 10.2 Final owner-run validation — Task 032 complete (2026-11-15)
+
+Following the missing `DiagnosticSeverity` import correction, the owner reran the combined DTO/reader test suite and reported **26 passed in 1.35s**. Task 032 / DB-ING-005 is complete. This confirms the tested reader and DTO contracts, but does not implement visual financial table-region detection; that remains the separate Task 033 / DB-ING-006. The assistant did not execute tests.
