@@ -29,6 +29,45 @@ NS = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 ET.register_namespace("", NS["x"])
 
 
+# Module import names and distribution names differ for several Excel engines.
+_READER_PACKAGES = {
+    "openpyxl": ("openpyxl",),
+    "python_calamine": ("python_calamine",),
+    "pandas": ("pandas",),
+    "xlrd": ("xlrd",),
+    "pyxlsb": ("pyxlsb",),
+    "odfpy": ("odf",),
+    "fastexcel": ("fastexcel",),
+}
+
+
+def _installed_reader_packages() -> dict:
+    """Report this interpreter's installed reader-related distributions.
+
+    requirements.txt is a declared-dependency snapshot, not an inventory of
+    packages manually installed into the active Python environment.
+    """
+    inventory = {}
+    for distribution, modules in _READER_PACKAGES.items():
+        try:
+            version = importlib.metadata.version(distribution)
+            installed = True
+        except importlib.metadata.PackageNotFoundError:
+            version = None
+            installed = False
+
+        module_available = any(
+            importlib.util.find_spec(module_name) is not None
+            for module_name in modules
+        )
+        inventory[distribution] = {
+            "distribution_installed": installed,
+            "version": version,
+            "import_module_available": module_available,
+        }
+    return inventory
+
+
 def _patch_formula_cache_and_numeric_token(source: Path, destination: Path) -> None:
     """Patch synthetic worksheet XML to model a cached formula result and raw token."""
     with ZipFile(source, "r") as zin, ZipFile(destination, "w", ZIP_DEFLATED) as zout:
@@ -81,7 +120,10 @@ def _make_synthetic_workbook(path: Path) -> None:
 
     hidden = workbook.create_sheet("HiddenSheet")
     hidden.sheet_state = "hidden"
-    hidden.append(["Metric", "Value"])\n    hidden.append(["HiddenMetric", 7])\n    hidden_table = Table(displayName="HiddenSheetFacts", ref="A1:B2")\n    hidden.add_table(hidden_table)
+    hidden.append(["Metric", "Value"])
+    hidden.append(["HiddenMetric", 7])
+    hidden_table = Table(displayName="HiddenSheetFacts", ref="A1:B2")
+    hidden.add_table(hidden_table)
 
     very_hidden = workbook.create_sheet("VeryHiddenSheet")
     very_hidden.sheet_state = "veryHidden"
@@ -127,12 +169,9 @@ def run_spike() -> dict:
                     raw_numeric_token = value.text if value is not None else None
                     break
 
-        try:
-            openpyxl_version = importlib.metadata.version("openpyxl")
-        except importlib.metadata.PackageNotFoundError:
-            openpyxl_version = "unknown"
-
-        calamine_available = importlib.util.find_spec("python_calamine") is not None
+        reader_packages = _installed_reader_packages()
+        openpyxl_version = reader_packages["openpyxl"]["version"] or "unknown"
+        calamine_available = reader_packages["python_calamine"]["import_module_available"]
 
         result = {
             "utility": "excel_reader_feature_spike",
@@ -140,6 +179,11 @@ def run_spike() -> dict:
             "workbook_epoch": formula_book.epoch.isoformat(),
             "openpyxl_version": openpyxl_version,
             "python_calamine_installed": calamine_available,
+            "reader_package_inventory": reader_packages,
+            "dependency_inventory_note": (
+                "Reflects the interpreter running this utility; packages installed "
+                "manually and absent from requirements.txt are reported when present."
+            ),
             "sheet_states": [
                 {"title": sheet.title, "state": sheet.sheet_state}
                 for sheet in formula_book.worksheets
@@ -149,7 +193,11 @@ def run_spike() -> dict:
                 name: table.ref for name, table in main.tables.items()
             },
             "formula_view": _cell_observation(formula_cell),
-            "cached_value_view": _cell_observation(cached_cell),\n            "formula_without_cache": {\n                "formula": main["H2"].value,\n                "cached_value": cached_main["H2"].value,\n            },
+            "cached_value_view": _cell_observation(cached_cell),
+            "formula_without_cache": {
+                "formula": main["H2"].value,
+                "cached_value": cached_main["H2"].value,
+            },
             "formula_cache_pair": {
                 "formula": formula_cell.value,
                 "cached_value": cached_cell.value,
