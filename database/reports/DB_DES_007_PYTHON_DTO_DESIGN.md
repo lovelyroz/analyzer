@@ -12,9 +12,9 @@
 3. Separate **reader observations** from **interpretation candidates**. The reader reports literal structure and values; it does not assign FinancialMetric, dimensions, FinancialPeriod, report type, audit/restatement rank, or in-scope status.
 4. Use stable, explicit identifiers within one observation envelope: worksheet ordinal, table ordinal, row number, column number, and A1 cell coordinate. These are transient references only.
 5. Store literal source strings unchanged. Optional normalized helper text is separate and never replaces the literal.
-6. Preserve the original numeric OOXML `<v>` token as a string when present. The adapter does not convert it to Decimal, round it, or normalize its lexical form.
-7. Keep the source artifact bytes immutable for the duration of both openpyxl passes and the OOXML sidecar pass. Compute SHA-256 once over those exact bytes.
-8. Use openpyxl normal mode as the primary workbook model. A read-only OOXML sidecar supplies numeric tokens only; it is not a second workbook interpretation engine.
+6. The owner-confirmed V1 source contract is text-only: every populated source cell is stored as literal text and there are no formulas. Preserve the exact Python string returned by the reader; do not parse, normalize, or coerce it.
+7. Keep the source artifact bytes immutable for the duration of the single reader pass. Compute SHA-256 once over those exact bytes.
+8. Use openpyxl normal mode as the primary workbook model. No OOXML value sidecar is required for the text-only source contract.
 9. The DTO is transient and must never be persisted as raw rows/cells. Only the later canonical ingestion contract controls persistence.
 
 ## 2. Module boundary
@@ -314,9 +314,16 @@ Whether a candidate is in-scope and whether the whole report must be rejected ar
 
 ## 11. Remaining work
 
-- Implement the DTO types and reader/OOXML sidecar under the separate Excel-ingestion implementation task.
+- Implement the DTO types and openpyxl text-only structural reader under the separate Excel-ingestion implementation task.
 - Implement deterministic table-region candidate detection as a separate component.
 - Validate against additional authorized workbook examples and update the evidence matrix when available.
 - Add user-run tests; no tests were run as part of this design task.
 
 **Conclusion:** this design converts the logical DB-DES-007 contract into a concrete, dependency-light Python type boundary while preserving the V1 reader profile selected by DB-AUD-008. It is ready for implementation planning, but it does not claim that any Python DTO or adapter exists yet.
+
+
+## 12. Owner-confirmed V1 text-only input amendment (2026-11-15)
+
+The owner confirms that the CODAL XLSX input files contain no formulas and that populated cells are text-only. This amendment supersedes all earlier formula/cache and numeric-typed-cell assumptions in this design. The reader must enforce this invariant and preserve literal text without coercion. Formula/cache DTO fields and the OOXML numeric-token sidecar are removed from the V1 design. Numeric/date parsing is performed only after extraction, in the interpretation/validation layer. A future source requiring numeric-typed cells must trigger a deliberate versioned contract change.
+
+The runtime DTO implementation is in `src/ingestion/excel/dto.py` and package exports in `src/ingestion/excel/__init__.py`. The implementation is awaiting owner-run tests and the reader implementation; no test was run by the assistant.
