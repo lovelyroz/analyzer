@@ -27,7 +27,8 @@ def test_detects_two_independent_vertical_tables_separated_by_blank_row():
 
     assert len(result.tables) == 2
     assert [table.bounds.a1_range for table in result.tables] == ["A1:B2", "A4:B5"]
-    assert all(table.status is StructureStatus.CANDIDATE for table in result.tables)
+    assert all(table.status is StructureStatus.AMBIGUOUS for table in result.tables)
+    assert all(table.diagnostics[0].code == "EXCEL_TABLE_SINGLE_BLANK_SEPARATOR" for table in result.tables)
     assert result.worksheets[0].candidate_table_ordinals == (1, 2)
 
 
@@ -46,6 +47,7 @@ def test_detects_side_by_side_regions_separated_by_empty_column():
     result = detect_visual_table_candidates(_observation(workbook))
 
     assert [table.bounds.a1_range for table in result.tables] == ["A1:B2", "D1:E2"]
+    assert all(table.status is StructureStatus.AMBIGUOUS for table in result.tables)
 
 
 def test_preserves_nearby_merged_caption_as_evidence_not_as_table_bounds():
@@ -65,7 +67,8 @@ def test_preserves_nearby_merged_caption_as_evidence_not_as_table_bounds():
     assert table.bounds.a1_range == "A3:B4"
     assert len(table.title_fragments) == 1
     assert table.title_fragments[0].literal_text == "عنوان جدول"
-    assert table.status is StructureStatus.CANDIDATE
+    assert table.status is StructureStatus.AMBIGUOUS
+    assert any(item.code == "EXCEL_TABLE_SINGLE_BLANK_SEPARATOR" for item in table.diagnostics)
 
 
 def test_merged_range_bridging_candidate_boundary_makes_status_ambiguous():
@@ -88,6 +91,21 @@ def test_merged_range_bridging_candidate_boundary_makes_status_ambiguous():
     assert second.status is StructureStatus.AMBIGUOUS
     assert second.diagnostics[0].code == "EXCEL_TABLE_BOUNDARY_CROSSED_BY_MERGE"
 
+
+def test_two_blank_rows_provide_a_stronger_separator_for_candidates():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["A", "B"])
+    sheet.append(["1", "2"])
+    sheet.append([])
+    sheet.append([])
+    sheet.append(["C", "D"])
+    sheet.append(["3", "4"])
+
+    result = detect_visual_table_candidates(_observation(workbook))
+
+    assert len(result.tables) == 2
+    assert all(table.status is StructureStatus.CANDIDATE for table in result.tables)
 
 def test_single_row_caption_or_note_is_not_promoted_to_table():
     workbook = Workbook()
