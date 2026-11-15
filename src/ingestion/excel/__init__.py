@@ -1,13 +1,5 @@
 """Excel source-observation boundary for CODAL ingestion V1."""
 
-from src.ingestion.excel.reader import (
-    ExcelReaderConfig,
-    ExcelSourceContractError,
-    ExcelSourceReadError,
-    read_excel_file,
-    read_excel_source,
-)
-
 from src.ingestion.excel.dto import (
     CellRange,
     CellRef,
@@ -28,6 +20,15 @@ from src.ingestion.excel.dto import (
     WorkbookObservation,
     WorksheetObservation,
     WorksheetVisibility,
+)
+
+
+from src.ingestion.excel.reader import (
+    ExcelReaderConfig,
+    ExcelSourceContractError,
+    ExcelSourceReadError,
+    read_excel_file,
+    read_excel_source,
 )
 
 __all__ = [
