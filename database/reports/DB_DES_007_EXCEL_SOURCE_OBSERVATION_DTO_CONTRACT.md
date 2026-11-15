@@ -290,3 +290,6 @@ The owner confirms that CODAL XLSX inputs contain no formulas and that all popul
 - openpyxl normal mode remains the selected reader; one structural/text pass is sufficient.
 
 The companion concrete DTO design is `reports/DB_DES_007_PYTHON_DTO_DESIGN.md`; initial immutable runtime types now exist in `src/ingestion/excel/dto.py`. Implementation of the structural/text reader, table-region detection, and owner-run validation remains open. Raw observations remain transient and are never persisted.
+
+
+Initial DTO implementation and owner-run test definitions are now present in `src/ingestion/excel/dto.py`, `src/ingestion/excel/__init__.py`, and `src/tests/test_excel_observation_dto.py`. The tests are authored but have not been run by the assistant. The structural/text reader and table-region detector remain separate implementation work.
