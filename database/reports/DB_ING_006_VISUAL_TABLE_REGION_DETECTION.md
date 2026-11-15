@@ -494,3 +494,25 @@ Place the complete transcript in `reply.md`. Preserve the full output; it is nee
 5. Does any combination provide a deterministic boundary signal across the five workbooks, or must the detector retain AMBIGUOUS?
 
 Task 033 remains PARTIAL. No split rule, Jaccard threshold, or promotion rule is approved. The assistant did not run tests or inspect XLSX files directly.
+
+
+### 8.18 Review of owner-run header-to-body column-transition audit — 2026-11-15
+
+The owner supplied the complete transcript in `reply.md` (blob SHA `804b3ca1b701e52aef9bff348b9cc575bd831d16`). The assistant reviewed the Markdown transcript only; it did not open XLSX files directly. All five workbooks were accepted by the Reader. The report covers six worksheets and repeats the 113 all-text bands previously identified by the header-band audit: Cheshmeh 10, Fzar 4, Fzar2 37, Saman 32, and Parsian 30 across its two worksheets.
+
+**What the transition evidence confirms:**
+- Genuine header-like bands commonly transition into populated mixed/numeric rows whose column footprints overlap strongly with the band footprint. Examples include Cheshmeh 130→131 (Jaccard 1.000), Fzar 43:44→45 (0.958), Fzar2 556→557 (1.000), Saman 11:12→13 (1.000), and Parsian 313→315 (the intermediate row 314 is an in-table subsection label).
+- Headers can be single-row or multi-row, and the first data row need not immediately follow the band. A section title or unit note may intervene. Examples include Fzar 10:11→12 (section title)→13 (data), Saman 85→86 (in-table subsection label)→87 (data), and Parsian 310→311 (section title)→312 (unit note)→313 (header)→314 (subsection label)→315 (data).
+- Sparse or changing populated columns occur in otherwise valid data. The continuity score is therefore descriptive and should not be used as a hard minimum or maximum.
+
+**False-positive / non-boundary evidence:**
+- A high Jaccard score is not a table-boundary signal. In Cheshmeh, row 162 is an in-table section label after the header band 160:161; row 163 resumes populated data with Jaccard 1.000. In Saman, row 86 is an in-table subsection label after header row 85; row 87 resumes the data with Jaccard 1.000. In Parsian, row 314 is an in-table subsection label after header row 313; row 315 resumes the data with Jaccard 1.000.
+- All-text bands followed by numeric/mixed rows also occur in narrative or descriptive report structures. A band-to-body transition cannot by itself prove that the preceding rows are a new independent table.
+- Adjacent independent Parsian tables remain difficult: the previously established sequences around rows 295/300, 309/334 and 358/359 show that a valid header→body transition may occur inside a broader visually contiguous report region, but this audit does not provide a unique structural signature that separates a new table from a subsection or repeated header within an existing table.
+- The audit's Jaccard values compare occupied-cell column sets only. They do not account for semantic roles, and merged-cell geometry does not remove the ambiguity. No threshold is supported by the observed positive and negative examples.
+
+**Decision:** this increment does not establish a deterministic, generic table-boundary rule. Do not split, resolve, or promote a region based on Jaccard, column-footprint continuity, an all-text band, a merged-range pattern, or a combination of these signals without a separately validated rule. In particular, do not interpret Jaccard=1.000 as proof of a new table. Keep unresolved regions AMBIGUOUS and block them from semantic extraction. No Detector implementation or regression fixture is approved from this audit alone.
+
+**Next technical step:** stop adding scalar row-similarity heuristics. Build a small, explicit boundary-evidence matrix from the known adjacent Parsian table pairs and the in-table subsection counterexamples (Cheshmeh 162/163, Saman 85–87, Parsian 313–315), recording for each proposed boundary: preceding body footprint, intervening title/unit/header rows, merged-range topology, following body footprint, and whether the boundary is independently established by the owner-provided report evidence. Use that matrix to specify exactly which boundary facts are observable structurally and which are not. If the same observable structure occurs on both sides of a true boundary and a non-boundary, the automatic Detector must not decide between them; preserve AMBIGUOUS or require an explicit report-specific mapping/confirmation. Do not use Persian label meaning or financial semantics to manufacture a structural distinction.
+
+Task 033 remains PARTIAL. No Detector behavior changed, no tests were run by the assistant, and no XLSX files were directly inspected.
