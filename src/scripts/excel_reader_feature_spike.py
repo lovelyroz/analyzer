@@ -160,16 +160,25 @@ def _date_epoch_observations(root: Path) -> dict:
         workbook.close()
 
         loaded = load_workbook(path, data_only=False, read_only=False)
+        with ZipFile(path, "r") as archive:
+            sheet_root = ET.fromstring(archive.read(MAIN_SHEET_XML))
+            date_serial = None
+            for cell in sheet_root.findall(".//x:c", NS):
+                if cell.attrib.get("r") == "A1":
+                    value = cell.find("x:v", NS)
+                    date_serial = value.text if value is not None else None
+                    break
         observations[label] = {
             "workbook_epoch": loaded.epoch.isoformat(),
             "cell_value": loaded["DateSystem"]["A1"].value.isoformat(),
+            "raw_date_serial": date_serial,
         }
         loaded.close()
     observations["same_calendar_value"] = (
         observations["1900"]["cell_value"] == observations["1904"]["cell_value"]
     )
     observations["serials_differ"] = (
-        observations["1900"]["workbook_epoch"] != observations["1904"]["workbook_epoch"]
+        observations["1900"]["raw_date_serial"] != observations["1904"]["raw_date_serial"]
     )
     return observations
 
