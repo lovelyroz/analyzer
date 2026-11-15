@@ -322,6 +322,14 @@ The observed rows support the following boundaries and internal structure:
 
 **Important structural distinction:** one-cell text rows occur both as table/section titles (for example rows 300, 311, 334 and 359) and as in-table subsection labels (row 314). Therefore, neither one-cell occupancy nor merged-range presence is a sufficient split criterion. A potentially useful *candidate pattern* is a title-like single-cell row followed by an optional one-cell note and then a multi-cell all-text row, but it is not yet an approved rule. The same pattern must be checked against counterexamples and the other representative workbooks before implementation. The detector must not infer financial meaning from Persian label text.
 
-**Next action:** run a cross-workbook structural-pattern audit that enumerates, without splitting, rows matching combinations of (a) one-cell literal text rows, (b) nearby one-cell text rows, (c) multi-cell all-text rows, and (d) subsequent mixed text/numeric rows. Include neighboring row coordinates, occupancy, cell value kinds, and merged-range geometry. Use the result to test the proposed pattern across all five workbooks and identify false positives such as row 314. No detector behavior is changed in this increment.
+**Next action:** run the new read-only cross-workbook audit:
+
+```powershell
+python src/scripts/excel_table_row_pattern_audit.py excel/cheshme.xlsx excel/fzar.xlsx excel/fzar2.xlsx excel/samanBank.xlsx excel/parsian_periodic.xlsx
+```
+
+The utility `src/scripts/excel_table_row_pattern_audit.py` enumerates single-cell literal-text rows in each worksheet and prints nearby populated rows, row occupancy/value-kind counts, literal values, and merged-range geometry. It labels structural patterns only (for example single-text → optional single-text note → multi-cell all-text row, or single-text → mixed row). It performs no table splitting and does not infer financial meaning. The default limit is 100 contexts per worksheet; increase it with `--max-per-sheet` if the output reports omitted contexts. Put the complete output in `reply.md`.
+
+Use the result to test the proposed pattern across all five workbooks and identify false positives such as Parsian row 314. No detector behavior is changed in this increment.
 
 Task 033 remains PARTIAL. Do not promote AMBIGUOUS regions or feed them to semantic extraction. The assistant did not run tests or inspect XLSX files directly.
