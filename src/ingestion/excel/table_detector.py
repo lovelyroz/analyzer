@@ -53,7 +53,7 @@ def detect_visual_table_candidates(observation: WorkbookObservation) -> Workbook
     """Return a new observation with conservative visual table candidates added.
 
     A candidate requires at least two occupied rows, two occupied columns, and
-    three populated text cells. Fully empty rows/columns are strong separators.
+    three populated literal cells. Fully empty rows/columns are strong separators.
     A merged range spanning a proposed separator makes the candidate AMBIGUOUS.
 
     Adjacent merged headings are retained as title evidence only; they do not
@@ -62,7 +62,7 @@ def detect_visual_table_candidates(observation: WorkbookObservation) -> Workbook
     """
     cells_by_sheet: dict[int, list[CellObservation]] = defaultdict(list)
     for cell in observation.cells:
-        if cell.value_kind is CellValueKind.PRESENT_TEXT:
+        if cell.value_kind in (CellValueKind.PRESENT_TEXT, CellValueKind.PRESENT_NUMBER):
             cells_by_sheet[cell.cell_ref.worksheet_ordinal].append(cell)
 
     existing_by_sheet: dict[int, list[TableObservation]] = defaultdict(list)
@@ -186,7 +186,7 @@ def detect_visual_table_candidates(observation: WorkbookObservation) -> Workbook
                         if cell.cell_ref.row_index == merged.min_row
                         and cell.cell_ref.column_index == merged.min_column
                     ), None)
-                    if anchor is not None:
+                    if anchor is not None and anchor.value_kind is CellValueKind.PRESENT_TEXT:
                         title_fragments.append(HeaderFragmentObservation(
                             literal_text=anchor.text_value,
                             source_cells=(anchor.cell_ref,),
