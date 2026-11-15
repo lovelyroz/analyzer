@@ -166,11 +166,20 @@ The `repeatability` observation reports `same_input_sha256: true` and `same_obse
 
 **Evidence boundary:** these are owner-provided observations from synthetic workbooks, not direct inspection of CODAL source workbooks. The earlier fixture observations and interpreter inventory remain as recorded in section 7.3. Large-sheet elapsed-time/peak-memory benchmarking, practical Calamine comparison, and source-workbook validation remain open. The assistant did not execute the utility or any tests.
 
-## 7.5 Optional large-sheet benchmark added (not executed)
+## 7.5 Owner-run large-sheet benchmark
 
-The spike utility now accepts an opt-in `--benchmark-rows N` argument. When enabled, it creates a deterministic, value-only synthetic workbook with the requested number of data rows and measures normal-mode `openpyxl` loading. The JSON includes requested/observed dimensions, non-empty cell count, XLSX file size, load elapsed time, and `tracemalloc` current/peak memory after load and after a full cell traversal. The default value is zero, so the existing lightweight probe does not generate or load the large workbook unless explicitly requested.
+The owner executed the opt-in benchmark with `--benchmark-rows 20000` under `openpyxl 3.1.5`. The synthetic value-only worksheet contained 20,000 data rows plus one header row and six columns (120,006 non-empty cells). The generated XLSX was 588,827 bytes.
 
-The benchmark reports Python allocations tracked by `tracemalloc`; native allocations outside Python's allocator may not be fully represented. Results are environment-specific and should be compared only with the same row count, reader version, runtime, and machine conditions. This is a measurement utility, not a pass/fail test. The assistant did not execute the utility or benchmark.
+| Observation | Owner-reported result |
+|---|---:|
+| Normal-mode workbook load | 6.545057 s |
+| Load plus full cell traversal | 6.769802 s |
+| Peak `tracemalloc` after load | 47,889,981 bytes (about 45.7 MiB) |
+| Current `tracemalloc` after load | 46,093,935 bytes |
+| Peak `tracemalloc` after load and traversal | 47,889,981 bytes |
+| Current `tracemalloc` after load and traversal | 46,269,931 bytes |
+
+These are single-run observations from the owner's environment, not a performance guarantee or a comparative benchmark. The memory figures track Python allocations through `tracemalloc`; native allocations outside Python's allocator may not be fully represented. No Calamine comparison was possible in this run because `python_calamine` was reported unavailable in that interpreter. The benchmark uses synthetic values and does not establish performance on representative CODAL workbooks. Repeated runs, a comparable Calamine run, and source-workbook validation remain open. The assistant did not execute the utility or benchmark.
 
 ## 8. Sources
 
@@ -186,3 +195,14 @@ The benchmark reports Python allocations tracked by `tracemalloc`; native alloca
 ---
 
 **Execution note:** The standalone synthetic spike utility was executed by the owner in their environment; its JSON output is retained in repository-root `reply.md` and summarized in section 7.3. The assistant did not execute the utility or any tests. No source XLSX was directly inspected, no package was installed or upgraded, no production ingestion code/DTO/ORM/schema/migration/data was changed, and no tests were run.
+
+
+## 7.6 Conditional same-file Calamine benchmark prepared
+
+The standalone utility now includes an optional python-calamine large-sheet benchmark alongside the existing openpyxl benchmark. When --benchmark-rows N is supplied, both readers are measured against the **same generated XLSX file**. Calamine loads the workbook through CalamineWorkbook.from_path(path), obtains LargeSheet, and traverses its native iter_rows() iterator while counting non-empty scalar values. The report includes load time, load-plus-traversal time, observed range bounds, Python-tracked current/peak memory, and the installed distribution version.
+
+If python_calamine is not importable, the utility emits calamine_large_sheet_benchmark.enabled: false with an explicit reason and continues normally; it does not install packages or fail solely because the optional reader is absent. If import succeeds but the comparative read fails, the failure is captured as an error observation.
+
+**Comparison caveat:** both readers use the same generated file and count non-empty values, but their internal representations and allocation strategies differ. tracemalloc does not reliably account for native Rust allocations, so the memory values are not total process-memory measurements and must not be interpreted as a strict memory winner. This is a controlled indicative comparison, not a production acceptance test. The utility has only been edited; it has not been executed by the assistant or owner after this change. The current owner-reported environment previously lacked python-calamine, so the first rerun may report the optional comparison as unavailable until the owner makes that package available in the intended interpreter.
+
+The public package usage reviewed for this implementation documents CalamineWorkbook.from_path(path), sheet_names, get_sheet_by_name(name), and sheet row iteration; see the [python-calamine package documentation](https://pypi.org/project/python-calamine/) and [Python API type declarations](https://github.com/dimastbk/python-calamine/blob/master/python/python_calamine/_python_calamine.pyi). No dependency declaration or installation was changed.

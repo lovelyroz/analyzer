@@ -325,6 +325,71 @@ def _large_sheet_benchmark(root: Path, row_count: int) -> dict:
     return result
 
 
+
+def _calamine_large_sheet_benchmark(path: Path, row_count: int) -> dict:
+    """Measure python-calamine load and full row traversal on the same XLSX bytes."""
+    if not importlib.util.find_spec("python_calamine"):
+        return {
+            "enabled": False,
+            "reason": "python_calamine import module is unavailable in this interpreter.",
+            "requested_data_rows": row_count,
+        }
+
+    try:
+        from python_calamine import CalamineWorkbook
+
+        tracemalloc.start()
+        started = time.perf_counter()
+        workbook = CalamineWorkbook.from_path(path)
+        loaded_at = time.perf_counter()
+        current_after_load, peak_after_load = tracemalloc.get_traced_memory()
+
+        sheet = workbook.get_sheet_by_name("LargeSheet")
+        non_empty_cells = sum(
+            1
+            for row in sheet.iter_rows()
+            for value in row
+            if value is not None and value != ""
+        )
+        scanned_at = time.perf_counter()
+        current_after_scan, peak_after_scan = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        start = sheet.start
+        end = sheet.end
+        result = {
+            "enabled": True,
+            "requested_data_rows": row_count,
+            "observed_start_zero_based": list(start) if start is not None else None,
+            "observed_end_zero_based": list(end) if end is not None else None,
+            "observed_non_empty_cells": non_empty_cells,
+            "load_elapsed_seconds": round(loaded_at - started, 6),
+            "load_peak_tracemalloc_bytes": peak_after_load,
+            "load_current_tracemalloc_bytes": current_after_load,
+            "load_and_scan_elapsed_seconds": round(scanned_at - started, 6),
+            "load_and_scan_peak_tracemalloc_bytes": peak_after_scan,
+            "load_and_scan_current_tracemalloc_bytes": current_after_scan,
+            "memory_measurement": (
+                "Python allocations tracked by tracemalloc; native Rust allocations "
+                "may not be represented, so this is not total process memory."
+            ),
+            "reader_mode": "Calamine native row iterator",
+            "reader_version": importlib.metadata.version("python-calamine"),
+            "traversal": "full row iteration; counts non-empty scalar values",
+        }
+        workbook.close()
+        return result
+    except Exception as exc:
+        if tracemalloc.is_tracing():
+            tracemalloc.stop()
+        return {
+            "enabled": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "requested_data_rows": row_count,
+            "note": "Calamine was importable but the comparative run failed.",
+        }
+
+
 def run_spike(benchmark_rows: int = 0) -> dict:
     with tempfile.TemporaryDirectory(prefix="excel-reader-spike-") as temp_dir:
         root = Path(temp_dir)
@@ -361,6 +426,14 @@ def run_spike(benchmark_rows: int = 0) -> dict:
             if benchmark_rows > 0
             else {"enabled": False, "reason": "Pass --benchmark-rows to opt in."}
         )
+        calamine_large_sheet_benchmark = (
+            _calamine_large_sheet_benchmark(
+                root / f"large_sheet_{benchmark_rows}_rows.xlsx",
+                benchmark_rows,
+            )
+            if benchmark_rows > 0
+            else {"enabled": False, "reason": "Pass --benchmark-rows to opt in."}
+        )
         openpyxl_version = reader_packages["openpyxl"]["version"] or "unknown"
         calamine_available = reader_packages["python_calamine"]["import_module_available"]
 
@@ -371,6 +444,13 @@ def run_spike(benchmark_rows: int = 0) -> dict:
             "date_epoch_comparison": date_epoch_comparison,
             "repeatability": repeatability,
             "large_sheet_benchmark": large_sheet_benchmark,
+            "calamine_large_sheet_benchmark": calamine_large_sheet_benchmark,
+            "benchmark_comparison_note": (
+                "Both readers are measured against the same generated XLSX file. "
+                "Traversal counts non-empty values, but reader internals and native "
+                "memory accounting differ; compare as indicative, not as a strict "
+                "like-for-like production benchmark."
+            ),
             "openpyxl_version": openpyxl_version,
             "python_calamine_installed": calamine_available,
             "reader_package_inventory": reader_packages,
