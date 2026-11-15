@@ -1,7 +1,7 @@
 # DB-AUD-008 — Excel Library Capability Assessment
 
 **Date:** 2026-11-15  
-**Status:** PARTIAL — repository inventory, documentation comparison, and the synthetic openpyxl probe have been run by the owner in their environment; basic fixture observations and runtime package inventory are recorded. Epoch 1900 comparison, repeatability, large-sheet performance/memory, Calamine comparison, and source-workbook validation remain open.  
+**Status:** PARTIAL — repository inventory, documentation comparison, synthetic fixture observations, 1900/1904 epoch comparison, and same-input repeatability have been demonstrated by the owner in their environment. Large-sheet performance/memory, Calamine comparison, and source-workbook validation remain open.  
 **Scope:** Excel reader selection for the CODAL Excel ingestion V1 and the logical observation contract in DB-DES-007. This report is not an implementation approval.
 
 ## 1. Executive decision
@@ -151,13 +151,20 @@ The synthetic fixture observations include:
 The full owner-provided output is retained in repository-root `reply.md` as execution evidence. The assistant did not execute the utility or any tests.
 
 
-## 7.4 Date-system and repeatability observations added to the utility (not yet executed)
+## 7.4 Owner-run date-system and repeatability observations
 
-The utility was extended to generate two additional synthetic workbooks containing the same calendar date (2024-01-01), one using the Excel 1900 date system and one using the 1904 date system. For each workbook it reports the workbook epoch, the decoded calendar value, and the raw numeric date serial read from worksheet XML; it also reports whether the decoded dates match and whether the serials differ. This is intended to verify that the date-system offset is preserved as workbook metadata rather than being mistaken for a change in the calendar date.
+The owner reran the enhanced utility and added its JSON output to repository-root `reply.md`. The emitted `date_epoch_comparison` reports:
 
-The utility also now loads the exact same immutable synthetic XLSX bytes twice in independent formula and cached-value views. It compares a stable observation projection (epoch, sheet states, merged ranges, table names/ranges, formula/cache values, numeric scalar, and non-empty coordinates), records the input SHA-256 for both reads, and reports whether both the input fingerprint and observation projection match. This tests repeatability of reading identical bytes within one execution and one reader version; it does not prove cross-version or cross-process reproducibility.
+| Workbook date system | Decoded calendar value | Raw worksheet XML date serial | Workbook epoch |
+|---|---|---:|---|
+| 1900 | `2024-01-01T00:00:00` | `45292` | `1899-12-30T00:00:00` |
+| 1904 | `2024-01-01T00:00:00` | `43830` | `1904-01-01T00:00:00` |
 
-These are source-level additions only. The enhanced utility has not yet been run by the owner or assistant. The JSON fields `date_epoch_comparison` and `repeatability` must be reviewed from the next owner-run output before any empirical conclusion is recorded. Large-sheet performance/memory, Calamine comparison, and source-workbook validation remain open. No tests were run.
+The utility reports `same_calendar_value: true` and `serials_differ: true`. This confirms, for the synthetic fixtures and installed `openpyxl` version, that the same calendar date decodes consistently while its underlying serial differs by date system. The adapter must retain the workbook epoch and must not treat the raw serial as a date without that context.
+
+The `repeatability` observation reports `same_input_sha256: true` and `same_observation_projection: true` for two independent loads of the same immutable synthetic XLSX bytes, using reader version `3.1.5` and input SHA-256 `fe97a73c7be51170e068ef9ae7671868b6ad54933078f2070764a3ef95f9ac2b`. This supports repeatability within one execution and one reader version only; it does not establish cross-process, cross-version, or cross-platform reproducibility.
+
+**Evidence boundary:** these are owner-provided observations from synthetic workbooks, not direct inspection of CODAL source workbooks. The earlier fixture observations and interpreter inventory remain as recorded in section 7.3. Large-sheet elapsed-time/peak-memory benchmarking, practical Calamine comparison, and source-workbook validation remain open. The assistant did not execute the utility or any tests.
 
 ## 8. Sources
 
