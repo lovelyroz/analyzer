@@ -356,3 +356,33 @@ Stop-Transcript
 ```
 
 Place the complete `row_pattern_audit_v2.txt` output in `reply.md`. The corrected audit remains diagnostic only; it does not split tables, assign financial meaning, or change the Detector. Task 033 remains PARTIAL. The assistant did not run tests or inspect XLSX files directly.
+
+
+### 8.13 Corrected physical-row pattern audit across five workbooks — 2026-11-15
+
+The owner supplied the corrected-version transcript in `reply.md` (blob SHA `2ef381fc9c60b5c237cafb72e5708ed5987b6c5d`). This version inspects physical worksheet rows, prints empty rows explicitly, and reports merged-range geometry on each row. The assistant reviewed the Markdown transcript only; it did not open the XLSX files directly.
+
+The output contains the following single-text-row anchor classifications:
+
+| Workbook | No match in next 2 physical rows | Direct next row all-text | Direct next row mixed | Single-text note, then all-text row |
+|---|---:|---:|---:|---:|
+| cheshmeh.xlsx | 19 | 9 | 5 | 0 |
+| fzar.xlsx | 12 | 4 | 1 | 1 |
+| fzar2.xlsx | 40 | 18 | 33 | 9 |
+| samanBank.xlsx | 26 | 27 | 17 | 15 |
+| parsian_periodic.xlsx | 35 | 28 | 18 | 18 |
+
+**Coverage caveat:** the Fzar2 worksheet reports 162 single-text rows, while the utility's default maximum is 100 contexts per worksheet. Its 100 printed contexts are therefore not a complete audit of all 162 anchors. The other listed worksheets have no more than 100 single-text rows. Counts above are audit-pattern counts, not counts of confirmed table boundaries.
+
+The audit confirms useful but non-conclusive structural signatures:
+
+- The sequence *single-cell title → single-cell unit note → multi-cell all-text row* appears in Fzar, Fzar2, Saman and Parsian. Examples include Fzar rows 8–10, Fzar2 rows 334–336 and 361–363, Saman rows 9–11 and 37–39, and Parsian rows 8–10 and 58–60. These are strong **table-start candidates**, but the audit does not establish a universal rule or prove that every such sequence is an independent table.
+- A single-cell text row followed immediately by a mixed row appears in all five workbooks. Many such rows are in-table section/subsection labels rather than table boundaries. Examples include Cheshmeh rows 11–12 and 162–163, Fzar rows 12–13, Fzar2 rows 11–12 and 26–27, Saman rows 41–42 and 86–87, and Parsian rows 12–13, 32–33 and 35–36. Parsian row 314, previously identified by the targeted audit, is a further in-table subsection-label counterexample.
+- A direct all-text successor is not by itself decisive: it can be a multi-row table header, a unit note preceding a header, or other structural text. Merged ranges provide useful topology but do not independently establish table identity.
+- The corrected audit did not identify a one-blank-row-then-all-text pattern among the emitted classifications. This does not prove that blank rows are never relevant; it only means this particular pattern was not demonstrated by these anchor contexts.
+
+**Decision:** no generic V2 split rule is approved from this evidence. In particular, do not split on single-cell occupancy, a direct all-text successor, or a single-text-note/all-text sequence alone. The title → optional unit note → all-text header sequence may be retained as a *candidate signal* for a future multi-signal classifier, not as an automatic split or promotion rule. The current Detector must continue to return AMBIGUOUS where it cannot establish boundaries safely; no AMBIGUOUS region may enter semantic extraction.
+
+**Next technical step:** inspect and model the *header structure itself* as a distinct structural signal, including multi-row headers, merged-cell coverage, populated-column footprint, and the transition from header rows to subsequent data rows. Any proposed combination must be evaluated against the in-table subsection-label examples above and the incomplete Fzar2 coverage. Do not use Persian label meaning or financial semantics in this structural phase. Before implementation, obtain complete Fzar2 anchor coverage (for example, rerun with `--max-per-sheet 200`) and define exact positive/negative regression fixtures from the owner-provided evidence.
+
+Task 033 remains PARTIAL. The owner has not yet rerun tests for a new Detector implementation because no implementation change is made in this increment. The assistant did not run tests or inspect XLSX files directly.
