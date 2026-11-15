@@ -306,3 +306,8 @@ The first implementation of the V1 openpyxl reader is available in `src/ingestio
 A populated numeric, boolean, date-typed, formula, or error cell produces a stable error diagnostic. After scanning all worksheets, the reader raises `ExcelSourceContractError` with the complete observation so the ingestion unit can reject the whole report. No text normalization, numeric/date parsing, semantic mapping, formula evaluation, or persistence is performed.
 
 Owner-run tests are authored in `src/tests/test_excel_source_reader.py`; the assistant did not execute them. Visual financial table segmentation is not inferred by this reader and is tracked separately as DB-ING-006 / Task 033. Implementation details, provisional resource limits, and acceptance status are recorded in `reports/DB_ING_005_EXCEL_SOURCE_READER_IMPLEMENTATION.md`. Task 032 remains PARTIAL pending owner-run validation.
+
+
+### 16.1 Reader test finding and correction (2026-11-15)
+
+The owner-run combined DTO/reader suite returned **21 passed, 5 failed**. Each failure traced to one missing import of `DiagnosticSeverity` in the reader, preventing the intended non-text/error diagnostic and whole-report rejection path from completing. The import has been added. This is a code correction only; Task 032 remains PARTIAL pending owner rerun. The assistant did not execute tests.
