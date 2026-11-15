@@ -430,3 +430,34 @@ Stop-Transcript
 Place the complete transcript in `reply.md`. Review must identify positive header-band examples and counterexamples (narrative/all-text rows, notes, and in-table section labels) before any Detector rule or regression fixture is approved.
 
 Task 033 remains PARTIAL. No tests were run by the assistant, and XLSX files were not directly inspected.
+
+
+### 8.16 Review of owner-run header-band audit across five workbooks — 2026-11-15
+
+The owner supplied the complete transcript in `reply.md` (current blob SHA `f68528aa775f99e1641715bc281b43ae31b3f9ff`). The assistant reviewed the Markdown transcript only; it did not open the XLSX files directly.
+
+All five workbooks were accepted by the Reader. The audit covered six worksheets and reported 113 adjacent all-text bands in total:
+
+| Workbook | Worksheet coverage | Adjacent all-text bands |
+|---|---:|---:|
+| cheshmeh.xlsx | 1 | 10 |
+| fzar.xlsx | 1 | 4 |
+| fzar2.xlsx | 1 | 37 |
+| samanBank.xlsx | 1 | 32 |
+| parsian_periodic.xlsx | 2 | 30 |
+| **Total** | **6** | **113** |
+
+**Positive header evidence:** the audit exposes genuine multi-row header structures, including Cheshmeh rows 9–10, 44–45, 107–109, 160–161 and 194–196; Fzar rows 10–11, 33–34 and 43–44; Fzar2 rows 9–10, 60–61 and 92–93; Saman rows 11–12 and 39–40; and Parsian rows 10–11, 60–61, 79–80, 176–177 and 238–239. These examples show that merged-cell geometry and column footprints can encode hierarchical headers, and that a valid header may span one, two or more physical rows.
+
+**Counterexamples and limitations:**
+- The band predicate is not a header classifier. In Saman, bands such as rows 29, 32 and 35 contain management forecasts/narrative text, not column headers. Similar explanatory/narrative bands appear elsewhere.
+- One-cell section labels and subsection labels remain present around otherwise valid tables. For example, Saman row 86 is an in-table subsection label after the header at row 85; Parsian row 314 was previously confirmed as an in-table subsection label.
+- A multi-cell all-text band can be a narrative/description row, not a table header. Conversely, a header may be one row high, or be followed by additional mixed/numeric content within a shared report region.
+- The audit's grouping rule requires at least two literal-text cells and excludes numeric/other populated cells. Therefore it deliberately does not capture every possible header form, especially headers interleaved with numeric/text mixed content. The 113 count is a count of detected bands, not a count of tables or confirmed headers.
+- Merged ranges and populated-column footprints are useful structural evidence, but no single one of them establishes a table boundary. The audit does not provide a universal transition signature that separates table headers from narrative bands and in-table labels.
+
+**Decision:** the header-band audit improves the evidence base but does not support a deterministic, generic table-splitting rule. Do not split or promote a region solely because it contains a multi-cell all-text band, adjacent all-text rows, merged ranges, or a particular column footprint. Do not pass AMBIGUOUS regions to semantic extraction. No Detector implementation or regression fixtures are approved from this audit alone.
+
+**Next technical step:** move from row-pattern heuristics to an explicit structural model of a *table candidate*: header-band candidate(s), merged-range coverage, column-footprint continuity, and the transition into subsequent populated rows. The model must permit single-row and multi-row headers, while retaining narrative bands and in-table subsection labels as negative cases. Before implementing it, define a small set of exact positive and negative regression fixtures from the owner-provided transcript and establish how each fixture maps to observed coordinates/regions. If the available observations cannot distinguish a boundary deterministically, preserve AMBIGUOUS rather than guessing.
+
+Task 033 remains PARTIAL. No tests were run by the assistant, no XLSX files were directly inspected, and no Detector behavior was changed in this increment.
