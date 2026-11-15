@@ -183,5 +183,5 @@ The immutable DTO definitions and package exports have been created in:
 - `src/ingestion/excel/dto.py`
 - `src/ingestion/excel/__init__.py`
 
-The implementation follows the text-only value model and contains no formula/cache fields or numeric XML sidecar. Owner-run tests have been added in `src/tests/test_excel_observation_dto.py` for literal text, blank/non-text/error states, immutability, tuple-only collections, and worksheet ordering. They have not been executed by the assistant. The next implementation increment is the openpyxl structural/text reader and deterministic diagnostics/table-region boundary.
+The implementation follows the text-only value model and contains no formula/cache fields or numeric XML sidecar. Owner-run tests in `src/tests/test_excel_observation_dto.py` cover literal text, blank/non-text/error states, immutability, tuple-only collections, and worksheet ordering. The owner reported `pytest src/tests/test_excel_observation_dto.py -q` → `13 passed in 2.49s`; the assistant did not run tests. DB-ING-004 / Task 031 is complete. The next implementation increment is DB-ING-005 / Task 032: the openpyxl structural/text reader and deterministic diagnostics, with table-region detection kept conservative and ambiguity explicit.
 
