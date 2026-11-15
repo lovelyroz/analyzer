@@ -58,7 +58,7 @@ class ExcelReaderConfig:
     max_file_bytes: int = 25 * 1024 * 1024
     max_total_cells: int = 500_000
     max_worksheets: int = 100
-    profile_name: str = "codal-text-only"
+    profile_name: str = "codal-literal-values"
     profile_version: str = "1"
     dto_schema_version: str = "1"
 
@@ -78,13 +78,13 @@ class ExcelSourceReadError(ValueError):
 
 
 class ExcelSourceContractError(ExcelSourceReadError):
-    """The workbook was readable but violates the text-only source contract."""
+    """The workbook was readable but violates the literal-value source contract."""
 
     def __init__(self, observation: WorkbookObservation) -> None:
         self.observation = observation
         super().__init__(
-            "EXCEL_TEXT_ONLY_CONTRACT_VIOLATION",
-            "The workbook contains one or more populated non-text or error cells.",
+            "EXCEL_LITERAL_VALUE_CONTRACT_VIOLATION",
+            "The workbook contains one or more unsupported populated cell kinds or error cells.",
         )
 
 
@@ -213,7 +213,7 @@ def read_excel_source(
 ) -> WorkbookObservation:
     """Read one XLSX source into an immutable observation.
 
-    On a text-only contract violation, raises ExcelSourceContractError after
+    On a literal-value contract violation, raises ExcelSourceContractError after
     scanning the workbook; the exception exposes the complete observation and
     all cell-level diagnostics so the caller can reject the entire report.
     """
