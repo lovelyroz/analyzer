@@ -28,6 +28,7 @@
 | [DB-STD-002_BANK_MONTHLY_SAMPLE_REVIEW_2.md](reports/DB-STD-002_BANK_MONTHLY_SAMPLE_REVIEW_2.md) | بررسی تکمیلی نمونه گزارش ماهانه بانک |
 | [DB-STD-002_BANK_quarterly_SAMPLE_REVIEW.md](reports/DB-STD-002_BANK_quarterly_SAMPLE_REVIEW.md) | بررسی نمونه گزارش دوره‌ای بانک |
 | [DB_DES_003_REPORT_PERIOD_CONTRACT.md](reports/DB_DES_003_REPORT_PERIOD_CONTRACT.md) | قرارداد منطقی دوره‌های مالی |
+| [DB_DES_004_MARKET_FX_SHARE_CONTRACT.md](reports/DB_DES_004_MARKET_FX_SHARE_CONTRACT.md) | قرارداد منطقی بازار، FX، تعداد سهام و رویدادهای سرمایه‌ای |
 | [findingSubheaders.md](reports/findingSubheaders.md) | بررسی زیرعنوان‌ها و ساختار گزارش |
 | [parsian_periodic_report_1.md](reports/parsian_periodic_report_1.md) | گزارش تحلیلی نمونه دوره‌ای بانک پارسیان |
 | [parsian_table_inventory.json](reports/parsian_table_inventory.json) | خروجی ساختاری فهرست جداول پارسیان |
