@@ -94,8 +94,13 @@ def _read_source(
 ) -> tuple[bytes, str | None, str | None]:
     if isinstance(source, (bytes, bytearray, memoryview)):
         payload = bytes(source)
-        return payload, file_name, None
+        resolved_name = file_name
+        if resolved_name is not None and Path(resolved_name).suffix.lower() != ".xlsx":
+            raise ExcelSourceReadError("EXCEL_UNSUPPORTED_EXTENSION", "V1 reader accepts .xlsx files only.")
+        return payload, resolved_name, None
     path = Path(source)
+    if path.suffix.lower() != ".xlsx":
+        raise ExcelSourceReadError("EXCEL_UNSUPPORTED_EXTENSION", "V1 reader accepts .xlsx files only.")
     try:
         payload = path.read_bytes()
     except OSError as exc:
@@ -392,7 +397,7 @@ def read_excel_source(
                         detection_method="excel_structured_table",
                         detection_version="1",
                         status=StructureStatus.RESOLVED,
-                        header_rows=(bounds.min_row,),
+                        header_rows=(bounds.min_row,) if getattr(table, "headerRowCount", 1) else (),
                         row_refs=tuple(range(bounds.min_row, bounds.max_row + 1)),
                         column_refs=tuple(range(bounds.min_column, bounds.max_column + 1)),
                         diagnostics=(),
