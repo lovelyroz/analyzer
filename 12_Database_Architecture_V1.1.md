@@ -222,7 +222,7 @@ Retain and define these period attributes:
 - `fiscal_quarter`: nullable where not applicable; otherwise an integer from 1 through 4.
 - `period_type`: describes the duration/span of the source data, not how often the report is published.
 - `months_length`: number of months represented by the source period.
-- `is_ytd`: whether the source amount is cumulative from the start of that company's fiscal year.
+- `is_ytd`: for a duration-based flow, whether the source amount is cumulative from the start of that company's fiscal year; it is not applicable (`NULL`/not applicable) to an instant/stock observation.
 
 The actual start of a fiscal year/period must be resolved from the source or a validated company fiscal calendar. Never infer Farvardin 1 or another start date from a market-wide convention.
 
@@ -240,9 +240,22 @@ Monthly source periods use `MONTH`, `months_length=1`, and `is_ytd=false`.
 Standalone-quarter figures calculated from cumulative source periods are derived analytical results, not database inputs. This database architecture defines no standalone-quarter field, column, table, or stored record. The database retains the source-reported cumulative values and their source-period metadata exactly as admitted under the input/provenance rules. Any quarter-differencing logic belongs to the runtime analytical layer and is outside this database storage contract.
 `TTM` is not a source `FinancialPeriod` type. TTM is a derived analytical window and is computed at runtime.
 
-The logical period identity is the company plus the exact Jalali start date and end date. Enforce valid Jalali components, start date not after end date, quarter range 1–4, and consistency between dates, duration, period type, and YTD semantics. Reject unresolved or contradictory period metadata rather than guessing.
+The logical period identity is the company plus period shape/type (`INSTANT` or `DURATION`) and the exact Jalali start date and end date. An `INSTANT` period has identical start and end dates and `months_length=0`; `is_ytd` is not applicable. A `DURATION` period has a source-supported date range and applicable duration/YTD semantics. Enforce valid Jalali components, valid shape/date relationships, quarter range 1–4 where applicable, and consistency between dates, duration, period type, and YTD semantics. Reject unresolved or contradictory period metadata rather than guessing.
 
 **Migration caution:** existing SQL `Date` values must be inspected before migration. Do not assume they represent Gregorian dates or Jalali dates and do not blindly convert them. Ambiguous/unresolvable records require an explicit migration report and safe resolution path.
+
+### DB-DES-003 — consolidated multi-period interpretation rules
+
+The detailed logical contract is maintained in `dbReports/DB_DES_003_REPORT_PERIOD_CONTRACT.md`. The following rules are normative and clarify this section:
+
+- **Period shape:** distinguish `INSTANT` observations (stock/balance at a date) from `DURATION` observations (flow over a date range). A point-in-time balance uses the same Jalali date as start and end, `period_type=INSTANT`, `months_length=0`, and no YTD flag. Duration periods retain exact start/end dates and their source-supported duration.
+- **YTD applicability:** `is_ytd` applies to duration-based flow values only. It is not a property to apply to stock/instant values. Rates/ratios follow the source-defined instant or duration basis.
+- **Per-value period assignment:** one Report/ReportVersion may contain multiple tables, periods, and temporal shapes. Every FinancialFact links to its own actual FinancialPeriod. The Report's declared primary period is filing metadata and never forces every fact into that period.
+- **Local table context:** interpret multi-row/merged headers, group labels, measure subheaders, adjustment blocks, comparative dates, and forecast columns within each table. A worksheet-wide or workbook-wide period assumption is invalid. `دوره منتهی به` identifies an end date but does not by itself establish start date, duration, or YTD/standalone.
+- **Opening/change/closing:** opening and closing balances are instant observations; changes over an interval are duration flows. A bare `ابتدای دوره`/`انتهای دوره` without a resolvable date must not be assigned a guessed FinancialPeriod.
+- **Standalone source versus derived:** an explicitly source-reported standalone-quarter value is a report input and may be stored with its actual quarter duration and `is_ytd=false`. A standalone quarter calculated by differencing cumulative source periods is derived and runtime-only. TTM is always runtime-only.
+- **Comparatives:** comparative values belong to the ReportVersion that publishes them and to the FinancialPeriod they describe. Their PIT availability begins at the containing version's publication datetime.
+- **Unresolved temporal meaning:** do not infer dates or temporal semantics from filename, publication date, column order, arithmetic coincidence, or a general report title. If a required fact period cannot be resolved, reject the report under the all-or-nothing admission rule.
 
 ### Report / ReportVersion / PIT
 
@@ -332,15 +345,19 @@ Each version must preserve the following information. This is a logical contract
 - Earlier versions remain preserved and must continue to be selected for PIT cutoffs before the correction became available.
 - A later correction must never be retroactively applied to an earlier PIT snapshot. Version selection must be deterministic and based on publication availability at the requested cutoff; do not select a version merely because it is currently the latest.
 
-**Audited / restated version preference**
+**Audited / restated version preference — owner-approved four-level ranking**
 
-- Preserve audit status and presentation/restatement status as separate, source-supported attributes of each `ReportVersion`. Retain the original CODAL labels or source evidence needed to explain how those attributes were classified.
-- For analysis, the preferred version is one that is both **audited** and **restated**.
-- If no audited-and-restated version is available within the requested PIT cutoff, the approved fallback is an **unaudited, original (not restated)** version.
-- Within the applicable preferred or fallback class, select the latest version published on or before the PIT cutoff. Never use a version published after the cutoff.
-- Do not infer audit or restatement status from the report title, publication order, or another version. If the source does not establish the status reliably, keep it unknown.
-- The preference above does not define an ordering for mixed or otherwise unclassified combinations (for example, audited-original or unaudited-restated) when neither approved combination is available. Do not silently promote one of those combinations to the preferred/fallback position; flag the selection as unresolved for an explicit policy decision rather than guessing.
-- Version preference affects which source version is selected for an analysis; it does not authorize deletion, overwriting, or loss of any published version. PIT history must remain reproducible.
+- Preserve audit status and presentation/restatement status as separate, source-supported attributes of each `ReportVersion`. Retain the original CODAL labels or source evidence used for classification.
+- First filter versions to those published on or before the requested PIT cutoff. Then rank eligible versions in this exact order:
+  1. **AUDITED + RESTATED**
+  2. **AUDITED + ORIGINAL**
+  3. **UNAUDITED + RESTATED**
+  4. **UNAUDITED + ORIGINAL**
+- Within an equal-ranked class, select the newest version by valid CODAL publication datetime. Never use a version published after the cutoff.
+- This means an audited-original version outranks an unaudited-restated version.
+- Do not infer audit or restatement status from the report title, publication order, or another version. If source evidence is missing or ambiguous, retain `UNKNOWN`.
+- A version with `UNKNOWN` status is not silently assigned to a rank. If its unresolved status could change which version is best-ranked, selection must return an explicit unresolved state rather than guess.
+- Version preference affects selection for analysis only; it never authorizes deletion, overwriting, or loss of any published version. PIT history must remain reproducible.
 
 ### Financial fact and calculation contract — reviewed and approved
 
