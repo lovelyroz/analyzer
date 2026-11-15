@@ -133,7 +133,25 @@ def detect_visual_table_candidates(observation: WorkbookObservation) -> Workbook
                 if overlaps_declared:
                     continue
 
-                status = StructureStatus.AMBIGUOUS if crossing_merges else StructureStatus.CANDIDATE
+                all_rows = tuple(sorted(by_row))
+                all_columns = tuple(sorted({cell.cell_ref.column_index for cell in sheet_cells}))
+                previous_rows = [value for value in all_rows if value < min_row]
+                next_rows = [value for value in all_rows if value > max_row]
+                weak_row_gap = (
+                    bool(previous_rows) and min_row - previous_rows[-1] == 2
+                ) or (
+                    bool(next_rows) and next_rows[0] - max_row == 2
+                )
+                previous_columns = [value for value in all_columns if value < min_col]
+                next_columns = [value for value in all_columns if value > max_col]
+                weak_column_gap = (
+                    bool(previous_columns) and min_col - previous_columns[-1] == 2
+                ) or (
+                    bool(next_columns) and next_columns[0] - max_col == 2
+                )
+                has_weak_separator = weak_row_gap or weak_column_gap
+                is_ambiguous = bool(crossing_merges) or has_weak_separator
+                status = StructureStatus.AMBIGUOUS if is_ambiguous else StructureStatus.CANDIDATE
                 diagnostics: list[Diagnostic] = []
                 if crossing_merges:
                     diagnostics.append(Diagnostic(
