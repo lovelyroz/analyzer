@@ -461,3 +461,36 @@ All five workbooks were accepted by the Reader. The audit covered six worksheets
 **Next technical step:** move from row-pattern heuristics to an explicit structural model of a *table candidate*: header-band candidate(s), merged-range coverage, column-footprint continuity, and the transition into subsequent populated rows. The model must permit single-row and multi-row headers, while retaining narrative bands and in-table subsection labels as negative cases. Before implementing it, define a small set of exact positive and negative regression fixtures from the owner-provided transcript and establish how each fixture maps to observed coordinates/regions. If the available observations cannot distinguish a boundary deterministically, preserve AMBIGUOUS rather than guessing.
 
 Task 033 remains PARTIAL. No tests were run by the assistant, no XLSX files were directly inspected, and no Detector behavior was changed in this increment.
+
+### 8.17 Header-to-body column-continuity audit utility — 2026-11-15
+
+Added read-only utility `src/scripts/excel_table_header_transition_audit.py` to measure structural continuity from every detected all-text band into the following physical rows.
+
+For each band, the utility reports:
+- the union of populated columns across the band and the per-row column footprints;
+- each subsequent physical row (default lookahead: six rows), including explicit empty rows;
+- populated text/number/other counts and the row's populated columns;
+- intersection count and Jaccard similarity between each following row's populated columns and the band's column union;
+- merged ranges touching the band/lookahead rows and merged ranges crossing the final band row into subsequent rows;
+- literal values and cell coordinates for owner review.
+
+The Jaccard value is descriptive evidence only. A high or low value is not interpreted as a header/body decision, a table boundary, or a split threshold. The utility deliberately does not classify headers, assign financial meaning, split candidates, mutate workbooks, or change Detector behavior.
+
+Owner-run command (from repository root):
+
+```powershell
+Start-Transcript -Path "D:\\Winprojects\\analyzer\\header_transition_audit.txt" -Force
+python src/scripts/excel_table_header_transition_audit.py --max-bands 200 --lookahead-rows 6 excel/cheshme.xlsx excel/fzar.xlsx excel/fzar2.xlsx excel/samanBank.xlsx excel/parsian_periodic.xlsx
+Stop-Transcript
+```
+
+Place the complete transcript in `reply.md`. Preserve the full output; it is needed to compare positive header/body transitions against narrative bands, unit notes, in-table subsection labels, and adjacent-table boundaries. Do not reduce the evidence to aggregate Jaccard averages: inspect representative row sequences and merged geometry.
+
+**Review questions:**
+1. Do genuine header bands transition into repeated mixed/numeric rows with stable populated-column footprints?
+2. Are those same continuity patterns also present after narrative/all-text bands or in-table subsection labels?
+3. Do adjacent independent tables show a meaningful change in column footprint, merged geometry, or row-type sequence?
+4. Are there valid tables whose data rows have sparse or shifting columns, such that a strict continuity threshold would create false negatives?
+5. Does any combination provide a deterministic boundary signal across the five workbooks, or must the detector retain AMBIGUOUS?
+
+Task 033 remains PARTIAL. No split rule, Jaccard threshold, or promotion rule is approved. The assistant did not run tests or inspect XLSX files directly.
