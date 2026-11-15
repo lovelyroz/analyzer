@@ -311,3 +311,8 @@ Owner-run tests are authored in `src/tests/test_excel_source_reader.py`; the ass
 ### 16.1 Reader test finding and correction (2026-11-15)
 
 The owner-run combined DTO/reader suite returned **21 passed, 5 failed**. Each failure traced to one missing import of `DiagnosticSeverity` in the reader, preventing the intended non-text/error diagnostic and whole-report rejection path from completing. The import has been added. This is a code correction only; Task 032 remains PARTIAL pending owner rerun. The assistant did not execute tests.
+
+
+### 16.2 Final reader validation (2026-11-15)
+
+After the reader import correction, the owner reran the combined DTO and reader tests and reported **26 passed in 1.35s**. Task 032 / DB-ING-005 is complete. Visual financial table-region detection remains outside this reader and is tracked as Task 033 / DB-ING-006. The assistant did not execute tests.
