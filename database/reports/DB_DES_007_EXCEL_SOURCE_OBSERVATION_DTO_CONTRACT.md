@@ -261,8 +261,9 @@ DB-DES-007 is PARTIAL until all of the following are satisfied:
 4. Formula cached-result status, blanks, explicit zero, and invalid cells are distinguishable.
 5. Adapter does not infer metric, dimensions, units, periods, or scope.
 6. Transient source observations are not persisted as raw-row archives.
-7. Whole-file validation and DB-DES-005 atomicity are supported.
-8. Representative workbook evidence validates the DTO shape.
-9. Implementation and user-run tests demonstrate deterministic extraction and rejection behavior.
+7. Group, measure, temporal, presentation and row-axis header evidence remain independently observable.
+8. Whole-file validation and DB-DES-005 atomicity are supported.
+9. Representative workbook evidence validates the DTO shape.
+10. Implementation and user-run tests demonstrate deterministic extraction and rejection behavior.
 
 **Current result:** logical DTO contract drafted; no adapter, DTO code, ORM, schema, migration, data, or tests changed. Tests were not run.
