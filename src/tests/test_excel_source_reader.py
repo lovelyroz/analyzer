@@ -202,3 +202,21 @@ def test_reader_records_declared_structured_table_as_resolved_structure():
     assert result.tables[0].detection_method == "excel_structured_table"
     assert result.tables[0].bounds.a1_range == "A1:B2"
     assert result.worksheets[0].candidate_table_ordinals == (1,)
+
+
+
+def test_reader_captures_cell_border_fill_font_and_style_evidence():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet["A1"] = "Header"
+    from openpyxl.styles import Border, Side, PatternFill, Font
+    sheet["A1"].border = Border(bottom=Side(style="thin"))
+    sheet["A1"].fill = PatternFill(fill_type="solid", fgColor="FFFF00")
+    sheet["A1"].font = Font(bold=True)
+
+    result = read_excel_source(_xlsx_bytes(workbook))
+    cell = next(item for item in result.cells if item.cell_ref.coordinate == "A1")
+    assert cell.border_bottom == "thin"
+    assert cell.fill_type == "solid"
+    assert cell.font_bold is True
+    assert cell.style_id is not None
