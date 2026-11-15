@@ -1,7 +1,7 @@
 # DB-AUD-008 — Excel Library Capability Assessment
 
 **Date:** 2026-11-15  
-**Status:** PARTIAL — repository inventory and documentation-based capability comparison completed; empirical feature spike and source-workbook validation remain open.  
+**Status:** PARTIAL — repository inventory, documentation comparison, and a synthetic openpyxl probe utility are in place; the utility has not been executed, Calamine comparison and source-workbook validation remain open.  
 **Scope:** Excel reader selection for the CODAL Excel ingestion V1 and the logical observation contract in DB-DES-007. This report is not an implementation approval.
 
 ## 1. Executive decision
@@ -100,12 +100,12 @@ The next bounded spike should use synthetic workbooks created specifically for v
 
 No source workbook should be changed. No formula should be executed. No test suite was run as part of this documentation assessment.
 
-## 7. Decision status
+## 7.1 Spike utility prepared (not executed)\n\nA standalone opt-in utility was added at `src/scripts/excel_reader_feature_spike.py`. It generates a temporary synthetic workbook and emits JSON observations for worksheet visibility, merged ranges, structured tables on multiple sheets, formula-expression versus cached-value views (including a formula without a cache), cell types, 1904 epoch, hidden rows/columns, coordinates, a raw XML numeric token, and a SHA-256 fingerprint. The fixture injects a cached formula result into its own generated XLSX package; it does not calculate a formula. It also reports whether `python_calamine` is installed, but does not import or benchmark it.\n\nThe utility is deliberately not a pytest test and was not run in this task. The current fixture does not yet compare 1900 and 1904 workbooks, benchmark large-sheet memory/time, establish repeatability across separate runs, or validate Calamine behavior. Those remain open evidence items.\n\n## 7. Decision status
 
 - `openpyxl`: **provisional primary candidate**.
 - `python-calamine`: **secondary candidate requiring feature spike**.
 - `pandas`: **not selected as the observation adapter**; may be considered downstream only after structural interpretation.
-- Production dependency changes, Python DTO classes, adapter code, ORM/schema/migrations, and data changes: **not authorized or performed by this assessment**.
+- Production dependency changes, Python DTO classes, production adapter code, ORM/schema/migrations, and data changes: **not authorized or performed by this assessment**. The standalone spike utility is diagnostic-only.
 
 ## 8. Sources
 
@@ -120,4 +120,4 @@ No source workbook should be changed. No formula should be executed. No test sui
 
 ---
 
-**Execution note:** Documentation-only assessment. No XLSX file was directly inspected, no package was installed or upgraded, no source code/DTO/ORM/schema/migration/data was changed, and no tests were run.
+**Execution note:** The assessment report and a standalone synthetic spike utility were added. The utility was not executed. No source XLSX was directly inspected, no package was installed or upgraded, no production ingestion code/DTO/ORM/schema/migration/data was changed, and no tests were run.
