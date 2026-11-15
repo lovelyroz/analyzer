@@ -489,3 +489,50 @@ Migrationها به‌صورت توابع Python در یک فایل `src/migratio
 **محدودیت دامنه:** این مرحله مسیر CODAL، Stage 5 query، مدل‌های ORM منتخب و یک تست معماری را بررسی کرد. تمام import/referenceهای repository، migrationهای اجرایی روی DB واقعی، محتوای دیتابیس عملیاتی و فایل‌های XLSX/CSV بررسی نشده‌اند. هیچ نتیجه‌ای دربارهٔ نبود قطعی استفاده از LegacyForecast یا وضعیت داده‌های موجود اعلام نمی‌شود.
 
 **وضعیت DB-AUD-001:** PARTIAL. یک شکاف اتصال مهم بین CODAL raw persistence و Stage 5 normalized reader، به‌علاوهٔ تعارض‌های مدل ORM با قراردادهای جدید ثبت شد. inventory کامل read/write/importها، تطبیق schema واقعی، و طرح migration هنوز باز است. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+
+## 14. Inventory سراسری referenceهای مدل‌های FinancialFact و LegacyForecast — 2026-11-15
+
+### 14.1 دامنه و روش
+
+- Tree شاخهٔ master شامل 128 فایل Python زیر src/ و دو فایل Python در ریشهٔ repository بود؛ هر 130 فایل برای symbolهای RawFinancialFact، NormalizedFinancialFact، DerivedFinancialFact، DerivedFinancialFactInput، NormalizedFinancialFactInput، FinancialMetric، MappingRule، MappingDecision، LegacyForecastBase، ForecastVersion و ForecastInputRefModel اسکن شد.
+- این inventory جست‌وجوی literal symbolها در Python است؛ reflection، import پویا، aliasهای ناشناخته، کد خارج از Python، runtime database و migrationهای اجراشده روی DB واقعی را پوشش نمی‌دهد. «مصرف‌کننده‌ای یافت نشد» فقط به همین دامنهٔ اسکن اشاره دارد.
+
+### 14.2 ماتریس reference و مصرف
+
+| مدل/خانواده | تعریف/ثبت schema | مصرف production مشاهده‌شده | تست‌ها/مصرف غیرproduction | نتیجه |
+|---|---|---|---|---|
+| RawFinancialFact | تعریف در models/normalized.py؛ import در migration runner و init_db.py | writer و lookup شمارشی در ingestion/service.py؛ reader تحلیلی دیگری در اسکن پیدا نشد | CODAL extraction/PDF extraction، Stage 1 architecture/rules، Stage 5 fixtures؛ docstring در CODAL ingestion/pipeline | جدول raw هنوز مسیر فعال CODAL است؛ Stage 5 آن را نمی‌خواند |
+| NormalizedFinancialFact | تعریف در models/normalized.py؛ import در migration runner و init_db.py | reader اصلی در forecast/queries.py | Stage 1 architecture/rules و Stage 5 tests آن را به‌عنوان fixture می‌سازند؛ integrity test import/schema را بررسی می‌کند | مصرف production خواندنی پیدا شد؛ writer production در اسکن پیدا نشد |
+| DerivedFinancialFact و DerivedFinancialFactInput | تعریف در models/normalized.py؛ import برای metadata در migration runner و init_db.py | writer یا reader production در اسکن پیدا نشد | import در Stage 1 architecture/integrity/rules؛ assertion عملیاتی مصرف در این فایل‌ها محدود است | مدل/schema ثبت‌شده بدون مسیر مصرف production مشاهده‌شده |
+| NormalizedFinancialFactInput | تعریف در models/normalized_provenance.py؛ import در migration runner و init_db.py | writer/reader production در اسکن پیدا نشد | Stage 1 architecture test دو provenance link می‌سازد و query می‌کند | مدل provenance فعلاً در مسیر تست/metadata دیده شد، نه pipeline ingestion |
+| FinancialMetric | تعریف در models/normalized.py؛ ثبت در migration و init | seed در scripts/seed_data.py؛ reader در forecast/queries.py | Stage 1 و Stage 5 tests fixture می‌سازند | مصرف production دوطرفهٔ روشن (seed/read) دارد |
+| MappingRule و MappingDecision | تعریف در models/normalized.py؛ import در migration و init | writer/reader production در اسکن پیدا نشد | Stage 1 architecture/rules tests رکورد نمونه می‌سازند | زیرساخت mapping در ORM وجود دارد، اما به CODAL production path متصل نیست |
+| LegacyForecastBase، ForecastVersion، ForecastInputRefModel | تعریف در models/forecast.py؛ migration runner آن‌ها را import می‌کند | migration 7 دو جدول را ایجاد می‌کند؛ migration 8 هر دو جدول را drop می‌کند؛ مصرف runtime در service/query پیدا نشد | Stage 1 database integrity test، metadata را create_all می‌کند | مدل‌ها برای migration تاریخی نگه داشته شده‌اند؛ تست می‌تواند جداول legacy را دوباره در DB تستی بسازد |
+
+### 14.3 یافته‌های تکمیلی از migration و initialization
+
+1. src/migrations/runner.py مدل‌های Raw/Normalized/Derived، metric/mapping و provenance را import می‌کند تا metadata برای migrationها در دسترس باشد؛ این import به‌تنهایی اثبات نمی‌کند برای هر مدل جدول فعال یا مسیر production وجود دارد.
+2. src/scripts/init_db.py همین مدل‌ها را import می‌کند و سپس Base.metadata.create_all را اجرا می‌کند. جدول‌هایی که هنوز در Base فعال تعریف شده‌اند می‌توانند در initialization تازه ایجاد شوند؛ این مسیر باید با migrationهای versioned جداگانه بررسی شود.
+3. Migration 7 جدول‌های forecast_versions و forecast_input_refs را از LegacyForecastBase ایجاد می‌کند؛ migration 8 هر دو را حذف می‌کند. بااین‌حال test_stage1_database_integrity.py از LegacyForecastBase.metadata.create_all استفاده می‌کند و در محیط تست می‌تواند schema قدیمی را مجدداً بسازد. این رفتار با فعال بودن runtime legacy در production یکی نیست.
+4. دو فایل Python ریشهٔ repository (debug_alerts.py و normalize_persian_test.py) هیچ‌یک از symbolهای اسکن‌شده را ارجاع نمی‌دهند.
+
+### 14.4 نقشهٔ وابستگی و ترتیب امن اقدام
+
+- مسیر ورودی: CODAL ingestion → RawFinancialFact (فعلی) → هنوز mapping/normalization production bridge شناسایی نشده است.
+- مسیر مصرف: NormalizedFinancialFact → forecast/queries.py → Forecast Stage 5.
+- گسست اصلی: writer فعلی و reader فعلی روی دو مدل متفاوت قرار دارند؛ تست‌های Stage 5 با ساخت مستقیم Normalized facts این گسست را پنهان می‌کنند و اثبات end-to-end محسوب نمی‌شوند.
+- MappingRule/Decision، NormalizedFinancialFactInput و DerivedFinancialFact/Input در ORM و metadata وجود دارند اما writer/reader production در اسکن symbolهای Python پیدا نشد.
+- Legacy Forecast فقط از طریق migration و تست integrity ظاهر شد؛ پیش از حذف کلاس‌ها باید importهای خارج از literal scan، مسیرهای migration و اثر تست‌ها بازبینی شود. همچنین create_all تست نباید ناخواسته schema حذف‌شده را احیا کند.
+
+ترتیب منطقی بعدی:
+1. تثبیت قرارداد pipeline واقعی CODAL از source adapter تا mapping/versioned standard و canonical fact؛ بدون افزودن writer جدید تا مشخص شدن قرارداد فیزیکی DB-DES-001/002.
+2. تعیین تکلیف RawFinancialFact: staging موقت، operational audit محدود، یا حذف از persistence؛ این تصمیم باید با ممنوعیت ذخیرهٔ raw rows در DB-DES-001 سازگار باشد.
+3. طراحی writer canonical برای NormalizedFinancialFact و provenance، با INTEGER، approved dimensions، exact standard version، atomicity و idempotency DB-DES-005.
+4. تصمیم رسمی دربارهٔ deprecation یا حذف DerivedFinancialFact/Input و NormalizedFinancialFactInputهای بدون consumer، پس از بررسی data migration واقعی.
+5. جداکردن LegacyForecast ORM از initialization/test metadata و اطمینان از عدم بازسازی جدول‌های حذف‌شده.
+
+**محدودیت:** این inventory کامل literal references در 130 فایل Python است، نه اثبات نبود مصرف پویا یا خارج از Python. XLSX/CSV، دیتابیس عملیاتی و اجرای تست‌ها بررسی/اجرا نشدند. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد.
+
+**وضعیت DB-AUD-001:** PARTIAL. inventory literal references تکمیل شد و شکاف مسیر CODAL→Raw در برابر Stage 5→Normalized به نقشهٔ وابستگی تبدیل شد. بررسی alias/dynamic imports، schema واقعی DB، و migration plan همچنان باز است.
