@@ -202,3 +202,29 @@ Corrective implementation now in progress:
 - Boolean/date-typed and Excel error cells remain unsupported pending explicit scope confirmation if encountered.
 
 The owner must rerun the updated review utility on all five source workbooks. The expected outcome is that ordinary numeric cells no longer reject the workbook; any remaining rejection must identify the actual unsupported cell kind (for example formula, Boolean, date-typed, or Excel error). Once the reader accepts a workbook, its full detector output—not the old text-only preview—can be reviewed against the workbook evidence. Task 033 remains PARTIAL until that full validation and any required detector corrections are complete. The assistant did not inspect XLSX files or run tests.
+
+
+### 8.7 Owner-run validation after literal numeric support — 2026-11-15
+
+The owner reran the combined test suite after the DTO/Reader/Detector correction:
+
+```text
+pytest src/tests/test_excel_observation_dto.py src/tests/test_excel_source_reader.py src/tests/test_excel_table_detector.py -q
+36 passed in 3.01s
+```
+
+The owner then ran `src/scripts/excel_table_detector_review.py` against all five representative workbooks. The Reader accepted every workbook:
+
+| Workbook | Reader | Worksheets | Observed cells | Preview regions |
+|---|---:|---:|---:|---:|
+| cheshmeh.xlsx | ACCEPTED | 1 | 2,153 | 16 |
+| fzar.xlsx | ACCEPTED | 1 | 953 | 5 |
+| fzar2.xlsx | ACCEPTED | 1 | 6,063 | 36 |
+| samanBank.xlsx | ACCEPTED | 1 | 2,753 | 19 |
+| parsian_periodic.xlsx | ACCEPTED | 2 | 2,183 | 18 |
+
+Across 94 preview regions, only 3 were `CANDIDATE`; 91 were `AMBIGUOUS`. Ambiguity is primarily caused by merged ranges crossing proposed bounds and single-blank-row/column separators. The results confirm that the current detector is highly conservative, but not yet operationally useful for identifying independent financial tables.
+
+Most importantly, the Parsian output contains broad merged regions in worksheet 1, including `A294:F341`, `A350:J363`, and `A365:C367` through `A403:E407`. Earlier Markdown evidence identifies independent adjacent tables inside some of these broad areas (for example the employee/branch-status and agency-fee/capital-adequacy tables, and the strategy/facility-income and investment-profit/loss tables). Therefore the present blank-band segmentation cannot reliably separate adjacent tables without a stronger boundary signal. This is an observed mismatch between the candidate output and documented workbook structure; it is not evidence that the XLSX itself was directly inspected by the assistant.
+
+**Disposition:** DTO and Reader validation are complete. DB-ING-006 remains `PARTIAL`. Do not treat `AMBIGUOUS` regions as accepted table bounds or proceed to semantic extraction from them. The next detector increment must investigate structural signals beyond blank bands (for example cell styles/borders, merged-range topology, repeated header geometry, and row/column density transitions), define deterministic evidence thresholds, and add regression fixtures for adjacent tables, merged headings, sparse layouts, and true single-table regions. Any style/border signal must remain structural evidence only; it must not infer financial meaning. The assistant did not run tests or directly inspect XLSX files.
