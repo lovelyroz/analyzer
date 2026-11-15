@@ -1,7 +1,8 @@
-"""Owner-run, read-only cross-workbook audit of title/note/header row patterns.
+"""Owner-run, read-only cross-workbook audit of physical row patterns.
 
-The utility reports structural row shapes around single-cell literal-text rows.
-It does not classify financial meaning, split regions, or modify workbooks.
+The utility reports the physical rows immediately following single-cell
+literal-text rows, including empty rows. It does not classify financial meaning,
+split table regions, or modify workbooks.
 """
 from __future__ import annotations
 
@@ -47,9 +48,34 @@ def _row_signature(cells: list[object]) -> str:
     )
 
 
+def _is_all_text_header(cells: list[object]) -> bool:
+    return (
+        len(cells) >= 2
+        and all(cell.value_kind is CellValueKind.PRESENT_TEXT for cell in cells)
+    )
+
+
+def _pattern(anchor: int, rows: dict[int, list[object]]) -> str:
+    next_row = rows.get(anchor + 1, [])
+    second_row = rows.get(anchor + 2, [])
+    if _is_all_text_header(next_row):
+        return "DIRECT_NEXT_ROW_ALL_TEXT"
+    if (
+        len(next_row) == 1
+        and next_row[0].value_kind is CellValueKind.PRESENT_TEXT
+        and _is_all_text_header(second_row)
+    ):
+        return "NEXT_ROW_SINGLE_TEXT_NOTE_THEN_ALL_TEXT"
+    if not next_row and _is_all_text_header(second_row):
+        return "ONE_BLANK_ROW_THEN_ALL_TEXT"
+    if any(cell.value_kind is CellValueKind.PRESENT_NUMBER for cell in next_row):
+        return "DIRECT_NEXT_ROW_MIXED"
+    return "NO_MATCH_IN_NEXT_2_PHYSICAL_ROWS"
+
+
 def _row_line(row_index: int, cells: list[object], merges: list[str]) -> str:
     if not cells:
-        return f"row {row_index}: <empty>"
+        return f"row {row_index}: <EMPTY>"
     values = " | ".join(
         f"{cell.cell_ref.coordinate}={_cell_value(cell)}"
         for cell in sorted(cells, key=lambda item: item.cell_ref.column_index)
@@ -82,75 +108,53 @@ def _audit_workbook(path: Path, max_per_sheet: int) -> None:
             ):
                 cells_by_row[cell.cell_ref.row_index].append(cell)
 
-        row_indices = sorted(cells_by_row)
-        row_positions = {row: index for index, row in enumerate(row_indices)}
         single_text_rows = [
-            row for row in row_indices
-            if len(cells_by_row[row]) == 1
-            and cells_by_row[row][0].value_kind is CellValueKind.PRESENT_TEXT
+            row for row, cells in cells_by_row.items()
+            if len(cells) == 1
+            and cells[0].value_kind is CellValueKind.PRESENT_TEXT
         ]
+        single_text_rows.sort()
 
         print(
             f"\n### SHEET {sheet.ordinal} {sheet.literal_name} "
             f"| used={sheet.used_range.a1_range if sheet.used_range else '—'} "
-            f"| populated_rows={len(row_indices)} "
+            f"| populated_rows={len(cells_by_row)} "
             f"| single_text_rows={len(single_text_rows)}"
         )
         if not single_text_rows:
             print("No single-cell literal-text rows.")
             continue
 
-        shown = single_text_rows[:max_per_sheet]
-        for row in shown:
-            pos = row_positions[row]
-            context_rows = row_indices[pos:min(pos + 4, len(row_indices))]
-            context_cells = [cells_by_row[item] for item in context_rows]
-
-            pattern = "NO_HEADER_PATTERN_WITHIN_NEXT_3_POPULATED_ROWS"
-            if len(context_cells) >= 2:
-                next_row = context_cells[1]
-                if (
-                    len(next_row) >= 2
-                    and all(c.value_kind is CellValueKind.PRESENT_TEXT for c in next_row)
-                ):
-                    pattern = "SINGLE_TEXT_THEN_ALL_TEXT_ROW"
-                elif len(context_cells) >= 3:
-                    second, third = context_cells[1], context_cells[2]
-                    if (
-                        len(second) == 1
-                        and second[0].value_kind is CellValueKind.PRESENT_TEXT
-                        and len(third) >= 2
-                        and all(c.value_kind is CellValueKind.PRESENT_TEXT for c in third)
-                    ):
-                        pattern = "SINGLE_TEXT_NOTE_THEN_ALL_TEXT_ROW"
-                    elif any(c.value_kind is CellValueKind.PRESENT_NUMBER for c in next_row):
-                        pattern = "SINGLE_TEXT_THEN_MIXED_ROW"
-
-            print(f"\n[{pattern}] anchor_row={row}")
-            for context_row, row_cells in zip(context_rows, context_cells):
+        for anchor in single_text_rows[:max_per_sheet]:
+            pattern = _pattern(anchor, cells_by_row)
+            print(f"\n[{pattern}] anchor_row={anchor}")
+            for row_index in range(anchor, anchor + 4):
                 row_merges = [
                     merged.a1_range
                     for merged in sheet.merged_ranges
-                    if merged.min_row <= context_row <= merged.max_row
+                    if merged.min_row <= row_index <= merged.max_row
                 ]
-                print("  " + _row_line(context_row, row_cells, row_merges))
+                print(
+                    "  "
+                    + _row_line(
+                        row_index,
+                        cells_by_row.get(row_index, []),
+                        row_merges,
+                    )
+                )
 
-            nearby_merges = [
-                merged.a1_range for merged in sheet.merged_ranges
-                if merged.min_row <= row + 3 and merged.max_row >= row
-            ]
-            if nearby_merges:
-                print("  nearby merged ranges: " + ", ".join(nearby_merges))
-
-        omitted = len(single_text_rows) - len(shown)
+        omitted = len(single_text_rows) - min(len(single_text_rows), max_per_sheet)
         if omitted:
-            print(f"\n... {omitted} additional single-text rows omitted; increase --max-per-sheet.")
+            print(
+                f"\n... {omitted} additional single-text rows omitted; "
+                "increase --max-per-sheet."
+            )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Audit row-shape patterns around single-cell literal-text rows "
+            "Audit physical row patterns around single-cell literal-text rows "
             "across representative Excel workbooks; no table splitting occurs."
         )
     )
