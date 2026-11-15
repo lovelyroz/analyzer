@@ -1,329 +1,187 @@
 # DB-DES-007A — Python DTO Design for Excel Source Observations
 
 **Date:** 2026-11-15  
-**Status:** DESIGN COMPLETE — implementation and user-run validation remain open.  
+**Status:** DTO runtime types created; structural reader, table-region detection, and owner-run validation remain open.  
 **Related contracts:** `DB_DES_007_EXCEL_SOURCE_OBSERVATION_DTO_CONTRACT.md`, `DB_AUD_008_EXCEL_LIBRARY_CAPABILITY_ASSESSMENT.md`, DB-DES-006.  
-**Scope:** Concrete Python representation of transient Excel observations for CODAL ingestion V1. This is a design specification, not production code, ORM schema, persistence model, or migration.
+**Scope:** Transient CODAL Excel observations V1. This is not an ORM model, persistence schema, or migration.
 
-## 1. Design decisions
+## 1. Owner-confirmed source contract
 
-1. Use Python 3.12 standard-library `dataclasses`, `enum.StrEnum`, and immutable `tuple` collections for the first DTO implementation. Do not add Pydantic or another runtime dependency for this boundary.
-2. DTO instances are immutable snapshots: `@dataclass(frozen=True, slots=True)`. Nested collections must also be immutable tuples; do not place mutable lists/dicts inside frozen objects.
-3. Separate **reader observations** from **interpretation candidates**. The reader reports literal structure and values; it does not assign FinancialMetric, dimensions, FinancialPeriod, report type, audit/restatement rank, or in-scope status.
-4. Use stable, explicit identifiers within one observation envelope: worksheet ordinal, table ordinal, row number, column number, and A1 cell coordinate. These are transient references only.
-5. Store literal source strings unchanged. Optional normalized helper text is separate and never replaces the literal.
-6. The owner-confirmed V1 source contract is text-only: every populated source cell is stored as literal text and there are no formulas. Preserve the exact Python string returned by the reader; do not parse, normalize, or coerce it.
-7. Keep the source artifact bytes immutable for the duration of the single reader pass. Compute SHA-256 once over those exact bytes.
-8. Use openpyxl normal mode as the primary workbook model. No OOXML value sidecar is required for the text-only source contract.
-9. The DTO is transient and must never be persisted as raw rows/cells. Only the later canonical ingestion contract controls persistence.
+The owner confirms that the XLSX input files contain no formulas and that all populated cells are text-only. This is a normative V1 input constraint.
 
-## 2. Module boundary
+- Every populated cell must be a literal text cell.
+- Blank cells remain blank; blank is not zero and is not an empty string.
+- Numeric-looking strings, dates, Persian digits, separators, and units remain exactly as source text.
+- The reader performs no digit normalization, trimming, locale parsing, Decimal parsing, date conversion, unit conversion, or formula evaluation.
+- Any populated non-text cell, formula cell, or Excel error cell violates the contract and must produce a deterministic error diagnostic. Never coerce it to text.
+- Numeric/date interpretation occurs downstream under approved, versioned rules.
+- A future workbook format with numeric-typed cells or formulas requires an explicit contract revision and new evidence.
 
-Proposed module layout (names are design targets, not files created in this task):
+Consequently, formula/cache DTO fields and the OOXML numeric-token sidecar are not part of V1. The text cell itself is the authoritative lexical source.
 
+## 2. Implementation decisions
+
+1. Use Python 3.12 standard-library `dataclasses`, `enum.StrEnum`, and immutable tuples. No Pydantic or additional dependency.
+2. DTOs are immutable snapshots: `@dataclass(frozen=True, slots=True)`.
+3. Keep reader observations separate from semantic interpretation. The reader does not assign company, industry, ReportType, Standard Database Header, Metric, dimensions, FinancialPeriod, audit/restatement rank, Actual/Forecast/Plan, or scope.
+4. Preserve literal worksheet names, source text, merged ranges, cell coordinates, and row/column context.
+5. Use 1-based worksheet, row, column, and table ordinals; A1 coordinates are also retained.
+6. Keep the source bytes immutable during reading and compute SHA-256 over those exact bytes.
+7. Use openpyxl normal mode. Do not add a second XML value parser.
+8. DTOs and raw observations are transient; never persist raw worksheet rows/cells.
+
+## 3. Module boundary
+
+Implemented:
 ```text
 src/ingestion/excel/
     __init__.py
-    dto.py             # immutable observation types and enums
-    reader.py          # openpyxl normal-mode observation
-    ooxml_tokens.py    # narrow numeric <v> token extraction
-    diagnostics.py     # stable diagnostic codes/helpers
-    table_regions.py   # table-region candidate detection, separate from reader
+    dto.py
 ```
 
-The reader returns a `WorkbookObservation`. It does not return canonical facts or a fully interpreted `ValueCandidate`.
+Planned:
+```text
+src/ingestion/excel/
+    reader.py          # openpyxl normal-mode structural/text observation
+    diagnostics.py     # stable diagnostic codes/helpers
+    table_regions.py  # deterministic candidate table-region detection
+```
 
-## 3. Type model
+The reader returns one `WorkbookObservation`. It does not return canonical facts or fully interpreted `ValueCandidate` objects.
 
-The following is the normative shape. Field names may be adjusted during implementation only if semantic distinctions and invariants are preserved.
+## 4. Type model
 
-### 3.1 Primitive identifiers and ranges
+### 4.1 Enums
 
-- `WorksheetId`: worksheet ordinal, 1-based, stable only within this workbook observation.
-- `TableId`: worksheet ordinal + table ordinal, 1-based.
-- `CellRef`: worksheet ordinal + A1 coordinate; row/column numeric indices are also retained.
-- `CellRange`: inclusive 1-based min/max row and column plus the original A1 range string when available.
-- `WorkbookDateSystem`: `WINDOWS_1900`, `MAC_1904`, or `UNKNOWN`.
+- `WorkbookDateSystem`: `WINDOWS_1900`, `MAC_1904`, `UNKNOWN` (metadata only; never used to interpret text values).
 - `WorksheetVisibility`: `VISIBLE`, `HIDDEN`, `VERY_HIDDEN`, `UNKNOWN`.
 - `StructureStatus`: `RESOLVED`, `CANDIDATE`, `AMBIGUOUS`, `UNSUPPORTED`.
+- `CellValueKind`: `PRESENT_TEXT`, `BLANK`, `UNEXPECTED_NON_TEXT`, `ERROR_VALUE`.
+- `HeaderAxisKind`: `GROUP`, `MEASURE`, `TEMPORAL`, `PRESENTATION`, `ROW_LABEL`, `UNIT_OR_BASIS`, `UNCLASSIFIED`.
+- `FragmentPresence`: `EXPLICIT`, `MERGED_INHERITED`, `BLANK`, `UNRESOLVED`.
+- `DiagnosticSeverity`: `INFO`, `WARNING`, `ERROR`.
 
-Do not use worksheet names as unique IDs; names are literal evidence and can be duplicated/renamed across different workbooks.
+### 4.2 Primitive references and ranges
 
-### 3.2 Value and formula states
+- `CellRef`: worksheet ordinal, A1 coordinate, 1-based row index, 1-based column index.
+- `CellRange`: inclusive 1-based min/max row and column plus optional original A1 range.
+- `TableObservation` is identified by worksheet ordinal + table ordinal.
+- Worksheet names are literal evidence, not stable identifiers across workbooks.
 
-`ObservedValueKind` must distinguish at least:
+### 4.3 Source and reader provenance
 
-- `PRESENT_NUMERIC`
-- `PRESENT_TEXT`
-- `PRESENT_BOOLEAN`
-- `PRESENT_DATE_OR_TIME`
-- `BLANK`
-- `FORMULA_CACHED_NUMERIC`
-- `FORMULA_CACHED_TEXT`
-- `FORMULA_CACHED_OTHER`
-- `FORMULA_NO_CACHE`
-- `ERROR_VALUE`
-- `UNSUPPORTED_OR_UNREADABLE`
+`SourceArtifactObservation` carries caller reference, display filename, format, SHA-256, and byte length. Filename is not issuer identity or revision identity.
 
-A numeric zero remains `PRESENT_NUMERIC` with a numeric token/value equal to zero; it is never represented as blank. Formula status is orthogonal metadata and must not be collapsed into an ordinary numeric state.
+`ReaderProvenance` carries reader name/version, profile name/version, and DTO schema version. No OOXML token-reader version exists in V1.
 
-### 3.3 Header axes
+### 4.4 Workbook and worksheet
 
-Represent each header fragment independently:
+`WorkbookMetadataObservation` contains optional non-semantic workbook metadata and diagnostics. It must not infer issuer, report period, fiscal year, or publication date.
 
-- `GROUP`
-- `MEASURE`
-- `TEMPORAL`
-- `PRESENTATION`
-- `ROW_LABEL`
-- `UNIT_OR_BASIS`
-- `UNCLASSIFIED`
+`WorksheetObservation` preserves ordinal, literal name, visibility, used range, merged ranges, declared Excel tables, table candidate ordinals, and diagnostics. Hidden and very-hidden worksheets remain observable; exclusion is a later explicit rule.
 
-The adapter does not decide that a fragment is economically a measure or period. The axis designation at this boundary means a structural observation bucket supplied by a deterministic structural parser or left `UNCLASSIFIED`; semantic interpretation remains later. Each fragment carries literal text, source cell references/ranges, level/order, explicit/inherited/blank state, and merge anchor reference where applicable.
+### 4.5 Table and header observations
 
-Do not construct one flattened header string as the canonical representation.
+`TableObservation` preserves worksheet/table identity, bounds, detection method/version, structural status, title fragments, header rows/columns, row/column references, and diagnostics.
 
-## 4. Normative DTO objects
+A declared Excel structured table and a visually inferred financial table are distinct observations. A worksheet may contain multiple independent table candidates. Ambiguous boundaries remain ambiguous; never guess.
 
-### 4.1 `SourceArtifactObservation`
+Each `HeaderFragmentObservation` preserves literal text, source cell references, hierarchy level, explicit/inherited/blank/unresolved state, merge anchor, and axis. `HeaderAxisObservation` groups fragments along one independent axis.
 
-Fields:
-- `source_ref: str | None` — caller-supplied reference, not assumed to be a path.
-- `file_name: str | None` — display-only literal name.
-- `format: str` — detected workbook format.
-- `sha256: str` — hash of immutable input bytes.
-- `byte_length: int`.
+The independent axes are:
+- group hierarchy;
+- measure hierarchy;
+- temporal hierarchy;
+- presentation qualifiers;
+- row-label hierarchy;
+- unit/basis clues.
 
-Invariant: the hash is calculated from the exact bytes used for all reader passes. A filename is not issuer identity or report revision identity.
+Do not irreversibly flatten these into one header string. Structural axis assignment is not final financial interpretation.
 
-### 4.2 `ReaderProvenance`
+### 4.6 Row and column observations
 
-Fields:
-- `reader_name: str` — `openpyxl`.
-- `reader_version: str`.
-- `profile_name: str` — selected V1 profile identifier.
-- `profile_version: str`.
-- `dto_schema_version: str`.
-- `ooxml_token_reader_version: str`.
+`RowObservation` preserves worksheet ordinal, row index, label fragments, parent row, outline level, cell references, and diagnostics.
 
-Invariant: the reader and profile versions are explicit so identical bytes parsed under different implementations can be distinguished.
+`ColumnObservation` preserves worksheet ordinal, column index, header axes, cell references, and diagnostics.
 
-### 4.3 `WorkbookMetadataObservation`
+Indentation, style, position, and outline level are structural evidence only. They do not classify detail/subtotal/total, stock/flow, rate, forecast, or other financial semantics.
 
-Fields:
-- `date_system: WorkbookDateSystem`.
-- `calculation_mode: str | None`.
-- `workbook_properties: tuple[MetadataItem, ...]` for selected, non-sensitive workbook properties only.
-- `unsupported_features: tuple[Diagnostic, ...]`.
+### 4.7 Cell observation — text-only
 
-Do not infer report period, fiscal year, issuer, or publication date from workbook properties.
-
-### 4.4 `WorksheetObservation`
-
-Fields:
-- `worksheet_id`, `ordinal`, `literal_name`, `visibility`.
-- `used_range: CellRange | None`.
-- `merged_ranges: tuple[CellRange, ...]`.
-- `declared_tables: tuple[DeclaredTableObservation, ...]`.
-- `candidate_table_ids: tuple[TableId, ...]`.
-- `diagnostics: tuple[Diagnostic, ...]`.
-- `ooxml_part_ref: str | None` — transient internal package-part locator used only to align numeric tokens; never exposed as business identity or persisted.
-
-Invariant: hidden/very-hidden worksheets remain in the observation. Exclusion is a later, explicit, versioned interpretation decision.
-
-### 4.5 `TableObservation`
-
-Fields:
-- `table_id`, `worksheet_id`, `bounds: CellRange`.
-- `detection_method: str`, `detection_version: str`.
-- `status: StructureStatus`.
-- `title_fragments: tuple[HeaderFragmentObservation, ...]`.
-- `header_rows: tuple[RowObservationRef, ...]`.
-- `header_columns: tuple[ColumnObservationRef, ...]`.
-- `row_refs: tuple[RowObservationRef, ...]`.
-- `column_refs: tuple[ColumnObservationRef, ...]`.
-- `diagnostics: tuple[Diagnostic, ...]`.
-
-A declared Excel structured table and a visually inferred financial table are different observations. The DTO must preserve that distinction. A worksheet may have multiple disjoint table candidates; unresolved boundaries remain `AMBIGUOUS`, not guessed.
-
-### 4.6 `HeaderFragmentObservation` and `HeaderAxisObservation`
-
-`HeaderFragmentObservation` fields:
-- `literal_text: str | None`.
-- `source_cells: tuple[CellRef, ...]`.
-- `level: int`.
-- `presence: EXPLICIT | MERGED_INHERITED | BLANK | UNRESOLVED`.
-- `merge_anchor: CellRef | None`.
-- `axis: GROUP | MEASURE | TEMPORAL | PRESENTATION | ROW_LABEL | UNIT_OR_BASIS | UNCLASSIFIED`.
-
-`HeaderAxisObservation` fields:
-- `axis`.
-- `fragments: tuple[HeaderFragmentObservation, ...]`.
-- `parent_axis_ref: str | None` only for structural relationships; it is not a semantic parent Metric.
-
-A fragment may be inherited from a merged anchor. Preserve the anchor reference and do not copy inherited text as if it were explicitly present in every cell.
-
-### 4.7 `RowObservation` and `ColumnObservation`
-
-`RowObservation` fields:
-- `worksheet_id`, `row_index`.
-- `label_fragments: tuple[HeaderFragmentObservation, ...]`.
-- `parent_row_index: int | None`.
-- `outline_level: int | None`.
-- `cell_refs: tuple[CellRef, ...]`.
-- `diagnostics: tuple[Diagnostic, ...]`.
-
-`ColumnObservation` fields:
-- `worksheet_id`, `column_index`.
-- `header_axes: tuple[HeaderAxisObservation, ...]`.
-- `cell_refs: tuple[CellRef, ...]`.
-- `diagnostics: tuple[Diagnostic, ...]`.
-
-Indentation, outline level, style, and position are observations only; they do not assign detail/subtotal/total/stock/flow/forecast semantics.
-
-### 4.8 `CellObservation`
-
-Fields:
-- `cell_ref: CellRef`.
-- `value_kind: ObservedValueKind`.
-- `data_type: str` — literal library data type code.
-- `observed_value: str | int | float | bool | date | datetime | time | timedelta | None`.
-- `formula_expression: str | None`.
-- `formula_cache_present: bool | None`.
-- `formula_cached_value: same scalar union | None`.
-- `numeric_xml_token: str | None`.
-- `number_format: str | None`.
-- `style_id: int | None`.
-- `merged_range: CellRange | None`.
-- `merged_anchor: CellRef | None`.
-- `diagnostics: tuple[Diagnostic, ...]`.
-
-Invariants:
-- `numeric_xml_token` is populated only when the source cell has an OOXML numeric `<v>` token; preserve the exact token string.
-- The token is not parsed, rounded, or rewritten in the reader.
-- A cell with formula and no usable cached result is `FORMULA_NO_CACHE`; do not substitute zero or evaluate the formula.
-- Blank cells are included only when needed to explain a candidate region/header/merged range; do not materialize every empty cell in the worksheet.
-- Error cells remain errors; they are not converted to text or NULL.
-
-### 4.9 `Diagnostic`
-
-Fields:
-- `code: str` — stable machine-readable code.
-- `severity: INFO | WARNING | ERROR`.
-- `message: str` — concise diagnostic text, no full financial row payload.
-- `worksheet_id: WorksheetId | None`.
-- `table_id: TableId | None`.
-- `cell_ref: CellRef | None`.
-- `details: tuple[DiagnosticDetail, ...]` — scalar, non-sensitive details only.
-
-Diagnostic codes should be stable and versioned. Do not make the message string itself the programmatic contract.
-
-### 4.10 `WorkbookObservation`
-
-Fields:
-- `source: SourceArtifactObservation`.
-- `reader: ReaderProvenance`.
-- `metadata: WorkbookMetadataObservation`.
-- `worksheets: tuple[WorksheetObservation, ...]`.
-- `tables: tuple[TableObservation, ...]`.
-- `rows: tuple[RowObservation, ...]`.
-- `columns: tuple[ColumnObservation, ...]`.
-- `cells: tuple[CellObservation, ...]`.
-- `diagnostics: tuple[Diagnostic, ...]`.
-
-Invariant: one immutable envelope describes exactly one immutable source byte sequence and one reader/profile version. It contains no canonical IDs or persistence objects.
-
-## 5. OOXML numeric-token sidecar contract
-
-The sidecar is deliberately narrow:
-
-1. Open the same immutable XLSX bytes as a ZIP package in read-only mode.
-2. Resolve worksheet names to OOXML worksheet part paths using workbook relationships; do not assume `sheet1.xml` corresponds to the first visible sheet.
-3. For each worksheet cell element with a numeric value token (`<v>` and numeric cell type, including cells whose type attribute is omitted), record the exact text token keyed by worksheet part + A1 coordinate.
-4. Preserve the token exactly; no Decimal conversion, locale parsing, rounding, or trailing-zero trimming occurs here.
-5. Align sidecar tokens with openpyxl cell observations using worksheet identity and cell coordinate.
-6. If a token cannot be aligned, emit an explicit diagnostic. Do not silently fall back to float for canonical financial parsing.
-7. Formula cached numeric values may also have a numeric `<v>`; preserve that token separately from the formula expression and formula-cache-presence state.
-8. Do not copy complete worksheet XML, all raw cells, or source rows into persistent storage.
-
-This sidecar must use public ZIP/XML APIs and avoid openpyxl private internals. OOXML package relationship resolution is required to support arbitrary sheet ordering/names.
-
-## 6. Interpretation boundary
-
-A later interpretation layer may construct a `ValueCandidate` that references:
-- source `CellObservation`;
-- row and column observations;
-- table and worksheet observations;
-- relevant title/caption/footnote fragments;
-- unresolved temporal and presentation evidence;
+`CellObservation` carries:
+- `cell_ref`;
+- `value_kind`;
+- literal openpyxl `data_type`;
+- `text_value` only for `PRESENT_TEXT`;
+- `unexpected_value` only when a populated non-text value violates the contract;
+- merged-range and merged-anchor references;
 - diagnostics.
 
-It must not place `metric_id`, `period_id`, canonical unit, dimension IDs, or final Actual/Forecast status into the reader DTO. These are assigned only by approved versioned interpretation rules.
+Rules:
+- Preserve source text exactly, including whitespace, Persian/Arabic digits, punctuation, separators, and signs.
+- Never turn a numeric, boolean, date-typed, formula, or error cell into a string to make it pass.
+- Formula cells are `UNEXPECTED_NON_TEXT` and cause an error diagnostic; there is no formula/cache state in this DTO.
+- Error cells use `ERROR_VALUE` and preserve their error token for diagnostics.
+- Blank cells are materialized only where structurally relevant; do not create every empty cell in a sparse range.
 
-## 7. Memory and determinism
+### 4.8 Diagnostics
 
-- Keep only non-empty cells plus structurally relevant blanks; avoid dense materialization of large sparse ranges.
-- Use tuples for stable ordered collections. Sort observations by worksheet ordinal, then row, then column.
-- Repeated loads of identical bytes with the same reader/profile version must produce identical DTO projections, excluding explicitly volatile timing metrics (which do not belong in the DTO).
-- Do not store Python object identity, memory addresses, temporary paths, or timestamps generated during parsing as DTO identity.
-- The large-sheet benchmark is environment-specific and does not define a universal row/cell limit. The implementation must expose a configurable safety limit and fail explicitly if exceeded; the actual default is a separate implementation decision backed by owner-run measurements.
+`Diagnostic` carries stable code, severity, concise message, optional worksheet/table/cell reference, and immutable scalar details. Programmatic behavior depends on the code, not message wording.
 
-## 8. Error and admission behavior
+### 4.9 Workbook envelope
 
-Reader-level fatal failures:
-- corrupt/unreadable workbook package;
-- unsupported encryption or file format;
-- worksheet relationship/package inconsistency;
-- inability to align required formula/cache or numeric token observations;
-- resource safety limit exceeded;
-- unsupported content that prevents reliable structural observation.
+`WorkbookObservation` contains source artifact, reader provenance, workbook metadata, ordered worksheets, tables, rows, columns, cells, and diagnostics.
 
-Non-fatal diagnostics:
-- hidden sheet/row/column observation;
-- ambiguous table boundary candidate;
-- unknown but preserved cell data type;
-- numeric XML token unavailable for a non-financial or non-numeric cell.
+One envelope describes exactly one immutable source byte sequence and one reader/profile version. It contains no canonical IDs or persistence objects.
 
-Whether a candidate is in-scope and whether the whole report must be rejected are interpretation/admission decisions under DB-DES-006 and DB-DES-005, not reader decisions.
+## 5. Interpretation boundary
 
-## 9. Explicit non-goals
+A later interpretation layer may construct a `ValueCandidate` referencing the source cell, row, column, table, worksheet, captions/footnotes, temporal evidence, presentation evidence, and diagnostics.
+
+It must not assign Metric, dimensions, canonical unit, currency, FinancialPeriod, ReportType, issuer identity, or scope inside the reader DTO. These are resolved only by approved, versioned interpretation rules.
+
+Text-to-number/date parsing is downstream. Numeric-looking strings are not automatically numeric merely because their characters resemble digits. The interpretation layer uses the approved Jalali/date and Decimal parsing rules, validates unit/basis, and applies canonical rounding exactly once at persistence validation.
+
+## 6. Determinism, memory, and failure behavior
+
+- Use immutable tuples and stable ordering by worksheet ordinal, row, and column.
+- Identical source bytes and reader/profile versions must yield identical DTO projections, excluding runtime timing metrics (which do not belong in the DTO).
+- Keep non-empty cells plus structurally relevant blanks; avoid dense materialization.
+- Expose a configurable resource safety limit and fail explicitly if exceeded; choose its default from owner-run measurements.
+- Fatal failures include corrupt/unreadable workbook, unsupported encryption/format, invalid worksheet/package structure, resource limit exceeded, or inability to obtain reliable cell structure.
+- Any populated non-text/formula/error cell violates the V1 input contract and must produce an error diagnostic. The ingestion admission layer rejects the complete report; it must not silently skip or coerce that cell.
+- Ambiguous in-scope table/value meaning remains an interpretation/admission failure under DB-DES-005/006, not a reader guess.
+
+## 7. Explicit non-goals
 
 - No ORM, SQLAlchemy model, DB table, migration, or persistence DTO.
 - No PDF support.
+- No formula calculation, cached formula values, or OOXML numeric-token extraction.
 - No fuzzy Header/Metric matching or semantic period inference.
 - No permanent raw workbook/cell/row archive.
-- No formula calculation or external-link resolution.
-- No full Excel calculation engine, macro execution, or workbook editing.
-- No table-detection algorithm approval in this design.
-- No assumption that five reported source workbooks represent every issuer/workbook variant.
+- No macros, external-link resolution, or workbook editing.
+- No approval of a table-detection algorithm in this design.
+- No assumption that the currently documented workbooks represent every issuer/workbook variant.
 
-## 10. Acceptance criteria for implementation
+## 8. Implementation acceptance criteria
 
-1. DTO classes are immutable and use immutable nested collections.
+1. DTO classes are frozen/slots dataclasses with immutable nested tuples.
 2. Worksheet order/name/visibility/used-range/merged-range metadata are preserved.
 3. Multiple table candidates per worksheet are supported without workbook-wide period defaults.
 4. Header fragments remain orthogonal across group, measure, temporal, presentation, row-label, and unit/basis axes.
-5. Row and column contexts are independent and source references remain traceable during the run.
-6. Cell states distinguish blank, explicit zero, text, numeric, errors, formulas with cache, and formulas without cache.
-7. Formula and cached-value observations are aligned by worksheet and coordinate using the same immutable bytes.
-8. Original numeric XML tokens are preserved exactly and can be aligned with the openpyxl observations.
-9. Jalali period, Metric, unit, currency, dimensions, report type, issuer identity, and scope are not inferred by the reader.
-10. The observation envelope is deterministic for identical bytes and reader/profile versions.
-11. DTOs and raw observations are not persisted.
-12. User-run tests cover source-shaped synthetic fixtures, malformed files, sparse/large sheets, and failure/diagnostic paths.
+5. Row and column contexts remain independent and traceable.
+6. Populated text is preserved byte-for-character at the Python string level; blanks remain distinct.
+7. Any populated non-text/formula/error cell is diagnosed and rejected without coercion.
+8. Jalali period, Metric, unit, currency, dimensions, report type, issuer, and scope are not inferred by the reader.
+9. The observation envelope is deterministic for identical bytes and reader/profile versions.
+10. DTOs and raw observations are not persisted.
+11. Owner-run tests cover text cells, blanks, Persian digits/separators, merged headers, unexpected numeric/formula/error cells, sparse/large sheets, malformed files, and diagnostics.
 
-## 11. Remaining work
+## 9. Runtime implementation status
 
-- Implement the DTO types and openpyxl text-only structural reader under the separate Excel-ingestion implementation task.
-- Implement deterministic table-region candidate detection as a separate component.
-- Validate against additional authorized workbook examples and update the evidence matrix when available.
-- Add user-run tests; no tests were run as part of this design task.
+The immutable DTO definitions and package exports have been created in:
+- `src/ingestion/excel/dto.py`
+- `src/ingestion/excel/__init__.py`
 
-**Conclusion:** this design converts the logical DB-DES-007 contract into a concrete, dependency-light Python type boundary while preserving the V1 reader profile selected by DB-AUD-008. It is ready for implementation planning, but it does not claim that any Python DTO or adapter exists yet.
+The implementation follows the text-only value model and contains no formula/cache fields or numeric XML sidecar. The code has not yet been executed or tested by the assistant. The next implementation increment is the openpyxl structural/text reader and deterministic diagnostics/table-region boundary.
 
-
-## 12. Owner-confirmed V1 text-only input amendment (2026-11-15)
-
-The owner confirms that the CODAL XLSX input files contain no formulas and that populated cells are text-only. This amendment supersedes all earlier formula/cache and numeric-typed-cell assumptions in this design. The reader must enforce this invariant and preserve literal text without coercion. Formula/cache DTO fields and the OOXML numeric-token sidecar are removed from the V1 design. Numeric/date parsing is performed only after extraction, in the interpretation/validation layer. A future source requiring numeric-typed cells must trigger a deliberate versioned contract change.
-
-The runtime DTO implementation is in `src/ingestion/excel/dto.py` and package exports in `src/ingestion/excel/__init__.py`. The implementation is awaiting owner-run tests and the reader implementation; no test was run by the assistant.
