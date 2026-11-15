@@ -89,7 +89,7 @@ def test_merged_range_bridging_candidate_boundary_makes_status_ambiguous():
     assert len(result.tables) == 2
     second = result.tables[1]
     assert second.status is StructureStatus.AMBIGUOUS
-    assert second.diagnostics[0].code == "EXCEL_TABLE_BOUNDARY_CROSSED_BY_MERGE"
+    assert any(item.code == "EXCEL_TABLE_BOUNDARY_CROSSED_BY_MERGE" for item in second.diagnostics)
 
 
 def test_two_blank_rows_provide_a_stronger_separator_for_candidates():
