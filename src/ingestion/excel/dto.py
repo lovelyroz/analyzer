@@ -299,8 +299,12 @@ class CellObservation:
             raise ValueError("PRESENT_TEXT cells must retain their literal text value.")
         if self.value_kind is not CellValueKind.PRESENT_TEXT and self.text_value is not None:
             raise ValueError("Only PRESENT_TEXT cells may carry text_value.")
+        if self.value_kind in (CellValueKind.PRESENT_TEXT, CellValueKind.BLANK) and self.unexpected_value is not None:
+            raise ValueError("Text and blank cells cannot carry unexpected_value.")
         if self.value_kind is CellValueKind.UNEXPECTED_NON_TEXT and self.unexpected_value is None:
             raise ValueError("Unexpected non-text cells must retain their observed scalar value.")
+        if self.value_kind is CellValueKind.ERROR_VALUE and not isinstance(self.unexpected_value, str):
+            raise ValueError("Excel error cells must retain their literal error token.")
         if not isinstance(self.diagnostics, tuple):
             raise TypeError("Cell diagnostics must be an immutable tuple.")
 
