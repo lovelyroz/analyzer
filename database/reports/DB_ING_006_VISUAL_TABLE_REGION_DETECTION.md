@@ -270,3 +270,38 @@ The owner ran the combined regression command and reported **37 passed, 1 failed
 The Reader was corrected to read each border side defensively, returning `None` when that side is absent. This preserves the intended optional formatting-evidence contract and does not change cell-value acceptance, table detection, or financial semantics. The fix is committed in `src/ingestion/excel/reader.py` (commit `7a67f02b77cc5ba9b79c8681257a8cdd5ba9dd01`).
 
 **Required owner action:** rerun the same combined regression command. The structural boundary audit output was not present in this `reply.md` result, so after the tests pass, run the audit command from section 8.8 and place its complete output in `reply.md`. Task 033 remains PARTIAL. The assistant did not run tests or inspect XLSX files directly.
+
+
+
+### 8.10 Targeted source-cell audit for documented adjacent-table boundaries — 2026-11-15
+
+The owner supplied the complete transcript of `excel_table_boundary_audit.py` in `reply.md`. The transcript confirms that the Reader accepted all five workbooks and that the Parsian workbook has two worksheets. The broad formatting report is not sufficient to decide the documented table boundaries: many consecutive Parsian rows carry the same `medium` border pattern across their occupied columns, and the style profiles repeat extensively. In particular, border presence and workbook-local style IDs do not distinguish the suspected adjacent tables reliably.
+
+To obtain the missing evidence without asking the owner to copy large XLSX regions manually, a narrow read-only utility was added:
+
+`src/scripts/excel_table_targeted_row_audit.py`
+
+It reads the workbook through the existing Excel Reader and prints literal cell coordinates/values plus merged-range topology for selected row windows. It does not classify headers, infer financial semantics, split tables, or modify the source workbook. Its default windows cover the documented Parsian boundaries with nearby context:
+
+- rows 292–302 (the adjacent table pair around 295/300);
+- rows 306–337 (the adjacent table pair around 309/334);
+- rows 355–362 (the suspected boundary around 358/359);
+- rows 402–409 (the suspected boundary around 405/406).
+
+**Owner-run command** (from the repository root):
+
+```powershell
+python src/scripts/excel_table_targeted_row_audit.py excel/parsian_periodic.xlsx
+```
+
+For a complete transcript in PowerShell:
+
+```powershell
+Start-Transcript -Path "D:\\Winprojects\\analyzer\\targeted_row_audit.txt" -Force
+python src/scripts/excel_table_targeted_row_audit.py excel/parsian_periodic.xlsx
+Stop-Transcript
+```
+
+Place the resulting `targeted_row_audit.txt` content in `reply.md`. If the first worksheet is not the intended source sheet, the utility supports `--sheet-ordinal 2`; row windows can be overridden with `--ranges "START:END,START:END"`.
+
+**Current disposition:** this is evidence collection only. No V2 split rule or threshold has been adopted. Task 033 remains PARTIAL until the actual cell content/merged topology is reviewed and any detector change is supported by regression tests and owner-run validation. The assistant did not run tests or inspect the XLSX workbook directly.
