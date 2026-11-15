@@ -333,3 +333,26 @@ The utility `src/scripts/excel_table_row_pattern_audit.py` enumerates single-cel
 Use the result to test the proposed pattern across all five workbooks and identify false positives such as Parsian row 314. No detector behavior is changed in this increment.
 
 Task 033 remains PARTIAL. Do not promote AMBIGUOUS regions or feed them to semantic extraction. The assistant did not run tests or inspect XLSX files directly.
+
+
+### 8.12 Cross-workbook row-pattern audit review and correction — 2026-11-15
+
+The owner-run output was supplied in `reply.md`. It covers all five representative workbooks. The first version of `excel_table_row_pattern_audit.py` selected the next populated rows, not the next physical worksheet rows. Consequently, rows separated by blank rows could be presented as if they formed a nearby sequence. Its pattern labels/counts are **not valid evidence of physical adjacency** and must not be used to approve a split rule.
+
+The output nevertheless illustrates why a generic single-cell-row rule is unsafe:
+- Cheshmeh and Fzar2 contain one-cell labels that are followed by mixed text/numeric data rows, consistent with in-table section labels as well as possible section boundaries.
+- Fzar, Saman and Parsian show examples of a title row, a one-cell unit note and a multi-cell text header. These are useful examples, not proof that the pattern is universal.
+- Several one-cell rows are explanatory notes, repeated report titles, narrative disclosures, subsection labels or merged explanatory text. A row's one-cell occupancy alone cannot distinguish these roles.
+- Parsian worksheet 2 contains many one-cell text rows in a compact financial-statement layout; this is additional counterexample material, not a basis for treating every such row as a table boundary.
+
+**Audit utility correction:** the script was revised to inspect the next three *physical* worksheet rows after each anchor, explicitly print empty rows, report merged ranges on each physical row, and classify only direct-next-row / next-row-note / one-blank-row structural patterns. The earlier audit output is superseded for adjacency analysis.
+
+Owner-run the corrected version with the same command:
+
+```powershell
+Start-Transcript -Path "D:\\Winprojects\\analyzer\\row_pattern_audit_v2.txt" -Force
+python src/scripts/excel_table_row_pattern_audit.py excel/cheshme.xlsx excel/fzar.xlsx excel/fzar2.xlsx excel/samanBank.xlsx excel/parsian_periodic.xlsx
+Stop-Transcript
+```
+
+Place the complete `row_pattern_audit_v2.txt` output in `reply.md`. The corrected audit remains diagnostic only; it does not split tables, assign financial meaning, or change the Detector. Task 033 remains PARTIAL. The assistant did not run tests or inspect XLSX files directly.
