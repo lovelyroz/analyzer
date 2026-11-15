@@ -166,6 +166,12 @@ The `repeatability` observation reports `same_input_sha256: true` and `same_obse
 
 **Evidence boundary:** these are owner-provided observations from synthetic workbooks, not direct inspection of CODAL source workbooks. The earlier fixture observations and interpreter inventory remain as recorded in section 7.3. Large-sheet elapsed-time/peak-memory benchmarking, practical Calamine comparison, and source-workbook validation remain open. The assistant did not execute the utility or any tests.
 
+## 7.5 Optional large-sheet benchmark added (not executed)
+
+The spike utility now accepts an opt-in `--benchmark-rows N` argument. When enabled, it creates a deterministic, value-only synthetic workbook with the requested number of data rows and measures normal-mode `openpyxl` loading. The JSON includes requested/observed dimensions, non-empty cell count, XLSX file size, load elapsed time, and `tracemalloc` current/peak memory after load and after a full cell traversal. The default value is zero, so the existing lightweight probe does not generate or load the large workbook unless explicitly requested.
+
+The benchmark reports Python allocations tracked by `tracemalloc`; native allocations outside Python's allocator may not be fully represented. Results are environment-specific and should be compared only with the same row count, reader version, runtime, and machine conditions. This is a measurement utility, not a pass/fail test. The assistant did not execute the utility or benchmark.
+
 ## 8. Sources
 
 - openpyxl tutorial and workbook loading options: https://openpyxl.readthedocs.io/en/stable/tutorial.html
