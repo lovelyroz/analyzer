@@ -200,3 +200,8 @@ The first read-only adapter is implemented in `src/ingestion/excel/reader.py` an
 - Visual financial table segmentation is intentionally not inferred in this reader. Only declared Excel structured tables are resolved; visual table-region detection is a separate next increment.
 
 Owner-run reader tests have been added in `src/tests/test_excel_source_reader.py`; they have not been executed by the assistant. The exact command is `pytest src/tests/test_excel_source_reader.py -q`. Task 032 remains PARTIAL until owner validation passes. See `reports/DB_ING_005_EXCEL_SOURCE_READER_IMPLEMENTATION.md`.
+
+
+### 10.1 Owner-run validation correction (2026-11-15)
+
+The owner executed the combined DTO/reader suite and reported **21 passed, 5 failed**. All five failures had the same root cause: `DiagnosticSeverity` was used by the reader but missing from its DTO imports, causing a `NameError` when non-text/error diagnostics were constructed. The missing import was added to `src/ingestion/excel/reader.py`. The reader acceptance status remains pending rerun by the owner; the assistant did not execute tests.
