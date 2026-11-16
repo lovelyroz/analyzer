@@ -587,3 +587,34 @@ Jaccard and column-footprint continuity remain descriptive only. A value of 1.00
 **Next step:** execute the already-added read-only compound boundary-signature audit documented in section 8.20, then review every flagged and unflagged occurrence against the known adjacent Parsian table boundaries and in-table/narrative counterexamples. The signature must remain a candidate flag, not a table count or automatic split. Task 033 remains PARTIAL; AMBIGUOUS regions remain excluded from semantic extraction.
 
 The assistant did not run tests and did not inspect XLSX files directly; analysis used the owner-provided `reply.md` transcript only.
+
+
+### 8.22 Compound boundary-signature audit results — 2026-11-16
+
+The owner ran `src/scripts/excel_table_boundary_signature_audit.py` with six physical context rows before and after each all-text band and committed the transcript to `reply.md` (blob SHA `9bdd1cb5bd25f7a165e919b92234819b78efe69a`). The transcript reports these worksheet summaries:
+
+| Workbook / worksheet | Bands printed | `COMPOUND_CANDIDATE` |
+|---|---:|---:|
+| Fzar (initial transcript segment; workbook heading and beginning of segment are absent) | 4 | 3 |
+| Fzar2 | 37 | 9 |
+| Saman Bank | 32 | 3 |
+| Parsian periodic, worksheet 1 | 29 | 3 |
+| Parsian periodic, worksheet 2 | 1 | 0 |
+
+The transcript does **not** contain a separately identifiable Cheshmeh workbook section. Therefore the run does not establish coverage of all five requested workbooks. The initial segment appears to be Fzar from its row content and four-band summary, but its workbook heading and beginning are missing; do not treat the transcript as complete evidence for that file either.
+
+The compound signature correctly flags several previously known adjacent-table examples:
+- Parsian rows 295–303: band at row 302 is flagged after the employee/branch data and the new title/unit rows.
+- Parsian rows 355–363: band at row 361 is flagged after the preceding investment data and title/unit rows.
+- Saman rows 49–53 and 72–76: the bands at rows 52 and 75 are flagged after the preceding table data and new section/unit context.
+- Fzar2 contains further plausible table starts, including bands at rows 556, 605–607, 632–635, 719–720, 745, 750–752, 762–764, 799, and 810. These remain candidate occurrences, not independently confirmed table boundaries.
+
+The audit also exposes an important **known false negative**. The Parsian transition around rows 309–341 contains a real adjacent-table sequence: prior table body through row 308, followed by section/title context at rows 309–312, a header at row 313, an in-table subsection label at row 314, and data from row 315; a further table header occurs at row 336 after the next section context. The compound-signature implementation rejects the row-313 band because the prior gap includes a `MULTI_TEXT` row (the merged heading at row 310), while its rule permits only `SINGLE_TEXT` and `EMPTY` between prior body and band. The known true boundary therefore demonstrates that the current signature is not exhaustive. The band at row 336 is likewise not promoted by the current strict prior-gap rule where the context includes a multi-text row.
+
+Known in-table subsection counterexamples remain important negatives: Saman row 86 and Parsian row 314 are single-text labels within continuing tables, not table boundaries. The signature's current candidate condition does not by itself establish table bounds or semantic eligibility; the owner transcript does not provide an independently adjudicated false-positive/false-negative rate.
+
+**Decision:** do not implement `COMPOUND_CANDIDATE` as an automatic split or promotion rule. It is a useful review prioritizer, but the observed missed Parsian case proves that its current gap grammar is too restrictive, and expanding the grammar to admit `MULTI_TEXT` without a new negative-case audit would be speculative. Keep AMBIGUOUS regions out of semantic extraction and Task 033 PARTIAL.
+
+**Next step:** obtain the missing Cheshmeh audit as a separate run, then perform a focused Parsian audit of rows 295–341 that compares the known true boundaries (295/300 and 309/334) with the internal subsection at 314. Specifically inspect the role and merged-range geometry of row 310 and the complete context around row 336, without using Persian label meaning or financial semantics to manufacture a structural distinction. Only then decide whether to extend the candidate grammar or require report-specific confirmation.
+
+The assistant did not run tests and did not inspect XLSX files directly; analysis used only the owner-provided `reply.md` transcript.
