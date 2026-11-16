@@ -657,3 +657,31 @@ The assistant did not run tests and did not inspect XLSX files directly; analysi
 **اثر بر کار جاری:** heuristicهای عمومی قبلی برای حدس‌زدن مرزها (blank bands، row classes، Jaccard و compound signature) مسیر اصلی حل مسئله نیستند. آن‌ها نباید برای جایگزینی template یا split خودکار در گزارش‌های بعدی به کار روند. Task 033 باید از «visual table-region detection عمومی» به «استخراج و ثبت Company Table Layout Template از workbook نمونه، سپس طراحی template-based matching» بازتعریف شود. وضعیت PARTIAL باقی می‌ماند؛ ابتدا باید مدل دقیق template و قواعد تطبیق گزارش‌های بعدی مشخص شود و سپس با یک شرکت/نمونه end-to-end اعتبارسنجی گردد.
 
 **دامنهٔ فعلی:** مالک گفته است `parsian_periodic.xlsx` نمونهٔ استانداردشدهٔ فعلی است. این ثبت، تصمیم معماری را مستند می‌کند؛ دستیار فایل XLSX را مستقیماً باز نکرده، محدوده‌های واقعی جدول‌ها را استخراج نکرده و تست اجرا نکرده است. همچنین هنوز تأیید نشده که مختصات جدول‌ها بین گزارش‌های زمانی همان شرکت ثابت است یا ممکن است جابه‌جا شوند؛ این موضوع باید هنگام طراحی matcher با شواهد نمونه و گزارش‌های دیگر تعیین شود.
+
+
+### 8.25 نتیجهٔ Cheshmeh و بازگشت از heuristic به Template — 2026-11-16
+
+مالک transcript اجرای مستقل `excel_table_boundary_signature_audit.py` روی `cheshme.xlsx` را در `reply.md` قرار داد (blob SHA `9bdd1cb5bd25f7a165e919b92234819b78efe69a`). Reader فایل را پذیرفت؛ worksheet با used range برابر `A1:V222` دارای 10 all-text band بود. فقط band ردیف‌های 138–139 به‌عنوان `COMPOUND_CANDIDATE` گزارش شد؛ 9 band دیگر `NO_MATCH` بودند. Headerهای نمونه در ردیف‌های 9–10، 44–45، 77، 94، 107–109، 130، 160–161 و 194–196 عمدتاً با signature شناسایی نشدند. این نتیجه، به‌همراه false negativeهای Parsian و subsectionهای داخلی ثبت‌شده در بخش 8.22، استفاده از compound signature یا سایر heuristicهای ردیفی به‌عنوان الگوریتم مرزبندی را منتفی می‌کند. از این پس این ممیزی‌ها صرفاً سابقهٔ تحقیق‌اند و نباید مسیر پیاده‌سازی باشند.
+
+**معماری مصوب مالک (تأکید):** یک workbook نمونه برای هر شرکت استاندارد می‌شود؛ محدودهٔ دقیق همهٔ جدول‌ها در همان نمونه با annotation بصری مشخص و به‌عنوان Company Table Layout Template نسخه‌بندی‌شده ثبت می‌شود. گزارش‌های بعدی همان شرکت با Template تطبیق داده شده و بر اساس محدوده/ساختار تعریف‌شده استخراج می‌شوند. Border و رنگ در فایل‌های بعدی نه لازم‌اند و نه معیار استخراج.
+
+**پاک‌سازی کد و فایل‌های موقت:** ابزارهای موقت ممیزی زیر از `src/scripts` حذف شدند:
+- `excel_table_boundary_audit.py`
+- `excel_table_boundary_signature_audit.py`
+- `excel_table_detector_review.py`
+- `excel_table_header_band_audit.py`
+- `excel_table_header_transition_audit.py`
+- `excel_table_row_pattern_audit.py`
+- `excel_table_targeted_row_audit.py`
+
+همچنین `src/ingestion/excel/table_detector.py` و `src/tests/test_excel_table_detector.py` حذف شدند؛ این detector مبتنی بر blank-band heuristic با معماری مصوب template-based هم‌راستا نبود و هیچ ارجاع کدی به تابع آن در جست‌وجوی مخزن یافت نشد. سایر فایل‌های ingestion اصلی حذف نشدند.
+
+**وضعیت تغییرات در کد اصلی (شفاف‌سازی):**
+- `src/ingestion/excel/reader.py` و `dto.py` تغییرات اصلی دارند. پذیرش و نگهداری native literal numeric values بخشی از قرارداد مصوب Excel است و حفظ می‌شود.
+- شواهد قالب‌بندی اضافه‌شده به `CellObservation` شامل `border_top/bottom/left/right`، `fill_type` و `font_bold` است؛ Reader این شواهد را برای سلول‌های populated و سلول‌های blank دارای style حفظ می‌کند. `style_id` از قبل وجود داشت.
+- رنگ واقعی Font و Fill هنوز در DTO/Reader ثبت نمی‌شود؛ برای خواندن annotationهای قرمز/آبی/سبز باید این قابلیت در گام ابزار استخراج Template تکمیل شود. این metadata فقط برای استانداردسازی نمونه مصرف می‌شود، نه برای extraction گزارش‌های بعدی.
+- `table_detector.py` و تست آن حذف شده‌اند؛ تست‌های DTO و Reader حفظ شده‌اند. دستیار هیچ تستی اجرا نکرده است.
+
+**گام بعدی اجرایی:** پیش از matcher، قرارداد Template باید مشخص و پیاده‌سازی شود: شناسهٔ پایدار شرکت و report-template، نسخهٔ immutable، worksheet identity، table ID/name، exact source bounds، header bounds/levels، sub-table bounds و parent-child relation، و fingerprint ساختاری لازم برای کنترل تغییرات. سپس ابزار one-time annotation reader باید در workbook نمونه، table name قرمز، header آبی، sub-table name سبز و thick outside border را بخواند و محدوده‌ها را به یک Template قابل بازبینی تبدیل کند. پس از تأیید bounds واقعی Parsian، matcher گزارش‌های بعدی همان شرکت جداگانه طراحی می‌شود. مختصات مطلق نمونه نباید بدون شواهد ثبات، به‌عنوان مختصات ثابت تمام گزارش‌های بعدی فرض شود.
+
+Task 033 همچنان PARTIAL است. دستیار فقط transcript موجود در `reply.md` را بررسی کرده؛ XLSX را مستقیماً باز نکرده و تست اجرا نکرده است. بخش 8.24 مرجع تصمیم معماری است؛ این بخش نتیجهٔ Cheshmeh، پاک‌سازی و وضعیت دقیق کد را تکمیل می‌کند.
