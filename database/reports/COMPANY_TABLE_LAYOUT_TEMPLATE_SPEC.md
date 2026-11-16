@@ -73,14 +73,24 @@ A sub-table is not automatically a separate top-level table. The parent-child re
 
 The standardized sample workbook uses the owner's visual annotation convention:
 
-- thick outside border: complete table bounds
+- non-default outside border (the exact Excel style token may be `medium` or another visibly non-normal style): evidence for the complete table boundary; the annotation audit must preserve the four edge styles and exact coordinates rather than requiring the literal token `thick`
 - red table-name cell: one or two cells before the table; its exact coordinate is recorded
-- blue header cells: header bounds/levels
-- green sub-table-name cells: sub-table identity and bounds
+- blue header cells: header bounds/levels; blue header cells alone do not establish an extractable table
+- green sub-table-name cells: sub-table identity and the start of a sub-table partition
+- yellow cells: row-description/label cells
+- gray cells: value cells approved for extraction
+- black cells: explicitly excluded columns/cells
+- uncolored cells: never extracted
 
 These visual annotations are used only during one-time template authoring and validation. Later reports are not required to contain these colors or borders.
 
 The annotation reader must inspect both font and fill color representations (RGB, indexed, and theme-based where present) rather than assuming that "cell color" means only font color or only fill color. It must preserve raw color metadata for review and avoid guessing when a color is ambiguous.
+
+A top-level extractable table requires all of the following: (a) a recognizable non-default border boundary, (b) at least one gray extraction cell, and (c) an approved table region. A blue header without gray extraction cells is not a table. A region with no annotation colors and no extraction cells is out of scope even if it has a header-like appearance. The table's normal case includes yellow description cells, but an owner-confirmed table may omit the description column; therefore yellow is not a universal admission requirement. Black cells/columns and all uncolored cells are excluded from extraction even when geometrically inside a table boundary. Gray cells are the positive extraction signal; the table bounds alone do not authorize extracting every enclosed cell.
+
+The border detector must not hard-code `Side.style == "thick"` as the sole table-boundary test. The owner's rule is visual/structural: a border that is distinguishable from the ordinary cell grid can mark the table boundary. Preserve the raw styles and edge coordinates so the approved template records exactly what was observed. The Parsian audit's report of zero literal `thick` sides is therefore not, by itself, evidence that the sample has no table borders; the reported `medium` edges are potential valid boundary evidence and must be reviewed by geometry.
+
+Sub-table partitions are driven by the green sub-table-name cells. In the table's approved reading order, the yellow description column immediately following each green name begins that sub-table's row-label region. That region continues until the next green sub-table-name marker or the parent table's end. The exact cell/range coordinates must be recorded in the template after the sample is reviewed; do not infer the bounds from text semantics. The final Parsian table is an owner-confirmed exception with no yellow description column and remains eligible because it contains gray extraction cells and a table border.
 
 ## 7. Matching and extraction of later reports
 
@@ -112,6 +122,7 @@ The following must be resolved with sample evidence before runtime matcher imple
 2. Whether table bounds remain at fixed absolute coordinates across periods or can shift while preserving internal structure.
 3. How the one-or-two-cell table-name placement is represented (exact cell coordinate plus row/column offset).
 4. How header/body/footer boundaries are represented for each table, including headers with merged cells.
-5. The approved storage location and serialization/persistence model for template versions.
+5. The exact coordinate bounds of every green-marker-driven sub-table partition.
+6. The approved storage location and serialization/persistence model for template versions.
 
 Do not resolve these by assumption. First extract the annotations and bounds from the standardized Parsian sample, then inspect a later report from the same company to measure layout drift.
