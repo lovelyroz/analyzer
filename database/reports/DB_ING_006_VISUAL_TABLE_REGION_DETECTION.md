@@ -685,3 +685,16 @@ The assistant did not run tests and did not inspect XLSX files directly; analysi
 **گام بعدی اجرایی:** پیش از matcher، قرارداد Template باید مشخص و پیاده‌سازی شود: شناسهٔ پایدار شرکت و report-template، نسخهٔ immutable، worksheet identity، table ID/name، exact source bounds، header bounds/levels، sub-table bounds و parent-child relation، و fingerprint ساختاری لازم برای کنترل تغییرات. سپس ابزار one-time annotation reader باید در workbook نمونه، table name قرمز، header آبی، sub-table name سبز و thick outside border را بخواند و محدوده‌ها را به یک Template قابل بازبینی تبدیل کند. پس از تأیید bounds واقعی Parsian، matcher گزارش‌های بعدی همان شرکت جداگانه طراحی می‌شود. مختصات مطلق نمونه نباید بدون شواهد ثبات، به‌عنوان مختصات ثابت تمام گزارش‌های بعدی فرض شود.
 
 Task 033 همچنان PARTIAL است. دستیار فقط transcript موجود در `reply.md` را بررسی کرده؛ XLSX را مستقیماً باز نکرده و تست اجرا نکرده است. بخش 8.24 مرجع تصمیم معماری است؛ این بخش نتیجهٔ Cheshmeh، پاک‌سازی و وضعیت دقیق کد را تکمیل می‌کند.
+
+
+### 8.26 گام بعدی: قرارداد Template شرکت/نوع گزارش — 2026-11-16
+
+سند طراحی اولیهٔ `database/reports/COMPANY_TABLE_LAYOUT_TEMPLATE_SPEC.md` ایجاد شد. کلید منطقی Template به‌صورت شرکت + نوع/خانوادهٔ گزارش تعریف شده است؛ هر نسخه immutable است و شامل هویت worksheetها، table ID/name، bounds دقیق نمونه، سلول نام جدول، header bounds/levels، body/footer در صورت نیاز، sub-tableها و رابطهٔ parent-child، ترتیب و fingerprint ساختاری خواهد بود.
+
+این سند همچنین تفکیک را تثبیت می‌کند: annotationهای قرمز/آبی/سبز و thick outside border فقط برای authoring/validation یک‌بارهٔ نمونه استفاده می‌شوند؛ گزارش‌های بعدی با Template تطبیق داده می‌شوند و به همان formatting نیاز ندارند. Matcher باید deterministic باشد؛ missing/duplicate/ambiguous یا تغییر ساختاری تأییدنشده باعث توقف و رد کل گزارش می‌شود، نه fuzzy matching یا ingestion جزئی.
+
+**تصمیم‌های باز که باید با شواهد نمونه پاسخ داده شوند:** ثبات نام/ترتیب worksheet، ثبات یا جابه‌جایی مختصات مطلق جدول‌ها در گزارش‌های بعدی، مدل‌سازی دقیق offset سلول table name، bounds header/body/footer، و محل ذخیره‌سازی/versioning Template. این موارد هنوز پیاده‌سازی نشده‌اند.
+
+گام اجرایی بعدی: توسعهٔ ابزار one-time annotation reader برای workbook نمونهٔ Parsian. Reader باید font/fill color را با حفظ نوع رنگ (RGB/indexed/theme) و Border side styles را برای سلول‌های populated و styled blank گزارش کند؛ سپس با قواعد رنگی و thick outside border، پیشنهاد bounds/table-name/header/sub-table بسازد تا مالک بتواند آن‌ها را تأیید کند. بعد از تأیید، bounds به Template نسخه‌دار تبدیل می‌شوند. برای runtime matcher باید یک گزارش دوره‌ای دیگر از همان شرکت مقایسه شود تا میزان drift مختصات معلوم گردد.
+
+Task 033 PARTIAL است؛ هنوز bounds واقعی Parsian استخراج نشده‌اند. دستیار تست اجرا نکرده و XLSX را مستقیماً باز نکرده است.
