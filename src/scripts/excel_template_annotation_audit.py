@@ -8,6 +8,7 @@ It never changes the workbook or infers financial meaning.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -58,9 +59,59 @@ def _cell_color_signature(cell: Any) -> tuple[str, str, bool]:
     return font_color, fill_color, not (font_is_default and fill_is_default)
 
 
-def _thick(cell: Any, side: str) -> bool:
+def _border_style(cell: Any, side: str) -> str | None:
     border_side = getattr(cell.border, side, None)
-    return getattr(border_side, "style", None) == "thick"
+    return getattr(border_side, "style", None)
+
+
+def _thick(cell: Any, side: str) -> bool:
+    return _border_style(cell, side) == "thick"
+
+
+def _report_border_evidence(worksheet: Any) -> None:
+    """Report actual per-cell border styles without assuming a table rectangle."""
+    sides = ("top", "bottom", "left", "right")
+    counts: dict[str, Counter[str]] = {side: Counter() for side in sides}
+    entries: list[tuple[str, str, str]] = []
+    for row in worksheet.iter_rows():
+        for cell in row:
+            for side in sides:
+                style = _border_style(cell, side)
+                if style is not None:
+                    counts[side][style] += 1
+                    entries.append((cell.coordinate, side, style))
+    print("BORDER_SIDE_STYLE_COUNTS")
+    for side in sides:
+        summary = ", ".join(
+            f"{style}={count}" for style, count in sorted(counts[side].items())
+        ) or "none"
+        print(f"  {side}: {summary}")
+    print("BORDER_SIDE_CELLS")
+    if not entries:
+        print("  none")
+    for coordinate, side, style in entries:
+        print(f"  {coordinate} {side}={style}")
+    print("MERGED_RANGE_BORDER_EDGES")
+    merged_ranges = sorted(
+        worksheet.merged_cells.ranges, key=lambda item: (item.min_row, item.min_col)
+    )
+    if not merged_ranges:
+        print("  none")
+    for merged in merged_ranges:
+        evidence: list[str] = []
+        for col in range(merged.min_col, merged.max_col + 1):
+            for side, row_num in (("top", merged.min_row), ("bottom", merged.max_row)):
+                cell = worksheet.cell(row_num, col)
+                style = _border_style(cell, side)
+                if style is not None:
+                    evidence.append(f"{cell.coordinate}.{side}={style}")
+        for row_num in range(merged.min_row, merged.max_row + 1):
+            for side, col_num in (("left", merged.min_col), ("right", merged.max_col)):
+                cell = worksheet.cell(row_num, col_num)
+                style = _border_style(cell, side)
+                if style is not None:
+                    evidence.append(f"{cell.coordinate}.{side}={style}")
+        print(f"  {merged}: {', '.join(evidence) if evidence else 'no perimeter styles'}")
 
 
 def _find_thick_outline_rectangles(worksheet: Any) -> list[str]:
@@ -129,8 +180,21 @@ def audit_workbook(path: Path, *, max_color_cells: int) -> int:
             print(
                 f"\n### SHEET {ordinal} {worksheet.title} "
                 f"| used={worksheet.calculate_dimension()} "
-                f"| merged={len(worksheet.merged_cells.ranges)}"
+                f"| merged={len(worksheet.merged_cells.ranges)} "
+                f"| right_to_left={bool(worksheet.sheet_view.rightToLeft)}"
             )
+            if worksheet.sheet_view.rightToLeft:
+                print(
+                    "VISUAL_EDGE_MAPPING: column A is displayed at the right; "
+                    "the visual right edge of a table beginning in A maps to "
+                    "the right border of its column-A cells."
+                )
+            else:
+                print(
+                    "VISUAL_EDGE_MAPPING: column A is displayed at the left; "
+                    "the visual left edge of a table beginning in A maps to "
+                    "the left border of its column-A cells."
+                )
 
             rectangles = _find_thick_outline_rectangles(worksheet)
             print(f"THICK_OUTSIDE_RECTANGLES count={len(rectangles)}")
@@ -140,6 +204,8 @@ def audit_workbook(path: Path, *, max_color_cells: int) -> int:
             print("MERGED_RANGES")
             for merged in sorted(str(item) for item in worksheet.merged_cells.ranges):
                 print(f"  {merged}")
+
+            _report_border_evidence(worksheet)
 
             print("COLOR_ANNOTATIONS")
             color_count = 0
