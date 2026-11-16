@@ -26,10 +26,19 @@ def _color_descriptor(color: Any) -> str:
         return "none"
     color_type = getattr(color, "type", None)
     parts = [f"type={color_type}"]
-    for name in ("rgb", "indexed", "theme", "tint", "auto"):
-        value = getattr(color, name, None)
+    active_property = {
+        "rgb": "rgb",
+        "indexed": "indexed",
+        "theme": "theme",
+        "auto": "auto",
+    }.get(color_type)
+    if active_property is not None:
+        value = getattr(color, active_property, None)
         if value is not None:
-            parts.append(f"{name}={value}")
+            parts.append(f"{active_property}={value}")
+    tint = getattr(color, "tint", None)
+    if tint not in (None, 0, 0.0):
+        parts.append(f"tint={tint}")
     return ",".join(parts)
 
 
