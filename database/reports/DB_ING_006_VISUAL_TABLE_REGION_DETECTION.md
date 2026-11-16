@@ -555,3 +555,35 @@ Stop-Transcript
 Commit the complete transcript in `reply.md`. Review every flagged occurrence against known adjacent-table cases and in-table subsection/narrative counterexamples; also inspect unflagged known boundaries for false negatives. A candidate count is not a table count and must not be treated as detector accuracy.
 
 Task 033 remains PARTIAL. No tests were run by the assistant, no XLSX files were directly inspected, and no Detector behavior changed.
+
+
+### 8.21 Header-to-body column-transition audit results — 2026-11-16
+
+The owner ran `src/scripts/excel_table_header_transition_audit.py` against all five representative workbooks and committed the complete transcript to `reply.md` (blob SHA `804b3ca1b701e52aef9bff348b9cc575bd831d16`). Reader accepted all five workbooks. The six worksheets contain 113 all-text bands in total: Cheshmeh 10, Fzar 4, Fzar2 37, Saman Bank 32, and Parsian periodic 30 (29 on the first worksheet and 1 on the second).
+
+A structural count of the **immediately following physical row** for each band gives:
+
+| Workbook | Mixed/numeric row | Single-text row | Empty row | No following row in audit context | Total |
+|---|---:|---:|---:|---:|---:|
+| Cheshmeh | 7 | 3 | 0 | 0 | 10 |
+| Fzar | 2 | 2 | 0 | 0 | 4 |
+| Fzar2 | 20 | 10 | 7 | 0 | 37 |
+| Saman Bank | 13 | 9 | 9 | 1 | 32 |
+| Parsian periodic | 13 | 9 | 8 | 0 | 30 |
+| **Total** | **55** | **33** | **24** | **1** | **113** |
+
+These are transition counts, not header-detection precision/recall. The 55 direct mixed/numeric transitions include genuine header-to-body examples, but also all-text rows/bands whose role is not established by this structural audit. The 33 single-text transitions include section headings and in-table subsection labels; some are followed by data, while others introduce a later header band. Empty-row transitions likewise do not prove a boundary.
+
+Important counterexamples and confirmations from the row-level transcript:
+- Cheshmeh rows 160–163: the 160–161 header band is followed by one-cell subsection label row 162 and then data row 163; row 163 has Jaccard 1.000 against the band footprint. This is an in-table continuation, not evidence for a split.
+- Parsian rows 313–315: the six-cell all-text header row 313 is followed by one-cell subsection label row 314 and then mixed data row 315. This confirms that a one-cell row between a header and data can be an internal label.
+- Saman rows 85–87 show the same header → one-cell label → data pattern.
+- Parsian row 336 is a multi-cell all-text header followed immediately by mixed row 337; row 313 is also a multi-cell all-text header, but its immediate successor is an in-table label. Thus even the same general header-band shape can have different legitimate transitions within one workbook.
+- Cheshmeh rows 9–10 are followed by a one-cell section title (row 11) and then mixed data (row 12). A direct-next-row test would miss this genuine header-to-body sequence unless it skips the intervening title, but skipping one-cell rows also risks treating internal subsection labels as boundary evidence.
+- Several one-row all-text bands in Parsian (for example rows 361, 376, 386, and 395) are followed by mixed rows. Their column continuity is high, but the audit alone cannot establish that those bands are independent table headers rather than in-table labels or other text rows.
+
+Jaccard and column-footprint continuity remain descriptive only. A value of 1.000 occurs both in legitimate header/body continuity and in known in-table subsection continuations. No Jaccard threshold, merged-range rule, or direct/indirect transition rule is justified by these results. No Detector behavior or table segmentation changed.
+
+**Next step:** execute the already-added read-only compound boundary-signature audit documented in section 8.20, then review every flagged and unflagged occurrence against the known adjacent Parsian table boundaries and in-table/narrative counterexamples. The signature must remain a candidate flag, not a table count or automatic split. Task 033 remains PARTIAL; AMBIGUOUS regions remain excluded from semantic extraction.
+
+The assistant did not run tests and did not inspect XLSX files directly; analysis used the owner-provided `reply.md` transcript only.
