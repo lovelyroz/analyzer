@@ -69,6 +69,33 @@ A table may contain zero or more sub-tables. Each sub-table records:
 
 A sub-table is not automatically a separate top-level table. The parent-child relationship is explicit.
 
+### Owner-driven sub-table partition rule
+
+For the standardized sample, a green cell is the sub-table title marker. In the approved table reading order, the yellow description/label column immediately after that marker begins the sub-table's data-label rows. The marker row belongs to the sub-table's structural range as its title row; data rows begin on the following row. The sub-table continues through the row immediately before the next green marker, or through the parent table's final row when no later marker exists. Its column bounds are inherited from the parent table. This is a coordinate-based partition rule, not a semantic/fuzzy inference. Black and uncolored cells remain excluded from extraction.
+
+The following bounds are mechanically derived from the current Parsian audit's parent-table bounds and green-marker coordinates. They are **provisional** until the owner reviews/approves them; they are not yet an approved template inventory:
+
+| Parent table | Green marker | Provisional sub-table bounds | Data-label rows |
+|---|---|---|---|
+| Recovered_Sheet1!A10:E42 | A12 | A12:E31 | 13:31 |
+| Recovered_Sheet1!A10:E42 | A32 | A32:E34 | 33:34 |
+| Recovered_Sheet1!A10:E42 | A35 | A35:E42 | 36:42 |
+| Recovered_Sheet1!A60:E68 | A63 | A63:E68 | 64:68 |
+| Recovered_Sheet1!A79:E119 | A81 | A81:E94 | 82:94 |
+| Recovered_Sheet1!A79:E119 | A96 | A96:E107 | 97:107 |
+| Recovered_Sheet1!A79:E119 | A108 | A108:E119 | 109:119 |
+| Recovered_Sheet1!A130:L165 | A152 | A152:L165 | 153:165 |
+| Recovered_Sheet1!A176:E213 | A178 | A178:E181 | 179:181 |
+| Recovered_Sheet1!A176:E213 | A182 | A182:E190 | 183:190 |
+| Recovered_Sheet1!A176:E213 | A191 | A191:E213 | 192:213 |
+| Recovered_Sheet1!A266:F275 | A268 | A268:F275 | 269:275 |
+| Recovered_Sheet1!A313:G332 | A314 | A314:G332 | 315:332 |
+| Recovered_Sheet1!A361:C367 | A362 | A362:C365 | 363:365 |
+| Recovered_Sheet1!A361:C367 | A366 | A366:C367 | 367:367 |
+
+The report also identifies `Sheet1!A16:E24` as an independent worksheet region, as confirmed by the owner. However, its current annotation audit records zero gray cells and zero yellow cells. It therefore cannot yet supply any positive extraction-cell coordinates under the approved gray-only rule. Keep it as an independently identified region, but do not infer that its uncolored cells are extractable; the owner must clarify whether it is intentionally structural-only/empty in this sample or whether its intended value cells still need gray annotation.
+
+
 ## 6. Sample annotation convention
 
 The standardized sample workbook uses the owner's visual annotation convention:
