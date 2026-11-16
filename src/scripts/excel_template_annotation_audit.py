@@ -32,11 +32,30 @@ def _color_descriptor(color: Any) -> str:
     return ",".join(parts)
 
 
-def _cell_color_signature(cell: Any) -> tuple[str, str]:
-    font_color = _color_descriptor(getattr(cell.font, "color", None))
+def _cell_color_signature(cell: Any) -> tuple[str, str, bool]:
+    font = getattr(cell.font, "color", None)
     fill = cell.fill
-    fill_color = _color_descriptor(getattr(fill, "fgColor", None))
-    return font_color, fill_color
+    fill_color_obj = getattr(fill, "fgColor", None)
+    font_color = _color_descriptor(font)
+    fill_color = _color_descriptor(fill_color_obj)
+
+    # Ignore the common default black font and default no-fill values.
+    font_is_default = (
+        font is None
+        or (getattr(font, "type", None) == "theme"
+            and getattr(font, "theme", None) == 1
+            and getattr(font, "tint", 0) in (None, 0, 0.0))
+        or (getattr(font, "type", None) == "indexed"
+            and getattr(font, "indexed", None) == 64)
+    )
+    fill_is_default = (
+        fill_color_obj is None
+        or (getattr(fill_color_obj, "type", None) == "rgb"
+            and getattr(fill_color_obj, "rgb", None) in ("00000000", "000000"))
+        or (getattr(fill_color_obj, "type", None) == "indexed"
+            and getattr(fill_color_obj, "indexed", None) == 64)
+    )
+    return font_color, fill_color, not (font_is_default and fill_is_default)
 
 
 def _thick(cell: Any, side: str) -> bool:
@@ -103,7 +122,7 @@ def audit_workbook(path: Path, *, max_color_cells: int) -> int:
 
     print(f"## WORKBOOK {path}")
     print("Reader: ACCEPTED")
-    print(f"SHA-256: {observation.source_artifact.sha256}")
+    print(f"SHA-256: {observation.source.sha256}")
     workbook = load_workbook(path, data_only=False, read_only=False, keep_links=False)
     try:
         for ordinal, worksheet in enumerate(workbook.worksheets, start=1):
@@ -126,11 +145,7 @@ def audit_workbook(path: Path, *, max_color_cells: int) -> int:
             color_count = 0
             for row in worksheet.iter_rows():
                 for cell in row:
-                    font_color, fill_color = _cell_color_signature(cell)
-                    has_color = (
-                        font_color != "none"
-                        or fill_color not in ("none", "type=rgb,rgb=00000000")
-                    )
+                    font_color, fill_color, has_color = _cell_color_signature(cell)
                     if not has_color:
                         continue
                     if color_count >= max_color_cells:
