@@ -698,3 +698,25 @@ Task 033 همچنان PARTIAL است. دستیار فقط transcript موجود 
 گام اجرایی بعدی: توسعهٔ ابزار one-time annotation reader برای workbook نمونهٔ Parsian. Reader باید font/fill color را با حفظ نوع رنگ (RGB/indexed/theme) و Border side styles را برای سلول‌های populated و styled blank گزارش کند؛ سپس با قواعد رنگی و thick outside border، پیشنهاد bounds/table-name/header/sub-table بسازد تا مالک بتواند آن‌ها را تأیید کند. بعد از تأیید، bounds به Template نسخه‌دار تبدیل می‌شوند. برای runtime matcher باید یک گزارش دوره‌ای دیگر از همان شرکت مقایسه شود تا میزان drift مختصات معلوم گردد.
 
 Task 033 PARTIAL است؛ هنوز bounds واقعی Parsian استخراج نشده‌اند. دستیار تست اجرا نکرده و XLSX را مستقیماً باز نکرده است.
+
+
+### 8.27 ابزار پایدار ممیزی Annotation نمونه — 2026-11-16
+
+ابزار `src/scripts/excel_template_annotation_audit.py` اضافه شد (read-only و مخصوص مرحلهٔ authoring نمونه، نه runtime extraction). ابزار ابتدا workbook را با Reader اصلی اعتبارسنجی می‌کند و سپس با openpyxl موارد زیر را گزارش می‌دهد:
+- مستطیل‌هایی که هر چهار ضلع کامل آن‌ها از Border style برابر `thick` تشکیل شده باشد؛
+- سلول‌های دارای رنگ غیرپیش‌فرض Font/Fill با حفظ نوع و مقدار خام RGB/indexed/theme/tint؛
+- سلول‌های دارای thick border و ضلع مربوط؛
+- تمام merged ranges هر worksheet؛
+- worksheet bounds و SHA-256 منبع.
+
+ابزار هیچ workbook را تغییر نمی‌دهد، رنگ را به قرمز/آبی/سبز تبدیل یا تفسیر نمی‌کند، و مستطیل‌های گزارش‌شده را بدون بازبینی مالک به‌عنوان جدول قطعی ثبت نمی‌کند. مستطیل‌های thick فقط پیشنهاد مرز هستند؛ رنگ‌ها نیز به‌صورت metadata خام ارائه می‌شوند تا نقش table name/header/sub-table با شواهد و تأیید مشخص شود.
+
+فرمان اجرای مالک در PowerShell:
+```powershell
+Start-Transcript -Path "D:\Winprojects\analyzer\template_annotation_audit_parsian.txt" -Force
+python src/scripts/excel_template_annotation_audit.py --max-color-cells 2000 excel/parsian_periodic.xlsx
+Stop-Transcript
+```
+Transcript کامل باید در `reply.md` ثبت شود. خروجی آن مبنای استخراج bounds و ساخت اولین Company Table Layout Template خواهد بود.
+
+این ابزار پس از ایجاد از نظر محتوا در GitHub بازخوانی شد؛ دستیار تست یا اجرای محلی انجام نداده و XLSX را مستقیماً باز نکرده است. Task 033 PARTIAL باقی است.
