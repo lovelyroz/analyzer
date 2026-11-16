@@ -1221,3 +1221,17 @@ Other bordered cells outside candidates:
 ## Method and scope
 
 Read-only inspection of worksheet used ranges, RTL flags, merged ranges, fill metadata, values/types, formulas, and border sides. Red-associated medium-border ranges are recorded as candidates, not silently upgraded to confirmed thick-bordered tables. Workbook and source code were not modified.
+
+## 14. Owner clarification and interpretation (2026-11-16)
+
+The following owner clarifications supersede any tentative interpretation in this audit report. The report's raw observations (cell coordinates, color metadata, and observed border styles) remain evidence; its candidate classifications are not authoritative where they conflict with these rules.
+
+- `Recovered_Sheet1!A297:D299` is not an extractable table: it has no colored cells and requires no extraction. A blue/header-like appearance alone is insufficient; an eligible table must also contain gray extraction cells and have a recognizable table border.
+- `Sheet1!A16:E24` is an independent valid table, not a duplicate. It remains in the Parsian periodic template.
+- The report's `black/dark excluded` grouping refers to the owner's black excluded columns. There is no separate dark-fill semantic category in this workbook. Preserve raw color metadata, but do not invent a distinct role for the dark grouping.
+- The final table is a valid owner-approved exception without a yellow description column. Its lack of a yellow label column must not cause rejection.
+- Cells without an annotation color are not extracted, even when they fall inside a table's geometric bounds. Black cells/columns are also excluded. Gray cells are the positive extraction signal.
+- A border need not have the literal Excel style token `thick`. The owner's criterion is a visible/non-default border that distinguishes the table boundary from ordinary cell grid borders. The report's zero literal-thick count does not invalidate the observed medium-style boundary candidates. Preserve exact border styles and coordinates in the template.
+- Green cells identify sub-table names. In the table's reading order, the yellow description column immediately after a green marker begins that sub-table's label region; it continues until the next green marker or the parent table's end. The exact sub-table ranges still need to be recorded from the standardized sample.
+
+Accordingly, this audit is evidence for template authoring, not an automatic table inventory. No template bounds are approved solely by this report. The owner-confirmed table list and exact green-marker sub-table ranges must be transcribed into the versioned template.
