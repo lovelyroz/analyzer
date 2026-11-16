@@ -1235,3 +1235,32 @@ The following owner clarifications supersede any tentative interpretation in thi
 - Green cells identify sub-table names. In the table's reading order, the yellow description column immediately after a green marker begins that sub-table's label region; it continues until the next green marker or the parent table's end. The exact sub-table ranges still need to be recorded from the standardized sample.
 
 Accordingly, this audit is evidence for template authoring, not an automatic table inventory. No template bounds are approved solely by this report. The owner-confirmed table list and exact green-marker sub-table ranges must be transcribed into the versioned template.
+
+
+## 15. Provisional sub-table bounds and unresolved Sheet1 extraction annotation (2026-11-16)
+
+Applying the owner-confirmed green-marker rule to the parent candidate bounds yields the following provisional partitions. The green marker row is the sub-table title row; data-label rows begin immediately below it. Each partition inherits the parent's column bounds and ends immediately before the next green marker, or at the parent table's last row.
+
+| Parent candidate | Green marker | Provisional sub-table bounds | Data-label rows |
+|---|---|---|---|
+| 01 `A10:E42` | A12 | `A12:E31` | 13:31 |
+| 01 `A10:E42` | A32 | `A32:E34` | 33:34 |
+| 01 `A10:E42` | A35 | `A35:E42` | 36:42 |
+| 02 `A60:E68` | A63 | `A63:E68` | 64:68 |
+| 03 `A79:E119` | A81 | `A81:E94` | 82:94 |
+| 03 `A79:E119` | A96 | `A96:E107` | 97:107 |
+| 03 `A79:E119` | A108 | `A108:E119` | 109:119 |
+| 04 `A130:L165` | A152 | `A152:L165` | 153:165 |
+| 05 `A176:E213` | A178 | `A178:E181` | 179:181 |
+| 05 `A176:E213` | A182 | `A182:E190` | 183:190 |
+| 05 `A176:E213` | A191 | `A191:E213` | 192:213 |
+| 07 `A266:F275` | A268 | `A268:F275` | 269:275 |
+| 10 `A313:G332` | A314 | `A314:G332` | 315:332 |
+| 13 `A361:C367` | A362 | `A362:C365` | 363:365 |
+| 13 `A361:C367` | A366 | `A366:C367` | 367:367 |
+
+These are mechanically derived candidate ranges, not owner-approved final coordinates. They must be checked against the standardized workbook before template approval.
+
+### Sheet1 independent region — extraction annotation conflict
+
+The owner confirmed that `Sheet1!A16:E24` is an independent region and not a duplicate. The current audit, however, reports 8 blue header cells and one green marker at A19, but zero yellow cells and zero gray extraction cells; its other cells are uncolored. Under the owner's explicit rule that uncolored cells are never extracted and an extractable table requires gray value cells, this region currently has no approved extraction cells. Retain the region as independently identified, but do not extract its uncolored contents. Clarification is required whether it is intentionally structural-only/empty in this sample or whether the intended value cells still need gray annotation.
