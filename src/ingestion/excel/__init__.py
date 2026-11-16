@@ -22,9 +22,6 @@ from src.ingestion.excel.dto import (
     WorksheetVisibility,
 )
 
-
-from src.ingestion.excel.table_detector import detect_visual_table_candidates
-
 from src.ingestion.excel.reader import (
     ExcelReaderConfig,
     ExcelSourceContractError,
@@ -39,7 +36,6 @@ __all__ = [
     "ExcelSourceReadError",
     "read_excel_file",
     "read_excel_source",
-    "detect_visual_table_candidates",
     "CellRange",
     "CellRef",
     "CellObservation",
