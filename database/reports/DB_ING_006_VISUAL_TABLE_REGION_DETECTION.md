@@ -618,3 +618,22 @@ Known in-table subsection counterexamples remain important negatives: Saman row 
 **Next step:** obtain the missing Cheshmeh audit as a separate run, then perform a focused Parsian audit of rows 295–341 that compares the known true boundaries (295/300 and 309/334) with the internal subsection at 314. Specifically inspect the role and merged-range geometry of row 310 and the complete context around row 336, without using Persian label meaning or financial semantics to manufacture a structural distinction. Only then decide whether to extend the candidate grammar or require report-specific confirmation.
 
 The assistant did not run tests and did not inspect XLSX files directly; analysis used only the owner-provided `reply.md` transcript.
+
+
+### 8.23 مالک استاندارد بصری جدول‌ها در نمونهٔ مرجع Parsian — 2026-11-16
+
+مالک تصریح کرد که مسئلهٔ تشخیص مرز جدول‌ها قبلاً از طریق استانداردسازی بصری در workbook نمونهٔ `parsian_periodic.xlsx` حل شده، اما این تصمیم در مستندات/زمینهٔ کاری ثبت نشده بود. این استاندارد فعلاً فقط روی همین فایل نمونه اعمال شده است و نباید فرض شود سایر workbookها نیز همین قالب‌بندی را دارند.
+
+**استاندارد اعلام‌شدهٔ مالک:**
+1. **مرز بیرونی جدول:** کل محدودهٔ هر جدول دارای `thick outside border` است؛ بنابراین لبهٔ آغاز و پایان جدول با Border ضخیم بیرونی مشخص می‌شود.
+2. **نام جدول (`table name`):** در یک سلول با رنگ متن قرمز درج می‌شود. این سلول خارج از محدودهٔ جدول و در فاصلهٔ یک یا دو سلول پیش از جدول قرار می‌گیرد.
+3. **سرستون (`header`):** با رنگ آبی مشخص می‌شود.
+4. **نام زیربخش (`sub table name`):** در برخی جدول‌ها وجود دارد و با رنگ سبز مشخص می‌شود.
+
+**تفسیر برای DB-ING-006:** این قواعد، شواهد ساختاری/قالب‌بندی صریح‌تری نسبت به heuristicهای قبلی مبتنی بر blank band، شمارش سلول، Jaccard یا نوع ردیف فراهم می‌کنند. در نتیجه مسیر بعدی باید از حدس‌زدن مرز از محتوای سلول‌ها به خواندن و اعتبارسنجی annotationهای بصری مالک تغییر کند. باید بررسی شود Reader و DTO فعلی تمام اجزای لازم را حفظ می‌کنند: رنگ واقعی/نوع رنگ Font، رنگ و نوع Fill، Borderهای هر چهار ضلع و نحوهٔ تشخیص outline بیرونی در حضور merged cells. وجود `border_top/bottom/left/right` و `font_bold/fill_type` فعلی به‌تنهایی قرارداد کامل این استاندارد را پوشش نمی‌دهد؛ رنگ Font و جزئیات لازم برای تشخیص thick outside border هنوز در DTO ثبت نشده‌اند.
+
+**محدودیت دامنه:** فقط `parsian_periodic.xlsx` به‌عنوان نمونه استانداردسازی‌شده معرفی شده است. هیچ ادعایی دربارهٔ اعمال استاندارد روی چهار workbook دیگر وجود ندارد. تا زمان پیاده‌سازی و اعتبارسنجی، این استاندارد نباید به‌عنوان شواهد موجود در فایل‌های دیگر فرض شود و نباید بر اساس آن‌ها مرز خودکار ساخته شود.
+
+**تصمیم و گام بعدی:** ابتدا یک ممیزی read-only هدفمند روی خود نمونهٔ استانداردشده انجام شود تا رنگ‌های واقعی قرمز/آبی/سبز، ضخامت و موقعیت Borderهای بیرونی، سلول‌های عنوان و header و subsection، و رفتار merged ranges به‌صورت دقیق گزارش شود. سپس یک جدول مستقل دیگر در `parsian_periodic.xlsx` که این نشانه‌ها را دارد به‌عنوان نمونهٔ دوم انتخاب و ممیزی شود؛ اگر الگو در هر دو جدول یکسان و قابل استخراج باشد، برای یک جدول از workbook دیگر نیز همین استانداردسازی بصری را انجام دهیم تا معلوم شود قرارداد بین فایل‌ها قابل تعمیم است یا صرفاً قرارداد annotation مخصوص نمونهٔ Parsian است. مالک هنوز تأیید نکرده که استاندارد روی فایل دیگری اعمال شده است.
+
+این تصمیم، هنوز به معنی تغییر Detector، تصویب split خودکار، یا تکمیل Task 033 نیست. Task 033 همچنان PARTIAL می‌ماند تا شواهد قالب‌بندی از فایل نمونه استخراج، در DTO/Reader پوشش داده، و با fixtureهای مثبت و منفی اعتبارسنجی شوند. دستیار XLSX را مستقیماً باز نکرد و تست اجرا نکرد؛ این ثبت بر اساس توضیح صریح مالک است.
