@@ -118,3 +118,9 @@ https://github.com/lovelyroz/analyzer/blob/master/reply.md
 ۵. چه اتفاقات مهمی وضعیت آینده شرکت را تغییر می‌دهد؟
 
 تغییرات سرمایه، تأمین مالی جدید، معاملات مهم، تغییر رویه‌های حسابداری، ریسک‌ها و سایر رویدادهای بااهمیت.
+
+Start-Transcript -Path "D:\Winprojects\analyzer\template_annotation_audit_parsian.txt" -Force
+
+python src/scripts/excel_template_annotation_audit.py --max-color-cells 2000 excel/parsian_periodic.xlsx
+
+Stop-Transcript

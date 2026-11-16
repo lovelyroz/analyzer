@@ -1,6 +1,6 @@
 **********************
 Windows PowerShell transcript start
-Start time: 20261116133227
+Start time: 20261116143516
 Username: DESKTOP-QGC44BJ\Papa
 RunAs User: DESKTOP-QGC44BJ\Papa
 Configuration Name: 
@@ -18,245 +18,8 @@ SerializationVersion: 1.1.0.1
 **********************
 Transcript started, output file is D:\Winprojects\analyzer\template_annotation_audit_parsian.txt
 PS D:\Winprojects\analyzer>
+PS D:\Winprojects\analyzer>
 (analyzer) python src/scripts/excel_template_annotation_audit.py --max-color-cells 2000 excel/parsian_periodic.xlsx
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  D200 value=0 data_type=n style_id=61 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,th
-eme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=0
-0000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mus
-t be of type <class 'bool'>] fill_type=None
-  E200 value=None data_type=n style_id=12 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>
-,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rg
-b=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_type=None
-  A201 value='پرداخت\u200cهای نقدی بابت سود اوراق مشارکت ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF055274,ind
-exed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of typ
-e <class 'bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of
- type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B201 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  C201 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  D201 value=0 data_type=n style_id=61 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,th
-eme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=0
-0000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mus
-t be of type <class 'bool'>] fill_type=None
-  E201 value=None data_type=n style_id=12 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>
-,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rg
-b=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_type=None
-  A202 value='دریافت\u200cهای نقدی حاصل از انتشار اوراق خرید دین ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF05
-5274,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must b
-e of type <class 'bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values mu
-st be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B202 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  C202 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  D202 value=0 data_type=n style_id=61 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,th
-eme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=0
-0000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mus
-t be of type <class 'bool'>] fill_type=None
-  E202 value=None data_type=n style_id=12 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>
-,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rg
-b=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_type=None
-  A203 value='پرداخت\u200cهای نقدی بابت اصل اوراق خرید دین ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF055274,i
-ndexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of t
-ype <class 'bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be
-of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B203 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  C203 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  D203 value=0 data_type=n style_id=61 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,th
-eme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=0
-0000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mus
-t be of type <class 'bool'>] fill_type=None
-  E203 value=None data_type=n style_id=12 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>
-,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rg
-b=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_type=None
-  A204 value='پرداخت\u200cهای نقدی بابت سود اوراق خرید دین ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF055274,i
-ndexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of t
-ype <class 'bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be
-of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B204 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  C204 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  D204 value=0 data_type=n style_id=61 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,th
-eme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=0
-0000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mus
-t be of type <class 'bool'>] fill_type=None
-  E204 value=None data_type=n style_id=12 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>
-,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rg
-b=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_type=None
-  A205 value='پرداخت\u200cهای نقدی بابت اصل اقساط اجاره سرمایه\u200cای ' data_type=s style_id=73 font_color=[type=rgb,rg
-b=FF055274,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Val
-ues must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B205 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  C205 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  D205 value=0 data_type=n style_id=61 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,th
-eme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=0
-0000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mus
-t be of type <class 'bool'>] fill_type=None
-  E205 value=None data_type=n style_id=12 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>
-,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rg
-b=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_type=None
-  A206 value='پرداخت\u200cهای نقدی بابت سود اجاره سرمایه\u200cای ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF05
-5274,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must b
-e of type <class 'bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values mu
-st be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B206 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  C206 value=0 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,the
-me=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00
-000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must
- be of type <class 'bool'>] fill_type=None
-  D206 value=0 data_type=n style_id=61 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,th
-eme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=0
-0000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mus
-t be of type <class 'bool'>] fill_type=None
-  E206 value=None data_type=n style_id=12 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>
-,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rg
-b=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_type=None
-  A207 value='پرداخت\u200cهای نقدی بابت سود سهام ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF055274,indexed=Val
-ues must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class
- 'bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <c
-lass 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B207 value=-1490891 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'in
-t'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb
-,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Valu
-es must be of type <class 'bool'>] fill_type=None
-  C207 value=-341 data_type=n style_id=6 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,
-theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb
-=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values m
-ust be of type <class 'bool'>] fill_type=None
-  D207 value=-341 data_type=n style_id=61 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>
-,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rg
-b=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values
-must be of type <class 'bool'>] fill_type=None
-  E207 value=-437111 data_type=n style_id=31 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'in
-t'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb
-,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Valu
-es must be of type <class 'bool'>] fill_type=None
-  A208 value='جريان خالص ورود (خروج) نقد حاصل از فعاليت\u200cهاي تامين مالي ' data_type=s style_id=73 font_color=[type=r
-gb,rgb=FF055274,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Va
-lues must be of type <class 'bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,them
-e=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B208 value=12340315 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'in
-t'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb
-,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Valu
-es must be of type <class 'bool'>] fill_type=None
-  C208 value=9875688 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int
-'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,
-rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Value
-s must be of type <class 'bool'>] fill_type=None
-  D208 value=-13141953 data_type=n style_id=74 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class '
-int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=r
-gb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Va
-lues must be of type <class 'bool'>] fill_type=None
-  E208 value=25 data_type=n style_id=32 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,t
-heme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=
-00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mu
-st be of type <class 'bool'>] fill_type=None
-  A209 value='خالص افزايش (کاهش) در موجودی نقد ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF055274,indexed=Value
-s must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class '
-bool'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <cla
-ss 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B209 value=-32576205 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'i
-nt'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rg
-b,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Val
-ues must be of type <class 'bool'>] fill_type=None
-  C209 value=-77842463 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'i
-nt'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rg
-b,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Val
-ues must be of type <class 'bool'>] fill_type=None
-  D209 value=-85837240 data_type=n style_id=74 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class '
-int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=r
-gb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Va
-lues must be of type <class 'bool'>] fill_type=None
-  E209 value=58 data_type=n style_id=32 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,t
-heme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=
-00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mu
-st be of type <class 'bool'>] fill_type=None
-  A210 value='مانده موجودی نقد در ابتدای سال ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF055274,indexed=Values
-must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bo
-ol'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class
- 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B210 value=295173082 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'i
-nt'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rg
-b,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Val
-ues must be of type <class 'bool'>] fill_type=None
-  C210 value=229326967 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'i
-nt'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rg
-b,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Val
-ues must be of type <class 'bool'>] fill_type=None
-  D210 value=229326967 data_type=n style_id=74 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class '
-int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=r
-gb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Va
-lues must be of type <class 'bool'>] fill_type=None
-  E210 value=29 data_type=n style_id=32 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,t
-heme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb=
-00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values mu
-st be of type <class 'bool'>] fill_type=None
-  A211 value='تاثير تغييرات نرخ ارز ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF055274,indexed=Values must be o
-f type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fil
-l_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,t
-int=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B211 value=84513662 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'in
-t'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb
-,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Valu
-es must be of type <class 'bool'>] fill_type=None
-  C211 value=19036184 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'in
-t'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb
-,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Valu
-es must be of type <class 'bool'>] fill_type=None
-  D211 value=151683355 data_type=n style_id=74 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class '
-int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=r
-gb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Va
-lues must be of type <class 'bool'>] fill_type=None
-  E211 value=344 data_type=n style_id=32 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'int'>,
-theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rgb,rgb
-=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values m
-ust be of type <class 'bool'>] fill_type=None
-  A212 value='مانده موجودی نقد در پايان سال ' data_type=s style_id=73 font_color=[type=rgb,rgb=FF055274,indexed=Values m
-ust be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'boo
-l'>] fill_color=[type=rgb,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class
-'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_type=None
-  B212 value=347110539 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'i
-nt'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rg
-b,rgb=00000000,indexed=Values must be of type <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Val
 ues must be of type <class 'bool'>] fill_type=None
   C212 value=170520688 data_type=n style_id=5 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of type <class 'i
 nt'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_color=[type=rg
@@ -2780,11 +2543,248 @@ COLOR_CELLS_PRINTED=1655
 THICK_BORDER_CELLS
 THICK_BORDER_CELLS_COUNT=0
 
-### SHEET 2 Sheet1 | used=A1:E24 | merged=2
+### SHEET 2 Sheet1 | used=A1:E24 | merged=2 | right_to_left=False
+VISUAL_EDGE_MAPPING: column A is displayed at the left; the visual left edge of a table beginning in A maps to the left
+border of its column-A cells.
 THICK_OUTSIDE_RECTANGLES count=0
 MERGED_RANGES
   A16:A17
   E16:E17
+BORDER_SIDE_STYLE_COUNTS
+  top: medium=55
+  bottom: medium=57
+  left: medium=57
+  right: medium=57
+BORDER_SIDE_CELLS
+  A1 top=medium
+  A1 bottom=medium
+  A1 left=medium
+  A1 right=medium
+  A2 top=medium
+  A2 bottom=medium
+  A2 left=medium
+  A2 right=medium
+  A3 top=medium
+  A3 bottom=medium
+  A3 left=medium
+  A3 right=medium
+  A4 top=medium
+  A4 bottom=medium
+  A4 left=medium
+  A4 right=medium
+  A5 top=medium
+  A5 bottom=medium
+  A5 left=medium
+  A5 right=medium
+  A6 top=medium
+  A6 bottom=medium
+  A6 left=medium
+  A6 right=medium
+  A7 top=medium
+  A7 bottom=medium
+  A7 left=medium
+  A7 right=medium
+  A8 top=medium
+  A8 bottom=medium
+  A8 left=medium
+  A8 right=medium
+  A9 top=medium
+  A9 bottom=medium
+  A9 left=medium
+  A9 right=medium
+  A10 top=medium
+  A10 bottom=medium
+  A10 left=medium
+  A10 right=medium
+  A11 top=medium
+  A11 bottom=medium
+  A11 left=medium
+  A11 right=medium
+  A12 top=medium
+  A12 bottom=medium
+  A12 left=medium
+  A12 right=medium
+  A16 top=medium
+  A16 bottom=medium
+  A16 left=medium
+  A16 right=medium
+  B16 top=medium
+  B16 bottom=medium
+  B16 left=medium
+  B16 right=medium
+  C16 top=medium
+  C16 bottom=medium
+  C16 left=medium
+  C16 right=medium
+  D16 top=medium
+  D16 bottom=medium
+  D16 left=medium
+  D16 right=medium
+  E16 top=medium
+  E16 bottom=medium
+  E16 left=medium
+  E16 right=medium
+  A17 bottom=medium
+  A17 left=medium
+  A17 right=medium
+  B17 top=medium
+  B17 bottom=medium
+  B17 left=medium
+  B17 right=medium
+  C17 top=medium
+  C17 bottom=medium
+  C17 left=medium
+  C17 right=medium
+  D17 top=medium
+  D17 bottom=medium
+  D17 left=medium
+  D17 right=medium
+  E17 bottom=medium
+  E17 left=medium
+  E17 right=medium
+  A18 top=medium
+  A18 bottom=medium
+  A18 left=medium
+  A18 right=medium
+  B18 top=medium
+  B18 bottom=medium
+  B18 left=medium
+  B18 right=medium
+  C18 top=medium
+  C18 bottom=medium
+  C18 left=medium
+  C18 right=medium
+  D18 top=medium
+  D18 bottom=medium
+  D18 left=medium
+  D18 right=medium
+  E18 top=medium
+  E18 bottom=medium
+  E18 left=medium
+  E18 right=medium
+  A19 top=medium
+  A19 bottom=medium
+  A19 left=medium
+  A19 right=medium
+  B19 top=medium
+  B19 bottom=medium
+  B19 left=medium
+  B19 right=medium
+  C19 top=medium
+  C19 bottom=medium
+  C19 left=medium
+  C19 right=medium
+  D19 top=medium
+  D19 bottom=medium
+  D19 left=medium
+  D19 right=medium
+  E19 top=medium
+  E19 bottom=medium
+  E19 left=medium
+  E19 right=medium
+  A20 top=medium
+  A20 bottom=medium
+  A20 left=medium
+  A20 right=medium
+  B20 top=medium
+  B20 bottom=medium
+  B20 left=medium
+  B20 right=medium
+  C20 top=medium
+  C20 bottom=medium
+  C20 left=medium
+  C20 right=medium
+  D20 top=medium
+  D20 bottom=medium
+  D20 left=medium
+  D20 right=medium
+  E20 top=medium
+  E20 bottom=medium
+  E20 left=medium
+  E20 right=medium
+  A21 top=medium
+  A21 bottom=medium
+  A21 left=medium
+  A21 right=medium
+  B21 top=medium
+  B21 bottom=medium
+  B21 left=medium
+  B21 right=medium
+  C21 top=medium
+  C21 bottom=medium
+  C21 left=medium
+  C21 right=medium
+  D21 top=medium
+  D21 bottom=medium
+  D21 left=medium
+  D21 right=medium
+  E21 top=medium
+  E21 bottom=medium
+  E21 left=medium
+  E21 right=medium
+  A22 top=medium
+  A22 bottom=medium
+  A22 left=medium
+  A22 right=medium
+  B22 top=medium
+  B22 bottom=medium
+  B22 left=medium
+  B22 right=medium
+  C22 top=medium
+  C22 bottom=medium
+  C22 left=medium
+  C22 right=medium
+  D22 top=medium
+  D22 bottom=medium
+  D22 left=medium
+  D22 right=medium
+  E22 top=medium
+  E22 bottom=medium
+  E22 left=medium
+  E22 right=medium
+  A23 top=medium
+  A23 bottom=medium
+  A23 left=medium
+  A23 right=medium
+  B23 top=medium
+  B23 bottom=medium
+  B23 left=medium
+  B23 right=medium
+  C23 top=medium
+  C23 bottom=medium
+  C23 left=medium
+  C23 right=medium
+  D23 top=medium
+  D23 bottom=medium
+  D23 left=medium
+  D23 right=medium
+  E23 top=medium
+  E23 bottom=medium
+  E23 left=medium
+  E23 right=medium
+  A24 top=medium
+  A24 bottom=medium
+  A24 left=medium
+  A24 right=medium
+  B24 top=medium
+  B24 bottom=medium
+  B24 left=medium
+  B24 right=medium
+  C24 top=medium
+  C24 bottom=medium
+  C24 left=medium
+  C24 right=medium
+  D24 top=medium
+  D24 bottom=medium
+  D24 left=medium
+  D24 right=medium
+  E24 top=medium
+  E24 bottom=medium
+  E24 left=medium
+  E24 right=medium
+MERGED_RANGE_BORDER_EDGES
+  A16:A17: A16.top=medium, A17.bottom=medium, A16.left=medium, A16.right=medium, A17.left=medium, A17.right=medium
+  E16:E17: E16.top=medium, E17.bottom=medium, E16.left=medium, E16.right=medium, E17.left=medium, E17.right=medium
 COLOR_ANNOTATIONS
   A1 value='عملیات در حال تداوم: ' data_type=s style_id=4 font_color=[type=rgb,rgb=FF055274,indexed=Values must be of ty
 pe <class 'int'>,theme=Values must be of type <class 'int'>,tint=0.0,auto=Values must be of type <class 'bool'>] fill_co
@@ -3014,8 +3014,4 @@ COLOR_CELLS_PRINTED=56
 THICK_BORDER_CELLS
 THICK_BORDER_CELLS_COUNT=0
 PS D:\Winprojects\analyzer>
-(analyzer) Stop-Transcript
-**********************
-Windows PowerShell transcript end
-End time: 20261116133252
-**********************
+PS D:\Winprojects\analyzer>
