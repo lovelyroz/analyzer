@@ -73,28 +73,9 @@ A sub-table is not automatically a separate top-level table. The parent-child re
 
 For the standardized sample, a green cell is the sub-table title marker. In the approved table reading order, the yellow description/label column immediately after that marker begins the sub-table's data-label rows. The marker row belongs to the sub-table's structural range as its title row; data rows begin on the following row. The sub-table continues through the row immediately before the next green marker, or through the parent table's final row when no later marker exists. Its column bounds are inherited from the parent table. This is a coordinate-based partition rule, not a semantic/fuzzy inference. Black and uncolored cells remain excluded from extraction.
 
-The following bounds are mechanically derived from the current Parsian audit's parent-table bounds and green-marker coordinates. They are **provisional** until the owner reviews/approves them; they are not yet an approved template inventory:
+The corrected single-sheet audit on 2026-11-17 supersedes the earlier provisional coordinate inventory below. The current red-title candidates, header coordinates, gray extraction coordinates, and green-marker row partitions are recorded in `PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md`. That report explicitly separates title-to-next-title review intervals from actual table bounds; it does not claim that complete rectangular bounds have been approved.
 
-| Parent table | Green marker | Provisional sub-table bounds | Data-label rows |
-|---|---|---|---|
-| Recovered_Sheet1!A10:E42 | A12 | A12:E31 | 13:31 |
-| Recovered_Sheet1!A10:E42 | A32 | A32:E34 | 33:34 |
-| Recovered_Sheet1!A10:E42 | A35 | A35:E42 | 36:42 |
-| Recovered_Sheet1!A60:E68 | A63 | A63:E68 | 64:68 |
-| Recovered_Sheet1!A79:E119 | A81 | A81:E94 | 82:94 |
-| Recovered_Sheet1!A79:E119 | A96 | A96:E107 | 97:107 |
-| Recovered_Sheet1!A79:E119 | A108 | A108:E119 | 109:119 |
-| Recovered_Sheet1!A130:L165 | A152 | A152:L165 | 153:165 |
-| Recovered_Sheet1!A176:E213 | A178 | A178:E181 | 179:181 |
-| Recovered_Sheet1!A176:E213 | A182 | A182:E190 | 183:190 |
-| Recovered_Sheet1!A176:E213 | A191 | A191:E213 | 192:213 |
-| Recovered_Sheet1!A266:F275 | A268 | A268:F275 | 269:275 |
-| Recovered_Sheet1!A313:G332 | A314 | A314:G332 | 315:332 |
-| Recovered_Sheet1!A361:C367 | A362 | A362:C365 | 363:365 |
-| Recovered_Sheet1!A361:C367 | A366 | A366:C367 | 367:367 |
-
-The report also identifies `Sheet1!A16:E24` as an independent worksheet region, as confirmed by the owner. However, its current annotation audit records zero gray cells and zero yellow cells. It therefore cannot yet supply any positive extraction-cell coordinates under the approved gray-only rule. Keep it as an independently identified region, but do not infer that its uncolored cells are extractable; the owner must clarify whether it is intentionally structural-only/empty in this sample or whether its intended value cells still need gray annotation.
-
+The earlier `Sheet1!A16:E24` paragraph is withdrawn. The owner confirmed that `Sheet1` was a temporary test worksheet and deleted it. The corrected workbook contains only `Recovered_Sheet1`; no `Sheet1` region belongs to the template.
 
 ## 6. Sample annotation convention
 
@@ -161,3 +142,14 @@ Do not resolve these by assumption. First extract the annotations and bounds fro
 - This rule is specific to gray extraction cells. Uncolored cells remain outside extraction; black cells/columns remain explicitly excluded. A blank cell without gray annotation does not become zero.
 - The prior audit-based claim that `Sheet1!A16:E24` has 8 blue cells, a green marker at A19, no yellow/gray cells, and a red title at A14 is disputed by the owner and must not be treated as verified workbook fact. The earlier "Sheet1 extraction annotation conflict" and any conclusion based on those reported coordinates are withdrawn pending a corrected audit report. Do not infer the actual worksheet, range, title, or annotations from the disputed report.
 - The report's candidate-18 classification and associated color inventory are therefore provisional/untrusted until the source workbook is re-audited and the owner confirms the corrected coordinates.
+
+
+## Corrected Parsian audit evidence — 2026-11-17
+
+The owner supplied a complete direct-output audit for `excel/parsian_periodic.xlsx`. The workbook SHA-256 is `95f94e739632e48ae6552c562ecbf6c3e8182848718d17977f69bc984a6638b0`. The workbook contains exactly one worksheet, `Recovered_Sheet1`, used range `A1:L411`, right-to-left. The temporary `Sheet1` referenced by earlier reports was deleted and is out of scope; all prior findings about that worksheet are withdrawn.
+
+The corrected audit inventory is 17 red title cells, 96 blue header cells, 15 green sub-table markers, 178 yellow label cells, 459 gray extraction cells, and zero cells with the explicit black annotation fill. Of the gray cells, 89 are blank, 134 contain numeric zero, and 236 contain nonzero numeric values. Blank gray cells must be extracted as numeric zero under the owner's rule.
+
+The audit reports zero exact `thick` outside rectangles but 101 border-evidence ranges using `medium` style. These are raw geometry evidence, not proof of complete table rectangles. The detailed candidate inventory and provisional row partitions are in `PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md`. That map is not an approved Template: full table rectangles/column bounds remain for owner review, and a second later Parsian periodic workbook is required to validate layout drift. Reports 1–3 are audits of the same sample workbook and do not count as an independent second workbook.
+
+This corrected evidence supersedes the older two-worksheet narrative, the `Sheet1!A16:E24` claim, and the previous candidate-18 color inventory. Task DB-ING-006 remains PARTIAL. The assistant reviewed the text audit output and did not open the XLSX directly or run tests.
