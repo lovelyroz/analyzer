@@ -966,3 +966,8 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 در `COMPANY_TABLE_LAYOUT_TEMPLATE_SPEC.md` نیز بخش Parsian-specific افزوده شد تا قواعد مالک و coordinate draft را تثبیت کند. این مختصات هنوز **candidate و در انتظار تأیید صریح مالک** هستند؛ هیچ‌کدام صرفاً با درج در سند به production Template approved تبدیل نشده‌اند.
 
 گام بعدی: مالک محدوده‌های 17 جدول و 15 زیرجدول را تأیید یا اصلاح کند. پس از آن، header/body/footer segmentation و قواعد worksheet identity و matching تعیین می‌شوند. Theme-fill re-audit و مقایسه با workbook دوره‌ای دوم فعلاً deferred هستند. Task 033 همچنان PARTIAL است؛ هیچ کدی تغییر نکرد و تستی اجرا نشد.
+
+
+### 8.34 بررسی نمونه‌ای مختصات Parsian — 2026-11-18
+
+مالک اعلام کرد چند مورد از محدوده‌های candidate ثبت‌شده برای 17 جدول و 15 زیرجدول را بررسی کرده و در موارد بررسی‌شده مشکلی ندیده است. این نتیجه به‌عنوان **Spot Check موفق** ثبت می‌شود، نه تأیید یکجای تمام مختصات. بنابراین coordinate map بخش 10 سند `PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md` مبنای کاری مرحله بعد است، اما هنوز production-approved نیست. گام بعدی تحلیل provisional تفکیک Header/Body/Footer با تفکیک روشن شواهد قطعی از مرزهای حل‌نشده است. Task 033 همچنان PARTIAL می‌ماند؛ این بررسی نمونه‌ای جایگزین تأیید کامل Template یا drift validation با workbook دوره‌ای مستقل نیست.
