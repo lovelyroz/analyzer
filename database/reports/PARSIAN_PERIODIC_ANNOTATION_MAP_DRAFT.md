@@ -273,3 +273,15 @@ Sub-table columns are inherited from the parent table candidate. Green-marker pa
 ### 10.4 Approval boundary
 
 This coordinate draft resolves the four owner questions recorded in section 9 and provides explicit candidate A1 bounds for the 17 tables and 15 green-marker partitions. It does **not** silently convert historical report-3 evidence into owner approval. The next owner-review gate is to accept or correct the listed table rectangles and the mechanically derived sub-table ranges. Header/body/footer segmentation and deterministic matching of later workbooks remain separate design work. Theme-fill re-audit and second-period drift validation remain deferred as previously agreed.
+
+
+## 11. Owner spot-check status — 2026-11-18
+
+The owner reports that several candidate table/sub-table ranges were checked and no issue was found in the checked examples. This is recorded as a successful **spot check only**. The owner has not stated that every one of the 17 top-level table bounds and 15 sub-table bounds was individually reviewed or approved.
+
+Accordingly:
+- Keep all coordinates in section 10 as the current working candidate map.
+- Do not relabel the complete set as owner-approved production bounds.
+- No correction has been requested for the sampled ranges.
+- Continue with header/body/footer segmentation as a provisional structural analysis, explicitly preserving unresolved boundaries and avoiding inferred certainty.
+- Task 033 remains PARTIAL; the spot check does not complete template approval or independent-period drift validation.
