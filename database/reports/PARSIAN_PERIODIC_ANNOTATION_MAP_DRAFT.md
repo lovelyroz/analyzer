@@ -285,3 +285,42 @@ Accordingly:
 - No correction has been requested for the sampled ranges.
 - Continue with header/body/footer segmentation as a provisional structural analysis, explicitly preserving unresolved boundaries and avoiding inferred certainty.
 - Task 033 remains PARTIAL; the spot check does not complete template approval or independent-period drift validation.
+
+
+## 12. Provisional Header / Body / Footer segmentation — 2026-11-18
+
+This is a structural segmentation draft derived from the candidate rectangles in section 10 and the currently recorded blue-header evidence. It is provisional: it does not promote candidate table bounds to approved Template bounds. “Body” here means the rows inside the candidate rectangle after the identified parent header; it does not mean every cell is extractable. Gray-only extraction, black/uncolored exclusion, blank-gray-to-zero, and green sub-table markers continue to apply.
+
+| Table | Candidate bounds | Parent Header | Provisional Body | Footer evidence |
+|---|---|---|---|---|
+| T01 | A10:D42 | A10:D11 | A12:D42 | None identified |
+| T02 | A60:D68 | A60:D61 | A62:D68 | None identified |
+| T03 | A79:C119 | A79:C80 | A81:C119 | None identified; repeated B95/C95 ignored |
+| T04 | A130:L165 | A130:L130 | A131:L165 | None identified; black A131:L151 remains excluded |
+| T05 | A176:D213 | A176:D177 | A178:D213 | None identified |
+| T06 | A238:I253 | A238:I239 | A240:I253 | None identified; uncolored/black rows remain excluded |
+| T07 | A266:C275 | A266:C267 | A268:C275 | None identified |
+| T08 | A279:B283 | A279:B279 | A280:B283 | None identified; A297:D297 is outside this table and not a footer |
+| T09 | A302:C308 | A302:C302 (mixed fill; B302 not blue) | A303:C308 | None identified |
+| T10 | A313:D332 | A313:D313 | A314:D332 | None identified |
+| T11 | A336:C339 | A336:C336 | A337:C339 | None identified |
+| T12 | A353:I358 | A353:I354 | A355:I358 | None identified |
+| T13 | A361:C367 | A361:C361 | A362:C367 | None identified |
+| T14 | A376:C378 | A376:C376 | A377:C378 | None identified |
+| T15 | A386:C387 | A386:C386 | A387:C387 | None identified |
+| T16 | A395:C398 | A395:C395 | A396:C398 | None identified |
+| T17 | A404:E405 | A404:E404 | A405:E405 | None identified |
+
+### 12.1 Interpretation and limits
+
+1. The ranges above partition the candidate rectangle into parent Header and provisional Body only. No Footer rows have been established from the current evidence. Do not manufacture an empty Footer range or classify the last data row as a footer by position alone.
+2. Green sub-table marker rows are retained inside the parent Body as structural sub-table titles. They are not parent-table headers and do not independently imply a new parent table.
+3. The header evidence for T09 is mixed: A302 and C302 are blue, B302 is not blue, and D302 lies outside the candidate rectangle. Preserve this exact cell-level fact; do not widen or normalize the header to a fully blue row.
+4. T03's duplicate B95/C95 cells are ignored and do not split the Body. T08's separate blue A297:D297 region is outside the candidate rectangle and is not a Footer.
+5. Body membership is not extraction permission. Only gray cells are extracted; black and uncolored cells are excluded. Blank gray cells map to zero.
+6. No explicit total/subtotal/footer classification is inferred from labels or numeric values in this structural pass. Financial semantic classification is a separate later step.
+7. These proposed row partitions should be checked against the workbook by the owner where necessary. The owner's successful spot check does not imply review of every row boundary.
+
+### 12.2 Next segmentation gate
+
+Before encoding these fields in a production Template schema, resolve whether the schema needs explicit header_ranges, body_ranges, and optional footer_ranges (supporting discontiguous/multi-level headers), and define whether sub-table headers are represented as nested header ranges or as independent sub-table structures. Keep footer ranges optional and empty unless directly evidenced. A later-period workbook is still required for coordinate-drift validation.
