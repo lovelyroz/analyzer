@@ -1027,3 +1027,15 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 این ممیزی فقط source code و اسناد را بررسی کرد؛ دیتابیس SQLite زنده، داده‌های موجود و نسخه runtime SQLite بررسی نشدند. در نتیجه فهرست واقعی ReportTypeهای legacy، سیاست backfill نهایی و feature floor نسخه SQLite هنوز gateهای جداگانه‌اند.
 
 **وضعیت:** DB-AUD-009 تکمیل شد؛ DB-DES-008 همچنان PROPOSED است. هیچ کد، ORM، Migration، تست یا داده‌ای تغییر نکرد و تستی اجرا نشد. Task 033 همچنان PARTIAL است؛ تأیید کامل Template و drift validation با workbook دوره‌ای مستقل باز هستند.
+
+### 8.39 تطبیق شواهد Runtime SQLite با Migrationهای مخزن — 2026-11-18
+
+مالک پروژه شواهد دیتابیس محلی را ارائه کرد: SQLite نسخه 3.45.3، تنها مقدار متمایز فعلی `reports.report_type` برابر `CODAL_XLSX_TEMP_TEST` با دو رکورد، و تاریخچه Migrationهای اعمال‌شده از نسخه 1 تا 9. نام Migration نهم `codal_excel_source_metadata` است.
+
+این شواهد با کد فعلی GitHub در `src/migrations/runner.py` مغایرت دارد؛ نسخه بررسی‌شده در مخزن Migrationها را فقط تا نسخه 8 ثبت کرده است. بنابراین source code مخزن و دیتابیس محلی هنوز هم‌نسخه و هم‌تبار اثبات نشده‌اند. صرف وجود ردیف Migration 9 در `schema_migrations` برای استنتاج ساختار ایجادشده یا تغییرات ORM کافی نیست.
+
+گزارش تکمیلی `database/reports/DB_AUD_010_RUNTIME_SQLITE_MIGRATION_RECONCILIATION.md` این اختلاف و اقدام لازم را ثبت می‌کند. پیش از هر تغییر در Migration runner یا ایجاد Migration بعدی، باید متن کامل migration 9، ثبت آن در runner، مدل‌های importشده، اثر schema و commit/revision محلی دریافت و با GitHub تطبیق داده شود.
+
+مقدار `CODAL_XLSX_TEMP_TEST` فعلاً فقط یک مقدار legacy/test مشاهده‌شده است و بدون تصمیم صریح نباید به‌عنوان ReportType عملیاتی پذیرفته شود. نسخه SQLite 3.45.3 از نظر قابلیت‌های موردنیاز طرح فعلی مناسب است؛ بااین‌حال این موضوع مغایرت Migration را رفع نمی‌کند.
+
+**وضعیت:** DB-AUD-010 ثبت شد؛ ممیزی سازگاری Runtime/Source به دلیل نامشخص بودن منشأ Migration 9 هنوز PARTIAL است. DB-DES-008 همچنان PROPOSED و Task 033 همچنان PARTIAL است. هیچ کد، ORM، Migration، تست یا داده‌ای تغییر نکرد و تستی اجرا نشد.
