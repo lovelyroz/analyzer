@@ -206,3 +206,70 @@ This section records the owner's explicit decisions and supersedes the correspon
 - **General extraction rule:** only gray-annotated cells are positive extraction targets. Black-filled and uncolored cells are excluded, including when they contain numeric values. A blank gray cell is different: it is an extraction target and maps to numeric zero.
 
 The former owner-confirmation questions about T03 row 95, T06 rows 243–244, T13 row 364, and T02 border extensions are closed. These decisions do not by themselves approve all 17 table bounds or complete the separate-period layout-drift validation.
+
+
+## 10. Consolidated coordinate draft for Company Table Layout Template — 2026-11-18
+
+This section converts the report-3 evidence and owner clarifications into explicit A1-coordinate candidates. It is a normalized working draft, **not yet an owner-approved production Template**. All coordinates refer only to `Recovered_Sheet1`; the deleted test worksheet is excluded.
+
+### 10.1 Top-level table candidates
+
+| Table | Red title cell | Candidate table bounds | Header evidence | Status |
+|---|---|---|---|---|
+| T01 | A8 | `A10:D42` | `A10:D11` | Candidate |
+| T02 | A58 | `A60:D68` | `A60:D61` | Candidate |
+| T03 | A77 | `A79:C119` | `A79:C80`; ignore redundant `B95:C95` | Candidate |
+| T04 | A128 | `A130:L165` | `A130:L130` | Candidate |
+| T05 | A174 | `A176:D213` | `A176:D177` | Candidate |
+| T06 | A236 | `A238:I253` | `A238:I239` | Candidate |
+| T07 | A264 | `A266:C275` | `A266:C267` | Candidate |
+| T08 | A277 | `A279:B283` | `A279:B279`; separate blue region `A297:D297` is not part of this table | Candidate |
+| T09 | A300 | `A302:C308` | Mixed header evidence in row 302; B302 is not blue | Candidate |
+| T10 | A311 | `A313:D332` | `A313:D313` | Candidate |
+| T11 | A334 | `A336:C339` | `A336:C336` | Candidate |
+| T12 | A351 | `A353:I358` | `A353:I354` | Candidate |
+| T13 | A359 | `A361:C367` | `A361:C361` | Candidate |
+| T14 | A374 | `A376:C378` | `A376:C376` | Candidate |
+| T15 | A384 | `A386:C387` | `A386:C386` | Candidate |
+| T16 | A393 | `A395:C398` | `A395:C395` | Candidate |
+| T17 | A403 | `A404:E405` | `A404:E404` | Candidate; owner-confirmed no-yellow exception |
+
+The red title coordinate identifies the corresponding table section. The candidate rectangle is taken from report-3 structural evidence and is not expanded to include external borders, adjacent formatting, blue cells, or uncolored values. In particular, T02 remains `A60:D68`; its external border marks do not extend the table.
+
+### 10.2 Green-marker sub-table coordinate candidates
+
+The following exact A1 ranges are mechanically derived by combining each green-marker row interval with its parent candidate table's column span. The marker row is included as the sub-table's title row. These are candidate structural partitions; they do not imply that every cell in the rectangle is extractable.
+
+| Parent | Green marker | Candidate sub-table bounds |
+|---|---|---|
+| T01 | A12 | `A12:D31` |
+| T01 | A32 | `A32:D34` |
+| T01 | A35 | `A35:D42` |
+| T02 | A63 | `A63:D68` |
+| T03 | A81 | `A81:C94` |
+| T03 | A96 | `A96:C107` |
+| T03 | A108 | `A108:C119` |
+| T04 | A152 | `A152:L165` |
+| T05 | A178 | `A178:D181` |
+| T05 | A182 | `A182:D190` |
+| T05 | A191 | `A191:D213` |
+| T07 | A268 | `A268:C275` |
+| T10 | A314 | `A314:D332` |
+| T13 | A362 | `A362:C365` |
+| T13 | A366 | `A366:C367` |
+
+Sub-table columns are inherited from the parent table candidate. Green-marker partitions define structural ranges only. Extraction remains cell-based: gray cells are extracted; black and uncolored cells are excluded; blank gray cells become numeric zero. T03 row 95 is not part of any secondary header or sub-table partition; B95/C95 duplicate B79/C79 and are ignored, while D95 lies outside T03.
+
+### 10.3 Explicit non-extraction and special cases
+
+- Black-filled cells are excluded, including theme-based black fills. The earlier corrected-audit count of zero black cells is not authoritative; report 3 found theme-based black fills. No theme-fill re-audit is being performed in this step.
+- Uncolored cells are excluded even when they contain numeric values, including T06 rows 243–244 and T13 row 364.
+- Blank gray cells are extraction targets and map to numeric zero.
+- T04 black-filled block `A131:L151` is excluded under the general black-cell rule.
+- T08's blue region `A297:D297` and uncolored rows 298–299 do not create an additional table or extraction region.
+- T09's B302 is not blue; its presence inside the candidate rectangle does not make it a header cell.
+- T17 remains valid without a yellow description column.
+
+### 10.4 Approval boundary
+
+This coordinate draft resolves the four owner questions recorded in section 9 and provides explicit candidate A1 bounds for the 17 tables and 15 green-marker partitions. It does **not** silently convert historical report-3 evidence into owner approval. The next owner-review gate is to accept or correct the listed table rectangles and the mechanically derived sub-table ranges. Header/body/footer segmentation and deterministic matching of later workbooks remain separate design work. Theme-fill re-audit and second-period drift validation remain deferred as previously agreed.
