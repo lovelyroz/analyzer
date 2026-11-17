@@ -62,7 +62,7 @@ Report 3 states that every outer edge is continuous, with no gaps, for all 17 ca
 - Gray extraction cells: 459 total; 89 are blank. Per the owner's explicit rule, blank gray cells map to numeric zero during semantic extraction, not NULL.
 - The 89 blank gray cells are distributed across T04 (85) and T06 (4).
 - Black-filled cells are excluded. Report 3 identifies black values in many tables, including interleaved black columns in T01/T02/T05/T06 and a full black block in T04 rows 131–151.
-- The T04 black block spans A131:L151 and contains 136 numeric values. The owner's convention clearly excludes black-filled cells, but whether an entire black row block is an intended exclusion rather than a special presentation area should remain an explicit owner-confirmation item before final template approval.
+- The T04 black block spans A131:L151 and contains 136 numeric values. Every black-filled cell is excluded under the owner's general rule; no separate block-level exception is needed.
 - T17 is a valid no-yellow exception according to the owner's later clarification: A404:E404 blue header and A405:E405 gray extraction cells. It has a thin but continuous outer border.
 - T08 contains a secondary blue header at A297:D297 and uncolored values at rows 298–299, outside the T08 border. These are not extraction cells under the current gray-only rule.
 - U01 A297:D299 is a separate unbordered blue-header/uncolored-value region with no red table title. It is not promoted to an extractable table.
@@ -71,21 +71,22 @@ Report 3 states that every outer edge is continuous, with no gaps, for all 17 ca
 ## 5. Sub-table and structural exceptions requiring explicit treatment
 
 Report 3 confirms 15 green markers on the main sheet. The row-partition rule can be applied provisionally, but these cases need explicit handling:
-- T03 marker A81 spans through row 95, where A95:C95 are blue and D95 lies outside the border. This may be a secondary header or a structural transition; do not treat row 95 as ordinary label/data rows without owner confirmation.
-- T13 marker A362 spans rows 363–365, but A364 is uncolored between yellow label rows. Preserve it as an observed structural anomaly; do not infer its meaning.
+- T03 row 95: B95 duplicates B79 and C95 duplicates C79. The owner classifies these repeated headers as redundant; ignore A95:C95 for header/semantic purposes. D95 is outside T03 bounds `A79:C119` and is irrelevant.
+- T13 row 364 is uncolored. It is excluded under the general rule for uncolored cells; no semantic interpretation is required.
 - T02 has yellow row A62 before its first green marker A63. That row belongs to the parent table but not to a green-marker-defined sub-table under the current partition rule.
 - Several bordered tables have yellow labels but no green markers (T06, T08, T09, T11, T12, T14, T15, T16). This is valid: green markers are optional, not a required property of every table.
 - Merged ranges do not cross the 17 candidate table boundaries in report 3. However, merged non-anchor cells carry annotation fills; the annotation reader must preserve those styles rather than relying only on openpyxl anchor-cell values.
 
 ## 6. Unresolved owner decisions / risks
 
-1. Confirm whether black-filled T04 rows 131–151 are wholly excluded, consistent with the general black-cell exclusion rule.
-2. Confirm the role of T03 row 95 (blue secondary header / structural boundary).
-3. Confirm whether T06 uncolored rows 243–244 and their uncolored numeric cells are intentionally excluded (gray-only rule currently excludes them).
-4. Confirm that the four blank gray cells C248:C251 and 85 blank gray cells in T04 are zero-valued extraction cells, as already required by the general blank-gray rule; confirm the sparse T04 pattern is intentional.
-5. Confirm T13 row 364's uncolored cells as a structural separator or simply excluded cells; no semantic inference is permitted.
-6. Confirm the T02 border extensions around A58:A59 and E68 are decorative/adjacent evidence, not part of the table bounds.
-7. Confirm the visual RTL interpretation of stored border-side attributes if physical edge orientation is material to authoring.
+Owner decisions received on 2026-11-17 resolve the former annotation questions:
+1. T03 row 95 is redundant: B95 = B79 and C95 = C79. Ignore these repeated header cells; D95 is outside the table and is not relevant.
+2. T06 rows 243–244: black-filled and uncolored cells inside the table are excluded. Only gray cells are positive extraction cells.
+3. T13 row 364: same rule; uncolored cells are excluded.
+4. T02 bounds are not expanded because of border extensions. The red title is the table-identification signal; border evidence is not the criterion for extending the table.
+5. Black-filled cells anywhere in the table are excluded, as are uncolored cells. Blank gray cells remain extraction cells and map to zero.
+
+No owner decision is outstanding for these points.
 
 The columns outside several bordered rectangles contain blue headers and uncolored values. Under the current rule they remain excluded; expanding the table geometry to include them would require an explicit owner decision and revised annotation.
 
@@ -96,7 +97,7 @@ The report supplies continuous border-supported candidate bounds for all 17 main
 Task DB-ING-006 / Task 033 remains **PARTIAL**:
 - sample candidate bounds now have detailed historical border evidence;
 - black/theme fill classification needs correction or a targeted re-audit;
-- unresolved structural exceptions need owner decisions;
+- the previously listed annotation exceptions have been resolved by the owner;
 - the map remains provisional until owner approval;
 - drift validation still requires a genuinely different Parsian periodic workbook from another reporting period.
 
