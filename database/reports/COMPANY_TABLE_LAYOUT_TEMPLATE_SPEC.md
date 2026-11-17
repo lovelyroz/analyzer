@@ -153,3 +153,11 @@ The following must be resolved with sample evidence before runtime matcher imple
 6. The approved storage location and serialization/persistence model for template versions.
 
 Do not resolve these by assumption. First extract the annotations and bounds from the standardized Parsian sample, then inspect a later report from the same company to measure layout drift.
+
+
+## Owner clarification — blank gray cells and Sheet1 audit correction (2026-11-17)
+
+- A cell annotated gray is an extraction cell even when its literal Excel value is blank. For canonical extraction, a blank gray cell must be interpreted as numeric zero (`0`), not NULL, missing, or an instruction to skip the cell.
+- This rule is specific to gray extraction cells. Uncolored cells remain outside extraction; black cells/columns remain explicitly excluded. A blank cell without gray annotation does not become zero.
+- The prior audit-based claim that `Sheet1!A16:E24` has 8 blue cells, a green marker at A19, no yellow/gray cells, and a red title at A14 is disputed by the owner and must not be treated as verified workbook fact. The earlier "Sheet1 extraction annotation conflict" and any conclusion based on those reported coordinates are withdrawn pending a corrected audit report. Do not infer the actual worksheet, range, title, or annotations from the disputed report.
+- The report's candidate-18 classification and associated color inventory are therefore provisional/untrusted until the source workbook is re-audited and the owner confirms the corrected coordinates.
