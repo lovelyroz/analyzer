@@ -224,7 +224,7 @@ This section converts the report-3 evidence and owner clarifications into explic
 | T06 | A236 | `A238:I253` | `A238:I239` | Candidate |
 | T07 | A264 | `A266:C275` | `A266:C267` | Candidate |
 | T08 | A277 | `A279:B283` | `A279:B279`; separate blue region `A297:D297` is not part of this table | Candidate |
-| T09 | A300 | `A302:C308` | Mixed header evidence in row 302; B302 is not blue | Candidate |
+| T09 | A300 | `A302:C308` | A302 and C302 are blue; B302 is not blue; D302 lies outside the candidate bounds | Candidate |
 | T10 | A311 | `A313:D332` | `A313:D313` | Candidate |
 | T11 | A334 | `A336:C339` | `A336:C336` | Candidate |
 | T12 | A351 | `A353:I358` | `A353:I354` | Candidate |
