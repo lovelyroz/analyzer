@@ -195,3 +195,8 @@ These ranges are **candidate coordinates pending explicit owner approval**, not 
 4. Decide template-version serialization/storage location.
 
 A second-period Parsian workbook comparison and a theme-fill re-audit are explicitly deferred for now. No runtime matcher or extraction implementation should be started until the owner has approved the coordinate draft and the remaining schema/matching decisions are specified.
+
+
+### Parsian owner spot-check — 2026-11-18
+
+The owner checked several of the candidate A1 ranges recorded in `PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md` section 10 and reported no issue in those checked examples. This is a spot check, not blanket approval of all 17 parent-table bounds and 15 sub-table partitions. The coordinate set remains the working candidate map; header/body/footer segmentation may proceed provisionally, but must distinguish observed facts from unresolved boundaries. No production Template approval or layout-drift validation is implied.
