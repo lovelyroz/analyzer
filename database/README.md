@@ -53,3 +53,4 @@
 - فایل‌های Excel منبع، صرفاً به‌دلیل ارتباط با دیتابیس، در این پوشه کپی یا آرشیو نمی‌شوند؛ این ساختار برای مستندات متنی و دیکشنری‌های پروژه است.
 - جابه‌جایی این اسناد نباید به معنی تأیید محتوای پیش‌نویس‌ها یا تغییر تصمیمات ثبت‌شده تلقی شود.| [DB_DES_008_COMPANY_TABLE_TEMPLATE_RELATIONAL_SCHEMA_PROPOSAL.md](reports/DB_DES_008_COMPANY_TABLE_TEMPLATE_RELATIONAL_SCHEMA_PROPOSAL.md) | پیشنهاد مدل رابطه‌ای فیزیکی و query-oriented برای Company Table Layout Template |
 | [DB_AUD_009_ORM_MIGRATION_TEMPLATE_COMPATIBILITY_AUDIT.md](reports/DB_AUD_009_ORM_MIGRATION_TEMPLATE_COMPATIBILITY_AUDIT.md) | ممیزی سازگاری مدل‌های ORM و Migrationهای موجود با Company Table Layout Template |
+| [DB_AUD_010_RUNTIME_SQLITE_MIGRATION_RECONCILIATION.md](reports/DB_AUD_010_RUNTIME_SQLITE_MIGRATION_RECONCILIATION.md) | تطبیق شواهد SQLite محلی با Migration runner مخزن و ثبت مغایرت نسخه ۹ |
