@@ -1264,3 +1264,11 @@ These are mechanically derived candidate ranges, not owner-approved final coordi
 ### Sheet1 independent region — extraction annotation conflict
 
 The owner confirmed that `Sheet1!A16:E24` is an independent region and not a duplicate. The current audit, however, reports 8 blue header cells and one green marker at A19, but zero yellow cells and zero gray extraction cells; its other cells are uncolored. Under the owner's explicit rule that uncolored cells are never extracted and an extractable table requires gray value cells, this region currently has no approved extraction cells. Retain the region as independently identified, but do not extract its uncolored contents. Clarification is required whether it is intentionally structural-only/empty in this sample or whether the intended value cells still need gray annotation.
+
+
+## Owner clarification — blank gray cells and Sheet1 audit correction (2026-11-17)
+
+- A cell annotated gray is an extraction cell even when its literal Excel value is blank. For canonical extraction, a blank gray cell must be interpreted as numeric zero (`0`), not NULL, missing, or an instruction to skip the cell.
+- This rule is specific to gray extraction cells. Uncolored cells remain outside extraction; black cells/columns remain explicitly excluded. A blank cell without gray annotation does not become zero.
+- The prior audit-based claim that `Sheet1!A16:E24` has 8 blue cells, a green marker at A19, no yellow/gray cells, and a red title at A14 is disputed by the owner and must not be treated as verified workbook fact. The earlier "Sheet1 extraction annotation conflict" and any conclusion based on those reported coordinates are withdrawn pending a corrected audit report. Do not infer the actual worksheet, range, title, or annotations from the disputed report.
+- The report's candidate-18 classification and associated color inventory are therefore provisional/untrusted until the source workbook is re-audited and the owner confirms the corrected coordinates.
