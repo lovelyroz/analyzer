@@ -130,3 +130,66 @@ The rule does not mean that every row in a sub-table partition is a value row. M
 ## 7. Next gate
 
 The next required evidence is a second Parsian periodic XLSX from a later reporting period. It must be compared against this sample's candidate structure to measure row/column shifts, inserted/deleted sections, merged-header changes, and table/sub-table inventory changes. Until that comparison and owner bounds approval are complete, this document remains a draft evidence map, not a production Template.
+
+
+## 8. Superseding structural evidence from report 3 — 2026-11-17
+
+This section supplements and supersedes the earlier statements in sections 2, 5 and 6 where the 2026-11-17 audit was interpreted as finding zero black cells or as providing no complete rectangular bounds.
+
+### 8.1 Provenance limitation
+
+`parsian_periodic_report_3.md` is a direct OOXML audit of the earlier two-sheet package with SHA-256 `69186f1ad2b0e481a3588f2731b7027b0a9d9a543d1ca17fd24fc71d8c5aca06`. The corrected one-sheet workbook has SHA-256 `95f94e739632e48ae6552c562ecbf6c3e8182848718d17977f69bc984a6638b0`. The owner removed the temporary `Sheet1`; all findings from that sheet are excluded. The report-3 findings below concern `Recovered_Sheet1`, but the available evidence does not include a worksheet XML hash proving byte-level identity with the retained sheet in the corrected workbook. Treat these as detailed historical evidence requiring final confirmation where material.
+
+### 8.2 Border-supported candidate bounds
+
+Report 3 found continuous distinguishable outer edges on all four sides of each main-sheet candidate:
+
+| ID | Red title | Evidence bounds | Border style |
+|---|---|---|---|
+| T01 | A8 | A10:D42 | medium |
+| T02 | A58 | A60:D68 | medium |
+| T03 | A77 | A79:C119 | medium |
+| T04 | A128 | A130:L165 | medium |
+| T05 | A174 | A176:D213 | medium |
+| T06 | A236 | A238:I253 | medium |
+| T07 | A264 | A266:C275 | medium |
+| T08 | A277 | A279:B283 | medium |
+| T09 | A300 | A302:C308 | medium |
+| T10 | A311 | A313:D332 | medium |
+| T11 | A334 | A336:C339 | medium |
+| T12 | A351 | A353:I358 | medium |
+| T13 | A359 | A361:C367 | medium |
+| T14 | A374 | A376:C378 | medium |
+| T15 | A384 | A386:C387 | medium |
+| T16 | A393 | A395:C398 | thin |
+| T17 | A403 | A404:E405 | thin |
+
+All four edges were reported continuous, without gaps. The ordinary grid border is also `medium`, but has RGB `FFDDDDDD`; the candidate perimeter uses indexed 64. Therefore style name alone is insufficient to distinguish table boundaries.
+
+These are evidence-supported sample bounds, **not yet owner-approved production Template bounds**. Blue headers and uncolored values occur outside several rectangles; they do not authorize automatic expansion or extraction.
+
+### 8.3 Correction to black-fill inventory
+
+Report 3's direct OOXML inspection found 492 black-filled cells on `Recovered_Sheet1`:
+- 252 cells with theme 1, tint 0.05;
+- 240 cells with theme 1, tint 0.
+
+The newer annotation audit's `BLACK=0` result is incomplete because it did not classify these theme-based black fills. Withdraw the zero-black conclusion. Black-filled cells remain excluded under the owner's convention. T04 contains a fully black block `A131:L151` with 136 numeric values; confirm the intended exclusion of this whole block before final Template approval.
+
+The 89 blank gray cells are distributed as 85 in T04 and 4 in T06. They remain extraction cells and map to numeric zero under the owner's rule.
+
+### 8.4 Remaining structural review points
+
+- T03 row 95: blue `A95:C95` inside the border and `D95` outside; role as secondary header/partition remains unresolved.
+- T06 rows 243–244 and associated uncolored numeric cells remain excluded under the gray-only rule; confirm whether this is intentional.
+- T13 row 364 contains uncolored cells between yellow rows; do not infer semantics.
+- T02 has a few non-ordinary border sides extending outside its rectangle; confirm they are decorative/adjacent.
+- Blue header columns and uncolored values outside the rectangles remain excluded unless the owner explicitly revises the annotation.
+- T17 remains the owner-confirmed no-yellow exception.
+- Green-marker partitions are provisional where they intersect unusual header/separator rows; notably T03 A81 through row 95 and T13 A362 through row 365.
+
+Detailed analysis and all caveats are in `PARSIAN_PERIODIC_REPORT_3_STRUCTURAL_REVIEW.md`.
+
+### 8.5 Current status
+
+The 17 candidate bounds now have continuous border evidence in report 3, but Template approval is still blocked on owner confirmation, theme-fill audit coverage, and unresolved exceptions. Report 3 audits the same sample workbook, not a second reporting period; a genuinely separate Parsian periodic workbook is still required for layout-drift validation.
