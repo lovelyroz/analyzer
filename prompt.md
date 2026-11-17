@@ -7,17 +7,14 @@
 
 Perform a completely independent, fresh audit of the original workbook:
 
-`excel/parsian_periodic.xlsx`
+`parsian_periodic.xlsx`
 
 Save the new report at:
 
-`database/reports/parsian_periodic_report_2.md`
+`parsian_periodic_report_2.md`
 
-An earlier audit exists at:
 
-`database/reports/parsian_periodic_report_1.md`
 
-The earlier report is provided only as a comparison target. **Do not use its findings as input to your inspection.** Do not copy its coordinates, classifications, cell counts, or conclusions. Inspect the original XLSX from scratch.
 
 The purpose is to establish reliable, coordinate-level evidence for creating a Company Table Layout Template.
 
@@ -278,7 +275,7 @@ Use Markdown tables where useful. For long coordinate lists, use compact grouped
 
 Create only:
 
-`database/reports/parsian_periodic_report_2.md`
+`parsian_periodic_report_2.md`
 
 At the end of your response, report:
 
