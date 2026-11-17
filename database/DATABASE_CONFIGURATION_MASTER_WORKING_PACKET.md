@@ -918,3 +918,11 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 
 | 2026-11-16 | transcript دوم Parsian بررسی شد. شیت دوم `Sheet1` محدودهٔ `A1:E24` و merged ranges در `A16:A17` و `E16:E17` دارد؛ `right_to_left=False` ثبت شده و تمام Borderهای گزارش‌شده `medium` هستند (top 55، bottom 57، left/right 57)، نه thick. عنوان قرمز A14، header آبی ردیف‌های 16–17 و برچسب سبز A19 مشاهده شدند؛ A16:E24 فقط candidate table bounds است و تأیید نهایی نشده. transcript شیت اول در ابتدا بریده است؛ فقط color count 1655 و thick count صفر قابل بازیابی است، پس دربارهٔ RTL و سایر Borderهای آن نتیجه‌گیری نمی‌شود. ابزار اصلاح شد تا color descriptor فقط ویژگی فعال نوع رنگ را بخواند. اجرای بعدی با `--max-color-cells 1` برای transcript کامل summary ثبت شود. Task 033 PARTIAL؛ تست اجرا نشده و XLSX مستقیماً بررسی نشده است. | `src/scripts/excel_template_annotation_audit.py`; `database/reports/DB_ING_006_VISUAL_TABLE_REGION_DETECTION.md` section 8.30; owner `reply.md` blob `0059dbe82da192c9332354b1051259ef1e8b6b4c` |
+
+
+## Owner clarification — blank gray cells and Sheet1 audit correction (2026-11-17)
+
+- A cell annotated gray is an extraction cell even when its literal Excel value is blank. For canonical extraction, a blank gray cell must be interpreted as numeric zero (`0`), not NULL, missing, or an instruction to skip the cell.
+- This rule is specific to gray extraction cells. Uncolored cells remain outside extraction; black cells/columns remain explicitly excluded. A blank cell without gray annotation does not become zero.
+- The prior audit-based claim that `Sheet1!A16:E24` has 8 blue cells, a green marker at A19, no yellow/gray cells, and a red title at A14 is disputed by the owner and must not be treated as verified workbook fact. The earlier "Sheet1 extraction annotation conflict" and any conclusion based on those reported coordinates are withdrawn pending a corrected audit report. Do not infer the actual worksheet, range, title, or annotations from the disputed report.
+- The report's candidate-18 classification and associated color inventory are therefore provisional/untrusted until the source workbook is re-audited and the owner confirms the corrected coordinates.
