@@ -324,3 +324,30 @@ This is a structural segmentation draft derived from the candidate rectangles in
 ### 12.2 Next segmentation gate
 
 Before encoding these fields in a production Template schema, resolve whether the schema needs explicit header_ranges, body_ranges, and optional footer_ranges (supporting discontiguous/multi-level headers), and define whether sub-table headers are represented as nested header ranges or as independent sub-table structures. Keep footer ranges optional and empty unless directly evidenced. A later-period workbook is still required for coordinate-drift validation.
+
+
+## 13. Template hierarchy and query-oriented storage decision — 2026-11-18
+
+**Architecture decision:** the Template is stored as normalized relational metadata for deterministic extraction and efficient application requests. It is not designed as a human-facing reconstruction of the Excel workbook.
+
+- A top-level table is a structural parent. A green-marker sub-table is a child record with its own stable identifier and an explicit parent reference.
+- A child sub-table inherits the parent's column/header definition by reference when its column meanings, order, units/basis, and temporal interpretation are unchanged. Do not copy the parent's header rows or column definitions into the child.
+- A child stores its own header definition only when one or more of those meanings or interpretations differ. In that case it references its own explicit header range(s) and has its own resolved column definitions. It may still inherit unchanged column definitions individually where the schema supports per-column inheritance; otherwise define the child header as a complete override. The chosen implementation must never silently combine conflicting definitions.
+- Header is a logical definition, not necessarily one contiguous rectangle. Store one or more ordered header ranges/levels, with explicit precedence/order. Preserve merged-cell and multi-level header structure as needed to resolve column meaning.
+- Body and optional Footer are separately represented structural ranges. Footer is absent/null when not explicitly identified. A final row is not a Footer merely because it is last.
+- The template should retain exact source coordinates as provenance/locators, but application requests should target canonical table/sub-table/field identifiers and report-period dimensions—not repeatedly interpret Excel coordinates or display labels at query time.
+- Do not persist duplicated header text, copied parent definitions, raw cell grids, or derived values merely to make the template visually resemble Excel. Persist stable IDs, relationships, versioned semantic definitions, coordinate locators, and extraction policy as normalized records with foreign keys and uniqueness constraints.
+
+### Query-oriented relationship model
+
+Company + ReportType -> TemplateVersion -> TableDefinition -> SubTableDefinition
+
+Table/SubTable -> HeaderDefinition (own or inherited reference) -> Column/FieldDefinition
+
+Table/SubTable -> BodyRange(s) -> ExtractionCell/Column mapping
+
+Table/SubTable -> optional FooterRange(s)
+
+For Parsian candidates, all 15 green-marker sub-tables initially inherit the parent header by reference as the default schema decision. This is a provisional mapping assumption pending workbook-specific confirmation that a child changes column meaning, period, unit/basis, or ordering. Do not create 15 duplicate header definitions. If a child-specific header difference is later established, add an explicit child override and record its provenance.
+
+This decision determines the storage model; it does not approve the candidate coordinates or complete Task 033. Owner spot-check status and the separate-period drift-validation gate remain unchanged.
