@@ -207,3 +207,16 @@ The owner checked several of the candidate A1 ranges recorded in `PARSIAN_PERIOD
 PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md section 12 now records a provisional row segmentation for all 17 candidate tables. It separates the observed parent Header ranges from the remaining candidate Body ranges. No Footer range is currently evidenced; the schema must not infer a footer merely because rows are at the end of a table. Green sub-table markers remain structural elements inside the parent Body. T09 retains its mixed header fill exactly as observed, T03 repeated B95/C95 is ignored, and T08's separate A297:D297 blue region is outside its candidate table.
 
 This segmentation remains provisional and does not approve all candidate bounds. Body membership is not extraction permission: only gray cells are extracted, black/uncolored cells are excluded, and blank gray cells map to zero. Before production serialization, decide how the schema represents multi-level/discontiguous headers and nested sub-table headers; keep footer ranges optional. A separate later-period workbook is still required for drift validation.
+
+
+## Query-oriented Template persistence decision — 2026-11-18
+
+The Company Table Layout Template is metadata for deterministic extraction and application requests, not a human-facing copy of the Excel workbook. Persist it in normalized relational records with stable identifiers, foreign keys, versioning, uniqueness constraints, and exact source-coordinate provenance.
+
+Hierarchy: Company + ReportType -> TemplateVersion -> TableDefinition -> SubTableDefinition. A sub-table is a child record linked to its parent; it does not duplicate parent metadata.
+
+**Header inheritance rule:** a sub-table references the parent Header/column definition when column meanings, order, units/basis, and temporal interpretation are unchanged. It stores an explicit own Header definition only when those semantics differ. Header definitions may consist of multiple ordered/discontiguous ranges and levels; do not assume one contiguous header rectangle. Conflicting inherited/overridden definitions must be rejected rather than guessed. For the Parsian draft, the 15 green-marker sub-tables provisionally inherit their parent's header by reference; this is the default pending evidence of a semantic difference, not a claim that the workbook has been fully validated.
+
+Body and optional Footer are separate structural ranges. Footer is absent unless explicitly identified. Body membership does not authorize extraction: only Gray cells are extracted, Black and Uncolored are excluded, and Blank Gray maps to numeric zero.
+
+Retain A1 coordinates as source locators/provenance, but runtime requests should use canonical table/sub-table/field IDs and report-period dimensions. Do not store duplicated header text, copied parent definitions, raw cell grids, or derived values for display purposes. This decision settles the storage direction; candidate coordinates and Task 033 remain provisional/partial pending full approval and independent-period drift validation.
