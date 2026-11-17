@@ -96,9 +96,9 @@ The report supplies continuous border-supported candidate bounds for all 17 main
 
 Task DB-ING-006 / Task 033 remains **PARTIAL**:
 - sample candidate bounds now have detailed historical border evidence;
-- black/theme fill classification needs correction or a targeted re-audit;
+- theme-fill re-audit is deferred and is not part of the current approval gate;
 - the previously listed annotation exceptions have been resolved by the owner;
-- the map remains provisional until owner approval;
-- drift validation still requires a genuinely different Parsian periodic workbook from another reporting period.
+- the map remains provisional pending approval of the complete table/sub-table geometry and remaining template metadata;
+- comparison with a genuinely different Parsian periodic workbook is deferred; reports 1–3 are still audits of the same sample.
 
 No code was changed and no tests were run as part of this report review. The assistant reviewed the Markdown report only; it did not open the XLSX directly.
