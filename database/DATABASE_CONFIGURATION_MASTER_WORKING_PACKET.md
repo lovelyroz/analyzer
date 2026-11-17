@@ -994,3 +994,10 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 - داده خام سلول‌ها، متن تکراری Header والد در هر زیرجدول، کپی تعریف‌های والد و مقادیر مشتق‌شده صرفاً برای بازسازی ظاهری Excel ذخیره نمی‌شوند.
 
 برای Parsian، هر 15 زیرجدول سبزرنگ در پیش‌نویس فعلی به‌صورت پیش‌فرض به Header والد reference می‌دهد؛ این یک تصمیم مدل‌سازی موقت و قابل override است، نه ادعای تأیید محتوایی همه زیرجدول‌ها. اگر شواهد نشان دهد معنای ستون/دوره/واحد/ترتیب تغییر کرده، Header مستقل برای همان زیرجدول تعریف می‌شود. این تصمیم معماری، مختصات candidate را approved نمی‌کند و وضعیت Task 033 را از PARTIAL خارج نمی‌سازد؛ تأیید کامل bounds و drift validation با گزارش دوره‌ای مستقل همچنان باقی است.
+
+
+### 8.37 پیشنهاد مدل رابطه‌ای فیزیکی Template — 2026-11-18
+
+گام بعد از تصمیم query-oriented در 8.36، تهیه پیشنهاد schema فیزیکی بود. سند `database/reports/DB_DES_008_COMPANY_TABLE_TEMPLATE_RELATIONAL_SCHEMA_PROPOSAL.md` ایجاد شد. طرح شامل logical template بر اساس Company + ReportType، نسخه‌های immutable، worksheet، یک موجودیت یکپارچه LayoutNode برای TABLE/SUBTABLE با self-reference والد، چند Range ساختاری، Header binding صریح OWN/INHERIT، ColumnSlotهای متعلق به Header والد/مستقل، و ExtractionSpanهای فشرده برای محدوده‌های مثبت Gray است. Semantic Metric/Dimension mapping از ساختار فیزیکی Excel جدا نگه داشته شده است.
+
+این سند صرفاً پیشنهاد طراحی است؛ هنوز ORM، Migration، کد یا تستی مجاز/اجرا نشده است. پیش از implementation باید مدل‌های ORM و migrationهای فعلی ممیزی شوند، FKهای موجود تأیید شوند، matcher و worksheet identity تعیین تکلیف شوند و extraction-span compression در برابر مختصات Gray اعتبارسنجی شود. مختصات Parsian همچنان candidate هستند؛ spot-check به معنی تأیید کامل نیست. Task 033 همچنان PARTIAL است.
