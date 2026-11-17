@@ -153,3 +153,45 @@ The corrected audit inventory is 17 red title cells, 96 blue header cells, 15 gr
 The audit reports zero exact `thick` outside rectangles but 101 border-evidence ranges using `medium` style. These are raw geometry evidence, not proof of complete table rectangles. The detailed candidate inventory and provisional row partitions are in `PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md`. That map is not an approved Template: full table rectangles/column bounds remain for owner review, and a second later Parsian periodic workbook is required to validate layout drift. Reports 1–3 are audits of the same sample workbook and do not count as an independent second workbook.
 
 This corrected evidence supersedes the older two-worksheet narrative, the `Sheet1!A16:E24` claim, and the previous candidate-18 color inventory. Task DB-ING-006 remains PARTIAL. The assistant reviewed the text audit output and did not open the XLSX directly or run tests.
+
+
+## Parsian sample — consolidated owner rules and coordinate draft (2026-11-18)
+
+This section supersedes conflicting provisional statements in the earlier Parsian-specific paragraphs above. The general Template schema remains proposed; this section records the current sample-specific contract.
+
+### Worksheet scope and provenance
+
+- The only in-scope worksheet is `Recovered_Sheet1`.
+- The temporary worksheet `Sheet1` was deleted and is excluded completely.
+- Sample workbook SHA-256: `95f94e739632e48ae6552c562ecbf6c3e8182848718d17977f69bc984a6638b0`.
+- Report-3 candidate geometry is historical structural evidence for the main worksheet. It is the working reference for this coordinate draft, but has not been silently promoted to owner-approved production geometry.
+
+### Owner-confirmed annotation semantics
+
+- Red title cells identify the top-level table sections. Border marks outside a candidate rectangle do not expand that table.
+- Blue cells identify header annotations; duplicate header cells B95/C95 in T03 are redundant because they repeat B79/C79 and must be ignored.
+- Green cells identify sub-table title markers.
+- Yellow cells identify row descriptions/labels where present; yellow is not mandatory (T17 is a valid no-yellow exception).
+- Gray cells are the only positive extraction signal. A blank gray cell is extracted as numeric zero.
+- Black-filled cells and uncolored cells are excluded even when they contain numeric values.
+- Theme-based black fills count as black exclusions. The earlier audit count of zero black cells is invalidated by report 3's theme-fill evidence; a new theme-fill audit is deferred and is not a prerequisite for recording the owner's exclusion rule.
+- T06 rows 243–244 and T13 row 364 require no special-case semantics: uncolored cells are excluded by the general rule.
+- T04 black block `A131:L151` is excluded by the general black-cell rule.
+
+### Working coordinate draft
+
+The report-3 evidence and owner decisions have been consolidated into `PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md`, section 10. It records:
+- 17 candidate top-level A1 rectangles;
+- 15 candidate green-marker sub-table ranges, derived from each marker's row partition and its parent's column span;
+- observed header ranges and explicit exceptions.
+
+These ranges are **candidate coordinates pending explicit owner approval**, not yet the approved production Template. The green-marker row partition rule is: include the green marker row as the sub-table title row; end immediately before the next marker or at the parent table's final row; inherit the parent table's column span. Only gray cells inside the validated structure are extracted.
+
+### Remaining design gates
+
+1. Owner approval or correction of the 17 candidate table rectangles and 15 derived sub-table ranges in annotation-map section 10.
+2. Define exact header/body/footer segmentation and treatment of merged headers for each approved table.
+3. Decide deterministic worksheet identity and later-report table matching/coordinate-drift behavior.
+4. Decide template-version serialization/storage location.
+
+A second-period Parsian workbook comparison and a theme-fill re-audit are explicitly deferred for now. No runtime matcher or extraction implementation should be started until the owner has approved the coordinate draft and the remaining schema/matching decisions are specified.
