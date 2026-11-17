@@ -220,3 +220,8 @@ Hierarchy: Company + ReportType -> TemplateVersion -> TableDefinition -> SubTabl
 Body and optional Footer are separate structural ranges. Footer is absent unless explicitly identified. Body membership does not authorize extraction: only Gray cells are extracted, Black and Uncolored are excluded, and Blank Gray maps to numeric zero.
 
 Retain A1 coordinates as source locators/provenance, but runtime requests should use canonical table/sub-table/field IDs and report-period dimensions. Do not store duplicated header text, copied parent definitions, raw cell grids, or derived values for display purposes. This decision settles the storage direction; candidate coordinates and Task 033 remain provisional/partial pending full approval and independent-period drift validation.
+
+
+## DB-DES-008 relational schema proposal — 2026-11-18
+
+The proposed physical relational model is detailed in `DB_DES_008_COMPANY_TABLE_TEMPLATE_RELATIONAL_SCHEMA_PROPOSAL.md`. It uses a logical company/report-type template, immutable template versions, worksheet records, unified parent/child layout nodes, multiple structural ranges, explicit OWN/INHERIT Header bindings, parent-owned column slots, and compact positive extraction spans. Physical layout remains separate from canonical Metric/Dimension mapping. The proposal is query-oriented and does not persist raw workbook grids or duplicate inherited Header definitions. It is not yet approved for ORM/migration implementation; Task 033 remains PARTIAL.
