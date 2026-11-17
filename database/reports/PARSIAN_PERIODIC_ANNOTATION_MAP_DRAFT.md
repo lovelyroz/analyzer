@@ -193,3 +193,16 @@ Detailed analysis and all caveats are in `PARSIAN_PERIODIC_REPORT_3_STRUCTURAL_R
 ### 8.5 Current status
 
 The 17 candidate bounds now have continuous border evidence in report 3, but Template approval is still blocked on owner confirmation, theme-fill audit coverage, and unresolved exceptions. Report 3 audits the same sample workbook, not a second reporting period; a genuinely separate Parsian periodic workbook is still required for layout-drift validation.
+
+
+## 9. Owner clarifications — structural questions closed (2026-11-17)
+
+This section records the owner's explicit decisions and supersedes the corresponding provisional questions in sections 5, 6, and 8.4.
+
+- **T03 row 95:** B95 duplicates B79 and C95 duplicates C79. These repeated headers are redundant and are ignored; they are not a secondary header and do not create a structural partition. D95 is outside the T03 bounds `A79:C119` and is irrelevant.
+- **T06 rows 243–244:** black-filled cells and uncolored cells inside the table are excluded from extraction. The same gray-only positive extraction rule applies throughout the table.
+- **T13 row 364:** uncolored cells are excluded under the same rule; no semantic interpretation or special separator classification is needed.
+- **T02 border extensions:** the red title cell is the table-identification signal. Border marks outside the candidate bounds do not expand the table. T02 remains `A60:D68`.
+- **General extraction rule:** only gray-annotated cells are positive extraction targets. Black-filled and uncolored cells are excluded, including when they contain numeric values. A blank gray cell is different: it is an extraction target and maps to numeric zero.
+
+The former owner-confirmation questions about T03 row 95, T06 rows 243–244, T13 row 364, and T02 border extensions are closed. These decisions do not by themselves approve all 17 table bounds or complete the separate-period layout-drift validation.
