@@ -952,3 +952,17 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 **قاعده استخراج تثبیت‌شده:** فقط سلول‌های خاکستری positive extraction signal هستند. سلول‌های مشکی و بی‌رنگ، حتی اگر مقدار عددی داشته باشند، استخراج نمی‌شوند. سلول خاکستری خالی همچنان استخراج می‌شود و در مرحله معنایی مقدار صفر می‌گیرد.
 
 این تصمیم‌ها ابهام‌های annotation فوق را می‌بندند؛ اما به‌تنهایی به معنی approval نهایی همه boundsها یا تکمیل drift validation با workbook دوره‌ای مستقل نیستند. وضعیت Task 033 همچنان PARTIAL است تا gateهای مستقل باقی‌مانده تعیین تکلیف شوند. جزئیات در `database/reports/PARSIAN_PERIODIC_REPORT_3_STRUCTURAL_REVIEW.md` و `database/reports/PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md` ثبت شد.
+
+
+### 8.33 تبدیل شواهد Parsian به پیش‌نویس مختصات Template — 2026-11-18
+
+پس از بسته‌شدن چهار ابهام مالک در 8.32، گام بعدی به‌جای تکرار ممیزی رنگ، تبدیل شواهد report 3 به مختصات صریح A1 برای Template بود. در `database/reports/PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md` بخش 10 ثبت شد:
+
+- 17 محدوده candidate جدول اصلی، از T01 تا T17؛
+- 15 محدوده candidate زیرجدول، مشتق‌شده از ردیف marker سبز تا marker بعدی/انتهای جدول والد و با ارث‌بری ستون‌های والد؛
+- شواهد Header و استثناهای مهم، از جمله نادیده‌گرفتن B95/C95 تکراری در T03، خارج‌بودن D95، خارج‌نشدن محدوده T02 به‌علت Borderهای مجاور، و استثنای T17 بدون Yellow؛
+- قاعده استخراج فقط Gray، حذف Black و Uncolored، و تبدیل Blank Gray به صفر.
+
+در `COMPANY_TABLE_LAYOUT_TEMPLATE_SPEC.md` نیز بخش Parsian-specific افزوده شد تا قواعد مالک و coordinate draft را تثبیت کند. این مختصات هنوز **candidate و در انتظار تأیید صریح مالک** هستند؛ هیچ‌کدام صرفاً با درج در سند به production Template approved تبدیل نشده‌اند.
+
+گام بعدی: مالک محدوده‌های 17 جدول و 15 زیرجدول را تأیید یا اصلاح کند. پس از آن، header/body/footer segmentation و قواعد worksheet identity و matching تعیین می‌شوند. Theme-fill re-audit و مقایسه با workbook دوره‌ای دوم فعلاً deferred هستند. Task 033 همچنان PARTIAL است؛ هیچ کدی تغییر نکرد و تستی اجرا نشد.
