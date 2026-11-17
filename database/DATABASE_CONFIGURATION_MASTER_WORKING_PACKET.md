@@ -1001,3 +1001,29 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 گام بعد از تصمیم query-oriented در 8.36، تهیه پیشنهاد schema فیزیکی بود. سند `database/reports/DB_DES_008_COMPANY_TABLE_TEMPLATE_RELATIONAL_SCHEMA_PROPOSAL.md` ایجاد شد. طرح شامل logical template بر اساس Company + ReportType، نسخه‌های immutable، worksheet، یک موجودیت یکپارچه LayoutNode برای TABLE/SUBTABLE با self-reference والد، چند Range ساختاری، Header binding صریح OWN/INHERIT، ColumnSlotهای متعلق به Header والد/مستقل، و ExtractionSpanهای فشرده برای محدوده‌های مثبت Gray است. Semantic Metric/Dimension mapping از ساختار فیزیکی Excel جدا نگه داشته شده است.
 
 این سند صرفاً پیشنهاد طراحی است؛ هنوز ORM، Migration، کد یا تستی مجاز/اجرا نشده است. پیش از implementation باید مدل‌های ORM و migrationهای فعلی ممیزی شوند، FKهای موجود تأیید شوند، matcher و worksheet identity تعیین تکلیف شوند و extraction-span compression در برابر مختصات Gray اعتبارسنجی شود. مختصات Parsian همچنان candidate هستند؛ spot-check به معنی تأیید کامل نیست. Task 033 همچنان PARTIAL است.
+
+
+
+### 8.38 ممیزی سازگاری ORM و Migration برای Company Table Layout Template — 2026-11-18
+
+در ادامه DB-DES-008، ممیزی محدود مدل‌های SQLAlchemy و سازوکار Migration مخزن انجام شد. گزارش کامل در `database/reports/DB_AUD_009_ORM_MIGRATION_TEMPLATE_COMPATIBILITY_AUDIT.md` ثبت شده است.
+
+یافته‌های قطعی از کد فعلی:
+- موجودیت‌های `Company`، `Industry`، `Report`، `ReportVersion`، `FinancialPeriod` و `FinancialMetric` از قبل وجود دارند و می‌توانند در محدوده‌های مشخص‌شده reuse شوند.
+- هیچ موجودیت یا جدول موجودی برای `ReportType` catalog یا Company Table Layout Template / Worksheet / LayoutNode / Range / HeaderBinding / ColumnSlot / ExtractionSpan پیدا نشد.
+- `reports.report_type` فعلاً یک رشته آزاد `VARCHAR(100)` است، نه FK. بنابراین کلید منطقی DB-DES-008 یعنی `company_id + report_type_id` پیش از ساخت catalog کنترل‌شده ReportType قابل پیاده‌سازی نیست.
+- `ReportVersion` به `Report` وصل است و محل مناسبی برای ثبت نسخه دقیق Template استفاده‌شده در استخراج تاریخی است؛ اما FK به TemplateVersion و fingerprint فایل منبع در مدل فعلی وجود ندارد.
+- `RawFinancialFact.source_section/source_row/source_column` و `MappingRule/MappingDecision` جایگزین مدل Layout نیستند و نباید برای این منظور توسعه داده شوند.
+- پروژه از Migration اختصاصی `src/migrations/runner.py` با نسخه‌های 1 تا 8 و جدول `schema_migrations` استفاده می‌کند؛ Alembic/revision chain در مسیر بررسی‌شده وجود ندارد. FKهای SQLite نیز در `src/core/database.py` برای هر connection فعال می‌شوند.
+
+تصمیم/جهت پیشنهادی برای گام پیاده‌سازی:
+1. ابتدا ReportType catalog با code پایدار تعریف شود؛ مقدارهای distinct فعلی `reports.report_type` باید پیش از backfill استخراج و به‌صورت صریح map شوند. مقدار ناشناخته نباید fuzzy-normalize شود. ستون متنی قدیمی در دوره گذار حفظ شود.
+2. پس از آن `report_type_id` به‌صورت additive به `reports` افزوده شود.
+3. FK nullable از `report_versions.template_version_id` به نسخه immutable Template اضافه شود تا provenance تاریخی ثبت شود؛ برای گزارش‌های قدیمی NULL مجاز بماند و ingestion جدید Excel پیش از پذیرش fact ملزم به ثبت آن باشد.
+4. سازگاری Company/ReportType بین Report و TemplateVersion باید با composite constraint یا validation تراکنشی صریح تضمین شود؛ FK ساده به‌تنهایی کافی نیست.
+5. فعلاً `active_version_id` به Template اضافه نشود؛ یک APPROVED version با partial unique index کنترل شود.
+6. مدل‌های جدید باید در importهای runner ثبت شوند و migration جدید بعد از version 8 افزوده شود؛ migrationهای تاریخی تغییر نکنند.
+
+این ممیزی فقط source code و اسناد را بررسی کرد؛ دیتابیس SQLite زنده، داده‌های موجود و نسخه runtime SQLite بررسی نشدند. در نتیجه فهرست واقعی ReportTypeهای legacy، سیاست backfill نهایی و feature floor نسخه SQLite هنوز gateهای جداگانه‌اند.
+
+**وضعیت:** DB-AUD-009 تکمیل شد؛ DB-DES-008 همچنان PROPOSED است. هیچ کد، ORM، Migration، تست یا داده‌ای تغییر نکرد و تستی اجرا نشد. Task 033 همچنان PARTIAL است؛ تأیید کامل Template و drift validation با workbook دوره‌ای مستقل باز هستند.
