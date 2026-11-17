@@ -200,3 +200,10 @@ A second-period Parsian workbook comparison and a theme-fill re-audit are explic
 ### Parsian owner spot-check — 2026-11-18
 
 The owner checked several of the candidate A1 ranges recorded in `PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md` section 10 and reported no issue in those checked examples. This is a spot check, not blanket approval of all 17 parent-table bounds and 15 sub-table partitions. The coordinate set remains the working candidate map; header/body/footer segmentation may proceed provisionally, but must distinguish observed facts from unresolved boundaries. No production Template approval or layout-drift validation is implied.
+
+
+### Parsian provisional Header / Body / Footer segmentation — 2026-11-18
+
+PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md section 12 now records a provisional row segmentation for all 17 candidate tables. It separates the observed parent Header ranges from the remaining candidate Body ranges. No Footer range is currently evidenced; the schema must not infer a footer merely because rows are at the end of a table. Green sub-table markers remain structural elements inside the parent Body. T09 retains its mixed header fill exactly as observed, T03 repeated B95/C95 is ignored, and T08's separate A297:D297 blue region is outside its candidate table.
+
+This segmentation remains provisional and does not approve all candidate bounds. Body membership is not extraction permission: only gray cells are extracted, black/uncolored cells are excluded, and blank gray cells map to zero. Before production serialization, decide how the schema represents multi-level/discontiguous headers and nested sub-table headers; keep footer ranges optional. A separate later-period workbook is still required for drift validation.
