@@ -1095,3 +1095,30 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 `python src/scripts/audit_legacy_raw_fact_links.py`
 
 سپس اعلام شود `reply.md is updated`. تا دریافت نتیجه، جدول و داده‌های legacy حفظ می‌شوند. حتی raw fact بدون ارجاع نیز صرفاً بر مبنای شمارش linkage قابل حذف نیست. گزارش DB-AUD-011 نیز مسیر persistence و این گام بعدی را ثبت کرده است. هیچ ORM، Migration، داده یا تستی تغییر نکرده است.
+
+
+### 8.44 نتیجه ممیزی Row-Linkage رکوردهای RawFinancialFact — 2026-11-18
+
+مالک پروژه اسکریپت read-only `src/scripts/audit_legacy_raw_fact_links.py` را اجرا کرد. خروجی `reply.md` نشان می‌دهد هر سه جدول دارای FK به `raw_financial_facts` در دیتابیس محلی خالی هستند:
+
+| جدول | تعداد کل ردیف | raw_fact_id غیرNULL | Raw Fact متمایز ارجاع‌شده |
+|---|---:|---:|---:|
+| `mapping_decisions` | 0 | 0 | 0 |
+| `normalized_financial_fact_inputs` | 0 | 0 | 0 |
+| `normalized_financial_facts` | 0 | 0 | 0 |
+
+بنابراین تمام 505 رکورد RawFinancialFact در این سه جدول هیچ ارجاعی ندارند و هیچ dangling reference نیز مشاهده نشده است. این نتیجه فقط وضعیت snapshot دیتابیس محلی را توصیف می‌کند و نبود وابستگی در محیط‌ها، نسخه‌های دیگر دیتابیس، backupها یا مصرف‌کننده‌های خارج از مخزن را اثبات نمی‌کند.
+
+بازبینی source فعلی نیز نشان می‌دهد مسیر `src/ingestion/codal/ingestion.py` و `src/ingestion/codal/pipeline.py` همچنان PDF را استخراج می‌کنند و در نهایت به `src/ingestion/service.py::ingest_codal_report` می‌رسند؛ این تابع برای هر RawLineInput یک RawFinancialFact می‌سازد و ذخیره می‌کند. در مقابل، `src/ingestion/excel` فعلاً DTO و Reader دارد و مسیر production مستقل Excel-to-canonical persistence در کد بررسی‌شده اثبات نشده است.
+
+**تصمیم و محدودیت فعلی:**
+1. هر 505 رکورد و پنج ستون provenance بدون تغییر حفظ شوند.
+2. این ممیزی مجوز حذف جدول، داده‌ها، ORM یا Migration نیست.
+3. جدول‌های downstream فعلاً خالی‌اند؛ نباید طراحی ingestion جدید Excel را بر پایه FKهای legacy به RawFinancialFact بنا کنیم مگر با تصمیم معماری صریح.
+4. پیش از بازنشستگی جدول، مسیر write-capable PDF باید به‌صورت مستقل و کامل بازنشسته شود؛ شامل facadeها، pipeline entry pointها، callerها، تست‌ها و importهای migration runner. نباید پس از حذف جدول، کدی باقی بماند که در آن بنویسد.
+5. درست پیش از هر migration مخرب، linkage روی همان دیتابیسی که قرار است migrate شود دوباره اجرا و وابستگی محیط‌ها/backupها/مصرف‌کننده‌های بیرونی بررسی شود.
+6. صفر بودن لینک‌های RawFact به‌تنهایی درباره‌ی ضرورت نگهداری Report و ReportVersion تصمیم نمی‌دهد؛ نقش آن‌ها در معماری Excel باید جداگانه تعیین شود.
+
+**وضعیت:** ممیزی linkage دیتابیس محلی COMPLETE؛ مسیر write قدیمی PDF در source PRESENT؛ مسیر production Excel-to-canonical persistence NOT ESTABLISHED؛ بازنشستگی RawFinancialFact NOT AUTHORIZED؛ Migration 9 reconciliation همچنان OPEN. هیچ ORM، Migration، داده یا تستی تغییر نکرد و تستی اجرا نشد.
+
+**گام بعدی پیشنهادی:** ممیزی دقیق وابستگی‌های کد و نقطه‌های ورود مسیر PDF، به‌همراه تفکیک اجزای مشترک ingestion از اجزای PDF-only؛ هدف تعیین دامنه‌ی امن بازنشستگی PDF بدون حذف/تغییر منطق مشترک مالی و بدون فرض درباره‌ی کدهای مصرف‌کننده است.
