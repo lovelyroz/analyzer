@@ -67,3 +67,4 @@
 - [DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md](reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md) — ممیزی تکمیل‌شده مسیر PDF و inventory محلی؛ تفکیک اجزای PDF-only از قراردادهای legacy و schema.
 - اسکریپت read-only: `src/scripts/audit_codal_pdf_dependencies.py`.
 - [DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md](reports/DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md) — طرح مرحله‌ای بازنشستگی PDF با حفظ RawFinancialFact و persistence مشترک تا تصمیم مستقل.
+- [DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md](reports/DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md) — مقایسه قرارداد FinancialFact هدف با ORM فعلی و شناسایی شکاف‌های Report/Version، Period، NormalizedFact و provenance.
