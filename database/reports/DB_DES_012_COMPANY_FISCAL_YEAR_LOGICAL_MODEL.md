@@ -172,3 +172,22 @@ The owner clarified the domain invariant: **every fiscal year is exactly twelve 
 A change in closing month cannot automatically be bridged while preserving both (a) twelve months in every fiscal year and (b) a continuous, non-overlapping annual sequence. Therefore, V1 does not implement automatic fiscal-year-boundary changes. It records only fully evidenced twelve-month fiscal-year intervals and rejects unresolved changes. If a real target-company case requires a different treatment, that is a separate policy decision; the system must not infer it.
 
 **Status:** The twelve-month invariant is accepted owner input and binding for the V1 logical design. This amendment changes documentation only; no ORM, migration, code, database, or tests changed.
+
+## 12. Owner decision amendment — collect only fiscal-year start month (2026-11-18)
+The owner simplified the V1 requirement: **the user supplies only the Jalali month in which the company's fiscal year begins.** The application must not ask the user to provide a start day, end date, or a separate record for every fiscal year.
+
+### Binding V1 model
+
+1. Store one company-level setting, logically named `fiscal_year_start_month`, with a valid Jalali month value from 1 through 12.
+2. The fiscal year begins on day 1 of that month. Its end is the final day of the month immediately preceding the next occurrence of the start month, so every fiscal year is exactly twelve consecutive Jalali calendar months.
+3. Example: if the start month is Dey (10), a fiscal year ending in Azar 1404 runs from 1403/10/01 through 1404/09/30. This is a twelve-month interval.
+4. Ask the user for the start month when a company's setting is unknown. Do not infer it from report titles, publication dates, CODAL metadata, prior-year labels, or incomplete workbook clues.
+5. Once the month is known, derive the exact Jalali start/end dates needed for each report period. Preserve any fiscal-year label explicitly supplied by the source; do not use the label alone to override the calculated dates.
+6. A report whose explicit dates conflict with the company's configured start month must be stopped and presented to the user for clarification. Do not silently change the company setting or force the report into a different year.
+7. This is a V1 simplification. Do not introduce per-year evidence records, approval workflows, transition-year machinery, calendar-history entities, or automatic discovery unless a concrete requirement later demonstrates they are necessary.
+
+### Supersession
+
+This owner decision supersedes the per-actual-year evidence-backed entity, mandatory evidence gates, historical interval workflow, and transition-year machinery proposed in Sections 1–10 above wherever they conflict. The strict twelve-month invariant in Section 11 remains in force and is naturally satisfied by this month-based rule.
+
+**Implementation boundary:** this amendment records the logical requirement only. It does not authorize ORM, migration, runtime code, or database changes. Migration 9 and legacy date semantics remain separate implementation prerequisites.
