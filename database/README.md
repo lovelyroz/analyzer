@@ -70,3 +70,5 @@
 - [DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md](reports/DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md) — طرح مرحله‌ای بازنشستگی PDF با حفظ RawFinancialFact و persistence مشترک تا تصمیم مستقل.
 - [DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md](reports/DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md) — مقایسه قرارداد FinancialFact هدف با ORM فعلی و شناسایی شکاف‌های Report/Version، Period، NormalizedFact و provenance.
 - [DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md](reports/DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md) — inventory مصرف‌کنندگان runtime، وابستگی Stage 5 و گپ linkage جداول Derived.
+
+- اسکریپت read-only برای تکمیل linkage جداول Normalized/Derived: `src/scripts/audit_normalized_derived_fact_links.py` — اجرا از ریشه پروژه با `python src/scripts/audit_normalized_derived_fact_links.py`؛ خروجی در `reply.md`.
