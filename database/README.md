@@ -81,3 +81,5 @@
 
 - [DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md](reports/DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md) — قرارداد پذیرفته‌شده مالکیت fact-level برای YTD/Standalone و دوره‌های جلالی.
 - [DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md](reports/DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md) — ممیزی تطبیق قراردادهای زمانی و ثبت gateهای باقی‌مانده.
+
+- [DB_AUD_017_FISCAL_CALENDAR_SOURCE_AND_LIFECYCLE_AUDIT.md](reports/DB_AUD_017_FISCAL_CALENDAR_SOURCE_AND_LIFECYCLE_AUDIT.md) — ممیزی شواهد منبع، مدل فعلی Company و چرخه عمر سال مالی اختصاصی هر شرکت.
