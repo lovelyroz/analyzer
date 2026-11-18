@@ -353,3 +353,23 @@ DB-AUD-006 در این نوبت **PARTIAL** باقی می‌ماند. این م�
 4. نقش نهایی Report.financial_period_id (حذف تدریجی، nullable و descriptive، یا جایگزینی با primary-period metadata) پس از inventory کامل call-siteها و physical design تعیین می‌شود.
 
 محدودیت: این بررسی static و read-only بود؛ تست اجرا نشد و هیچ کد، ORM، schema، migration یا دیتابیسی تغییر نکرد.
+
+
+## 15. تکمیل inventory ایستا در فایل‌های Python برای Gate 5 — 2026-11-18
+
+پس از اصلاح دستور PowerShell، خروجی جست‌وجوی تمام فایل‌های *.py در repository (با حذف .git، محیط‌های مجازی و __pycache__) بررسی شد. این خروجی دامنهٔ فایل‌های Python را پوشش می‌دهد؛ نه فایل‌های غیر Python، کدهای خارج از repository یا فراخوانی‌های پویا در زمان اجرا.
+
+نتایج مرتبط:
+- تعریف و پیاده‌سازی writer مرکزی: src/ingestion/service.py::ingest_codal_report.
+- API سازگاری src/ingestion/codal/ingestion.py::ingest_codal_report به writer مرکزی delegate می‌کند؛ ingest_codal_pdf نیز پس از استخراج آن API را صدا می‌زند.
+- src/ingestion/codal/pipeline.py، تابع‌های load_codal_pdf و load_codal_pdf_from_url را دارد و هر دو مسیر در نهایت writer مرکزی را فراخوانی می‌کنند.
+- src/ingestion/__init__.py و src/ingestion/codal/__init__.py توابع را export می‌کنند؛ export به‌تنهایی caller اجرایی محسوب نمی‌شود.
+- جست‌وجوی financial_period_id کاربردهای جداگانه‌ای در src/evaluation نشان داد. در فایل‌های بازبینی‌شده، این شناسه در DTOها و قراردادهای observation/evaluation به دورهٔ داده اشاره دارد؛ نباید صرفاً به‌دلیل یکسان بودن نام، آن را مصرف ستون Report.financial_period_id تلقی کرد.
+- در خروجی جست‌وجو، ارجاع‌های تستی به writer و ساخت Report با period نیز وجود دارد؛ این‌ها قراردادهای آزمون/سازگاری را نشان می‌دهند، نه caller تولیدی مستقل.
+
+### نتیجهٔ Gate 5 پس از این گام
+در محدودهٔ کدهای Python زیر src/ که با جست‌وجو و بازبینی فایل‌های مرتبط بررسی شدند، وابستگی اجرایی مستقیم ستون Report.financial_period_id در writer قدیمی متمرکز است؛ facadeها و pipelineهای PDF آن را از طریق همان writer به ارث می‌برند. مصرف‌کنندهٔ تولیدی مستقلی که جداگانه این ستون را بخواند، از شواهد این خروجی احراز نشد. این نتیجه را نباید به تمام محیط‌ها، اسکریپت‌های بیرونی، SQL یا فراخوانی‌های پویا تعمیم داد.
+
+**تصمیم فعلی بدون تغییر:** ستون و قرارداد legacy دست‌نخورده می‌مانند. طراحی writer اکسل باید period هر observation/fact را مستقل تعیین کند و نباید period واحد Report را به همهٔ factها تعمیم دهد. تعیین نقش نهایی ستون Report و هرگونه nullable/remove فقط پس از بررسی وابستگی‌های باقی‌مانده و طراحی coexistence/retirement انجام می‌شود.
+
+این گام فقط جست‌وجو و بازبینی ایستا بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
