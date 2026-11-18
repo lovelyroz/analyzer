@@ -2025,3 +2025,16 @@ Reader باید read-only بماند. لایهٔ Template resolution، semantic 
 نتیجه: 40/40 slot از نظر موقعیت ساختاری قابل‌شناسایی‌اند، اما هیچ‌یک صرفاً با گزارش ساختاری برای ingestion نهایی از تمام ابعاد semantic و provenance اثبات نشده‌اند. T01 بهترین fixture ساختاری direct mapping است؛ T03 fixture دوم برای HeaderPath چندسطحی و RowAxis گروهی است. T17 نیازمند alternative row identity صریح است. Multi-input همچنان UNPROVEN است.
 
 قدم بعدی: ایجاد Mapping Decision Register محدود به T01 و T03 و تعیین فیلدهای semantic لازم برای یک direct mapping قابل‌آزمایش. Provenance واقعی CODAL همچنان مانع مستقل ingestion نهایی است. این مرحله فقط مستندات را تغییر داد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.94 ثبت Row-level Semantic Mapping برای T01
+
+DB-DES-009 بخش 27 برای T01 ثبت کرد:
+- دو ColumnSlot مستقل B و D با HeaderPath و audit status مشخص؛ هیچ ادغامی به Multi-input Fact مجاز نیست.
+- سه RowAxis parent node در A12/A32/A35 و 28 leaf row با source labelهای دقیق.
+- ستون C Black و excluded؛ ستون E خارج محدوده و excluded.
+- note سلول A9 فقط scale «میلیون» را اثبات می‌کند و currency را به‌تنهایی ثابت نمی‌کند؛ ردیف‌های 36–41 صریحاً واحد ریال دارند؛ واحد/measurement basis ردیف 42 نامعلوم است.
+- 56 مقدار Gray و بدون Gray blank؛ Rule 7 در T01 کاربرد ندارد.
+- period/duration_basis، canonical Metric/Dimension، sign/aggregation policy و CODAL revision provenance هنوز برای ingestion نهایی BLOCKED یا ناقص‌اند.
+
+T01 اکنون یک structural fixture با RowAxis/ColumnSlot مشخص است، نه TemplateVersion مصوب production. قدم بعدی بررسی T03 با همین روش است. این مرحله فقط مستندات را تغییر داد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
