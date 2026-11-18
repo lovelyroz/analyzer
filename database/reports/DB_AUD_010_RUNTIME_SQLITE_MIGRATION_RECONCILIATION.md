@@ -73,3 +73,21 @@ A compact local PowerShell evidence collection is sufficient; no new schema chan
 ## 6. Status
 
 DB-AUD-010 records a runtime/source discrepancy and narrows the next investigation. It does not approve ReportType values, resolve the discrepancy, or authorize implementation. DB-DES-008 remains PROPOSED. Task 033 remains PARTIAL. No tests were run.
+
+
+## 7. Follow-up audit of Migration 9 columns — 2026-11-18
+
+A subsequent read-only audit of the owner's local SQLite database and Python source produced these results for `raw_financial_facts`:
+
+| Column | Total rows | Non-null rows | Distinct non-null values |
+|---|---:|---:|---:|
+| `source_sheet` | 505 | 505 | 1 |
+| `source_column_header` | 505 | 505 | 23 |
+
+The sole `source_sheet` value is `Recovered_Sheet1`. The 23 observed `source_column_header` values contain period/header text from the source workbook. Thus, neither column is empty in the current local database. This is evidence of populated legacy provenance/context data, not proof that these fields belong in the final canonical fact schema.
+
+The source-reference scan found the two names only in the temporary audit scripts then present under `src/scripts`; it did not establish active application/ORM usage. The audit script itself was excluded from any claim of application usage.
+
+**Architectural assessment:** these columns must not be dropped or retained solely because they contain data. The new Excel ingestion design uses explicit template structure, canonical identifiers, and source locators/provenance at the appropriate report/template level. Before deciding their final disposition, determine whether the information they contain is represented elsewhere in the approved design and whether any existing service/report requires backward compatibility. Until then, preserve the columns and their values; do not run a destructive migration.
+
+This follow-up resolves the earlier uncertainty about whether the two columns are populated, but does not recover the original Migration 9 implementation or prove its complete schema effects. The exact historical migration source remains unavailable in the checked-out repository.
