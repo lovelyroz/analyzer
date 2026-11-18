@@ -122,11 +122,13 @@ Reject facts whose temporal kind conflicts with the approved metric definition.
 
 ### 5.3 Duration basis and period length
 
-For each duration fact, the query must know:
-- exact Jalali start/end;
-- months_length;
-- whether the value is standalone or cumulative/YTD;
+For each duration fact, the query must project and validate the fact-level `duration_basis`:
+- exact Jalali start/end from FinancialPeriod;
+- months_length under the approved interval rule;
+- `duration_basis=STANDALONE` or `YTD` from FinancialFact (never from FinancialPeriod);
 - fiscal-year identity where needed.
+
+For INSTANT facts, duration_basis is NULL / NOT_APPLICABLE. Reject an INSTANT fact carrying YTD/standalone or a DURATION fact missing a required basis. Validate the basis against the approved metric/report-family temporal mapping.
 
 Do not compare or combine duration values with incompatible bases or lengths.
 
@@ -319,7 +321,7 @@ No dual-write and no unverified union of legacy/new fact rows.
 | Equal-ranked version tie | newest publication wins | OWNER-DECIDED |
 | Period order | Jalali boundaries, never period ID | PROPOSED |
 | Dimension selection | explicit metric binding; empty set default; fail on ambiguity | PROPOSED |
-| Duration comparability | no YTD/standalone or length mixing | PROPOSED |
+| Duration comparability | fact-level duration_basis; no YTD/standalone or length mixing | PROPOSED |
 | Stock selection | latest/nearest prior INSTANT | PROPOSED |
 | NULL / zero / fallback | three distinct states and metric policy | OWNER-DECIDED / PROPOSED query behavior |
 | Provenance | preserve direct fact IDs and all inputs of runtime derivations | PROPOSED |
