@@ -168,3 +168,18 @@ After that, the next design task is a Stage 5 query migration contract: map old 
 - Local Derived table/linkage evidence: PENDING.
 - ORM, migration, runtime code, database rows, and tests: UNCHANGED.
 - Tests run: NONE.
+
+
+## 9. Read-only local database audit prepared
+
+The follow-up script has now been added:
+
+`src/scripts/audit_normalized_derived_fact_links.py`
+
+Owner command from the repository root:
+
+`python src/scripts/audit_normalized_derived_fact_links.py`
+
+It opens `tehran_stock.db` in SQLite read-only mode and writes the results to `reply.md`. It reports counts for the four normalized/derived tables, all relevant references (including `derived_financial_fact_inputs.normalized_fact_id`), per-target linkage distributions, duplicate input-link groups and `PRAGMA foreign_key_check` output. Missing tables or columns are reported explicitly. It does not change schema or rows.
+
+**Execution status:** script created and committed; owner execution and local database evidence are PENDING. No tests were run.
