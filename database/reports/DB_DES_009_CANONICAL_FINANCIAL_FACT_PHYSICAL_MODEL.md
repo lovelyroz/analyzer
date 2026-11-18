@@ -922,10 +922,13 @@ T01 در `Recovered_Sheet1!A10:D42` یک **نمونهٔ مرجع ساختاری 
 ### 24.7 معیار عبور از این مرحله و وضعیت
 
 این قرارداد، مرز رفتار V1 را روشن می‌کند اما هنوز Template تولیدی Parsian را تصویب نمی‌کند. برای بستن Gate 7 لازم است:
-- مالک ابهام‌های مؤثر را صریحاً حل کند یا آن‌ها را به‌صورت scope exclusion قطعی تأیید کند؛
+- همهٔ 17 مرز candidate و 15 partition فرعی به‌صورت صریح بررسی و تصویب شوند؛ spot-check قبلی چند محدوده به معنی blanket approval نیست؛
+- برای T01، currency/unit و بازهٔ واقعی Jalali و YTD/STANDALONE هر Fact با شواهد صریح تعیین شود؛
+- برای T03، unit/scale و scope شرکت/تجمیع و Metric/Dimension canonical تعیین شود؛
+- provenance و ranking نسخه‌های audited/restated به‌صورت مستقل از Header text اثبات شود؛
 - همین قرارداد روی workbook مستقل دیگری از همان شرکت/ReportType آزموده شود تا drift ساختاری معلوم شود؛
 - دست‌کم یک fixture direct mapping end-to-end و constraintهای عدم‌ابهام آن اثبات شود؛
 - multi-input با نمونهٔ واقعی مستقل اثبات شود یا از V1 صریحاً خارج بماند؛
-- طرح با متن کامل DB-DES-008 و DB-DES-014 reconcile شود.
+- reconciliation با قراردادهای DB-DES-008/013/014 و مسیر DB-ING-006 / Task 033 حفظ شود.
 
 **وضعیت:** قرارداد شناسایی Template V1 به‌صورت طراحی PROPOSED ثبت شد؛ T01 نمونهٔ direct mapping ساختاری است و T03 برای proof محدود شواهد Header/RowAxis دارد. تصمیم‌های مالک دربارهٔ T02/T03/T06/T13/T17، Black/uncolored، U01 و Sheet1 اعمال شده‌اند. موارد باز اصلی دیگر صرفاً annotation نیستند: تأیید نهایی تمام 17 مرز و 15 partition (spot-check قبلی blanket approval نیست)، تعیین currency/unit و temporal basis برای T01، تعیین unit/scale برای T03، تثبیت provenance و ranking نسخه‌های گزارش، و workbook مستقل دورهٔ بعد. Gate 7 PARTIAL/OPEN؛ Gateهای فیزیکی 1/2/7/8 همچنان PROPOSED. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
