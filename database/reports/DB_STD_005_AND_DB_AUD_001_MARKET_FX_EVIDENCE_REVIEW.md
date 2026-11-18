@@ -536,3 +536,15 @@ Migrationها به‌صورت توابع Python در یک فایل `src/migratio
 **محدودیت:** این inventory کامل literal references در 130 فایل Python است، نه اثبات نبود مصرف پویا یا خارج از Python. XLSX/CSV، دیتابیس عملیاتی و اجرای تست‌ها بررسی/اجرا نشدند. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد.
 
 **وضعیت DB-AUD-001:** PARTIAL. inventory literal references تکمیل شد و شکاف مسیر CODAL→Raw در برابر Stage 5→Normalized به نقشهٔ وابستگی تبدیل شد. بررسی alias/dynamic imports، schema واقعی DB، و migration plan همچنان باز است.
+
+
+## 9. Reconciliation of available sample files — 2026-11-19
+
+A recursive inventory of the tracked `master` repository tree found no tracked `.csv`, `.xlsx`, or `.xls` source files. A Library search for actual MarketDaily CSV, both FX-rate samples, ShareCountHistory and CorporateAction source files returned no relevant source sample; returned items were unrelated project notes/reports. This does not prove that no local files exist on the owner's computer, but it confirms that the current repository evidence cannot establish real Feed headers, units, scales, date/number formats, or revision metadata.
+
+Therefore the following evidence requests remain exact and unchanged:
+- one authentic MarketDaily CSV with source identity and representative rows;
+- one authentic daily FX sample for FREE_MARKET and one for EXCHANGE_CENTER (or one source file containing both with an explicit discriminator);
+- an owner decision whether ShareCountHistory and CorporateAction are V1 file imports, manually entered records, or deferred.
+
+No parser, code, ORM, schema, migration, database, or test was changed/run. This section closes only the repository/library sample-availability check; it does not close DB-STD-005.
