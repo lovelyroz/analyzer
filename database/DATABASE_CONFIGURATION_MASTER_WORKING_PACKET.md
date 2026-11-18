@@ -1923,3 +1923,19 @@ Gateهای 7 و 8 به‌صورت یک بسته بررسی شدند، چون pro
 **Gate 8:** یک TemplateVersion و یک InterpretationStandardVersion برای هر ReportVersion پذیرفته‌شده در V1 از نظر منطقی بسته است؛ physical binding، NOT NULL/immutability و قید سازگاری Template داخل Interpretation bundle باز است.
 
 Reader باید read-only بماند. لایهٔ Template resolution، semantic interpretation، validation و canonical persistence باید جداگانه طراحی شوند. این گام read-only بود؛ کد/ORM/schema/migration/DB تغییر نکرد و تستی اجرا نشد.
+
+
+## 8.88 طرح فیزیکی یکپارچه Template / Interpretation / Dimension / Provenance — 2026-11-19
+
+یک طرح یکپارچه برای Gateهای 1، 2، 7 و 8 در بخش 22 سند DB-DES-009 ثبت شد. زنجیرهٔ هویت پیشنهادی: ReportVersion → TemplateVersion → InterpretationStandardVersion → SemanticMapping → FinancialFact → FinancialFactProvenance.
+
+نکات اصلی:
+- TemplateVersion ساختار کامل workbook را نسخه‌بندی می‌کند؛ row-axis سلسله‌مراتبی و Header path چندسطحی باید identity ساختاری داشته باشند. row index و cell coordinate فقط locator نسخه‌ای هستند.
+- InterpretationStandardVersion به یک TemplateVersion دقیق pin می‌شود؛ ReportVersion برای Excel پذیرفته‌شده دقیقاً یک TemplateVersion و یک Bundle می‌گیرد و composite FK برابری TemplateVersion داخل Bundle را enforce می‌کند.
+- SemanticMapping باید intersection دقیق layout/table + row-axis path + Header/ColumnSlot را به Metric و ruleهای نسخه‌دار temporal, dimension, unit/basis و value-state وصل کند؛ free-text/fuzzy-only mapping کافی نیست.
+- Dimension و member کاتالوگ global و immutable دارند؛ allowed dimensions/values در Bundle محدود می‌شوند. DimensionSet با canonical key قطعی و composite FK برای تطابق value با dimension ساخته می‌شود.
+- Fact identity فعلی DB-DES-009 حفظ می‌شود؛ scenario/تمایز value-defining باید در DimensionSet باشد. Provenance چندمنبعی با چند ردیف مستقل ثبت می‌شود.
+- UNIQUE provenance شامل ستون nullable در SQLite کافی نیست؛ برای slot=NULL باید identity/unique-index strategy صریح تعیین شود.
+- پیش از migration دو fixture واقعی direct و multi-input و adversarial tests لازم است.
+
+این طرح هنوز PROPOSED است و باید با متن کامل DB-DES-008 و DB-DES-014 reconcile شود؛ متن کامل آن دو سند از مسیرهای حدس‌زده‌شده قبلی بازیابی نشد. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
