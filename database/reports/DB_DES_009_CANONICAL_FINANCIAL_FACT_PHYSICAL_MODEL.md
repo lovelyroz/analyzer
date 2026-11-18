@@ -1015,3 +1015,58 @@ Partitionها فقط ساختار RowAxis را تعیین می‌کنند؛ عن
 دیگر لازم نیست 17 محدوده و 15 marker را از ابتدا با کاربر مرور کنیم. قدم بعدی باید یک **Semantic Mapping Readiness Matrix** محدود به ColumnSlotهای استخراجی باشد: برای هر slot، ثبت شود که HeaderPath، RowAxisPath، Metric، Dimension، unit/scale، Jalali period، duration_basis و provenance چه چیزی را اثبات می‌کنند و چه چیزی هنوز نامعلوم است. موارد نامعلوم به‌صورت BLOCKED باقی می‌مانند؛ هیچ مقدار مالی با حدس تکمیل نمی‌شود.
 
 **وضعیت:** پوشش ساختاری 17/17 candidate و 15/15 partition بر مبنای گزارش و تصمیم‌های ثبت‌شده مستند شد. این به معنی approval نهایی همهٔ Templateها یا semantic mapping نیست. Gate 7 همچنان PARTIAL / OPEN؛ physical design همچنان PROPOSED. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 26. ماتریس آمادگی Semantic Mapping در سطح ColumnSlot — 2026-11-19
+
+### 26.1 دامنه
+
+بر اساس 17 candidate و نقش‌های سلولی ثبت‌شده در بخش 25، تعداد **40 ColumnSlot مقداری** در محدوده‌های فعلی شناسایی می‌شود. این ماتریس مشخص می‌کند ساختار هر slot تا کجا قابل مشاهده است و چه اطلاعاتی برای تبدیل آن به FinancialFact هنوز لازم است. «Slot شناسایی شد» به معنی «Metric آن معلوم است» نیست.
+
+### 26.2 ماتریس ColumnSlotها
+
+| Candidate | ColumnSlotهای مقداری | تعداد | Header/RowAxis evidence | وضعیت Metric و Dimension | واحد/مقیاس | Period و duration_basis |
+|---|---|---:|---|---|---|---|
+| T01 | B, D | 2 | HeaderPath دو سطحی و RowAxis سه گروهی؛ direct intersection روشن | Metric هر ردیف باید به catalog متصل شود؛ Dimension هنوز مصوب نیست | یادداشت «میلیون» در A9 شاهد candidate است؛ canonical unit/scale نیازمند تأیید mapping | Header تاریخ و audit status دارد؛ تبدیل به period و YTD/STANDALONE هنوز اثبات نشده |
+| T02 | B, D | 2 | HeaderPath دو سطحی؛ یک marker و یک ردیف مستقل قبل از آن | Metric/Dimension باز | یادداشت «میلیون» در A59 candidate evidence | تاریخ و audit status قابل‌مشاهده؛ temporal basis باز |
+| T03 | B, C | 2 | دو HeaderPath مستقل؛ RowAxis سه گروهی؛ Header آبی A95 نقش ساختاری دارد و B95/C95 تکراری‌اند | Metric و Dimension گروه‌های دارایی/حقوق مالکانه/بدهی باید canonical شوند | یادداشت واحد در A78 candidate evidence؛ scale نهایی باز | تاریخ/وضعیت در Header؛ دوره و duration_basis هر ستون باید تثبیت شود |
+| T04 | B:L | 11 | Headerهای 12 ستونی در ردیف 130؛ RowAxis labelهای زرد بعد از marker A152؛ Black rows قبل از آن excluded | ستون‌ها اجزای سرمایه/حقوق مالکانه‌اند؛ تعیین اینکه هر ستون Metric یا Dimension است نیازمند catalog mapping صریح | واحد/scale در گزارش ساختاری به‌تنهایی کافی نیست | temporal semantics از Header/عنوان و rule گزارش باید تعیین شود |
+| T05 | B, D | 2 | HeaderPath دو سطحی و سه RowAxis partition | Metric/Dimension باز | یادداشت واحد نزدیک جدول باید با محدوده و معنای دقیقش تطبیق داده شود | تاریخ و audit status دیده می‌شود؛ YTD/STANDALONE باز |
+| T06 | C, E, G, I | 4 | چهار slot متناوب؛ Headerهای تاریخ/گروه در دو سطح؛ black columns excluded | دسته‌بندی معنایی هر slot و Metric ردیف‌ها هنوز به mapping مصوب نیاز دارد | یادداشت واحد در A237 candidate evidence | تاریخ‌های Header موجود؛ معنای هر ستون و دورهٔ قابل‌تفسیر باید جداگانه ثبت شود |
+| T07 | C | 1 | HeaderPath و RowAxis هفت‌ردیفی با marker A268 | Metricها و Dimensionهای نوع سپرده باید canonical شوند | یادداشت واحد در A265 candidate evidence | Header تاریخ دارد؛ duration_basis و period semantics باز |
+| T08 | B | 1 | Header یک‌سطحی؛ RowAxis چهار ردیفی؛ C:F خارج محدوده | Metric هر ردیف باز | یادداشت واحد در A278 candidate evidence | تاریخ Header قابل‌مشاهده؛ duration_basis نامشخص |
+| T09 | C | 1 | HeaderPath و RowAxis شش‌ردیفی | Metricهای حق‌الوکاله/کفایت سرمایه باید جداگانه map شوند | یادداشت واحد در A301 candidate evidence | Header دورهٔ 6 ماهه دارد؛ آیا مقدار مستقل دوره یا تجمعی است، از این گزارش به‌تنهایی قطعی نیست |
+| T10 | D | 1 | Header چندستونی در A313:D313؛ RowAxis دارای یک marker و 18 label | Metricها از نام تسهیلات قابل حدس نیستند؛ mapping صریح لازم است | یادداشت واحد در A312 candidate evidence | Header دورهٔ 6 ماهه؛ YTD/STANDALONE و scope زمانی نیازمند rule |
+| T11 | C | 1 | Header در C336 و سه ردیف Yellow | Metricها باید جداگانه map شوند | یادداشت واحد در A335 candidate evidence | Header دورهٔ 6 ماهه؛ duration_basis باز |
+| T12 | G:I | 3 | Headerهای چندسطحی و merge؛ RowAxis در A:B؛ Black C:F excluded | معنای سه slot و ردیف‌های شرکت‌های سرمایه‌پذیر باید Dimension/Metric شوند | یادداشت واحد در A352 candidate evidence | Headerهای هر slot باید به دوره/وضعیت دقیق resolve شوند |
+| T13 | C | 1 | Header در C361؛ دو partition؛ A364 excluded | Metric درآمد/هزینهٔ عملیاتی و جمع‌ها نیازمند mapping مجزا و کنترل double-counting | یادداشت واحد در A360 candidate evidence | تاریخ Header قابل‌مشاهده؛ duration_basis باز |
+| T14 | C | 1 | Header و دو ردیف Yellow | Metricهای دو ردیف باید canonical شوند | یادداشت واحد در A375 candidate evidence | تاریخ Header و duration_basis نیازمند تثبیت |
+| T15 | C | 1 | Header و یک ردیف Yellow | Metric نیازمند mapping | یادداشت واحد در A385 candidate evidence | تاریخ Header و duration_basis نیازمند تثبیت |
+| T16 | C | 1 | Header و سه ردیف Yellow؛ thin border پیوسته | Metricهای سه ردیف نیازمند mapping | یادداشت واحد در A394 candidate evidence | تاریخ Header و duration_basis نیازمند تثبیت |
+| T17 | A:E | 5 | Header آبی و پنج مقدار Gray؛ Yellow ندارد؛ RowAxis کلاسیک ندارد | هر ستون احتمالاً یک مفهوم مستقل است، اما Metricها فقط از Headerهای دقیق قابل تعیین‌اند؛ تا آن زمان BLOCK | واحد/scale باید از Header/یادداشت معتبر استخراج و تأیید شود | تاریخ/افق زمانی هر Header باید مستقل resolve شود |
+
+### 26.3 قواعد تصمیم برای تکمیل Mapping
+
+برای هر ColumnSlot باید این رکوردها پیش از approval کامل شوند:
+1. هویت TemplateVersion، worksheet و table/layout node.
+2. RowAxisPath کامل یا برای ساختار بدون Yellow، نقش صریح alternative row identity.
+3. HeaderPath کامل، مرتب و resolved؛ merged cells فقط از anchor/path تعریف‌شده استفاده کنند.
+4. Metric canonical و در صورت لزوم DimensionSet canonical؛ نام فارسی ردیف به‌تنهایی شناسهٔ Metric نیست.
+5. unit، scale و measurement basis؛ یادداشت «میلیون» فقط وقتی قابل استفاده است که scope آن به همان table/slot اثبات شود.
+6. Jalali period و duration_basis مستقل برای هر slot؛ Header date به‌تنهایی YTD یا STANDALONE را ثابت نمی‌کند.
+7. audit/restatement/source revision provenance از metadata filing، نه از رنگ یا صرفاً متن Header.
+8. value-state rule برای numeric، explicit zero، Gray blank=zero طبق Rule 7، NULL، absent و excluded.
+
+اگر یکی از این اجزا برای Fact موردنظر نامعلوم باشد، همان mapping در حالت BLOCKED می‌ماند و نباید مقدار canonical تولید کند.
+
+### 26.4 جمع‌بندی آمادگی
+
+- **40/40 ColumnSlot** از نظر موقعیت ساختاری قابل‌شناسایی‌اند.
+- هیچ‌یک از این 40 مورد صرفاً با گزارش ساختاری، برای ingestion نهایی به‌طور کامل از نظر Metric + Dimension + unit/scale + period/duration_basis + provenance اثبات نشده‌اند.
+- T01 مناسب‌ترین fixture برای پیاده‌سازی آزمایشی direct mapping است، ولی حتی آن نیز پیش از تعیین temporal basis و provenance، فقط fixture ساختاری است.
+- T17 باید با alternative row identity صریح مدل شود؛ نباید با جعل Yellow/RowAxis عادی normalize شود.
+- هیچ evidence برای Multi-input Fact ایجاد نشده؛ 40 slot مشاهده‌شده، 40 ورودی بالقوهٔ مستقل‌اند، نه شاهد ترکیب چند ورودی در یک Fact.
+
+**قدم بعدی:** به‌جای بررسی دوبارهٔ workbook، یک «Mapping Decision Register» برای T01 و T03 ساخته شود و فقط فیلدهای semantic واقعاً لازم برای این دو fixture تعیین شوند. پس از اثبات یک direct mapping، الگو به candidateهای دیگر تعمیم داده شود. Provenance CODAL همچنان یک workstream مستقل و مسدودکنندهٔ ingestion نهایی است.
+
+**وضعیت:** ساختار 40 ColumnSlot ثبت شد؛ Semantic Mapping هنوز BLOCKED/INCOMPLETE و Gate 7 PARTIAL / OPEN است. طرح فیزیکی همچنان PROPOSED. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
