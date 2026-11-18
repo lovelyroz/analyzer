@@ -1625,3 +1625,28 @@ The semantic candidate is company-level total assets, temporal kind INSTANT, wit
 **Admission remains blocked:** source unit/scale is not explicit in the recorded Header evidence; do not infer Rial or a multiplier from numeric magnitude. T03 bounds/child partition, industry/entity scope, stable metric code, dimension policy, ReportVersion provenance, and independent later-period validation also remain open.
 
 **Result:** PARTIAL PROOF only. DB-ING-006 / Task 033 remains PARTIAL. No ORM, migration, runtime, database, or test changes are authorized or made.
+
+
+
+### 8.69 DB-DES-016 — Parsian T01 Income Statement Mapping Proof (2026-11-18)
+
+**Document:** `database/reports/DB_DES_016_PARSIAN_T01_INCOME_STATEMENT_MAPPING_PROOF.md`
+
+A second evidence-limited mapping proof was prepared for T01 (`صورت سود و زیان`) after the T03 balance-sheet proof in DB-DES-015.
+
+**Candidate physical/header structure:**
+- Parent candidate: `Recovered_Sheet1!A10:D42`, title A8.
+- Header paths: B = `[دوره منتهي به ۱۴۰۳/۰۶/۳۱, حسابرسی نشده]`; D = `[تجدید ارائه شده ۱۴۰۲/۱۲/۲۹, حسابرسی شده]`.
+- C is black-filled and excluded. E percentage-change data lies outside the candidate bounds and its values are uncolored; it is not silently included.
+- Green row-axis markers: A12 (continuing operations), A32 (discontinued operations), A35 (basic EPS section).
+- Candidate row examples include operating income (A22), continuing-operations net profit (A31), discontinued-operations net profit (A34), and per-share profit (A41).
+
+**Important semantic outcomes:**
+- A22/A31/A34 are duration/flow candidates, but the recorded Header dates do not establish exact start dates or YTD versus STANDALONE. Duration basis and exact Jalali intervals remain unresolved under DB-DES-011.
+- A9 states amounts are in millions; currency is not explicitly established by that text. A41 separately states Rial in its row label and must not blindly inherit the general million scale.
+- Audit/restatement qualifiers remain source/ReportVersion provenance, not automatic financial dimensions.
+- Continuing/discontinued/total net-profit rows require an explicit accounting-semantic reconciliation to prevent duplicate or inconsistent mappings.
+
+**Evidence limitation:** report 3's detailed cell inventory is for the earlier workbook SHA `69186f1ad2b0e481a3588f2731b7027b0a9d9a543d1ca17fd24fc71d8c5aca06`; the corrected workbook SHA is `95f94e739632e48ae6552c562ecbf6c3e8182848718d17977f69bc984a6638b0`. The structural review confirms that the old detailed report cannot prove retained-sheet byte identity. Literal values and header text require direct confirmation against the corrected workbook.
+
+**Result:** PARTIAL PROOF only. DB-ING-006 / Task 033 remains PARTIAL. No ORM, migration, runtime code, database data, or tests changed; no ingestion is authorized.
