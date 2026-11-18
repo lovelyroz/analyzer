@@ -1898,3 +1898,12 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 کاربردهای financial_period_id در src/evaluation مربوط به دورهٔ observation/evaluation هستند و نباید بدون اثبات رابطه، مصرف ستون Report.financial_period_id شمرده شوند. در محدودهٔ فایل‌های Python بررسی‌شده، مصرف‌کنندهٔ تولیدی مستقلی برای ستون Report جدا از writer legacy احراز نشد؛ اما این نتیجه شامل فایل‌های غیر Python، کد بیرون repository یا فراخوانی پویا نیست.
 
 **نتیجه:** ستون Report.financial_period_id و قرارداد writer legacy فعلاً حفظ می‌شوند. writer جدید Excel باید period را در سطح هر observation/fact تعیین کند. نقش نهایی ستون Report و تصمیم nullable/remove هنوز باز است و به بررسی وابستگی‌های باقیمانده و طرح بازنشستگی legacy موکول می‌شود. این بررسی read-only بود؛ تست یا تغییر کد/مدل/schema/migration/DB انجام نشد.
+
+
+## 8.86 بررسی ایستای فایل‌های غیر Python برای Gate 5 — 2026-11-19
+
+جست‌وجوی repository-wide در فایل‌های غیر Python با الگوهای `financial_period_id`، `reports.financial_period_id`، `financial_periods` و نام writer/loaderهای قدیمی اجرا شد. مسیرهای منطبقِ قابل شناسایی در خروجی، مستندات Markdown شامل گزارش‌های ممیزی/طراحی، Master Packet، مستندات Stage، handoff و implementation status بودند؛ فایل SQL یا اسکریپت اجرایی غیر Python در فهرست مسیرهای منطبق دیده نشد. این ارجاع‌های مستنداتی مصرف‌کنندهٔ اجرایی ستون محسوب نمی‌شوند.
+
+**محدودیت شواهد:** فایل مقصد `reply.md` از دامنهٔ جست‌وجو مستثنا نشده بود و خروجی در نتیجه بخشی از نتایج قبلی را دوباره جست‌وجو کرده است. تکرارهای `reply.md` شاهد مستقل محسوب نشدند. نتیجه فقط به فایل‌های متنیِ مشمول دستور و working tree بررسی‌شده محدود است و نبود caller بیرونی، dynamic یا runtime را اثبات نمی‌کند.
+
+**نتیجهٔ Gate 5:** در شواهد غیر Python نیز مصرف‌کنندهٔ اجرایی مستقلی برای `Report.financial_period_id` احراز نشد. وابستگی مستقیم شناخته‌شده همچنان writer قدیمی `src/ingestion/service.py::ingest_codal_report` و facade/pipelineهای متصل به آن است. ستون و قرارداد legacy بدون تغییر حفظ می‌شوند؛ writer جدید Excel باید period را در سطح هر observation/fact تعیین کند. تصمیم nullable/remove به بررسی callerهای بیرونی و طرح coexistence/retirement موکول است. این بررسی read-only بود و هیچ کد، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
