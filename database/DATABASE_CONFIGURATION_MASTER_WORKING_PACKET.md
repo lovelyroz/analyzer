@@ -2002,3 +2002,17 @@ Reader باید read-only بماند. لایهٔ Template resolution، semantic 
 **ترتیب ادامهٔ کار بر اساس DB-ING-006 / Task 033 و قراردادهای DB-DES-008/013/014:** (1) تکمیل و تصویب inventory ساختار برای یک Template منتخب؛ (2) تکمیل mapping محدود و صریح یک جدول با فیلدهای مسدودشدهٔ روشن؛ (3) سپس اعتبارسنجی روی workbook مستقل دورهٔ بعد؛ (4) بعد از آن تصمیم دربارهٔ physical mapping schema و پیاده‌سازی. در این مرحله هنوز هیچ مجوزی برای ORM، migration، persistence یا ingest ایجاد نشده است.
 
 هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.92 ممیزی کامل 17 Candidate و 15 Green Partition در Parsian — 2026-11-19
+
+بر اساس گزارش `database/reports/parsian_periodic_report_3.md` و تصمیم‌های مالک که قبلاً در §8.90/§8.91 ثبت شده‌اند، ماتریس پوشش کامل 17 محدودهٔ T01–T17 و 15 marker سبز/partition در DB-DES-009 بخش 25 ثبت شد.
+
+- هر 17 محدوده از نظر مکان‌یابی ساختاری ارزیابی شدند؛ این نتیجه به معنی approval نهایی TemplateVersion یا Semantic Mapping نیست.
+- 15 partition در 8 candidate قرار دارند: T01(3)، T02(1)، T03(3)، T04(1)، T05(3)، T07(1)، T10(1)، T13(2).
+- تصمیم‌های موجود دربارهٔ Black/uncolored exclusion، T02 boundary، T03 header تکراری، T04 black block، T06 rows 243–244 و Gray blankها، T13 row 364، T17 بدون Yellow، U01 و Sheet1 در ماتریس اعمال شدند.
+- U01 از استخراج V1 خارج است؛ Sheet1 آزمایشی است و حذف می‌شود؛ ستون‌های بیرون محدوده فقط با تصمیم صریح و TemplateVersion جدید قابل افزودن‌اند.
+- Gate 7 هنوز PARTIAL / OPEN است. موانع باقیمانده دیگر کشف محدوده نیستند؛ شامل Metric/Dimension، واحد/مقیاس، دوره و duration_basis، provenance/CODAL version ranking، drift validation روی workbook مستقل و fixture end-to-end هستند.
+- قدم بعدی Semantic Mapping Readiness Matrix در سطح ColumnSlot است. Multi-input تا اثبات مثال واقعی یا تصمیم صریح برای خروج از V1، UNPROVEN باقی می‌ماند.
+
+این مرحله فقط مستندات طراحی/پیشرفت را به‌روزرسانی کرد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
