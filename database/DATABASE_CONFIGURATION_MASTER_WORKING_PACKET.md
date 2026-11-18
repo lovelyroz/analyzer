@@ -2085,3 +2085,7 @@ DB-DES-009 بخش 30 ماتریس تصمیم T01/T03 را در سطح 126 observ
 مانع‌های باقیماندهٔ Task 033 محدود و مشخص‌اند: (1) تأیید/اصلاح کامل 17 bounds و 15 partition توسط مالک؛ (2) اجرای annotation/template utility روی workbook نهایی بدون شیت آزمایشی و reconciliation با hash/report3؛ (3) workbook مستقل دورهٔ بعد برای drift validation؛ (4) اثبات deterministic template matching و owner-run acceptance. مواردی مانند تکرار Header در T03 row95 و exclusionهای T02/T04/T06/T08/T13/U01/T17 و Sheet1 با تصمیم‌های قبلی بسته شده‌اند و نباید دوباره پرسیده شوند.
 
 هیچ کد، ORM، schema، migration یا دیتابیس تغییر نکرد و هیچ تستی اجرا نشد. تست‌های یادشده نتایج owner-run قبلی‌اند.
+
+### 2026-11-19 — تکمیل ممیزی metadata نسخهٔ نهایی Parsian
+
+خروجی owner-run ابزار annotation در `reply.md` بررسی و در DB-ING-006 بخش 8.31 ثبت شد. فایل فعلی `excel/parsian_periodic.xlsx` توسط Reader پذیرفته شد؛ SHA-256 برابر `55266751a5ae60666ebce05f1ed4ee1c4df94a4f78fa0c764aa4a0dc4325db85`، تنها worksheet برابر `Recovered_Sheet1` با used range `A1:L411` و 101 merged ranges است؛ `right_to_left=True`. شمارش Borderها medium/thin است و هیچ مستطیل چهارضلعی با چهار ضلع دقیقاً `thick` شناسایی نشد. این نتیجه، hash و تک‌شیتی بودن نسخهٔ فعلی را تثبیت می‌کند، اما به‌تنهایی bounds جدول‌ها را تعیین نمی‌کند. خروجی transcript برای بخش COLOR_ANNOTATIONS ناقص/غایب است و فهرست کامل annotationها هنوز قابل استناد نیست. Task 033 PARTIAL می‌ماند؛ هیچ bounds جدیدی تصویب نشده، هیچ تستی اجرا نشده و هیچ کد/ORM/schema/migration/DB تغییر نکرده است.
