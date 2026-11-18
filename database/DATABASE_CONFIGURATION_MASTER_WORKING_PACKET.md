@@ -1967,3 +1967,18 @@ Reader باید read-only بماند. لایهٔ Template resolution، semantic 
 - Resolver باید exact/versioned و fail-closed باشد؛ fuzzy mapping، سلول خارج از scope و ساختار ناشناخته حق ingest ندارند.
 
 **نتیجه:** قرارداد طراحی PROPOSED است؛ Gate 7 همچنان PARTIAL/OPEN و physical design همچنان PROPOSED. برای عبور، تصمیم صریح مالک دربارهٔ ambiguityهای مؤثر، آزمون workbook مستقل، fixture direct end-to-end، تعیین تکلیف multi-input و reconciliation با متن کامل DB-DES-008/014 لازم است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.91 اعمال تصمیم‌های قبلی مالک بر ابهام‌های Parsian — 2026-11-19
+
+بازیابی گفتگوهای قبلی نشان داد بخشی از پرسش‌های بخش 13.3 گزارش Parsian قبلاً پاسخ گرفته‌اند. این تصمیم‌ها در DB-DES-009 بخش 24 اعمال شدند:
+
+- **T03:** B95 و C95 تکرار B79 و C79 و نادیده‌اند؛ D95 بیرون محدوده و غیرضروری است. بنابراین A95:D95 دیگر ابهام Header/sub-table محسوب نمی‌شود.
+- **T06:** سلول‌های uncolored و Black در ردیف‌های 243–244 استخراج نمی‌شوند.
+- **T13:** سلول‌های uncolored و Black در ردیف 364 استخراج نمی‌شوند؛ separator/data row جدید تلقی نمی‌شوند.
+- **T02:** عنوان/ناحیهٔ Red معیار محدوده است؛ Borderهای بیرونی A58:A59 و E68 محدوده را گسترش نمی‌دهند.
+- **Rule 7:** Gray blank در value slot استخراجی صفر است؛ uncolored حذف می‌شود و با Gray blank یکی نیست.
+
+**مواردی که هنوز پاسخ صریح مالک ندارند:** Blue headerهای خارج از border، ردیف‌های Black در T04، ساختار T08، وضعیت U01، استثنای T17/Rule 8، وضعیت Sheet1 و تأیید بصری/ترتیب نمایش RTL. این موارد همچنان unresolved باقی می‌مانند.
+
+**اثر:** T03/T06/T13/T02 از فهرست ابهام‌های باز به تصمیم‌های مشخص تبدیل شدند؛ این موضوع به‌تنهایی Gate 7 یا physical design را نمی‌بندد. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
