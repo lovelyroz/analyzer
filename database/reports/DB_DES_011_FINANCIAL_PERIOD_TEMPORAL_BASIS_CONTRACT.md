@@ -1,6 +1,6 @@
 # DB-DES-011 — FinancialPeriod and Duration-Basis Temporal Contract
 
-**Status:** DESIGN PROPOSAL — resolves the temporal ownership gap between DB-DES-009 and DB-DES-010; no ORM, migration, runtime code, data, or tests changed  
+**Status:** ACCEPTED DESIGN DECISION — fact-level duration_basis is the canonical temporal ownership rule; implementation gates remain open; no ORM, migration, runtime code, data, or tests changed  
 **Date:** 2026-11-18  
 **Scope:** Jalali period identity, INSTANT/DURATION, fiscal-year boundaries, YTD versus standalone value basis, source interval classification, and Stage 5 comparability  
 **Depends on:** Database Contract V1.3, DB-DES-003, DB-DES-006, DB-DES-009, DB-DES-010, DB-AUD-002, DB-AUD-013
@@ -210,27 +210,27 @@ Do not create a placeholder FinancialPeriod or a NULL fact to hide a temporal in
 ## 10. Required refinements to DB-DES-009 and DB-DES-010
 
 Before ORM/migration:
-1. Move `is_ytd` out of FinancialPeriod as a global property and represent duration_basis at fact/temporal-interpretation level.
+1. Keep `is_ytd` out of FinancialPeriod; represent `duration_basis` on FinancialFact.
 2. Add `INSTANT` as a controlled period kind/class or otherwise represent it explicitly; do not classify instant rows as MONTH/QUARTER.
 3. Make `months_length` zero for INSTANT, exact positive whole-month count for aligned DURATION, and NULL for irregular intervals unless owner-approved source evidence justifies rejection.
 4. Remove TTM from source-period catalog; runtime-only.
 5. Add explicit temporal basis to Stage 5 metric bindings and query identity/selection.
 6. Keep exact Jalali dates authoritative and company fiscal-calendar boundaries explicit.
-7. Review DB-DES-003 for consistency; do not silently edit the architecture baseline in this proposal.
+7. DB-DES-003, DB-DES-009 and DB-DES-010 have been amended to the same fact-level ownership rule; Architecture V1.3 has also been amended in the coordinated documentation update.
 
-## 11. Owner decision gates
+## 11. Remaining technical gates
 
-This proposal intentionally avoids asking the owner to repeat already-settled decisions. The following points need confirmation only if actual source evidence conflicts:
+The following are implementation questions, not requests for owner decision:
 - whether irregular non-whole-month DURATION intervals occur in V1 reports; if none, schema may require months_length > 0 for all DURATION;
 - which exact source fields/approved fiscal-calendar records establish company fiscal-year start and fiscal quarter;
-- whether the canonical storage representation is a `duration_basis` column on FinancialFact or a one-to-one immutable temporal interpretation object.
+- verify that `duration_basis` is a NOT NULL constrained field for applicable DURATION facts and NULL only for INSTANT facts (with metric-specific applicability checks).
 
-The recommended default is a `duration_basis` field on FinancialFact because it is value semantics, is queried frequently, and must not be global to a period shared by different metric interpretations.
+**Resolved:** use a `duration_basis` field on FinancialFact. This is value semantics, is queried frequently, and must not be global to a period shared by different metric interpretations.
 
 ## 12. Implementation gates
 
 No ORM or migration work should begin until:
-- DB-DES-003, DB-DES-009 and DB-DES-010 are reconciled to this temporal ownership model;
+- source evidence and fiscal-calendar gates below are closed;
 - Migration 9 lineage is resolved;
 - company fiscal-year boundary source is identified for each report family;
 - the current real workbook samples are checked for explicit YTD/standalone headers and exact period dates;
@@ -241,4 +241,4 @@ Owner runs tests locally; no test result is claimed by this design document.
 
 ## 13. Status
 
-DB-DES-011 is a design proposal resolving the temporal ownership ambiguity. It does not authorize code, ORM, migration, data mutation, PDF retirement, or legacy table deletion. All existing schemas and rows remain unchanged.
+DB-DES-011 records the accepted fact-level temporal ownership rule and its remaining implementation gates. It does not authorize code, ORM, migration, data mutation, PDF retirement, or legacy table deletion. All existing schemas and rows remain unchanged.
