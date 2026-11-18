@@ -143,3 +143,18 @@ Consequences:
 This rule also means that a change in fiscal-year closing month cannot be represented by simply inserting a short/long transition year. The V1 system must fail closed on such a case rather than inventing a bridge.
 
 **Supersession:** This Section 9 supersedes any earlier statement in this report that suggested an approved short/long transition year.
+
+## 7. Owner decision — do not discover the fiscal calendar from opaque reports (2026-11-18)
+The owner clarified the operational rule after reviewing the source limitations:
+
+- The user can provide the company's fiscal-year start month.
+- The application asks only for that Jalali month; it does not ask for exact start/end dates.
+- Day 1 of the supplied month is the fiscal-year start. The application derives the end as the last day of the month before the next occurrence of that start month.
+- Every fiscal year remains exactly twelve consecutive Jalali calendar months.
+- If a report does not clearly state the fiscal-year start month, the application must not try to force-discover it from indirect clues. It asks the user.
+- CODAL metadata and report text may be used when they clearly provide relevant information, but they are not mandatory evidence sources and do not replace the user's answer.
+- A report-date conflict with the configured month is shown to the user for clarification; the application must not guess or silently revise the company setting.
+
+This simpler owner-directed rule supersedes the earlier recommendation for mandatory evidence-backed per-year intervals and automated source discovery for V1. The audit findings above remain valid as historical observations about what the sampled reports did or did not disclose; they are no longer implementation gates for collecting the fiscal-year start month.
+
+No ORM, migration, runtime code, database, workbook, or test was changed.
