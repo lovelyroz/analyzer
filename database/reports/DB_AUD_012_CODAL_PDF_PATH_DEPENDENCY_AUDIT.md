@@ -92,3 +92,69 @@ load_codal_pdf / load_codal_pdf_from_url
 6. مسیر Excel باید مستقل و end-to-end طراحی و پیاده‌سازی شود؛ Reader به‌تنهایی جایگزین persistence قدیمی نیست.
 
 **وضعیت نهایی این ممیزی در این مرحله:** مسیر PDF در source PRESENT؛ مرز اولیه اجزا مشخص؛ inventory کامل local هنوز PENDING؛ هیچ کد اجرایی/ORM/Migration/داده‌ای تغییر نکرده و هیچ تستی اجرا نشده است.
+
+
+## 6. تکمیل inventory روی working tree محلی — خروجی 2026-11-18
+
+مالک اسکریپت را از ریشه پروژه اجرا کرد و خروجی را در `reply.md` قرار داد.
+
+- فایل‌های متنی/کد اسکن‌شده: **5,611**
+- فایل‌های دارای حداقل یک تطبیق: **26**
+- خطوط تطبیق در production source: **131**
+- خطوط تطبیق در tests: **121**
+- خطوط تطبیق در scripts: **24**
+- تطبیق در root/config: **0**
+- دیتابیس باز نشده، source تغییر نکرده و تستی اجرا نشده است.
+
+این شمارش‌ها تعداد خطوط دارای تطبیق هستند، نه تعداد وابستگی‌های اجرایی مستقل؛ تطبیق‌های داخل comment/docstring نیز در شمارش خام حضور دارند و باید با توجه به کاربردشان تفسیر شوند.
+
+### 6.1 یافته‌های تکمیلی و طبقه‌بندی دقیق‌تر
+
+**الف) PDF-only و قابل بازنشستگی در مرحله مسیر استخراج**
+- `acquisition.py`: دریافت PDF محلی/URL.
+- `pdf_extract.py`: استخراج ساختار/متن از PDF.
+- `adapter.py`: تبدیل خروجی PDF به RawLineInput.
+- `pipeline.py`: اتصال acquisition، extraction، validation و persistence.
+- `parser.py`: مستقیماً از `pypdf.PdfReader` استفاده می‌کند و توابعش PDF/text-extraction specific هستند؛ نباید به‌عنوان Reader عمومی Excel حفظ/استفاده شود.
+- `codal/ingestion.py`: facade قدیمی که استخراج PDF را به persistence متصل می‌کند.
+
+**ب) CODAL legacy، اما نه لزوماً PDF extractor**
+- `validator.py`: قرارداد RawLineInput را اعتبارسنجی می‌کند.
+- `numbers.py`: ارقام و مبلغ‌های متنی را برای مسیر قدیمی CODAL parse می‌کند. این منطق نباید به Excel Reader تحمیل شود؛ Excel باید مقادیر native را حفظ کند.
+- `RawLineInput` و `ReportIngestionResult` در `service.py`: DTOهای قرارداد legacy هستند و باید در مرحله جداگانه درباره بازنشستگی آن‌ها تصمیم گرفت.
+- `service.py::ingest_codal_report`: persistence قدیمی RawFinancialFact را انجام می‌دهد؛ با این حال همان فایل توابع مستقل FX/OHLC دارد و نباید حذف شود.
+
+**ج) وابستگی‌های schema و compatibility که با خاموش‌کردن PDF خودبه‌خود حذف نمی‌شوند**
+- `src/models/normalized.py`: تعریف RawFinancialFact و FKهای مرتبط.
+- `src/models/normalized_provenance.py`: FK به raw_financial_facts.
+- `src/migrations/runner.py` و `src/scripts/init_db.py`: import مدل برای ثبت SQLAlchemy metadata و ساخت schema.
+- `src/ingestion/__init__.py` و `src/ingestion/codal/__init__.py`: exportهای عمومی API legacy.
+- سه FK به RawFinancialFact در مدل‌های MappingDecision، NormalizedFinancialFact و NormalizedFinancialFactInput.
+
+**د) تست‌ها: دو گروه متفاوت**
+1. PDF/extraction tests: `test_codal_acquisition.py`، `test_codal_extraction.py` و `test_codal_pdf_extraction.py`؛ این‌ها مستقیماً به قابلیت PDF وابسته‌اند.
+2. legacy model/persistence/schema tests: `test_stage1_rules.py`، `test_stage1_database_architecture.py` و `test_stage1_database_integrity.py`؛ این‌ها قرارداد RawFinancialFact، mapping، FK و migration/data preservation را هم آزمایش می‌کنند و نباید صرفاً به‌عنوان تست PDF حذف شوند.
+3. `test_stage5_forecast.py` در بخش snapshot ورودی‌های production، RawFinancialFact را می‌خواند تا اطمینان دهد اجرای forecast داده‌های منبع را تغییر نمی‌دهد. این وابستگی تست به جدول است، نه به استخراج PDF؛ تا زمان تغییر آگاهانه قرارداد source lineage باید حفظ یا با تست معادل جایگزین شود.
+
+### 6.2 نتیجه معماری
+
+دو تصمیم/کار باید جدا بمانند:
+
+1. **بازنشستگی قابلیت استخراج و دریافت PDF:** حذف entry pointها، adapterها، parser و وابستگی‌های مخصوص PDF، پس از بررسی callerها و اصلاح facadeها و تست‌های PDF.
+2. **بازنشستگی RawFinancialFact و schema legacy:** تصمیم مستقل درباره DTO/persistence، مدل، سه FK، migration runner، bootstrap و جایگزینی تست‌های قرارداد/حفظ provenance. صفر بودن لینک‌ها در snapshot محلی به‌تنهایی برای این کار کافی نیست.
+
+در نتیجه، خاموش‌کردن PDF نباید به حذف فوری RawFinancialFact منجر شود. در کوتاه‌مدت می‌توان مسیر PDF را از persistence جدا کرد و جدول/مدل را دست‌نخورده نگه داشت؛ اما حتی این تغییر نیز باید با توجه به public API و تست‌های فعلی در یک تغییر کد مستقل طراحی شود.
+
+### 6.3 وضعیت نهایی ممیزی
+
+- Inventory محلی: **COMPLETE**.
+- مرز اولیه PDF-only در برابر legacy/shared/schema: **IDENTIFIED**.
+- بازنشستگی PDF: **NOT IMPLEMENTED**.
+- بازنشستگی RawFinancialFact: **NOT AUTHORIZED**.
+- مسیر production Excel-to-canonical: **NOT ESTABLISHED**.
+- Migration 9 reconciliation: **OPEN**.
+- هیچ source/ORM/Migration/data تغییر نکرده و هیچ تستی اجرا نشده است.
+
+### 6.4 گام بعدی
+
+تهیه یک طرح اجرایی مرحله‌ای برای بازنشستگی PDF به‌تنهایی، با فهرست دقیق فایل‌ها و APIهایی که حذف یا اصلاح می‌شوند، callerها و تست‌هایی که باید تغییر کنند، و مواردی که صریحاً باید حفظ شوند. این طرح باید از حذف جدول و مدل RawFinancialFact خارج از دامنه این مرحله پرهیز کند.
