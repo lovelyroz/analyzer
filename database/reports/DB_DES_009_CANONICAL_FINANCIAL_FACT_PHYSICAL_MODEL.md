@@ -1153,3 +1153,79 @@ T01 محدودهٔ `Recovered_Sheet1!A10:D42` دارد. Headerها:
 **قدم بعدی:** بررسی T03 با همین روش، اما با تمرکز بر دو ستون B/C، سه RowAxis group و اثر header داخلی A95:C95. پس از آن دو fixture از نظر پوشش مشترک و تفاوت‌های واقعی مقایسه شوند.
 
 هیچ کد، ORM، schema، migration، دیتابیس یا تستی در این مرحله تغییر نکرد/اجرا نشد.
+
+
+## 28. T03 — Row-level Semantic Mapping Readiness Register — 2026-11-19
+
+### 28.1 شواهد Header وColumnSlotها
+
+T03 محدودهٔ `Recovered_Sheet1!A79:C119` دارد. ستون A شرح و دو ستون مقداری مستقل‌اند:
+
+| Slot | Header level 1 | Header level 2 | Interpretation مشاهده‌شده |
+|---|---|---|---|
+| B | دوره منتهي به ۱۴۰۳/۰۶/۳۱ | حسابرسی نشده | تاریخ ۱۴۰۳/۰۶/۳۱؛ وضعیت حسابرسی‌نشده |
+| C | تجدید ارائه شده ۱۴۰۲/۱۲/۲۹ | حسابرسی شده | تاریخ ۱۴۰۲/۱۲/۲۹؛ تجدیدارائه‌شده و حسابرسی‌شده |
+
+D و E بیرون از مرز T03 هستند؛ با وجود Header و دادهٔ عددی در آن‌ها، وارد mapping این candidate نمی‌شوند. B و C دو observation مستقل‌اند.
+
+سلول A78 متن `کلیه مبالغ درج شده به میلیون` دارد. بنابراین scale میلیون مشاهده شده، اما currency از همین note به‌تنهایی اثبات نمی‌شود.
+
+### 28.2 RowAxis سه‌گروهی
+
+| Parent node | Leaf rows | Leaf labels | Mapping status |
+|---|---|---|---|
+| A81 — دارایی‌ها | 82–94 | موجودی نقد؛ مطالبات از بانک‌ها و سایر مؤسسات اعتباری؛ مطالبات از دولت؛ تسهیلات اعطایی و مطالبات از اشخاص دولتی؛ تسهیلات اعطایی و مطالبات از اشخاص غیردولتی؛ سرمایه‌گذاری در سهام و سایر اوراق بهادار؛ مطالبات از شرکت‌های فرعی و وابسته؛ سایر حساب‌های دریافتنی؛ دارایی‌های ثابت مشهود؛ دارایی‌های نامشهود؛ سپرده قانونی؛ سایر دارایی‌ها؛ جمع دارایی‌ها | ساختار 13 leaf روشن؛ Metric ID و policy جمع دارایی‌ها باز |
+| A96 — حقوق مالکانه | 97–107 | سرمایه؛ افزایش سرمایه در جریان؛ صرف سهام؛ اندوخته صرف سهام؛ اندوخته قانونی؛ سایر اندوخته‌ها؛ مازاد تجدید ارزیابی دارایی‌ها؛ تفاوت تسعیر ارز؛ سود (زیان) انباشته؛ سهام خزانه؛ جمع حقوق مالکانه | ساختار 11 leaf روشن؛ canonical Metric و sign/presentation policy باز |
+| A108 — بدهی‌ها | 109–119 | بدهی به بانک‌ها و سایر مؤسسات اعتباری؛ سپرده‌های مشتریان؛ سود سهام پرداختنی؛ اوراق بدهی؛ ذخیره مالیات عملکرد؛ ذخایر و سایر بدهی‌ها؛ ذخیره مزایای پایان خدمت و تعهدات بازنشستگی کارکنان؛ جمع بدهی‌های قبل از حقوق صاحبان سپرده‌های سرمایه‌گذاری؛ حقوق صاحبان سپرده‌های سرمایه‌گذاری؛ جمع بدهی‌ها؛ جمع بدهی‌ها و حقوق مالکانه | ساختار 11 leaf روشن؛ canonical Metric و policy جمع‌ها باز |
+
+جمعاً 35 leaf row و 3 parent node ثبت می‌شود. A95:C95 یک ردیف Header/مرزبندی داخلی است، نه leaf مالی:
+- A95 = «حقوق مالکانه و بدهی‌ها»؛
+- B95 و C95 تکرار Headerهای B79 و C79 هستند و طبق تصمیم مالک نادیده گرفته می‌شوند؛
+- A95 مرز ساختاری بین گروه دارایی‌ها و دو گروه بعدی را مشخص می‌کند؛ گروه A81 به ردیف 94 ختم می‌شود.
+- D95 خارج محدودهٔ T03 است.
+
+### 28.3 نوع زمانی و واحد
+
+عنوان اصلی T03 «صورت وضعیت مالی» است و هر دو Header به تاریخ مشخص اشاره می‌کنند. بنابراین semantic candidate قوی برای این جدول **INSTANT / point-in-time balance** است، نه DURATION؛ در صورت تأیید accounting contract، هر Fact به period/date همان slot متصل می‌شود و duration_basis برای آن applicable نخواهد بود. متن «دوره منتهی به» در Header به‌تنهایی نباید این جدول را به YTD تبدیل کند.
+
+این تشخیص از ماهیت صورت وضعیت مالی ناشی می‌شود، اما تا زمان ثبت rule مصوب ReportType/Metric در Interpretation Standard، وضعیت temporal mapping **PROPOSED, NOT APPROVED** باقی می‌ماند.
+
+Scale note «به میلیون» در A78 ثبت شده؛ currency نامعلوم است. همهٔ 70 سلول Gray در B/C عددی و دارای مقدار ذخیره‌شده‌اند؛ Gray blank وجود ندارد و Rule 7 فعال نمی‌شود.
+
+### 28.4 Value, exclusion و provenance
+
+- 35 leaf × دو slot = 70 observation candidate مستقل.
+- B و C باید period/status خود را جداگانه حفظ کنند؛ C تجدیدارائه‌شده است، اما provenance کامل revision identity و ranking باید از metadata CODAL بیاید.
+- هیچ‌یک از D/E خارج از border، حتی اگر Header و عدد داشته باشند، وارد Template T03 نمی‌شود.
+- هیچ Black cell در محدوده نیست؛ هیچ formula cell در workbook وجود ندارد.
+- جمع دارایی‌ها (ردیف 94)، جمع حقوق مالکانه (107)، جمع بدهی‌ها (118) و جمع بدهی‌ها و حقوق مالکانه (119) باید Metricهای مستقل یا کنترل‌های سازگاری با سیاست صریح باشند؛ نباید هم‌زمان به‌صورت اجزای قابل‌جمع دوباره‌شماری شوند.
+- رابطهٔ ترازنامه‌ای `Assets = Liabilities + Equity` می‌تواند validation invariant باشد، ولی خود این invariant جایگزین mapping ردیف‌ها یا مجوز ساخت مقدار missing نیست.
+
+### 28.5 خروجی فعلی T03
+
+- **ساختار:** ACCEPTED AS STRUCTURAL FIXTURE.
+- **RowAxis:** سه parent node، 35 leaf row؛ ردیف 95 به‌عنوان Header/boundary غیرمالی.
+- **ColumnSlot:** B و C مستقل و resolve شده‌اند؛ D/E excluded.
+- **Temporal type:** INSTANT candidate قوی، اما نیازمند approval در Interpretation Standard.
+- **Unit/scale:** scale میلیون مشاهده شده؛ currency نامعلوم.
+- **Metric/Dimension:** source labelها روشن‌اند؛ canonical Metric/Dimension و جمع‌ها هنوز نیازمند catalog mapping.
+- **Provenance/revision:** BLOCKED برای ingestion نهایی.
+- **Ingestion:** ممنوع تا تصویب currency، temporal rule، canonical mapping و CODAL provenance.
+
+### 28.6 مقایسهٔ T01 و T03 و نتیجهٔ طراحی
+
+| Concern | T01 — صورت سود و زیان | T03 — صورت وضعیت مالی | نتیجه برای قرارداد |
+|---|---|---|---|
+| RowAxis | 3 گروه / 28 leaf | 3 گروه / 35 leaf، با یک Header داخلی | مدل باید parent/leaf و non-data structural row را پشتیبانی کند |
+| ColumnSlot | B و D | B و C | هر slot مستقل و دارای HeaderPath کامل است |
+| Time semantics | DURATION محتمل؛ YTD/STANDALONE هنوز تعیین نشده | INSTANT محتمل؛ duration_basis نامرتبط در صورت approval | temporal type باید per Metric/Fact یا semantic mapping تعیین شود، نه یک فیلد کلی برای ReportVersion |
+| Unit | note میلیون؛ EPS ردیف‌های 36–41 صریحاً ریال؛ ردیف 42 نامعلوم | note میلیون؛ currency نامعلوم | واحد و scale باید به mapping/metric level متصل شوند؛ note scope باید اثبات شود |
+| Header exception | دو سطح Header با وضعیت audit | دو سطح Header با وضعیت audit + row 95 تکراری/مرزی | HeaderPath و structural row role باید صریح version شوند |
+| Aggregation | subtotal/result و EPS | total rows و balance invariant | metric role و double-count policy لازم است |
+| Provenance | ستون D تجدیدارائه‌شده/حسابرسی‌شده | ستون C تجدیدارائه‌شده/حسابرسی‌شده | Header status کافی برای revision identity/ranking نیست |
+
+**نتیجه:** T01 و T03 دو fixture مکمل‌اند و نشان می‌دهند قرارداد واحد باید هر دو DURATION و INSTANT را پشتیبانی کند، RowAxis hierarchy را از structural header row جدا سازد و unit/scale و provenance را از سطح ReportVersion به سطح slot/mapping محدود نکند. با این حال، هیچ‌یک هنوز برای ingestion نهایی تصویب نشده‌اند.
+
+**قدم بعدی:** تثبیت قرارداد معنایی مشترک برای Template/Interpretation: تعریف صریح TemporalType (INSTANT/DURATION)، scope واحد/scale، HeaderPath، RowAxisPath، structural non-data rows و metric aggregation role؛ سپس reconciliation با DB-DES-008/013/014 و DB-ING-006/Task 033. تا آن زمان Gate 7 PARTIAL/OPEN و physical design PROPOSED باقی می‌مانند.
+
+هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
