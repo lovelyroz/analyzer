@@ -127,3 +127,18 @@
 - تستی اجرا نشده است.
 
 **گام بعدی فنی پیشنهادی:** Phase 0 را تکمیل کنیم؛ یعنی ابتدا مدل persistence مقصد برای Excel و نحوه reuse کردن Report/ReportVersion را طراحی و با معماری Company Table Layout Template تطبیق دهیم. این کار قبل از حذف هر ماژول PDF ضروری است.
+
+
+## 6. نتیجه ممیزی Phase 0 — DB-AUD-013
+
+گزارش: `database/reports/DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md`
+
+- Report و ReportVersion موجود پایه قابل reuse هستند، اما ReportType catalog و source artifact fingerprint/standard-version binding کامل نیست.
+- FinancialPeriod فعلی از Gregorian Date استفاده می‌کند و با قرارداد authoritative Jalali و INSTANT/DURATION هنوز منطبق نیست.
+- NormalizedFinancialFact فعلی Numeric(30,4)، بدون dimension identity و بدون source unit/basis/value state/extraction-standard version کامل است؛ بنابراین مقصد آماده و مستقیم برای Excel نیست.
+- NormalizedFinancialFactInput فعلی به RawFinancialFact و MappingDecision اجباری وابسته است و برای provenance جدید مناسب نیست.
+- Company Table Layout Template ساختار workbook را حل می‌کند، اما به‌تنهایی semantic mapping و canonical persistence را تعریف نمی‌کند.
+
+**نتیجه Phase 0:** شکاف persistence شناسایی شد؛ مسیر Excel-to-canonical هنوز آماده نیست. Report/ReportVersion را به‌عنوان پایه قابل توسعه نگه می‌داریم، اما NormalizedFinancialFact را بدون بازطراحی مقصد آماده تلقی نمی‌کنیم. هنوز هیچ کد، ORM، Migration یا داده‌ای تغییر نمی‌کند.
+
+**گام بعدی:** طراحی فیزیکی مستقل canonical FinancialFact و provenance contract؛ تصمیم میان بازطراحی NormalizedFinancialFact و جایگزینی آن باید با مقایسه migration/compatibility گرفته شود. تا تکمیل این طراحی و مسیر Excel end-to-end، مسیر PDF عملیاتی قطع نمی‌شود.
