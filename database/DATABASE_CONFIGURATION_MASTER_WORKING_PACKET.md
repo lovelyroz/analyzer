@@ -1194,3 +1194,21 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **وضعیت:** طرح DRAFTED؛ هیچ پیاده‌سازی، ORM، Migration، داده یا تستی تغییر نکرده و تستی اجرا نشده است. مسیر Excel-to-canonical هنوز NOT ESTABLISHED و Migration 9 reconciliation همچنان OPEN است.
 
 **گام بعدی:** Phase 0؛ طراحی مقصد persistence برای Excel و تعیین دقیق نقش قابل reuse برای Report/ReportVersion در معماری جدید.
+
+
+### 8.48 ممیزی آمادگی persistence مسیر Excel — DB-AUD-013 — 2026-11-18
+
+گزارش: `database/reports/DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md`
+
+مقایسه قرارداد منطقی DB-DES-001/006 با ORM فعلی نشان داد:
+- Report و ReportVersion پایه قابل reuse هستند، اما ReportType catalog، source artifact fingerprint و binding به نسخه دقیق extraction/template استاندارد کامل نیست.
+- FinancialPeriod فعلی از Gregorian Date استفاده می‌کند و با قرارداد Jalali authoritative و INSTANT/DURATION منطبق نیست.
+- NormalizedFinancialFact فعلی Numeric(30,4) است، dimensions را در unique identity ندارد و source unit/currency/basis/state و extraction-standard version را کامل نگه نمی‌دارد؛ بنابراین مقصد آماده Excel نیست.
+- NormalizedFinancialFactInput به raw_fact_id و mapping_decision_id اجباری وابسته است و با provenance بدون raw archive سازگار نیست.
+- Company Table Layout Template ساختار فیزیکی workbook را تعریف می‌کند، نه semantic mapping یا canonical fact persistence.
+
+**تصمیم موقت:** Report/ReportVersion به‌عنوان پایه قابل توسعه حفظ شوند؛ NormalizedFinancialFact بدون بازطراحی مقصد آماده تلقی نشود. پیش از هر کد/Migration باید physical canonical FinancialFact و provenance contract طراحی شود. هیچ مدل/جدول/FK/داده‌ای در این ممیزی تغییر نکرده است.
+
+**وضعیت:** Phase 0 gap audit COMPLETE؛ Excel-to-canonical persistence NOT ESTABLISHED؛ مسیر PDF production نباید پیش از آماده‌شدن مسیر جایگزین قطع شود؛ Migration 9 reconciliation OPEN؛ هیچ تستی اجرا نشده است.
+
+**گام بعدی:** DB-DES برای مدل فیزیکی canonical FinancialFact و provenance حداقلی، با تصمیم صریح درباره بازطراحی NormalizedFinancialFact در برابر مدل جایگزین و سازگاری migration.
