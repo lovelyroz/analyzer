@@ -1907,3 +1907,19 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 **محدودیت شواهد:** فایل مقصد `reply.md` از دامنهٔ جست‌وجو مستثنا نشده بود و خروجی در نتیجه بخشی از نتایج قبلی را دوباره جست‌وجو کرده است. تکرارهای `reply.md` شاهد مستقل محسوب نشدند. نتیجه فقط به فایل‌های متنیِ مشمول دستور و working tree بررسی‌شده محدود است و نبود caller بیرونی، dynamic یا runtime را اثبات نمی‌کند.
 
 **نتیجهٔ Gate 5:** در شواهد غیر Python نیز مصرف‌کنندهٔ اجرایی مستقلی برای `Report.financial_period_id` احراز نشد. وابستگی مستقیم شناخته‌شده همچنان writer قدیمی `src/ingestion/service.py::ingest_codal_report` و facade/pipelineهای متصل به آن است. ستون و قرارداد legacy بدون تغییر حفظ می‌شوند؛ writer جدید Excel باید period را در سطح هر observation/fact تعیین کند. تصمیم nullable/remove به بررسی callerهای بیرونی و طرح coexistence/retirement موکول است. این بررسی read-only بود و هیچ کد، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.87 بازبینی تجمیعی آمادگی Gateهای 7 و 8 — 2026-11-19
+
+Gateهای 7 و 8 به‌صورت یک بسته بررسی شدند، چون provenance هر Fact به Template/Interpretation همان ReportVersion وابسته است.
+
+- Excel Reader فعلی در `src/ingestion/excel/reader.py` read-only است و فقط ساختار workbook و literal values را مشاهده می‌کند؛ semantics یا persistence انجام نمی‌دهد.
+- DTOهای `src/ingestion/excel/dto.py` observationهای immutable برای cell/row/column/table/Header و locator دارند، اما stable TemplateVersion، semantic row-axis identity، semantic mapping یا InterpretationStandardVersion تولید نمی‌کنند.
+- فهرست import مدل‌ها در migration runner فعلی شامل مدل فیزیکی TemplateVersion، InterpretationStandardVersion، SemanticMapping یا FinancialFact جدید نیست. مسیر production Excel-to-canonical persistence نیز در ممیزی قبلی احراز نشده است.
+- فایل‌های طراحی DB-DES-008 و DB-DES-014 از مسیرهای حدس‌زده‌شدهٔ `database/reports/` بازیابی نشدند؛ این بازبینی برای جزئیات آن‌ها بر تصمیم‌های ثبت‌شده در DB-DES-009 تکیه دارد و ادعای بازخوانی مستقل متن کامل آن دو سند را ندارد.
+
+**Gate 7:** الگوی provenance منطقی پذیرفته است، اما row-axis physical schema، semantic mapping versioning و uniqueness چند ورودی هنوز حل نشده؛ وضعیت PARTIAL/OPEN.
+
+**Gate 8:** یک TemplateVersion و یک InterpretationStandardVersion برای هر ReportVersion پذیرفته‌شده در V1 از نظر منطقی بسته است؛ physical binding، NOT NULL/immutability و قید سازگاری Template داخل Interpretation bundle باز است.
+
+Reader باید read-only بماند. لایهٔ Template resolution، semantic interpretation، validation و canonical persistence باید جداگانه طراحی شوند. این گام read-only بود؛ کد/ORM/schema/migration/DB تغییر نکرد و تستی اجرا نشد.
