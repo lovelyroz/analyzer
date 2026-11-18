@@ -1519,3 +1519,37 @@ python src/scripts/audit_codal_fiscal_year_metadata.py
 
 **وضعیت:** وجود الگوی آماده برای گزارش ماهانه پست‌بانک به‌عنوان ورودی بالقوهٔ آینده ثبت شد؛ اجرای آن به زمان نیاز واقعی موکول است.
 
+
+
+### 8.64 بستن ممیزی و پاک‌سازی Migration 9 — 2026-11-18
+
+پس از ممیزی read-only دیتابیس محلی، دو ستون `source_sheet` و `source_column_header` که در ORM فعلی وجود نداشتند و رکورد ledger مربوط به `codal_excel_source_metadata` شناسایی شدند. مالک اجرای cleanup کنترل‌شده را تأیید و اجرا کرد.
+
+**نتیجهٔ اجرای مالک:**
+- فایل پشتیبان پیش از تغییر ساخته شد: `D:\\winprojects\\analyzer\\tehran_stock_before_migration9_cleanup_20261118_152253.db`.
+- دو ستون اضافی از `raw_financial_facts` حذف شدند.
+- رکورد نسخهٔ 9 از `schema_migrations` حذف شد.
+- 505 ردیف `raw_financial_facts` حذف نشدند.
+- ممیزی read-only پس از cleanup تأیید کرد که رکورد نسخهٔ 9 وجود ندارد؛ هیچ‌یک از دو ستون اضافی وجود ندارد؛ ستون‌های دیتابیس و ORM در این مدل تطبیق دارند؛ سه FK موجود حفظ شده‌اند و Index/Trigger اضافی وجود ندارد.
+
+**محدودیت:** چون implementation اصلی Migration 9 در دسترس نبود، این نتیجه فقط آثار قابل‌مشاهده و ممیزی‌شده را می‌بندد و اثبات نمی‌کند هیچ side effect تاریخی دیگری وجود نداشته است.
+
+**وضعیت:** reconciliation و cleanup قابل‌مشاهدهٔ Migration 9 انجام و تأیید شد. Migration runner مخزن همچنان تا نسخهٔ 8 است؛ Migration 9 جایگزین ساخته نمی‌شود. فایل پشتیبان حفظ شود. هیچ تستی اجرا نشد.
+
+### 8.65 ممیزی مالکیت انحصاری Gray Extraction Spans در Parsian — 2026-11-18
+
+در ادامهٔ DB-DES-008، مختصات Gray ثبت‌شده در بخش 3 نقشهٔ Parsian با candidate parent/sub-table bounds و قاعدهٔ استخراج Gray-only تطبیق داده شد.
+
+**نتیجهٔ reconciliation مستنداتی:**
+- 459 سلول Gray ثبت‌شده در نقشه بازشماری شد؛ جمع با audit مالک برابر است.
+- این سلول‌ها در قالب 60 بازهٔ عمودی پیوسته، به تفکیک ستون، فشرده می‌شوند.
+- 373 سلول داخل محدودهٔ زیرجدول‌ها قرار می‌گیرند و 86 سلول فقط به جدول مادر تعلق دارند.
+- 36 span به node زیرجدول و 24 span به node جدول مادر اختصاص می‌یابد.
+- جزئیات شمارش به تفکیک T01 تا T17 در بخش 9 سند `DB_DES_008_COMPANY_TABLE_TEMPLATE_RELATIONAL_SCHEMA_PROPOSAL.md` ثبت شد.
+
+**قاعدهٔ طراحی تکمیلی:**
+هر سلول استخراجی دقیقاً یک مالک `template_layout_node` دارد. اگر داخل محدودهٔ زیرجدول باشد به همان زیرجدول تعلق می‌گیرد؛ در غیر این صورت به جدول مادر. درخواست جدول مادر باید spanهای خودش و تمام فرزندان را به‌صورت union بدون تکرار بازیابی کند. ذخیرهٔ هم‌زمان یک مختصات در parent و child ممنوع است. اعتبارسنجی باید overlap بین nodeهای مختلف یک worksheet/template version را نیز رد کند.
+
+**محدودیت:** این شمارش از coordinate inventory در Markdown انجام شده و ممیزی مستقیم مجدد XLSX نیست. candidate bounds هنوز به‌طور کامل توسط مالک تأیید نشده‌اند؛ spot-check قبلی به‌عنوان approval کامل تلقی نمی‌شود. تعداد 60 span فقط نتیجهٔ نقشهٔ فعلی است و invariant دائمی نیست.
+
+**وضعیت Task 033 / DB-ING-006:** همچنان PARTIAL. این گام، ابهام مالکیت span و خطر double extraction را در طراحی DB-DES-008 برطرف می‌کند؛ اما مجوز ORM، migration، runtime matcher، تولید Template production یا ingestion نیست. تستی اجرا نشد و هیچ کد/ORM/schema/migration/data تغییر نکرد.
