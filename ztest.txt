@@ -119,7 +119,7 @@ https://github.com/lovelyroz/analyzer/blob/master/reply.md
 
 تغییرات سرمایه، تأمین مالی جدید، معاملات مهم، تغییر رویه‌های حسابداری، ریسک‌ها و سایر رویدادهای بااهمیت.
 
-Start-Transcript -Path "D:\Winprojects\analyzer\template_annotation_audit_parsian.txt" -Force
+Start-Transcript -Path "D:\Winprojects\analyzer\reply.md" -Force
 
 python src/scripts/excel_template_annotation_audit.py --max-color-cells 2000 excel/parsian_periodic.xlsx
 

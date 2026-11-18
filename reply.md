@@ -1,1970 +1,3027 @@
-﻿
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:11:مسیر اجرایی CODAL موجود هنوز مسیر V1 
-موردنیاز نیست. کد فعال بررسی‌شده صریحاً PDF-oriented است، در حالی که دامنهٔ V1 مصوب Excel است. Adapter و pipeline فعلی 
-PDF را استخراج می‌کنند، خروجی `RawLineInput` می‌سازند و `ingest_codal_report()` آن را به `RawFinancialFact` ذخیره 
-می‌کند. این مسیر mapping ساختاری/معنایی نسخه‌دار، ساخت FinancialMetric/approved dimensions، تخصیص مستقل دوره به هر 
-fact، canonical INTEGER، provenance نسخهٔ استاندارد و writer متصل به NormalizedFinancialFact را در خود ندارد.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:21:| CODAL service | 
-`src/ingestion/service.py` | `RawLineInput`، `ingest_codal_report`، transaction و replay |
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:41:- `src/tests/test_codal_extraction.py` 
-از `load_codal_pdf` و PDFهای fixture استفاده می‌کند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:61:در `ingest_codal_report()`:
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:82:- `Report` دارای یک 
-`financial_period_id` است، درحالی‌که قرارداد منطقی می‌گوید یک ReportVersion می‌تواند چند دوره و هر FinancialFact دورهٔ 
-خودش را داشته باشد.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:83:- `ingest_codal_report()` یک period_id 
-برای کل فایل می‌گیرد و همان را به همهٔ RawFinancialFactها اختصاص می‌دهد.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:224:### 11.1 CODAL — `ingest_codal_report`
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:267:- 
-`src/ingestion/codal/ingestion.py::ingest_codal_report` صرفاً facade سازگاری است و به 
-`src/ingestion/service.py::ingest_codal_report` delegate می‌کند؛ transaction مستقل ندارد.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:268:- 
-`src/ingestion/codal/ingestion.py::ingest_codal_pdf` extraction را اجرا می‌کند و سپس به facade بالا می‌رسد. در 
-extraction failure، Session را rollback و یک Run جدید FAILED commit می‌کند؛ پیش از extraction یک Run پایدار STARTED 
-ایجاد نمی‌کند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:269:- 
-`src/ingestion/codal/pipeline.py::load_codal_pdf` و `load_codal_pdf_from_url` acquisition، extraction و validation را 
-پیش از فراخوانی writer مرکزی اجرا می‌کنند. `_audit_failed_run` در failure یک Run جدید FAILED می‌سازد؛ pipeline پیش از 
-acquisition/extraction یک Run پایدار STARTED ایجاد نمی‌کند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:270:- 
-`src/ingestion/service.py::ingest_codal_report` writer اصلی Report/ReportVersion/RawFinancialFact است. این تابع Run را 
-STARTED و flush می‌کند؛ در success همان Run و writes را commit می‌کند. در exception، transaction را rollback و Run 
-اولیه را از بین می‌برد، سپس Run جدید FAILED می‌سازد و commit می‌کند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:302:**مسیر بعدی پروژه:** ادامهٔ Phase 0 
-از DB-PLAN-013 و بستن gateهای طراحی DB-DES-009 است؛ نه تکرار PDF dependency audit، RawFact linkage یا 
-Normalized/Derived local linkage. اولین gate اجرایی-مستندی که باید بسته شود، inventory تمام مصرف‌کنندگان 
-`reports.financial_period_id` پیش از nullable کردن/جابه‌جایی آن است. سپس gateهای ReportVersion source 
-revision/standard binding، dimension scope، company-consistency و provenance granularity به‌ترتیب بررسی می‌شوند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:306:## 14. بررسی مصرف‌کنندگان 
-`reports.financial_period_id` و مسیرهای فراخوانی CODAL — 2026-11-18
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:309:خروجی جست‌وجوی محلی کاربر برای 
-`financial_period_id|FinancialPeriod` در کل فایل‌های `*.py` و `*.sql` زیر repository، موارد زیر را نشان داد:
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:310:- `src/models/report.py`: ستون 
-`Report.financial_period_id` با `nullable=False` و FK به `financial_periods.period_id`.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:312:- `src/forecast/queries.py`: query 
-تولیدی Forecast، دوره را از `NormalizedFinancialFact.period_id` به `FinancialPeriod` join می‌کند؛ در این query از 
-`Report.financial_period_id` استفاده نشده است.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:313:- `src/evaluation/*` و بسیاری از 
-تست‌های Stage 5/6: نام `financial_period_id` در DTOها و مدل‌های ارزیابی به‌عنوان شناسهٔ دورهٔ observation/forecast 
-استفاده شده است؛ این موارد به‌تنهایی مصرف ستون `reports.financial_period_id` نیستند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:314:- تست‌های Stage 1 و CODAL، ساخت 
-Report و قرارداد قدیمی را با `financial_period_id` اجباری می‌آزمایند؛ تست‌های PDF نیز رابطهٔ Report با FinancialPeriod 
-را assert می‌کنند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:318:- `src/ingestion/codal/ingestion.py`: 
-تابع عمومی `ingest_codal_report` یک facade سازگار با گذشته است و به `src.ingestion.service.ingest_codal_report` 
-delegate می‌کند. تابع `ingest_codal_pdf` پس از extraction همین facade را فراخوانی می‌کند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:319:- `src/ingestion/codal/pipeline.py`: 
-توابع `load_codal_pdf` و `load_codal_pdf_from_url` پس از acquisition/extraction/validation، writer مرکزی 
-`src.ingestion.service.ingest_codal_report` را فراخوانی می‌کنند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:320:- `src/ingestion/excel/reader.py` و 
-`src/ingestion/excel/dto.py`: در نسخهٔ بررسی‌شده، reader/DTO اکسل هیچ فراخوانی writer CODAL و هیچ ارجاعی به 
-`financial_period_id` ندارند؛ این با یافتهٔ قبلی DB-AUD-013 مبنی بر نبود production Excel-to-canonical persistence 
-هم‌راستا است.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:326:1. `Report.financial_period_id` در 
-حال حاضر یک فیلد الزامی و بخشی از قرارداد writer قدیمی CODAL است؛ حذف یا nullable کردن آن بدون جایگزینی قرارداد legacy 
-باعث شکستن مسیر موجود و تست‌های مربوط می‌شود.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:329:4. بنابراین مسیر جدید Excel باید 
-writer/contract مستقل یا نسخهٔ توسعه‌یافته‌ای داشته باشد که برای هر Fact دورهٔ خودش را دریافت و اعتبارسنجی کند. 
-`Report.financial_period_id` تا زمان تعیین تکلیف و بازنشستگی کنترل‌شدهٔ مسیر legacy باید حفظ شود؛ اگر در مدل نهایی 
-باقی بماند، نقش آن باید صرفاً metadata دورهٔ اصلی/نمایشی گزارش باشد و نباید مرجع دورهٔ مقادیر تلقی شود.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:335:## 14. تکمیل بررسی 
-Report.financial_period_id و مرز writer قدیمی — 2026-11-18
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:340:- تنها writer مرکزی CODAL که در این 
-مسیر مشاهده شد `src/ingestion/service.py::ingest_codal_report` است؛ facade در `codal/ingestion.py` به همین تابع 
-delegate می‌کند و pipeline نیز همین writer را صدا می‌زند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:342:- برای Report موجود، company_id و 
-`Report.financial_period_id` با ورودی مقایسه می‌شوند؛ اختلاف باعث رد عملیات می‌شود.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:343:- برای Report جدید، 
-`financial_period_id=period_id` ثبت می‌شود.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:353:4. نقش نهایی 
-Report.financial_period_id (حذف تدریجی، nullable و descriptive، یا جایگزینی با primary-period metadata) پس از 
-inventory کامل call-siteها و physical design تعیین می‌شود.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:363:- تعریف و پیاده‌سازی writer مرکزی: 
-src/ingestion/service.py::ingest_codal_report.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:364:- API سازگاری 
-src/ingestion/codal/ingestion.py::ingest_codal_report به writer مرکزی delegate می‌کند؛ ingest_codal_pdf نیز پس از 
-استخراج آن API را صدا می‌زند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:365:- src/ingestion/codal/pipeline.py، 
-تابع‌های load_codal_pdf و load_codal_pdf_from_url را دارد و هر دو مسیر در نهایت writer مرکزی را فراخوانی می‌کنند.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:367:- جست‌وجوی financial_period_id 
-کاربردهای جداگانه‌ای در src/evaluation نشان داد. در فایل‌های بازبینی‌شده، این شناسه در DTOها و قراردادهای 
-observation/evaluation به دورهٔ داده اشاره دارد؛ نباید صرفاً به‌دلیل یکسان بودن نام، آن را مصرف ستون 
-Report.financial_period_id تلقی کرد.
-database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:371:در محدودهٔ کدهای Python زیر src/ که 
-با جست‌وجو و بازبینی فایل‌های مرتبط بررسی شدند، وابستگی اجرایی مستقیم ستون Report.financial_period_id در writer قدیمی 
-متمرکز است؛ facadeها و pipelineهای PDF آن را از طریق همان writer به ارث می‌برند. مصرف‌کنندهٔ تولیدی مستقلی که جداگانه 
-این ستون را بخواند، از شواهد این خروجی احراز نشد. این نتیجه را نباید به تمام محیط‌ها، اسکریپت‌های بیرونی، SQL یا 
-فراخوانی‌های پویا تعمیم داد.
-database\reports\DB_AUD_009_ORM_MIGRATION_TEMPLATE_COMPATIBILITY_AUDIT.md:22:| `Report` / `reports` | Integer PK; FK 
-`company_id`; free-text `report_type`; FK `financial_period_id` | Reuse, but report-type normalization is a 
-prerequisite for the proposed `report_type_id` |
-database\reports\DB_AUD_009_ORM_MIGRATION_TEMPLATE_COMPATIBILITY_AUDIT.md:24:| `FinancialPeriod` / `financial_periods` 
-| Integer PK; FK `company_id`; period type and date/fiscal attributes | Reuse for reporting-period semantics; do not 
-duplicate period fields in Template metadata |
-database\reports\DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md:92:- `ingest_codal_report(...)` creates one 
-`RawFinancialFact` object for each `RawLineInput` and calls `session.add_all(facts)`.
-database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:17:load_codal_pdf / load_codal_pdf_from_url  
-database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:21:→ ingest_codal_report  
-database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:35:| src/ingestion/codal/ingestion.py | facade شامل 
-ingest_codal_pdf و facade سازگاری ingest_codal_report | بخش PDF-only + facade legacy |
-database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:36:| src/ingestion/service.py::ingest_codal_report | 
-ساخت Report/ReportVersion و درج یک RawFinancialFact برای هر RawLineInput | persistence قدیمی CODAL؛ در فایل مشترک با 
-FX و Market قرار دارد |
-database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:125:- `service.py::ingest_codal_report`: persistence 
-قدیمی RawFinancialFact را انجام می‌دهد؛ با این حال همان فایل توابع مستقل FX/OHLC دارد و نباید حذف شود.
-database\reports\DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md:45:- financial_period_id به‌عنوان primary report 
-period
-database\reports\DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md:53:- financial_period_id در مدل فعلی روی Report 
-اجباری است، در حالی که قرارداد هدف می‌گوید یک ReportVersion می‌تواند چند FinancialPeriod داشته باشد و هر fact دوره 
-واقعی خودش را تعیین کند؛ report-level period نباید دوره همه facts را تحمیل کند.
-database\reports\DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md:49:The current CODAL path in 
-`src/ingestion/service.py::ingest_codal_report`:
-database\reports\DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md:103:    -> ingest_codal_report
-database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:43:3. `financial_periods` — redesigned for 
-authoritative Jalali dates and INSTANT/DURATION semantics.
-database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:83:The report-level period is descriptive 
-metadata only. A ReportVersion can publish facts for several actual periods, and every fact links to its own 
-FinancialPeriod. The current NOT NULL `reports.financial_period_id` must not be allowed to impose one period on every 
-fact.
-database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:93:The new/updated `financial_periods` model 
-must use Jalali components as authoritative values; no Gregorian conversion is required or permitted as a substitute.
-database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:300:5. **Report primary period:** inspect 
-consumers before making current `reports.financial_period_id` nullable or moving it.
-database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:342:- `Report` نیز `company_id` و 
-`financial_period_id` را جداگانه نگه می‌دارد؛ FKها به‌تنهایی تضمین نمی‌کنند که دورهٔ گزارش متعلق به همان شرکت باشد.
-database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:359:3. پس از ایجاد Fact، تغییر هویت رابطه‌ای 
-والدها نباید invariant را بی‌صدا خراب کند. سیاست پیشنهادی این است که تغییر `reports.company_id`، 
-`report_versions.report_id` یا `financial_periods.company_id` تا وقتی Fact وابسته وجود دارد ممنوع باشد؛ اصلاح هویت با 
-ساخت رکورد صحیح و مسیر اصلاح کنترل‌شده انجام شود، نه reassignment خام.
-database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:360:4. اگر `Report.financial_period_id` در مدل 
-نهایی به‌صورت optional metadata باقی بماند، trigger جداگانه باید در صورت non-NULL بودن، تطابق شرکت Report و 
-FinancialPeriod را enforce کند؛ NULL بودن این metadata نباید مانع ثبت Fact دارای period_id مستقل شود.
-database\reports\DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md:29:| \`src/ingestion/codal/pipeline.py\` | حذف 
-pipelineهای load_codal_pdf و load_codal_pdf_from_url |
-database\reports\DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md:41:| \`src/ingestion/service.py::ingest_codal_report\` | 
-API قدیمی ایجاد Report/ReportVersion و ذخیره RawFinancialFact؛ هنوز جداسازی metadata persistence از raw persistence 
-انجام نشده |
-database\reports\DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md:42:| \`src/ingestion/codal/ingestion.py\` | facade قدیمی؛ 
-پس از شناسایی callerها باید فقط facade PDF حذف و وضعیت ingest_codal_report جداگانه تعیین شود |
-database\reports\DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md:45:| \`src/ingestion/__init__.py\` | exportهای قدیمی 
-RawLineInput و ingest_codal_report فعلاً حفظ؛ بعداً با API جدید جایگزین یا صریحاً بازنشسته شوند |
-database\reports\DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md:72:1. تابع فعلی \`ingest_codal_report\` را به دو مسئولیت 
-تفکیک طراحی کن: ایجاد/انتخاب Report و ReportVersion، و ذخیره RawLineInput به RawFinancialFact.
-database\reports\DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md:288:| `service.py::ingest_codal_report` | 
-STARTED با flush؛ ساخت Report/ReportVersion/Facts؛ COMPL​ETED و canonical writes با یک commit؛ در exception rollback و 
-سپس FAILED در commit جداگانه | الگوی کلی به atomicity نزدیک است؛ اما Run شروع‌شده در rollback از بین می‌رود و به‌جای 
-update همان Run، رکورد FAILED جدید ساخته می‌شود. مسیر idempotent موجود بر اساس tracking ID و publication datetime، 
-payload را مقایسه نمی‌کند و در صورت یافتن نسخه، شمارنده را در `records_updated` ثبت می‌کند |
-database\reports\DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md:291:| `codal/ingestion.py::ingest_codal_pdf` و 
-`codal/pipeline.py` | در خطای acquisition/extraction/validation، rollback و سپس درج FAILED و commit؛ مسیر PDF legacy 
-است | audit شکست مستقل است، اما مسیر جاری V1 نیست و نباید مبنای قرارداد Excel تلقی شود |
-database\reports\DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md:458:2. مسیر CODAL در 
-`ingestion/service.py::ingest_codal_report` (تابع persistence گزارش CODAL) یک `ReportVersion` و مجموعه‌ای از 
-`RawFinancialFact` ایجاد می‌کند. در همین تابع، ایجاد `MappingDecision`، ساخت `NormalizedFinancialFact` یا ایجاد 
-bridgeهای `NormalizedFinancialFactInput` مشاهده نشد.
-database\reports\DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md:481:| CODAL فقط Raw می‌نویسد | 
-`ingest_codal_report` و Stage 5 query | Stage 5 مصرف‌کنندهٔ مستقیم خروجی CODAL نیست | طراحی/پیاده‌سازی pipeline 
-استخراج، mapping و canonical validation مطابق DB-DES-001/002 |
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:333:- `src/ingestion/service.py`: ورودی `ingest_codal_report` 
-یک `period_id` برای کل گزارش می‌گیرد و همان را به همهٔ `RawFinancialFact`ها نسبت می‌دهد. `RawLineInput` فعلی اطلاعات 
-دورهٔ مستقل برای هر مقدار/سلول ندارد.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:339:رابطهٔ فعلی Report و FinancialPeriod هنوز تعیین تکلیف 
-نشده است: گزارش منطقی ممکن است در یک انتشار چند ستون زمانی داشته باشد، در حالی که سرویس فعلی یک `financial_period_id` 
-را به کل Report و همهٔ ردیف‌های آن متصل می‌کند. پیش از تغییر مدل یا DTO باید تصمیم گرفته شود که هر مقدار canonical 
-چگونه به دورهٔ واقعی خودش وصل می‌شود و نقش احتمالی دورهٔ اصلی گزارش چیست.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:351:| Period | `FinancialPeriod` | `financial_periods` |
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:396:2. `Report.financial_period_id` اجباری است و 
-`ingest_codal_report` یک period_id واحد را به تمام RawFinancialFactهای یک report version اختصاص می‌دهد.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:417:| `reports`, `report_versions`, `raw_financial_facts` | 
-`src/ingestion/service.py::ingest_codal_report`؛ facadeها در `src/ingestion/codal/ingestion.py` و `pipeline.py` | در 
-این مرحله، queryهای انتخاب نسخه و تمام مصرف‌کنندگان downstream هنوز فهرست نشده‌اند | یک `period_id` به Report و همهٔ 
-raw lineها داده می‌شود؛ برای گزارش چنددوره‌ای ناکافی است. نسخهٔ جدید، current قبلی را غیرفعال و 
-`supersedes_version_id` را به آخرین نسخه وصل می‌کند. |
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:422:| `financial_periods` | در مسیر CODAL، period از قبل 
-موجود فرض و با `session.get` خوانده می‌شود؛ writer مستقل در مسیرهای بررسی‌شده پیدا نشد | `src/ingestion/service.py` 
-برای اعتبارسنجی وجود period و تطبیق company | منشأ ایجاد/مدیریت دوره هنوز باید در جست‌وجوی کامل call siteها مشخص شود. |
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:460:5. ساختار فعلی `Report.financial_period_id` و 
-`RawFinancialFact.period_id` همچنان هر گزارش/ردیف را به یک period محدود می‌کند؛ DTO و ingestion هیچ دورهٔ مستقل برای 
-هر ستون/مقدار ارائه نمی‌کنند. برای گزارش چندستونه باید تخصیص period در سطح هر مقدار canonical تعریف شود؛ اینکه Report 
-یک دورهٔ اصلی اختیاری/نمایشی داشته باشد یا رابطهٔ جداگانهٔ Report–Period لازم باشد، هنوز تصمیم طراحی نهایی می‌خواهد.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:476:3. `RawLineInput` در `src/ingestion/service.py` نیز همین 
-محدودیت را دارد. متد `ingest_codal_report` یک `period_id` می‌گیرد و همان مقدار را برای همهٔ RawFinancialFactها ذخیره 
-می‌کند.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:477:4. `Report.financial_period_id` هم اجباری است؛ بنابراین 
-حتی مدل Report هم در حال حاضر فقط یک دورهٔ اصلی را نمایش می‌دهد. ReportVersion رابطهٔ دوره‌ای مستقل ندارد.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:496:**گزینهٔ معماری برای مرحلهٔ طراحی (پیشنهاد، نه تصمیم 
-مصوب):** یک association در سطح ReportVersion برای دوره‌های پوشش‌داده‌شده، با حفظ source-column/header locator، و اتصال 
-هر canonical input به period مشخص خودش. این طرح از نسبت‌دادن یک period واحد به کل Report جلوگیری می‌کند؛ اما شکل دقیق 
-association، الزامی/اختیاری بودن `Report.financial_period_id` قدیمی و نگاشت نسخه‌های اصلاحی باید در Task 008 و Task 
-006 نهایی شود. در این مرحله هیچ schema یا migration تغییر نمی‌کند.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1085:بررسی source code فعلی GitHub نشان داد 
-`src/ingestion/service.py::ingest_codal_report` مستقیماً برای هر `RawLineInput` یک `RawFinancialFact` می‌سازد و با 
-`session.add_all` در `raw_financial_facts` ذخیره می‌کند. این مسیر از `src/ingestion/codal/adapter.py` تغذیه می‌شود که 
-صراحتاً مرز استخراج PDF است. بنابراین مسیر CODAL فعلی legacy/PDF-oriented است؛ وجود مسیر production مستقل 
-Excel-to-canonical در این بررسی اثبات نشد. Runner نیز در source فعلی تا Migration 8 پیش می‌رود.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1112:بازبینی source فعلی نیز نشان می‌دهد مسیر 
-`src/ingestion/codal/ingestion.py` و `src/ingestion/codal/pipeline.py` همچنان PDF را استخراج می‌کنند و در نهایت به 
-`src/ingestion/service.py::ingest_codal_report` می‌رسند؛ این تابع برای هر RawLineInput یک RawFinancialFact می‌سازد و 
-ذخیره می‌کند. در مقابل، `src/ingestion/excel` فعلاً DTO و Reader دارد و مسیر production مستقل Excel-to-canonical 
-persistence در کد بررسی‌شده اثبات نشده است.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1131:بررسی source در branch فعلی زنجیره PDF را مشخص کرد: 
-pipeline محلی/URL → acquisition → adapter و PDF extract → RawLineInput → persistence قدیمی در 
-`service.py::ingest_codal_report` → RawFinancialFact.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1682:- `codal/ingestion.py::ingest_codal_report` فقط facade 
-است و به writer مرکزی `service.py::ingest_codal_report` می‌رسد.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1683:- `codal/ingestion.py::ingest_codal_pdf` extraction و 
-سپس persistence را انجام می‌دهد؛ extraction failure با Run جدید FAILED ثبت می‌شود و STARTED پایدار پیش از extraction 
-ندارد.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1684:- `codal/pipeline.py::load_codal_pdf` و 
-`load_codal_pdf_from_url` acquisition/extraction/validation را پیش از writer اجرا می‌کنند؛ failureهای این مراحل Run 
-جدید FAILED ثبت می‌کنند، نه ادامهٔ یک STARTED پایدار.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1706:**قدم بعدی:** ادامهٔ Phase 0 از DB-PLAN-013 و بستن 
-gateهای طراحی DB-DES-009. اولین مورد: inventory تمام مصرف‌کنندگان `reports.financial_period_id`، چون پیش از nullable 
-کردن یا انتقال این فیلد باید تمام readerها/writerها مشخص شوند. پس از آن gateهای source revision و ReportVersion 
-standard binding، dimension scope، company consistency و provenance granularity بررسی می‌شوند.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1710:### 8.73 بررسی مصرف‌کنندگان 
-`reports.financial_period_id` و تفکیک قرارداد legacy CODAL از Excel — 2026-11-18
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1714:- ستون `Report.financial_period_id` در ORM اجباری است 
-(`nullable=False`) و writer قدیمی CODAL آن را مقداردهی و در replay identity validation می‌کند.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1715:- facade در `codal/ingestion.py` به writer مرکزی 
-`service.py::ingest_codal_report` delegate می‌کند؛ PDF wrapper پس از extraction از آن استفاده می‌کند. مسیرهای 
-`codal/pipeline.py` نیز پس از acquisition/extraction/validation مستقیماً writer مرکزی را فراخوانی می‌کنند.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1718:- نام `financial_period_id` در evaluation/forecast 
-observation DTOها و تست‌های Stage 5/6 لزوماً به ستون `reports.financial_period_id` اشاره ندارد؛ این دو مفهوم باید در 
-تحلیل وابستگی از هم جدا بمانند.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1721:**تصمیم طراحی موقت این gate:** مسیر legacy CODAL تا زمان 
-retirement/migration کنترل‌شده به قرارداد فعلی نیاز دارد؛ بنابراین nullable کردن یا حذف فوری 
-`Report.financial_period_id` مجاز نیست. مسیر جدید Excel باید دوره را در سطح هر Fact تعیین کند و نباید یک دورهٔ واحد را 
-به تمام facts یک ReportVersion تحمیل کند. اگر فیلد Report در مدل نهایی باقی بماند، فقط metadata دورهٔ اصلی/نمایشی 
-گزارش است و مرجع authoritative دورهٔ هر مقدار نیست.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1739:**توصیهٔ معماری:** برای `financial_facts` جدید، 
-company_id را تکرار نکنیم. تطابق شرکت را با SQLite BEFORE INSERT و BEFORE UPDATE trigger روی Fact، به‌علاوه service 
-validation enforce کنیم. برای جلوگیری از خراب شدن invariant پس از ثبت Fact، تغییر `reports.company_id`، 
-`report_versions.report_id` و `financial_periods.company_id` تا وقتی Fact وابسته وجود دارد باید ممنوع باشد. اگر 
-`Report.financial_period_id` به‌صورت optional metadata باقی ماند، در صورت non-NULL بودن تطابق شرکت آن نیز کنترل شود.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1876:### 8.84 بررسی اولیهٔ Gate 5 از DB-DES-009 — وابستگی 
-writer قدیمی به Report.financial_period_id — 2026-11-18
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1880:- `service.py::ingest_codal_report` writer مرکزی CODAL 
-مشاهده‌شده است.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1883:- برای Report موجود، company_id و 
-`Report.financial_period_id` باید با ورودی یکسان باشند؛ در غیر این صورت عملیات رد می‌شود.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1896:خروجی جست‌وجوی PowerShell در تمام فایل‌های Python 
-repository (به‌استثنای .git، محیط‌های مجازی و __pycache__) بررسی شد. writer مرکزی 
-src/ingestion/service.py::ingest_codal_report است؛ facade در src/ingestion/codal/ingestion.py و pipelineهای PDF در 
-src/ingestion/codal/pipeline.py به آن متصل‌اند. packageها این APIها را export می‌کنند. ارجاع‌های تستی نیز قرارداد فعلی 
-را پوشش می‌دهند.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1898:کاربردهای financial_period_id در src/evaluation مربوط به 
-دورهٔ observation/evaluation هستند و نباید بدون اثبات رابطه، مصرف ستون Report.financial_period_id شمرده شوند. در 
-محدودهٔ فایل‌های Python بررسی‌شده، مصرف‌کنندهٔ تولیدی مستقلی برای ستون Report جدا از writer legacy احراز نشد؛ اما این 
-نتیجه شامل فایل‌های غیر Python، کد بیرون repository یا فراخوانی پویا نیست.
-database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1900:**نتیجه:** ستون Report.financial_period_id و قرارداد 
-writer legacy فعلاً حفظ می‌شوند. writer جدید Excel باید period را در سطح هر observation/fact تعیین کند. نقش نهایی ستون 
-Report و تصمیم nullable/remove هنوز باز است و به بررسی وابستگی‌های باقیمانده و طرح بازنشستگی legacy موکول می‌شود. این 
-بررسی read-only بود؛ تست یا تغییر کد/مدل/schema/migration/DB انجام نشد.
-prompts\10_Implementation_Status.md:81:| Format-agnostic core persistence | PASS | `ingest_fx_rates` / 
-`ingest_codal_report` take DTOs |
-prompts\10_Implementation_Status.md:83:| CODAL extraction outside core write | PASS | `ingest_codal_report` accepts 
-`RawLineInput[]` only |
-prompts\10_Implementation_Status.md:243:ingest_codal_report()
-src\tests\final_validation_audit.md:140:  → ingest_codal_report()
-src\tests\golden_audit_source_plan.md:15:ingest_codal_report()
-src\tests\golden_audit_source_plan.md:115:- Report / ReportVersion / RawFinancialFact created by ingest_codal_report()
-01_Stage1_Data_Foundation.md:278:financial_period_id
-06_Stage6_Forecast_Evaluation.md:1112:**Owner-approved pointer (Prompt 34 — scenario persistence evidence, additive 
-clarification only, 2026-10-09):** audit evidence — no evaluation-results persistence table exists in `src/models/*` 
-(models cover industries/companies, financial_periods, reports/report_versions, raw 
-facts/metrics/mapping/normalized/derived, fx, market_daily, share actions, forecast_versions/forecast_input_refs); 
-`forecast_versions` persists scenario with a BEAR/BASE/BULL check constraint; evaluation verdicts are in-memory only; 
-`EvaluationKey` carries scenario (default BASE) while aggregation is scenario-free by design (code-level gap recorded 
-for the future implementation prompt, not changed here). Migration necessity is therefore NOT APPLICABLE/UNDETERMINED 
-as framed — there is no evaluation persistence table to migrate; when evaluation persistence is built, scenario 
-identity must be part of its contract per policy D3, with no cross-scenario pooling.
-10_Production_Codal_Extraction_and_Data_Load.md:22:ingest_codal_report()
-10_Production_Codal_Extraction_and_Data_Load.md:113:`extract → validate → RawLineInput[] → ingest_codal_report()`
-11_Production_Data_Load_and_Foundation_Validation.md:136:ingest_codal_report()
-12_Database_Architecture_V1.1.md:104:- `financial_periods`
-12_Database_Architecture_V1.1.md:801:ingest_codal_report / ingest_ohlc_* / ingest_fx_rates
-12_Database_Architecture_V1.1.md:810:- The Excel adapter must emit the same common financial input DTO contract 
-consumed by `ingest_codal_report`; the existing downstream persistence boundary must remain format-independent.
-99_Architecture_Change_Log.md:386:  ingest_codal_report / ingest_ohlc_* / ingest_fx_rates
-99_Architecture_Change_Log.md:397:   Codal financial statements arrive as PDFs. Extraction (table/text/OCR as needed) 
-is a **pre-ingestion** responsibility. `ingest_codal_report` receives already-extracted `RawLineInput` lines plus 
-report metadata (tracking id, URL, publication datetime, version). The PDF itself may be referenced via `source_url` / 
-tracking fields; the binary is not required inside the DB contract for V1.
-PROJECT_HANDOFF_INSTRUCTIONS.md:252:    ingest_codal_report()
-reply.md:4:PDF را استخراج می‌کنند، خروجی `RawLineInput` می‌سازند و `ingest_codal_report()` آن را به `RawFinancialFact` 
-ذخیره 
-reply.md:8:`src/ingestion/service.py` | `RawLineInput`، `ingest_codal_report`، transaction و replay |
-reply.md:10:از `load_codal_pdf` و PDFهای fixture استفاده می‌کند.
-reply.md:11:database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:61:در `ingest_codal_report()`:
-reply.md:13:`financial_period_id` است، درحالی‌که قرارداد منطقی می‌گوید یک ReportVersion می‌تواند چند دوره و هر 
-FinancialFact دورهٔ 
-reply.md:15:database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:83:- `ingest_codal_report()` 
-یک period_id 
-reply.md:17:database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:224:### 11.1 CODAL — 
-`ingest_codal_report`
-reply.md:19:`src/ingestion/codal/ingestion.py::ingest_codal_report` صرفاً facade سازگاری است و به 
-reply.md:20:`src/ingestion/service.py::ingest_codal_report` delegate می‌کند؛ transaction مستقل ندارد.
-reply.md:22:`src/ingestion/codal/ingestion.py::ingest_codal_pdf` extraction را اجرا می‌کند و سپس به facade بالا 
-می‌رسد. در 
-reply.md:26:`src/ingestion/codal/pipeline.py::load_codal_pdf` و `load_codal_pdf_from_url` acquisition، extraction و 
-validation را 
-reply.md:30:`src/ingestion/service.py::ingest_codal_report` writer اصلی Report/ReportVersion/RawFinancialFact است. این 
-تابع Run را 
-reply.md:36:`reports.financial_period_id` پیش از nullable کردن/جابه‌جایی آن است. سپس gateهای ReportVersion source 
-reply.md:39:`reports.financial_period_id` و مسیرهای فراخوانی CODAL — 2026-11-18
-reply.md:41:`financial_period_id|FinancialPeriod` در کل فایل‌های `*.py` و `*.sql` زیر repository، موارد زیر را نشان 
-داد:
-reply.md:43:`Report.financial_period_id` با `nullable=False` و FK به `financial_periods.period_id`.
-reply.md:46:`Report.financial_period_id` استفاده نشده است.
-reply.md:48:تست‌های Stage 5/6: نام `financial_period_id` در DTOها و مدل‌های ارزیابی به‌عنوان شناسهٔ دورهٔ 
-observation/forecast 
-reply.md:49:استفاده شده است؛ این موارد به‌تنهایی مصرف ستون `reports.financial_period_id` نیستند.
-reply.md:51:Report و قرارداد قدیمی را با `financial_period_id` اجباری می‌آزمایند؛ تست‌های PDF نیز رابطهٔ Report با 
-FinancialPeriod 
-reply.md:54:تابع عمومی `ingest_codal_report` یک facade سازگار با گذشته است و به 
-`src.ingestion.service.ingest_codal_report` 
-reply.md:55:delegate می‌کند. تابع `ingest_codal_pdf` پس از extraction همین facade را فراخوانی می‌کند.
-reply.md:57:توابع `load_codal_pdf` و `load_codal_pdf_from_url` پس از acquisition/extraction/validation، writer مرکزی 
-reply.md:58:`src.ingestion.service.ingest_codal_report` را فراخوانی می‌کنند.
-reply.md:61:`financial_period_id` ندارند؛ این با یافتهٔ قبلی DB-AUD-013 مبنی بر نبود production Excel-to-canonical 
-persistence 
-reply.md:63:database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:326:1. 
-`Report.financial_period_id` در 
-reply.md:68:`Report.financial_period_id` تا زمان تعیین تکلیف و بازنشستگی کنترل‌شدهٔ مسیر legacy باید حفظ شود؛ اگر در 
-مدل نهایی 
-reply.md:71:Report.financial_period_id و مرز writer قدیمی — 2026-11-18
-reply.md:73:مسیر مشاهده شد `src/ingestion/service.py::ingest_codal_report` است؛ facade در `codal/ingestion.py` به همین 
-تابع 
-reply.md:76:`Report.financial_period_id` با ورودی مقایسه می‌شوند؛ اختلاف باعث رد عملیات می‌شود.
-reply.md:78:`financial_period_id=period_id` ثبت می‌شود.
-reply.md:80:Report.financial_period_id (حذف تدریجی، nullable و descriptive، یا جایگزینی با primary-period metadata) پس 
-از 
-reply.md:83:src/ingestion/service.py::ingest_codal_report.
-reply.md:85:src/ingestion/codal/ingestion.py::ingest_codal_report به writer مرکزی delegate می‌کند؛ ingest_codal_pdf 
-نیز پس از 
-reply.md:88:تابع‌های load_codal_pdf و load_codal_pdf_from_url را دارد و هر دو مسیر در نهایت writer مرکزی را فراخوانی 
-می‌کنند.
-reply.md:89:database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:367:- جست‌وجوی 
-financial_period_id 
-reply.md:92:Report.financial_period_id تلقی کرد.
-reply.md:94:با جست‌وجو و بازبینی فایل‌های مرتبط بررسی شدند، وابستگی اجرایی مستقیم ستون Report.financial_period_id در 
-writer قدیمی 
-reply.md:99:`company_id`; free-text `report_type`; FK `financial_period_id` | Reuse, but report-type normalization is 
-a 
-reply.md:101:database\reports\DB_AUD_009_ORM_MIGRATION_TEMPLATE_COMPATIBILITY_AUDIT.md:24:| `FinancialPeriod` / 
-`financial_periods` 
-reply.md:104:database\reports\DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md:92:- `ingest_codal_report(...)` 
-creates one 
-reply.md:106:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:17:load_codal_pdf / 
-load_codal_pdf_from_url  
-reply.md:107:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:21:→ ingest_codal_report  
-reply.md:109:ingest_codal_pdf و facade سازگاری ingest_codal_report | بخش PDF-only + facade legacy |
-reply.md:110:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:36:| 
-src/ingestion/service.py::ingest_codal_report | 
-reply.md:113:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:125:- `service.py::ingest_codal_report`: 
-persistence 
-reply.md:115:database\reports\DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md:45:- financial_period_id به‌عنوان 
-primary report 
-reply.md:117:database\reports\DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md:53:- financial_period_id در مدل فعلی 
-روی Report 
-reply.md:121:`src/ingestion/service.py::ingest_codal_report`:
-reply.md:122:database\reports\DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md:103:    -> ingest_codal_report
-reply.md:123:database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:43:3. `financial_periods` — 
-redesigned for 
-reply.md:127:FinancialPeriod. The current NOT NULL `reports.financial_period_id` must not be allowed to impose one 
-period on every 
-reply.md:129:database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:93:The new/updated 
-`financial_periods` model 
-reply.md:132:consumers before making current `reports.financial_period_id` nullable or moving it.
-reply.md:134:`financial_period_id` را جداگانه نگه می‌دارد؛ FKها به‌تنهایی تضمین نمی‌کنند که دورهٔ گزارش متعلق به همان 
-شرکت باشد.
-reply.md:137:`report_versions.report_id` یا `financial_periods.company_id` تا وقتی Fact وابسته وجود دارد ممنوع باشد؛ 
-اصلاح هویت با 
-reply.md:139:database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:360:4. اگر 
-`Report.financial_period_id` در مدل 
-reply.md:143:pipelineهای load_codal_pdf و load_codal_pdf_from_url |
-reply.md:144:database\reports\DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md:41:| 
-\`src/ingestion/service.py::ingest_codal_report\` | 
-reply.md:148:پس از شناسایی callerها باید فقط facade PDF حذف و وضعیت ingest_codal_report جداگانه تعیین شود |
-reply.md:150:RawLineInput و ingest_codal_report فعلاً حفظ؛ بعداً با API جدید جایگزین یا صریحاً بازنشسته شوند |
-reply.md:151:database\reports\DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md:72:1. تابع فعلی \`ingest_codal_report\` را 
-به دو مسئولیت 
-reply.md:153:database\reports\DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md:288:| 
-`service.py::ingest_codal_report` | 
-reply.md:158:database\reports\DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md:291:| 
-`codal/ingestion.py::ingest_codal_pdf` و 
-reply.md:162:`ingestion/service.py::ingest_codal_report` (تابع persistence گزارش CODAL) یک `ReportVersion` و مجموعه‌ای 
-از 
-reply.md:166:`ingest_codal_report` و Stage 5 query | Stage 5 مصرف‌کنندهٔ مستقیم خروجی CODAL نیست | طراحی/پیاده‌سازی 
-pipeline 
-reply.md:168:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:333:- `src/ingestion/service.py`: ورودی 
-`ingest_codal_report` 
-reply.md:172:نشده است: گزارش منطقی ممکن است در یک انتشار چند ستون زمانی داشته باشد، در حالی که سرویس فعلی یک 
-`financial_period_id` 
-reply.md:175:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:351:| Period | `FinancialPeriod` | 
-`financial_periods` |
-reply.md:176:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:396:2. `Report.financial_period_id` اجباری است و 
-reply.md:177:`ingest_codal_report` یک period_id واحد را به تمام RawFinancialFactهای یک report version اختصاص می‌دهد.
-reply.md:179:`src/ingestion/service.py::ingest_codal_report`؛ facadeها در `src/ingestion/codal/ingestion.py` و 
-`pipeline.py` | در 
-reply.md:183:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:422:| `financial_periods` | در مسیر CODAL، 
-period از قبل 
-reply.md:186:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:460:5. ساختار فعلی `Report.financial_period_id` 
-و 
-reply.md:191:محدودیت را دارد. متد `ingest_codal_report` یک `period_id` می‌گیرد و همان مقدار را برای همهٔ 
-RawFinancialFactها ذخیره 
-reply.md:193:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:477:4. `Report.financial_period_id` هم اجباری 
-است؛ بنابراین 
-reply.md:198:association، الزامی/اختیاری بودن `Report.financial_period_id` قدیمی و نگاشت نسخه‌های اصلاحی باید در Task 
-008 و Task 
-reply.md:201:`src/ingestion/service.py::ingest_codal_report` مستقیماً برای هر `RawLineInput` یک `RawFinancialFact` 
-می‌سازد و با 
-reply.md:207:`src/ingestion/service.py::ingest_codal_report` می‌رسند؛ این تابع برای هر RawLineInput یک 
-RawFinancialFact می‌سازد و 
-reply.md:212:`service.py::ingest_codal_report` → RawFinancialFact.
-reply.md:213:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1682:- `codal/ingestion.py::ingest_codal_report` 
-فقط facade 
-reply.md:214:است و به writer مرکزی `service.py::ingest_codal_report` می‌رسد.
-reply.md:215:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1683:- `codal/ingestion.py::ingest_codal_pdf` 
-extraction و 
-reply.md:218:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1684:- `codal/pipeline.py::load_codal_pdf` و 
-reply.md:219:`load_codal_pdf_from_url` acquisition/extraction/validation را پیش از writer اجرا می‌کنند؛ failureهای این 
-مراحل Run 
-reply.md:222:gateهای طراحی DB-DES-009. اولین مورد: inventory تمام مصرف‌کنندگان `reports.financial_period_id`، چون پیش 
-از nullable 
-reply.md:226:`reports.financial_period_id` و تفکیک قرارداد legacy CODAL از Excel — 2026-11-18
-reply.md:227:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1714:- ستون `Report.financial_period_id` در ORM 
-اجباری است 
-reply.md:230:`service.py::ingest_codal_report` delegate می‌کند؛ PDF wrapper پس از extraction از آن استفاده می‌کند. 
-مسیرهای 
-reply.md:232:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1718:- نام `financial_period_id` در 
-evaluation/forecast 
-reply.md:233:observation DTOها و تست‌های Stage 5/6 لزوماً به ستون `reports.financial_period_id` اشاره ندارد؛ این دو 
-مفهوم باید در 
-reply.md:237:`Report.financial_period_id` مجاز نیست. مسیر جدید Excel باید دوره را در سطح هر Fact تعیین کند و نباید یک 
-دورهٔ واحد را 
-reply.md:243:`report_versions.report_id` و `financial_periods.company_id` تا وقتی Fact وابسته وجود دارد باید ممنوع 
-باشد. اگر 
-reply.md:244:`Report.financial_period_id` به‌صورت optional metadata باقی ماند، در صورت non-NULL بودن تطابق شرکت آن نیز 
-کنترل شود.
-reply.md:246:writer قدیمی به Report.financial_period_id — 2026-11-18
-reply.md:247:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1880:- `service.py::ingest_codal_report` writer 
-مرکزی CODAL 
-reply.md:250:`Report.financial_period_id` باید با ورودی یکسان باشند؛ در غیر این صورت عملیات رد می‌شود.
-reply.md:253:src/ingestion/service.py::ingest_codal_report است؛ facade در src/ingestion/codal/ingestion.py و 
-pipelineهای PDF در 
-reply.md:256:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1898:کاربردهای financial_period_id در 
-src/evaluation مربوط به 
-reply.md:257:دورهٔ observation/evaluation هستند و نباید بدون اثبات رابطه، مصرف ستون Report.financial_period_id شمرده 
-شوند. در 
-reply.md:260:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1900:**نتیجه:** ستون Report.financial_period_id 
-و قرارداد 
-reply.md:265:`ingest_codal_report` take DTOs |
-reply.md:266:prompts\10_Implementation_Status.md:83:| CODAL extraction outside core write | PASS | 
-`ingest_codal_report` accepts 
-reply.md:268:prompts\10_Implementation_Status.md:243:ingest_codal_report()
-reply.md:269:src\tests\final_validation_audit.md:140:  → ingest_codal_report()
-reply.md:270:src\tests\golden_audit_source_plan.md:15:ingest_codal_report()
-reply.md:271:src\tests\golden_audit_source_plan.md:115:- Report / ReportVersion / RawFinancialFact created by 
-ingest_codal_report()
-reply.md:272:01_Stage1_Data_Foundation.md:278:financial_period_id
-reply.md:275:(models cover industries/companies, financial_periods, reports/report_versions, raw 
-reply.md:282:10_Production_Codal_Extraction_and_Data_Load.md:22:ingest_codal_report()
-reply.md:283:10_Production_Codal_Extraction_and_Data_Load.md:113:`extract → validate → RawLineInput[] → 
-ingest_codal_report()`
-reply.md:284:11_Production_Data_Load_and_Foundation_Validation.md:136:ingest_codal_report()
-reply.md:285:12_Database_Architecture_V1.1.md:104:- `financial_periods`
-reply.md:286:12_Database_Architecture_V1.1.md:801:ingest_codal_report / ingest_ohlc_* / ingest_fx_rates
-reply.md:288:consumed by `ingest_codal_report`; the existing downstream persistence boundary must remain 
-format-independent.
-reply.md:289:99_Architecture_Change_Log.md:386:  ingest_codal_report / ingest_ohlc_* / ingest_fx_rates
-reply.md:291:is a **pre-ingestion** responsibility. `ingest_codal_report` receives already-extracted `RawLineInput` 
-lines plus 
-reply.md:294:PROJECT_HANDOFF_INSTRUCTIONS.md:252:    ingest_codal_report()
-reply.md:295:reply.md:4:PDF را استخراج می‌کنند، خروجی `RawLineInput` می‌سازند و `ingest_codal_report()` آن را به 
-`RawFinancialFact` 
-reply.md:297:reply.md:8:`src/ingestion/service.py` | `RawLineInput`، `ingest_codal_report`، transaction و replay |
-reply.md:298:reply.md:10:از `load_codal_pdf` و PDFهای fixture استفاده می‌کند.
-reply.md:299:reply.md:11:database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:61:در 
-`ingest_codal_report()`:
-reply.md:300:reply.md:13:`financial_period_id` است، درحالی‌که قرارداد منطقی می‌گوید یک ReportVersion می‌تواند چند دوره 
-و هر 
-reply.md:302:reply.md:15:database\reports\DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md:83:- 
-`ingest_codal_report()` 
-reply.md:305:`ingest_codal_report`
-reply.md:306:reply.md:19:`src/ingestion/codal/ingestion.py::ingest_codal_report` صرفاً facade سازگاری است و به 
-reply.md:307:reply.md:20:`src/ingestion/service.py::ingest_codal_report` delegate می‌کند؛ transaction مستقل ندارد.
-reply.md:308:reply.md:22:`src/ingestion/codal/ingestion.py::ingest_codal_pdf` extraction را اجرا می‌کند و سپس به 
-facade بالا 
-reply.md:310:reply.md:26:`src/ingestion/codal/pipeline.py::load_codal_pdf` و `load_codal_pdf_from_url` acquisition، 
-extraction و 
-reply.md:312:reply.md:30:`src/ingestion/service.py::ingest_codal_report` writer اصلی 
-Report/ReportVersion/RawFinancialFact است. این 
-reply.md:314:reply.md:36:`reports.financial_period_id` پیش از nullable کردن/جابه‌جایی آن است. سپس gateهای 
-ReportVersion source 
-reply.md:315:reply.md:39:`reports.financial_period_id` و مسیرهای فراخوانی CODAL — 2026-11-18
-reply.md:316:reply.md:41:`financial_period_id|FinancialPeriod` در کل فایل‌های `*.py` و `*.sql` زیر repository، موارد 
-زیر را نشان 
-reply.md:318:reply.md:43:`Report.financial_period_id` با `nullable=False` و FK به `financial_periods.period_id`.
-reply.md:319:reply.md:46:`Report.financial_period_id` استفاده نشده است.
-reply.md:320:reply.md:48:تست‌های Stage 5/6: نام `financial_period_id` در DTOها و مدل‌های ارزیابی به‌عنوان شناسهٔ دورهٔ 
-reply.md:322:reply.md:49:استفاده شده است؛ این موارد به‌تنهایی مصرف ستون `reports.financial_period_id` نیستند.
-reply.md:323:reply.md:51:Report و قرارداد قدیمی را با `financial_period_id` اجباری می‌آزمایند؛ تست‌های PDF نیز رابطهٔ 
-Report با 
-reply.md:325:reply.md:54:تابع عمومی `ingest_codal_report` یک facade سازگار با گذشته است و به 
-reply.md:326:`src.ingestion.service.ingest_codal_report` 
-reply.md:327:reply.md:55:delegate می‌کند. تابع `ingest_codal_pdf` پس از extraction همین facade را فراخوانی می‌کند.
-reply.md:328:reply.md:57:توابع `load_codal_pdf` و `load_codal_pdf_from_url` پس از acquisition/extraction/validation، 
-writer مرکزی 
-reply.md:329:reply.md:58:`src.ingestion.service.ingest_codal_report` را فراخوانی می‌کنند.
-reply.md:330:reply.md:61:`financial_period_id` ندارند؛ این با یافتهٔ قبلی DB-AUD-013 مبنی بر نبود production 
-Excel-to-canonical 
-reply.md:333:`Report.financial_period_id` در 
-reply.md:334:reply.md:68:`Report.financial_period_id` تا زمان تعیین تکلیف و بازنشستگی کنترل‌شدهٔ مسیر legacy باید حفظ 
-شود؛ اگر در 
-reply.md:336:reply.md:71:Report.financial_period_id و مرز writer قدیمی — 2026-11-18
-reply.md:337:reply.md:73:مسیر مشاهده شد `src/ingestion/service.py::ingest_codal_report` است؛ facade در 
-`codal/ingestion.py` به همین 
-reply.md:339:reply.md:76:`Report.financial_period_id` با ورودی مقایسه می‌شوند؛ اختلاف باعث رد عملیات می‌شود.
-reply.md:340:reply.md:78:`financial_period_id=period_id` ثبت می‌شود.
-reply.md:341:reply.md:80:Report.financial_period_id (حذف تدریجی، nullable و descriptive، یا جایگزینی با primary-period 
-metadata) پس 
-reply.md:343:reply.md:83:src/ingestion/service.py::ingest_codal_report.
-reply.md:344:reply.md:85:src/ingestion/codal/ingestion.py::ingest_codal_report به writer مرکزی delegate می‌کند؛ 
-ingest_codal_pdf 
-reply.md:346:reply.md:88:تابع‌های load_codal_pdf و load_codal_pdf_from_url را دارد و هر دو مسیر در نهایت writer مرکزی 
-را فراخوانی 
-reply.md:349:financial_period_id 
-reply.md:350:reply.md:92:Report.financial_period_id تلقی کرد.
-reply.md:351:reply.md:94:با جست‌وجو و بازبینی فایل‌های مرتبط بررسی شدند، وابستگی اجرایی مستقیم ستون 
-Report.financial_period_id در 
-reply.md:353:reply.md:99:`company_id`; free-text `report_type`; FK `financial_period_id` | Reuse, but report-type 
-normalization is 
-reply.md:356:`financial_periods` 
-reply.md:357:reply.md:104:database\reports\DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md:92:- 
-`ingest_codal_report(...)` 
-reply.md:359:reply.md:106:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:17:load_codal_pdf / 
-reply.md:360:load_codal_pdf_from_url  
-reply.md:361:reply.md:107:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:21:→ ingest_codal_report  
-reply.md:362:reply.md:109:ingest_codal_pdf و facade سازگاری ingest_codal_report | بخش PDF-only + facade legacy |
-reply.md:364:src/ingestion/service.py::ingest_codal_report | 
-reply.md:365:reply.md:113:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:125:- 
-`service.py::ingest_codal_report`: 
-reply.md:367:reply.md:115:database\reports\DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md:45:- 
-financial_period_id به‌عنوان 
-reply.md:369:reply.md:117:database\reports\DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md:53:- 
-financial_period_id در مدل فعلی 
-reply.md:371:reply.md:121:`src/ingestion/service.py::ingest_codal_report`:
-reply.md:372:reply.md:122:database\reports\DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md:103:    -> 
-ingest_codal_report
-reply.md:373:reply.md:123:database\reports\DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md:43:3. 
-`financial_periods` — 
-reply.md:375:reply.md:127:FinancialPeriod. The current NOT NULL `reports.financial_period_id` must not be allowed to 
-impose one 
-reply.md:378:`financial_periods` model 
-reply.md:379:reply.md:132:consumers before making current `reports.financial_period_id` nullable or moving it.
-reply.md:380:reply.md:134:`financial_period_id` را جداگانه نگه می‌دارد؛ FKها به‌تنهایی تضمین نمی‌کنند که دورهٔ گزارش 
-متعلق به همان 
-reply.md:382:reply.md:137:`report_versions.report_id` یا `financial_periods.company_id` تا وقتی Fact وابسته وجود دارد 
-ممنوع باشد؛ 
-reply.md:385:`Report.financial_period_id` در مدل 
-reply.md:386:reply.md:143:pipelineهای load_codal_pdf و load_codal_pdf_from_url |
-reply.md:388:\`src/ingestion/service.py::ingest_codal_report\` | 
-reply.md:389:reply.md:148:پس از شناسایی callerها باید فقط facade PDF حذف و وضعیت ingest_codal_report جداگانه تعیین شود 
-|
-reply.md:390:reply.md:150:RawLineInput و ingest_codal_report فعلاً حفظ؛ بعداً با API جدید جایگزین یا صریحاً بازنشسته 
-شوند |
-reply.md:391:reply.md:151:database\reports\DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md:72:1. تابع فعلی 
-\`ingest_codal_report\` را 
-reply.md:394:`service.py::ingest_codal_report` | 
-reply.md:396:`codal/ingestion.py::ingest_codal_pdf` و 
-reply.md:397:reply.md:162:`ingestion/service.py::ingest_codal_report` (تابع persistence گزارش CODAL) یک 
-`ReportVersion` و مجموعه‌ای 
-reply.md:399:reply.md:166:`ingest_codal_report` و Stage 5 query | Stage 5 مصرف‌کنندهٔ مستقیم خروجی CODAL نیست | 
-طراحی/پیاده‌سازی 
-reply.md:402:`ingest_codal_report` 
-reply.md:404:`financial_period_id` 
-reply.md:406:`financial_periods` |
-reply.md:407:reply.md:176:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:396:2. `Report.financial_period_id` 
-اجباری است و 
-reply.md:408:reply.md:177:`ingest_codal_report` یک period_id واحد را به تمام RawFinancialFactهای یک report version 
-اختصاص می‌دهد.
-reply.md:409:reply.md:179:`src/ingestion/service.py::ingest_codal_report`؛ facadeها در 
-`src/ingestion/codal/ingestion.py` و 
-reply.md:411:reply.md:183:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:422:| `financial_periods` | در مسیر 
-CODAL، 
-reply.md:413:reply.md:186:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:460:5. ساختار فعلی 
-`Report.financial_period_id` 
-reply.md:415:reply.md:191:محدودیت را دارد. متد `ingest_codal_report` یک `period_id` می‌گیرد و همان مقدار را برای همهٔ 
-reply.md:417:reply.md:193:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:477:4. `Report.financial_period_id` 
-هم اجباری 
-reply.md:419:reply.md:198:association، الزامی/اختیاری بودن `Report.financial_period_id` قدیمی و نگاشت نسخه‌های اصلاحی 
-باید در Task 
-reply.md:421:reply.md:201:`src/ingestion/service.py::ingest_codal_report` مستقیماً برای هر `RawLineInput` یک 
-`RawFinancialFact` 
-reply.md:423:reply.md:207:`src/ingestion/service.py::ingest_codal_report` می‌رسند؛ این تابع برای هر RawLineInput یک 
-reply.md:425:reply.md:212:`service.py::ingest_codal_report` → RawFinancialFact.
-reply.md:426:reply.md:213:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1682:- 
-`codal/ingestion.py::ingest_codal_report` 
-reply.md:428:reply.md:214:است و به writer مرکزی `service.py::ingest_codal_report` می‌رسد.
-reply.md:429:reply.md:215:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1683:- 
-`codal/ingestion.py::ingest_codal_pdf` 
-reply.md:431:reply.md:218:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1684:- 
-`codal/pipeline.py::load_codal_pdf` و 
-reply.md:432:reply.md:219:`load_codal_pdf_from_url` acquisition/extraction/validation را پیش از writer اجرا می‌کنند؛ 
-failureهای این 
-reply.md:434:reply.md:222:gateهای طراحی DB-DES-009. اولین مورد: inventory تمام مصرف‌کنندگان 
-`reports.financial_period_id`، چون پیش 
-reply.md:436:reply.md:226:`reports.financial_period_id` و تفکیک قرارداد legacy CODAL از Excel — 2026-11-18
-reply.md:437:reply.md:227:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1714:- ستون 
-`Report.financial_period_id` در ORM 
-reply.md:439:reply.md:230:`service.py::ingest_codal_report` delegate می‌کند؛ PDF wrapper پس از extraction از آن 
-استفاده می‌کند. 
-reply.md:441:reply.md:232:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1718:- نام `financial_period_id` در 
-reply.md:443:reply.md:233:observation DTOها و تست‌های Stage 5/6 لزوماً به ستون `reports.financial_period_id` اشاره 
-ندارد؛ این دو 
-reply.md:445:reply.md:237:`Report.financial_period_id` مجاز نیست. مسیر جدید Excel باید دوره را در سطح هر Fact تعیین 
-کند و نباید یک 
-reply.md:447:reply.md:243:`report_versions.report_id` و `financial_periods.company_id` تا وقتی Fact وابسته وجود دارد 
-باید ممنوع 
-reply.md:449:reply.md:244:`Report.financial_period_id` به‌صورت optional metadata باقی ماند، در صورت non-NULL بودن 
-تطابق شرکت آن نیز 
-reply.md:451:reply.md:246:writer قدیمی به Report.financial_period_id — 2026-11-18
-reply.md:452:reply.md:247:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1880:- 
-`service.py::ingest_codal_report` writer 
-reply.md:454:reply.md:250:`Report.financial_period_id` باید با ورودی یکسان باشند؛ در غیر این صورت عملیات رد می‌شود.
-reply.md:455:reply.md:253:src/ingestion/service.py::ingest_codal_report است؛ facade در 
-src/ingestion/codal/ingestion.py و 
-reply.md:457:reply.md:256:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1898:کاربردهای financial_period_id 
-در 
-reply.md:459:reply.md:257:دورهٔ observation/evaluation هستند و نباید بدون اثبات رابطه، مصرف ستون 
-Report.financial_period_id شمرده 
-reply.md:461:reply.md:260:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1900:**نتیجه:** ستون 
-Report.financial_period_id 
-reply.md:463:reply.md:265:`ingest_codal_report` take DTOs |
-reply.md:465:`ingest_codal_report` accepts 
-reply.md:466:reply.md:268:prompts\10_Implementation_Status.md:243:ingest_codal_report()
-reply.md:467:reply.md:269:src\tests\final_validation_audit.md:140:  → ingest_codal_report()
-reply.md:468:reply.md:270:src\tests\golden_audit_source_plan.md:15:ingest_codal_report()
-reply.md:470:ingest_codal_report()
-reply.md:471:reply.md:272:01_Stage1_Data_Foundation.md:278:financial_period_id
-reply.md:472:reply.md:275:(models cover industries/companies, financial_periods, reports/report_versions, raw 
-reply.md:473:reply.md:282:10_Production_Codal_Extraction_and_Data_Load.md:22:ingest_codal_report()
-reply.md:475:ingest_codal_report()`
-reply.md:476:reply.md:284:11_Production_Data_Load_and_Foundation_Validation.md:136:ingest_codal_report()
-reply.md:477:reply.md:285:12_Database_Architecture_V1.1.md:104:- `financial_periods`
-reply.md:478:reply.md:286:12_Database_Architecture_V1.1.md:801:ingest_codal_report / ingest_ohlc_* / ingest_fx_rates
-reply.md:479:reply.md:288:consumed by `ingest_codal_report`; the existing downstream persistence boundary must remain 
-reply.md:481:reply.md:289:99_Architecture_Change_Log.md:386:  ingest_codal_report / ingest_ohlc_* / ingest_fx_rates
-reply.md:482:reply.md:291:is a **pre-ingestion** responsibility. `ingest_codal_report` receives already-extracted 
-`RawLineInput` 
-reply.md:484:reply.md:294:PROJECT_HANDOFF_INSTRUCTIONS.md:252:    ingest_codal_report()
-reply.md:485:reply.md:295:reply.md:4:PDF را استخراج می‌کنند، خروجی `RawLineInput` می‌سازند و `ingest_codal_report()` 
-آن را به 
-reply.md:487:reply.md:297:reply.md:8:`src/ingestion/service.py` | `RawLineInput`، `ingest_codal_report`، transaction و 
-replay |
-reply.md:488:reply.md:298:reply.md:10:از `load_codal_pdf` و PDFهای fixture استفاده می‌کند.
-reply.md:490:`ingest_codal_report()`:
-reply.md:491:reply.md:300:reply.md:13:`financial_period_id` است، درحالی‌که قرارداد منطقی می‌گوید یک ReportVersion 
-می‌تواند چند دوره 
-reply.md:494:`ingest_codal_report()` 
-reply.md:495:reply.md:305:`ingest_codal_report`
-reply.md:496:reply.md:306:reply.md:19:`src/ingestion/codal/ingestion.py::ingest_codal_report` صرفاً facade سازگاری است 
-و به 
-reply.md:497:reply.md:307:reply.md:20:`src/ingestion/service.py::ingest_codal_report` delegate می‌کند؛ transaction 
-مستقل ندارد.
-reply.md:498:reply.md:308:reply.md:22:`src/ingestion/codal/ingestion.py::ingest_codal_pdf` extraction را اجرا می‌کند و 
-سپس به 
-reply.md:500:reply.md:310:reply.md:26:`src/ingestion/codal/pipeline.py::load_codal_pdf` و `load_codal_pdf_from_url` 
-acquisition، 
-reply.md:502:reply.md:312:reply.md:30:`src/ingestion/service.py::ingest_codal_report` writer اصلی 
-reply.md:504:reply.md:314:reply.md:36:`reports.financial_period_id` پیش از nullable کردن/جابه‌جایی آن است. سپس gateهای 
-reply.md:506:reply.md:315:reply.md:39:`reports.financial_period_id` و مسیرهای فراخوانی CODAL — 2026-11-18
-reply.md:507:reply.md:316:reply.md:41:`financial_period_id|FinancialPeriod` در کل فایل‌های `*.py` و `*.sql` زیر 
-repository، موارد 
-reply.md:509:reply.md:318:reply.md:43:`Report.financial_period_id` با `nullable=False` و FK به 
-`financial_periods.period_id`.
-reply.md:510:reply.md:319:reply.md:46:`Report.financial_period_id` استفاده نشده است.
-reply.md:511:reply.md:320:reply.md:48:تست‌های Stage 5/6: نام `financial_period_id` در DTOها و مدل‌های ارزیابی به‌عنوان 
-شناسهٔ دورهٔ 
-reply.md:512:reply.md:322:reply.md:49:استفاده شده است؛ این موارد به‌تنهایی مصرف ستون `reports.financial_period_id` 
-نیستند.
-reply.md:513:reply.md:323:reply.md:51:Report و قرارداد قدیمی را با `financial_period_id` اجباری می‌آزمایند؛ تست‌های 
-PDF نیز رابطهٔ 
-reply.md:515:reply.md:325:reply.md:54:تابع عمومی `ingest_codal_report` یک facade سازگار با گذشته است و به 
-reply.md:516:reply.md:326:`src.ingestion.service.ingest_codal_report` 
-reply.md:517:reply.md:327:reply.md:55:delegate می‌کند. تابع `ingest_codal_pdf` پس از extraction همین facade را 
-فراخوانی می‌کند.
-reply.md:518:reply.md:328:reply.md:57:توابع `load_codal_pdf` و `load_codal_pdf_from_url` پس از 
-acquisition/extraction/validation، 
-reply.md:520:reply.md:329:reply.md:58:`src.ingestion.service.ingest_codal_report` را فراخوانی می‌کنند.
-reply.md:521:reply.md:330:reply.md:61:`financial_period_id` ندارند؛ این با یافتهٔ قبلی DB-AUD-013 مبنی بر نبود 
-production 
-reply.md:523:reply.md:333:`Report.financial_period_id` در 
-reply.md:524:reply.md:334:reply.md:68:`Report.financial_period_id` تا زمان تعیین تکلیف و بازنشستگی کنترل‌شدهٔ مسیر 
-legacy باید حفظ 
-reply.md:526:reply.md:336:reply.md:71:Report.financial_period_id و مرز writer قدیمی — 2026-11-18
-reply.md:527:reply.md:337:reply.md:73:مسیر مشاهده شد `src/ingestion/service.py::ingest_codal_report` است؛ facade در 
-reply.md:529:reply.md:339:reply.md:76:`Report.financial_period_id` با ورودی مقایسه می‌شوند؛ اختلاف باعث رد عملیات 
-می‌شود.
-reply.md:530:reply.md:340:reply.md:78:`financial_period_id=period_id` ثبت می‌شود.
-reply.md:531:reply.md:341:reply.md:80:Report.financial_period_id (حذف تدریجی، nullable و descriptive، یا جایگزینی با 
-primary-period 
-reply.md:533:reply.md:343:reply.md:83:src/ingestion/service.py::ingest_codal_report.
-reply.md:534:reply.md:344:reply.md:85:src/ingestion/codal/ingestion.py::ingest_codal_report به writer مرکزی delegate 
-می‌کند؛ 
-reply.md:535:ingest_codal_pdf 
-reply.md:536:reply.md:346:reply.md:88:تابع‌های load_codal_pdf و load_codal_pdf_from_url را دارد و هر دو مسیر در نهایت 
-writer مرکزی 
-reply.md:538:reply.md:349:financial_period_id 
-reply.md:539:reply.md:350:reply.md:92:Report.financial_period_id تلقی کرد.
-reply.md:541:Report.financial_period_id در 
-reply.md:542:reply.md:353:reply.md:99:`company_id`; free-text `report_type`; FK `financial_period_id` | Reuse, but 
-report-type 
-reply.md:544:reply.md:356:`financial_periods` 
-reply.md:546:`ingest_codal_report(...)` 
-reply.md:547:reply.md:359:reply.md:106:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:17:load_codal_pdf
- / 
-reply.md:548:reply.md:360:load_codal_pdf_from_url  
-reply.md:549:reply.md:361:reply.md:107:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:21:→ 
-ingest_codal_report  
-reply.md:550:reply.md:362:reply.md:109:ingest_codal_pdf و facade سازگاری ingest_codal_report | بخش PDF-only + facade 
-legacy |
-reply.md:551:reply.md:364:src/ingestion/service.py::ingest_codal_report | 
-reply.md:553:`service.py::ingest_codal_report`: 
-reply.md:555:financial_period_id به‌عنوان 
-reply.md:557:financial_period_id در مدل فعلی 
-reply.md:558:reply.md:371:reply.md:121:`src/ingestion/service.py::ingest_codal_report`:
-reply.md:560:ingest_codal_report
-reply.md:562:`financial_periods` — 
-reply.md:563:reply.md:375:reply.md:127:FinancialPeriod. The current NOT NULL `reports.financial_period_id` must not be 
-allowed to 
-reply.md:565:reply.md:378:`financial_periods` model 
-reply.md:566:reply.md:379:reply.md:132:consumers before making current `reports.financial_period_id` nullable or 
-moving it.
-reply.md:567:reply.md:380:reply.md:134:`financial_period_id` را جداگانه نگه می‌دارد؛ FKها به‌تنهایی تضمین نمی‌کنند که 
-دورهٔ گزارش 
-reply.md:569:reply.md:382:reply.md:137:`report_versions.report_id` یا `financial_periods.company_id` تا وقتی Fact 
-وابسته وجود دارد 
-reply.md:571:reply.md:385:`Report.financial_period_id` در مدل 
-reply.md:572:reply.md:386:reply.md:143:pipelineهای load_codal_pdf و load_codal_pdf_from_url |
-reply.md:573:reply.md:388:\`src/ingestion/service.py::ingest_codal_report\` | 
-reply.md:574:reply.md:389:reply.md:148:پس از شناسایی callerها باید فقط facade PDF حذف و وضعیت ingest_codal_report 
-جداگانه تعیین شود 
-reply.md:576:reply.md:390:reply.md:150:RawLineInput و ingest_codal_report فعلاً حفظ؛ بعداً با API جدید جایگزین یا 
-صریحاً بازنشسته 
-reply.md:579:\`ingest_codal_report\` را 
-reply.md:580:reply.md:394:`service.py::ingest_codal_report` | 
-reply.md:581:reply.md:396:`codal/ingestion.py::ingest_codal_pdf` و 
-reply.md:582:reply.md:397:reply.md:162:`ingestion/service.py::ingest_codal_report` (تابع persistence گزارش CODAL) یک 
-reply.md:584:reply.md:399:reply.md:166:`ingest_codal_report` و Stage 5 query | Stage 5 مصرف‌کنندهٔ مستقیم خروجی CODAL 
-نیست | 
-reply.md:586:reply.md:402:`ingest_codal_report` 
-reply.md:587:reply.md:404:`financial_period_id` 
-reply.md:588:reply.md:406:`financial_periods` |
-reply.md:589:reply.md:407:reply.md:176:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:396:2. 
-`Report.financial_period_id` 
-reply.md:591:reply.md:408:reply.md:177:`ingest_codal_report` یک period_id واحد را به تمام RawFinancialFactهای یک 
-report version 
-reply.md:593:reply.md:409:reply.md:179:`src/ingestion/service.py::ingest_codal_report`؛ facadeها در 
-reply.md:595:reply.md:411:reply.md:183:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:422:| 
-`financial_periods` | در مسیر 
-reply.md:598:`Report.financial_period_id` 
-reply.md:599:reply.md:415:reply.md:191:محدودیت را دارد. متد `ingest_codal_report` یک `period_id` می‌گیرد و همان مقدار 
-را برای همهٔ 
-reply.md:600:reply.md:417:reply.md:193:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:477:4. 
-`Report.financial_period_id` 
-reply.md:602:reply.md:419:reply.md:198:association، الزامی/اختیاری بودن `Report.financial_period_id` قدیمی و نگاشت 
-نسخه‌های اصلاحی 
-reply.md:604:reply.md:421:reply.md:201:`src/ingestion/service.py::ingest_codal_report` مستقیماً برای هر `RawLineInput` 
-یک 
-reply.md:606:reply.md:423:reply.md:207:`src/ingestion/service.py::ingest_codal_report` می‌رسند؛ این تابع برای هر 
-RawLineInput یک 
-reply.md:607:reply.md:425:reply.md:212:`service.py::ingest_codal_report` → RawFinancialFact.
-reply.md:609:`codal/ingestion.py::ingest_codal_report` 
-reply.md:610:reply.md:428:reply.md:214:است و به writer مرکزی `service.py::ingest_codal_report` می‌رسد.
-reply.md:612:`codal/ingestion.py::ingest_codal_pdf` 
-reply.md:614:`codal/pipeline.py::load_codal_pdf` و 
-reply.md:615:reply.md:432:reply.md:219:`load_codal_pdf_from_url` acquisition/extraction/validation را پیش از writer 
-اجرا می‌کنند؛ 
-reply.md:618:`reports.financial_period_id`، چون پیش 
-reply.md:619:reply.md:436:reply.md:226:`reports.financial_period_id` و تفکیک قرارداد legacy CODAL از Excel — 2026-11-18
-reply.md:621:`Report.financial_period_id` در ORM 
-reply.md:622:reply.md:439:reply.md:230:`service.py::ingest_codal_report` delegate می‌کند؛ PDF wrapper پس از extraction 
-از آن 
-reply.md:624:reply.md:441:reply.md:232:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1718:- نام 
-`financial_period_id` در 
-reply.md:625:reply.md:443:reply.md:233:observation DTOها و تست‌های Stage 5/6 لزوماً به ستون 
-`reports.financial_period_id` اشاره 
-reply.md:627:reply.md:445:reply.md:237:`Report.financial_period_id` مجاز نیست. مسیر جدید Excel باید دوره را در سطح هر 
-Fact تعیین 
-reply.md:629:reply.md:447:reply.md:243:`report_versions.report_id` و `financial_periods.company_id` تا وقتی Fact 
-وابسته وجود دارد 
-reply.md:631:reply.md:449:reply.md:244:`Report.financial_period_id` به‌صورت optional metadata باقی ماند، در صورت 
-non-NULL بودن 
-reply.md:633:reply.md:451:reply.md:246:writer قدیمی به Report.financial_period_id — 2026-11-18
-reply.md:635:`service.py::ingest_codal_report` writer 
-reply.md:636:reply.md:454:reply.md:250:`Report.financial_period_id` باید با ورودی یکسان باشند؛ در غیر این صورت عملیات 
-رد می‌شود.
-reply.md:637:reply.md:455:reply.md:253:src/ingestion/service.py::ingest_codal_report است؛ facade در 
-reply.md:639:reply.md:457:reply.md:256:database\DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md:1898:کاربردهای 
-financial_period_id 
-reply.md:642:Report.financial_period_id شمرده 
-reply.md:644:Report.financial_period_id 
-reply.md:645:reply.md:463:reply.md:265:`ingest_codal_report` take DTOs |
-reply.md:646:reply.md:465:`ingest_codal_report` accepts 
-reply.md:647:reply.md:466:reply.md:268:prompts\10_Implementation_Status.md:243:ingest_codal_report()
-reply.md:648:reply.md:467:reply.md:269:src\tests\final_validation_audit.md:140:  → ingest_codal_report()
-reply.md:649:reply.md:468:reply.md:270:src\tests\golden_audit_source_plan.md:15:ingest_codal_report()
-reply.md:650:reply.md:470:ingest_codal_report()
-reply.md:651:reply.md:471:reply.md:272:01_Stage1_Data_Foundation.md:278:financial_period_id
-reply.md:652:reply.md:472:reply.md:275:(models cover industries/companies, financial_periods, reports/report_versions, 
-raw 
-reply.md:653:reply.md:473:reply.md:282:10_Production_Codal_Extraction_and_Data_Load.md:22:ingest_codal_report()
-reply.md:654:reply.md:475:ingest_codal_report()`
-reply.md:655:reply.md:476:reply.md:284:11_Production_Data_Load_and_Foundation_Validation.md:136:ingest_codal_report()
-reply.md:656:reply.md:477:reply.md:285:12_Database_Architecture_V1.1.md:104:- `financial_periods`
-reply.md:657:reply.md:478:reply.md:286:12_Database_Architecture_V1.1.md:801:ingest_codal_report / ingest_ohlc_* / 
-ingest_fx_rates
-reply.md:658:reply.md:479:reply.md:288:consumed by `ingest_codal_report`; the existing downstream persistence boundary 
-must remain 
-reply.md:659:reply.md:481:reply.md:289:99_Architecture_Change_Log.md:386:  ingest_codal_report / ingest_ohlc_* / 
-ingest_fx_rates
-reply.md:660:reply.md:482:reply.md:291:is a **pre-ingestion** responsibility. `ingest_codal_report` receives 
-already-extracted 
-reply.md:662:reply.md:484:reply.md:294:PROJECT_HANDOFF_INSTRUCTIONS.md:252:    ingest_codal_report()
-reply.md:663:reply.md:485:reply.md:295:reply.md:4:PDF را استخراج می‌کنند، خروجی `RawLineInput` می‌سازند و 
-`ingest_codal_report()` 
-reply.md:665:reply.md:487:reply.md:297:reply.md:8:`src/ingestion/service.py` | `RawLineInput`، `ingest_codal_report`، 
-transaction و 
-reply.md:667:reply.md:488:reply.md:298:reply.md:10:از `load_codal_pdf` و PDFهای fixture استفاده می‌کند.
-reply.md:668:reply.md:490:`ingest_codal_report()`:
-reply.md:669:reply.md:491:reply.md:300:reply.md:13:`financial_period_id` است، درحالی‌که قرارداد منطقی می‌گوید یک 
-ReportVersion 
-reply.md:671:reply.md:494:`ingest_codal_report()` 
-reply.md:672:reply.md:495:reply.md:305:`ingest_codal_report`
-reply.md:673:reply.md:496:reply.md:306:reply.md:19:`src/ingestion/codal/ingestion.py::ingest_codal_report` صرفاً 
-facade سازگاری است 
-reply.md:675:reply.md:497:reply.md:307:reply.md:20:`src/ingestion/service.py::ingest_codal_report` delegate می‌کند؛ 
-transaction 
-reply.md:677:reply.md:498:reply.md:308:reply.md:22:`src/ingestion/codal/ingestion.py::ingest_codal_pdf` extraction را 
-اجرا می‌کند و 
-reply.md:679:reply.md:500:reply.md:310:reply.md:26:`src/ingestion/codal/pipeline.py::load_codal_pdf` و 
-`load_codal_pdf_from_url` 
-reply.md:681:reply.md:502:reply.md:312:reply.md:30:`src/ingestion/service.py::ingest_codal_report` writer اصلی 
-reply.md:682:reply.md:504:reply.md:314:reply.md:36:`reports.financial_period_id` پیش از nullable کردن/جابه‌جایی آن 
-است. سپس gateهای 
-reply.md:683:reply.md:506:reply.md:315:reply.md:39:`reports.financial_period_id` و مسیرهای فراخوانی CODAL — 2026-11-18
-reply.md:684:reply.md:507:reply.md:316:reply.md:41:`financial_period_id|FinancialPeriod` در کل فایل‌های `*.py` و 
-`*.sql` زیر 
-reply.md:686:reply.md:509:reply.md:318:reply.md:43:`Report.financial_period_id` با `nullable=False` و FK به 
-reply.md:687:`financial_periods.period_id`.
-reply.md:688:reply.md:510:reply.md:319:reply.md:46:`Report.financial_period_id` استفاده نشده است.
-reply.md:689:reply.md:511:reply.md:320:reply.md:48:تست‌های Stage 5/6: نام `financial_period_id` در DTOها و مدل‌های 
-ارزیابی به‌عنوان 
-reply.md:691:reply.md:512:reply.md:322:reply.md:49:استفاده شده است؛ این موارد به‌تنهایی مصرف ستون 
-`reports.financial_period_id` 
-reply.md:693:reply.md:513:reply.md:323:reply.md:51:Report و قرارداد قدیمی را با `financial_period_id` اجباری 
-می‌آزمایند؛ تست‌های 
-reply.md:695:reply.md:515:reply.md:325:reply.md:54:تابع عمومی `ingest_codal_report` یک facade سازگار با گذشته است و به 
-reply.md:696:reply.md:516:reply.md:326:`src.ingestion.service.ingest_codal_report` 
-reply.md:697:reply.md:517:reply.md:327:reply.md:55:delegate می‌کند. تابع `ingest_codal_pdf` پس از extraction همین 
-facade را 
-reply.md:699:reply.md:518:reply.md:328:reply.md:57:توابع `load_codal_pdf` و `load_codal_pdf_from_url` پس از 
-reply.md:701:reply.md:520:reply.md:329:reply.md:58:`src.ingestion.service.ingest_codal_report` را فراخوانی می‌کنند.
-reply.md:702:reply.md:521:reply.md:330:reply.md:61:`financial_period_id` ندارند؛ این با یافتهٔ قبلی DB-AUD-013 مبنی بر 
-نبود 
-reply.md:704:reply.md:523:reply.md:333:`Report.financial_period_id` در 
-reply.md:705:reply.md:524:reply.md:334:reply.md:68:`Report.financial_period_id` تا زمان تعیین تکلیف و بازنشستگی 
-کنترل‌شدهٔ مسیر 
-reply.md:707:reply.md:526:reply.md:336:reply.md:71:Report.financial_period_id و مرز writer قدیمی — 2026-11-18
-reply.md:708:reply.md:527:reply.md:337:reply.md:73:مسیر مشاهده شد `src/ingestion/service.py::ingest_codal_report` است؛ 
-facade در 
-reply.md:709:reply.md:529:reply.md:339:reply.md:76:`Report.financial_period_id` با ورودی مقایسه می‌شوند؛ اختلاف باعث 
-رد عملیات 
-reply.md:711:reply.md:530:reply.md:340:reply.md:78:`financial_period_id=period_id` ثبت می‌شود.
-reply.md:712:reply.md:531:reply.md:341:reply.md:80:Report.financial_period_id (حذف تدریجی، nullable و descriptive، یا 
-جایگزینی با 
-reply.md:714:reply.md:533:reply.md:343:reply.md:83:src/ingestion/service.py::ingest_codal_report.
-reply.md:715:reply.md:534:reply.md:344:reply.md:85:src/ingestion/codal/ingestion.py::ingest_codal_report به writer 
-مرکزی delegate 
-reply.md:717:reply.md:535:ingest_codal_pdf 
-reply.md:718:reply.md:536:reply.md:346:reply.md:88:تابع‌های load_codal_pdf و load_codal_pdf_from_url را دارد و هر دو 
-مسیر در نهایت 
-reply.md:720:reply.md:538:reply.md:349:financial_period_id 
-reply.md:721:reply.md:539:reply.md:350:reply.md:92:Report.financial_period_id تلقی کرد.
-reply.md:722:reply.md:541:Report.financial_period_id در 
-reply.md:723:reply.md:542:reply.md:353:reply.md:99:`company_id`; free-text `report_type`; FK `financial_period_id` | 
-Reuse, but 
-reply.md:725:reply.md:544:reply.md:356:`financial_periods` 
-reply.md:726:reply.md:546:`ingest_codal_report(...)` 
-reply.md:727:reply.md:547:reply.md:359:reply.md:106:database\reports\DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md:17:l
-oad_codal_pdf
-reply.md:729:reply.md:548:reply.md:360:load_codal_pdf_from_url  
-reply.md:731:ingest_codal_report  
-reply.md:732:reply.md:550:reply.md:362:reply.md:109:ingest_codal_pdf و facade سازگاری ingest_codal_report | بخش 
-PDF-only + facade 
-reply.md:734:reply.md:551:reply.md:364:src/ingestion/service.py::ingest_codal_report | 
-reply.md:735:reply.md:553:`service.py::ingest_codal_report`: 
-reply.md:736:reply.md:555:financial_period_id به‌عنوان 
-reply.md:737:reply.md:557:financial_period_id در مدل فعلی 
-reply.md:738:reply.md:558:reply.md:371:reply.md:121:`src/ingestion/service.py::ingest_codal_report`:
-reply.md:739:reply.md:560:ingest_codal_report
-reply.md:740:reply.md:562:`financial_periods` — 
-reply.md:741:reply.md:563:reply.md:375:reply.md:127:FinancialPeriod. The current NOT NULL 
-`reports.financial_period_id` must not be 
-reply.md:743:reply.md:565:reply.md:378:`financial_periods` model 
-reply.md:744:reply.md:566:reply.md:379:reply.md:132:consumers before making current `reports.financial_period_id` 
-nullable or 
-reply.md:746:reply.md:567:reply.md:380:reply.md:134:`financial_period_id` را جداگانه نگه می‌دارد؛ FKها به‌تنهایی تضمین 
-نمی‌کنند که 
-reply.md:748:reply.md:569:reply.md:382:reply.md:137:`report_versions.report_id` یا `financial_periods.company_id` تا 
-وقتی Fact 
-reply.md:750:reply.md:571:reply.md:385:`Report.financial_period_id` در مدل 
-reply.md:751:reply.md:572:reply.md:386:reply.md:143:pipelineهای load_codal_pdf و load_codal_pdf_from_url |
-reply.md:752:reply.md:573:reply.md:388:\`src/ingestion/service.py::ingest_codal_report\` | 
-reply.md:753:reply.md:574:reply.md:389:reply.md:148:پس از شناسایی callerها باید فقط facade PDF حذف و وضعیت 
-ingest_codal_report 
-reply.md:755:reply.md:576:reply.md:390:reply.md:150:RawLineInput و ingest_codal_report فعلاً حفظ؛ بعداً با API جدید 
-جایگزین یا 
-reply.md:757:reply.md:579:\`ingest_codal_report\` را 
-reply.md:758:reply.md:580:reply.md:394:`service.py::ingest_codal_report` | 
-reply.md:759:reply.md:581:reply.md:396:`codal/ingestion.py::ingest_codal_pdf` و 
-reply.md:760:reply.md:582:reply.md:397:reply.md:162:`ingestion/service.py::ingest_codal_report` (تابع persistence 
-گزارش CODAL) یک 
-reply.md:761:reply.md:584:reply.md:399:reply.md:166:`ingest_codal_report` و Stage 5 query | Stage 5 مصرف‌کنندهٔ مستقیم 
-خروجی CODAL 
-reply.md:763:reply.md:586:reply.md:402:`ingest_codal_report` 
-reply.md:764:reply.md:587:reply.md:404:`financial_period_id` 
-reply.md:765:reply.md:588:reply.md:406:`financial_periods` |
-reply.md:767:`Report.financial_period_id` 
-reply.md:768:reply.md:591:reply.md:408:reply.md:177:`ingest_codal_report` یک period_id واحد را به تمام 
-RawFinancialFactهای یک 
-reply.md:770:reply.md:593:reply.md:409:reply.md:179:`src/ingestion/service.py::ingest_codal_report`؛ facadeها در 
-reply.md:772:`financial_periods` | در مسیر 
-reply.md:773:reply.md:598:`Report.financial_period_id` 
-reply.md:774:reply.md:599:reply.md:415:reply.md:191:محدودیت را دارد. متد `ingest_codal_report` یک `period_id` می‌گیرد 
-و همان مقدار 
-reply.md:777:`Report.financial_period_id` 
-reply.md:778:reply.md:602:reply.md:419:reply.md:198:association، الزامی/اختیاری بودن `Report.financial_period_id` 
-قدیمی و نگاشت 
-reply.md:780:reply.md:604:reply.md:421:reply.md:201:`src/ingestion/service.py::ingest_codal_report` مستقیماً برای هر 
-`RawLineInput` 
-reply.md:782:reply.md:606:reply.md:423:reply.md:207:`src/ingestion/service.py::ingest_codal_report` می‌رسند؛ این تابع 
-برای هر 
-reply.md:784:reply.md:607:reply.md:425:reply.md:212:`service.py::ingest_codal_report` → RawFinancialFact.
-reply.md:785:reply.md:609:`codal/ingestion.py::ingest_codal_report` 
-reply.md:786:reply.md:610:reply.md:428:reply.md:214:است و به writer مرکزی `service.py::ingest_codal_report` می‌رسد.
-reply.md:787:reply.md:612:`codal/ingestion.py::ingest_codal_pdf` 
-reply.md:788:reply.md:614:`codal/pipeline.py::load_codal_pdf` و 
-reply.md:789:reply.md:615:reply.md:432:reply.md:219:`load_codal_pdf_from_url` acquisition/extraction/validation را پیش 
-از writer 
-reply.md:791:reply.md:618:`reports.financial_period_id`، چون پیش 
-reply.md:792:reply.md:619:reply.md:436:reply.md:226:`reports.financial_period_id` و تفکیک قرارداد legacy CODAL از 
-Excel — 2026-11-18
-reply.md:793:reply.md:621:`Report.financial_period_id` در ORM 
-reply.md:794:reply.md:622:reply.md:439:reply.md:230:`service.py::ingest_codal_report` delegate می‌کند؛ PDF wrapper پس 
-از extraction 
-reply.md:797:`financial_period_id` در 
-reply.md:799:`reports.financial_period_id` اشاره 
-reply.md:800:reply.md:627:reply.md:445:reply.md:237:`Report.financial_period_id` مجاز نیست. مسیر جدید Excel باید دوره 
-را در سطح هر 
-reply.md:802:reply.md:629:reply.md:447:reply.md:243:`report_versions.report_id` و `financial_periods.company_id` تا 
-وقتی Fact 
-reply.md:804:reply.md:631:reply.md:449:reply.md:244:`Report.financial_period_id` به‌صورت optional metadata باقی ماند، 
-در صورت 
-reply.md:806:reply.md:633:reply.md:451:reply.md:246:writer قدیمی به Report.financial_period_id — 2026-11-18
-reply.md:807:reply.md:635:`service.py::ingest_codal_report` writer 
-reply.md:808:reply.md:636:reply.md:454:reply.md:250:`Report.financial_period_id` باید با ورودی یکسان باشند؛ در غیر این 
-صورت عملیات 
-reply.md:810:reply.md:637:reply.md:455:reply.md:253:src/ingestion/service.py::ingest_codal_report است؛ facade در 
-reply.md:812:financial_period_id 
-reply.md:813:reply.md:642:Report.financial_period_id شمرده 
-reply.md:814:reply.md:644:Report.financial_period_id 
-reply.md:815:reply.md:645:reply.md:463:reply.md:265:`ingest_codal_report` take DTOs |
-reply.md:816:reply.md:646:reply.md:465:`ingest_codal_report` accepts 
-reply.md:817:reply.md:647:reply.md:466:reply.md:268:prompts\10_Implementation_Status.md:243:ingest_codal_report()
-reply.md:818:reply.md:648:reply.md:467:reply.md:269:src\tests\final_validation_audit.md:140:  → ingest_codal_report()
-reply.md:819:reply.md:649:reply.md:468:reply.md:270:src\tests\golden_audit_source_plan.md:15:ingest_codal_report()
-reply.md:820:reply.md:650:reply.md:470:ingest_codal_report()
-reply.md:821:reply.md:651:reply.md:471:reply.md:272:01_Stage1_Data_Foundation.md:278:financial_period_id
-reply.md:822:reply.md:652:reply.md:472:reply.md:275:(models cover industries/companies, financial_periods, 
-reports/report_versions, 
-reply.md:824:reply.md:653:reply.md:473:reply.md:282:10_Production_Codal_Extraction_and_Data_Load.md:22:ingest_codal_rep
-ort()
-reply.md:825:reply.md:654:reply.md:475:ingest_codal_report()`
-reply.md:826:reply.md:655:reply.md:476:reply.md:284:11_Production_Data_Load_and_Foundation_Validation.md:136:ingest_cod
-al_report()
-reply.md:827:reply.md:656:reply.md:477:reply.md:285:12_Database_Architecture_V1.1.md:104:- `financial_periods`
-reply.md:828:reply.md:657:reply.md:478:reply.md:286:12_Database_Architecture_V1.1.md:801:ingest_codal_report / 
-ingest_ohlc_* / 
-reply.md:830:reply.md:658:reply.md:479:reply.md:288:consumed by `ingest_codal_report`; the existing downstream 
-persistence boundary 
-reply.md:832:reply.md:659:reply.md:481:reply.md:289:99_Architecture_Change_Log.md:386:  ingest_codal_report / 
-ingest_ohlc_* / 
-reply.md:834:reply.md:660:reply.md:482:reply.md:291:is a **pre-ingestion** responsibility. `ingest_codal_report` 
-receives 
-reply.md:836:reply.md:662:reply.md:484:reply.md:294:PROJECT_HANDOFF_INSTRUCTIONS.md:252:    ingest_codal_report()
-reply.md:838:`ingest_codal_report()` 
-reply.md:839:reply.md:665:reply.md:487:reply.md:297:reply.md:8:`src/ingestion/service.py` | `RawLineInput`، 
-`ingest_codal_report`، 
-reply.md:841:reply.md:667:reply.md:488:reply.md:298:reply.md:10:از `load_codal_pdf` و PDFهای fixture استفاده می‌کند.
-reply.md:842:reply.md:668:reply.md:490:`ingest_codal_report()`:
-reply.md:843:reply.md:669:reply.md:491:reply.md:300:reply.md:13:`financial_period_id` است، درحالی‌که قرارداد منطقی 
-می‌گوید یک 
-reply.md:845:reply.md:671:reply.md:494:`ingest_codal_report()` 
-reply.md:846:reply.md:672:reply.md:495:reply.md:305:`ingest_codal_report`
-reply.md:847:reply.md:673:reply.md:496:reply.md:306:reply.md:19:`src/ingestion/codal/ingestion.py::ingest_codal_report`
- صرفاً 
-reply.md:849:reply.md:675:reply.md:497:reply.md:307:reply.md:20:`src/ingestion/service.py::ingest_codal_report` 
-delegate می‌کند؛ 
-reply.md:851:reply.md:677:reply.md:498:reply.md:308:reply.md:22:`src/ingestion/codal/ingestion.py::ingest_codal_pdf` 
-extraction را 
-reply.md:853:reply.md:679:reply.md:500:reply.md:310:reply.md:26:`src/ingestion/codal/pipeline.py::load_codal_pdf` و 
-reply.md:854:`load_codal_pdf_from_url` 
-reply.md:855:reply.md:681:reply.md:502:reply.md:312:reply.md:30:`src/ingestion/service.py::ingest_codal_report` writer 
-اصلی 
-reply.md:856:reply.md:682:reply.md:504:reply.md:314:reply.md:36:`reports.financial_period_id` پیش از nullable 
-کردن/جابه‌جایی آن 
-reply.md:858:reply.md:683:reply.md:506:reply.md:315:reply.md:39:`reports.financial_period_id` و مسیرهای فراخوانی CODAL 
-— 2026-11-18
-reply.md:859:reply.md:684:reply.md:507:reply.md:316:reply.md:41:`financial_period_id|FinancialPeriod` در کل فایل‌های 
-`*.py` و 
-reply.md:861:reply.md:686:reply.md:509:reply.md:318:reply.md:43:`Report.financial_period_id` با `nullable=False` و FK 
-به 
-reply.md:862:reply.md:687:`financial_periods.period_id`.
-reply.md:863:reply.md:688:reply.md:510:reply.md:319:reply.md:46:`Report.financial_period_id` استفاده نشده است.
-reply.md:864:reply.md:689:reply.md:511:reply.md:320:reply.md:48:تست‌های Stage 5/6: نام `financial_period_id` در DTOها 
-و مدل‌های 
-reply.md:867:`reports.financial_period_id` 
-reply.md:868:reply.md:693:reply.md:513:reply.md:323:reply.md:51:Report و قرارداد قدیمی را با `financial_period_id` 
-اجباری 
-reply.md:870:reply.md:695:reply.md:515:reply.md:325:reply.md:54:تابع عمومی `ingest_codal_report` یک facade سازگار با 
-گذشته است و به 
-reply.md:871:reply.md:696:reply.md:516:reply.md:326:`src.ingestion.service.ingest_codal_report` 
-reply.md:872:reply.md:697:reply.md:517:reply.md:327:reply.md:55:delegate می‌کند. تابع `ingest_codal_pdf` پس از 
-extraction همین 
-reply.md:874:reply.md:699:reply.md:518:reply.md:328:reply.md:57:توابع `load_codal_pdf` و `load_codal_pdf_from_url` پس 
-از 
-reply.md:875:reply.md:701:reply.md:520:reply.md:329:reply.md:58:`src.ingestion.service.ingest_codal_report` را 
-فراخوانی می‌کنند.
-reply.md:876:reply.md:702:reply.md:521:reply.md:330:reply.md:61:`financial_period_id` ندارند؛ این با یافتهٔ قبلی 
-DB-AUD-013 مبنی بر 
-reply.md:878:reply.md:704:reply.md:523:reply.md:333:`Report.financial_period_id` در 
-reply.md:879:reply.md:705:reply.md:524:reply.md:334:reply.md:68:`Report.financial_period_id` تا زمان تعیین تکلیف و 
-بازنشستگی 
-reply.md:881:reply.md:707:reply.md:526:reply.md:336:reply.md:71:Report.financial_period_id و مرز writer قدیمی — 
-2026-11-18
-reply.md:882:reply.md:708:reply.md:527:reply.md:337:reply.md:73:مسیر مشاهده شد 
-`src/ingestion/service.py::ingest_codal_report` است؛ 
-reply.md:884:reply.md:709:reply.md:529:reply.md:339:reply.md:76:`Report.financial_period_id` با ورودی مقایسه می‌شوند؛ 
-اختلاف باعث 
-reply.md:886:reply.md:711:reply.md:530:reply.md:340:reply.md:78:`financial_period_id=period_id` ثبت می‌شود.
-reply.md:887:reply.md:712:reply.md:531:reply.md:341:reply.md:80:Report.financial_period_id (حذف تدریجی، nullable و 
-descriptive، یا 
-reply.md:889:reply.md:714:reply.md:533:reply.md:343:reply.md:83:src/ingestion/service.py::ingest_codal_report.
-reply.md:890:reply.md:715:reply.md:534:reply.md:344:reply.md:85:src/ingestion/codal/ingestion.py::ingest_codal_report 
-به writer 
-reply.md:892:reply.md:717:reply.md:535:ingest_codal_pdf 
-reply.md:893:reply.md:718:reply.md:536:reply.md:346:reply.md:88:تابع‌های load_codal_pdf و load_codal_pdf_from_url را 
-دارد و هر دو 
-reply.md:895:reply.md:720:reply.md:538:reply.md:349:financial_period_id 
-reply.md:896:reply.md:721:reply.md:539:reply.md:350:reply.md:92:Report.financial_period_id تلقی کرد.
-reply.md:897:reply.md:722:reply.md:541:Report.financial_period_id در 
-reply.md:898:reply.md:723:reply.md:542:reply.md:353:reply.md:99:`company_id`; free-text `report_type`; FK 
-`financial_period_id` | 
-reply.md:900:reply.md:725:reply.md:544:reply.md:356:`financial_periods` 
-reply.md:901:reply.md:726:reply.md:546:`ingest_codal_report(...)` 
-reply.md:904:reply.md:729:reply.md:548:reply.md:360:load_codal_pdf_from_url  
-reply.md:905:reply.md:731:ingest_codal_report  
-reply.md:906:reply.md:732:reply.md:550:reply.md:362:reply.md:109:ingest_codal_pdf و facade سازگاری ingest_codal_report 
-| بخش 
-reply.md:908:reply.md:734:reply.md:551:reply.md:364:src/ingestion/service.py::ingest_codal_report | 
-reply.md:909:reply.md:735:reply.md:553:`service.py::ingest_codal_report`: 
-reply.md:910:reply.md:736:reply.md:555:financial_period_id به‌عنوان 
-reply.md:911:reply.md:737:reply.md:557:financial_period_id در مدل فعلی 
-reply.md:912:reply.md:738:reply.md:558:reply.md:371:reply.md:121:`src/ingestion/service.py::ingest_codal_report`:
-reply.md:913:reply.md:739:reply.md:560:ingest_codal_report
-reply.md:914:reply.md:740:reply.md:562:`financial_periods` — 
-reply.md:916:`reports.financial_period_id` must not be 
-reply.md:917:reply.md:743:reply.md:565:reply.md:378:`financial_periods` model 
-reply.md:918:reply.md:744:reply.md:566:reply.md:379:reply.md:132:consumers before making current 
-`reports.financial_period_id` 
-reply.md:920:reply.md:746:reply.md:567:reply.md:380:reply.md:134:`financial_period_id` را جداگانه نگه می‌دارد؛ FKها 
-به‌تنهایی تضمین 
-reply.md:922:reply.md:748:reply.md:569:reply.md:382:reply.md:137:`report_versions.report_id` یا 
-`financial_periods.company_id` تا 
-reply.md:924:reply.md:750:reply.md:571:reply.md:385:`Report.financial_period_id` در مدل 
-reply.md:925:reply.md:751:reply.md:572:reply.md:386:reply.md:143:pipelineهای load_codal_pdf و load_codal_pdf_from_url |
-reply.md:926:reply.md:752:reply.md:573:reply.md:388:\`src/ingestion/service.py::ingest_codal_report\` | 
-reply.md:928:ingest_codal_report 
-reply.md:929:reply.md:755:reply.md:576:reply.md:390:reply.md:150:RawLineInput و ingest_codal_report فعلاً حفظ؛ بعداً 
-با API جدید 
-reply.md:931:reply.md:757:reply.md:579:\`ingest_codal_report\` را 
-reply.md:932:reply.md:758:reply.md:580:reply.md:394:`service.py::ingest_codal_report` | 
-reply.md:933:reply.md:759:reply.md:581:reply.md:396:`codal/ingestion.py::ingest_codal_pdf` و 
-reply.md:934:reply.md:760:reply.md:582:reply.md:397:reply.md:162:`ingestion/service.py::ingest_codal_report` (تابع 
-persistence 
-reply.md:936:reply.md:761:reply.md:584:reply.md:399:reply.md:166:`ingest_codal_report` و Stage 5 query | Stage 5 
-مصرف‌کنندهٔ مستقیم 
-reply.md:938:reply.md:763:reply.md:586:reply.md:402:`ingest_codal_report` 
-reply.md:939:reply.md:764:reply.md:587:reply.md:404:`financial_period_id` 
-reply.md:940:reply.md:765:reply.md:588:reply.md:406:`financial_periods` |
-reply.md:941:reply.md:767:`Report.financial_period_id` 
-reply.md:942:reply.md:768:reply.md:591:reply.md:408:reply.md:177:`ingest_codal_report` یک period_id واحد را به تمام 
-reply.md:944:reply.md:770:reply.md:593:reply.md:409:reply.md:179:`src/ingestion/service.py::ingest_codal_report`؛ 
-facadeها در 
-reply.md:945:reply.md:772:`financial_periods` | در مسیر 
-reply.md:946:reply.md:773:reply.md:598:`Report.financial_period_id` 
-reply.md:947:reply.md:774:reply.md:599:reply.md:415:reply.md:191:محدودیت را دارد. متد `ingest_codal_report` یک 
-`period_id` می‌گیرد 
-reply.md:949:reply.md:777:`Report.financial_period_id` 
-reply.md:950:reply.md:778:reply.md:602:reply.md:419:reply.md:198:association، الزامی/اختیاری بودن 
-`Report.financial_period_id` 
-reply.md:952:reply.md:780:reply.md:604:reply.md:421:reply.md:201:`src/ingestion/service.py::ingest_codal_report` 
-مستقیماً برای هر 
-reply.md:954:reply.md:782:reply.md:606:reply.md:423:reply.md:207:`src/ingestion/service.py::ingest_codal_report` 
-می‌رسند؛ این تابع 
-reply.md:956:reply.md:784:reply.md:607:reply.md:425:reply.md:212:`service.py::ingest_codal_report` → RawFinancialFact.
-reply.md:957:reply.md:785:reply.md:609:`codal/ingestion.py::ingest_codal_report` 
-reply.md:958:reply.md:786:reply.md:610:reply.md:428:reply.md:214:است و به writer مرکزی 
-`service.py::ingest_codal_report` می‌رسد.
-reply.md:959:reply.md:787:reply.md:612:`codal/ingestion.py::ingest_codal_pdf` 
-reply.md:960:reply.md:788:reply.md:614:`codal/pipeline.py::load_codal_pdf` و 
-reply.md:961:reply.md:789:reply.md:615:reply.md:432:reply.md:219:`load_codal_pdf_from_url` 
-acquisition/extraction/validation را پیش 
-reply.md:963:reply.md:791:reply.md:618:`reports.financial_period_id`، چون پیش 
-reply.md:964:reply.md:792:reply.md:619:reply.md:436:reply.md:226:`reports.financial_period_id` و تفکیک قرارداد legacy 
-CODAL از 
-reply.md:966:reply.md:793:reply.md:621:`Report.financial_period_id` در ORM 
-reply.md:967:reply.md:794:reply.md:622:reply.md:439:reply.md:230:`service.py::ingest_codal_report` delegate می‌کند؛ 
-PDF wrapper پس 
-reply.md:969:reply.md:797:`financial_period_id` در 
-reply.md:970:reply.md:799:`reports.financial_period_id` اشاره 
-reply.md:971:reply.md:800:reply.md:627:reply.md:445:reply.md:237:`Report.financial_period_id` مجاز نیست. مسیر جدید 
-Excel باید دوره 
-reply.md:973:reply.md:802:reply.md:629:reply.md:447:reply.md:243:`report_versions.report_id` و 
-`financial_periods.company_id` تا 
-reply.md:975:reply.md:804:reply.md:631:reply.md:449:reply.md:244:`Report.financial_period_id` به‌صورت optional 
-metadata باقی ماند، 
-reply.md:977:reply.md:806:reply.md:633:reply.md:451:reply.md:246:writer قدیمی به Report.financial_period_id — 
-2026-11-18
-reply.md:978:reply.md:807:reply.md:635:`service.py::ingest_codal_report` writer 
-reply.md:979:reply.md:808:reply.md:636:reply.md:454:reply.md:250:`Report.financial_period_id` باید با ورودی یکسان 
-باشند؛ در غیر این 
-reply.md:981:reply.md:810:reply.md:637:reply.md:455:reply.md:253:src/ingestion/service.py::ingest_codal_report است؛ 
-facade در 
-reply.md:982:reply.md:812:financial_period_id 
-reply.md:983:reply.md:813:reply.md:642:Report.financial_period_id شمرده 
-reply.md:984:reply.md:814:reply.md:644:Report.financial_period_id 
-reply.md:985:reply.md:815:reply.md:645:reply.md:463:reply.md:265:`ingest_codal_report` take DTOs |
-reply.md:986:reply.md:816:reply.md:646:reply.md:465:`ingest_codal_report` accepts 
-reply.md:987:reply.md:817:reply.md:647:reply.md:466:reply.md:268:prompts\10_Implementation_Status.md:243:ingest_codal_r
-eport()
-reply.md:988:reply.md:818:reply.md:648:reply.md:467:reply.md:269:src\tests\final_validation_audit.md:140:  → 
-ingest_codal_report()
-reply.md:989:reply.md:819:reply.md:649:reply.md:468:reply.md:270:src\tests\golden_audit_source_plan.md:15:ingest_codal_
-report()
-reply.md:990:reply.md:820:reply.md:650:reply.md:470:ingest_codal_report()
-reply.md:991:reply.md:821:reply.md:651:reply.md:471:reply.md:272:01_Stage1_Data_Foundation.md:278:financial_period_id
-reply.md:992:reply.md:822:reply.md:652:reply.md:472:reply.md:275:(models cover industries/companies, 
-financial_periods, 
-reply.md:996:reply.md:825:reply.md:654:reply.md:475:ingest_codal_report()`
-reply.md:999:reply.md:827:reply.md:656:reply.md:477:reply.md:285:12_Database_Architecture_V1.1.md:104:- 
-`financial_periods`
-reply.md:1000:reply.md:828:reply.md:657:reply.md:478:reply.md:286:12_Database_Architecture_V1.1.md:801:ingest_codal_rep
-ort / 
-reply.md:1002:reply.md:830:reply.md:658:reply.md:479:reply.md:288:consumed by `ingest_codal_report`; the existing 
-downstream 
-reply.md:1004:reply.md:832:reply.md:659:reply.md:481:reply.md:289:99_Architecture_Change_Log.md:386:  
-ingest_codal_report / 
-reply.md:1006:reply.md:834:reply.md:660:reply.md:482:reply.md:291:is a **pre-ingestion** responsibility. 
-`ingest_codal_report` 
-reply.md:1008:reply.md:836:reply.md:662:reply.md:484:reply.md:294:PROJECT_HANDOFF_INSTRUCTIONS.md:252:    
-ingest_codal_report()
-reply.md:1009:reply.md:838:`ingest_codal_report()` 
-reply.md:1011:`ingest_codal_report`، 
-reply.md:1012:reply.md:841:reply.md:667:reply.md:488:reply.md:298:reply.md:10:از `load_codal_pdf` و PDFهای fixture 
-استفاده می‌کند.
-reply.md:1013:reply.md:842:reply.md:668:reply.md:490:`ingest_codal_report()`:
-reply.md:1014:reply.md:843:reply.md:669:reply.md:491:reply.md:300:reply.md:13:`financial_period_id` است، درحالی‌که 
-قرارداد منطقی 
-reply.md:1016:reply.md:845:reply.md:671:reply.md:494:`ingest_codal_report()` 
-reply.md:1017:reply.md:846:reply.md:672:reply.md:495:reply.md:305:`ingest_codal_report`
-reply.md:1018:reply.md:847:reply.md:673:reply.md:496:reply.md:306:reply.md:19:`src/ingestion/codal/ingestion.py::ingest
-_codal_report`
-reply.md:1020:reply.md:849:reply.md:675:reply.md:497:reply.md:307:reply.md:20:`src/ingestion/service.py::ingest_codal_r
-eport` 
-reply.md:1022:reply.md:851:reply.md:677:reply.md:498:reply.md:308:reply.md:22:`src/ingestion/codal/ingestion.py::ingest
-_codal_pdf` 
-reply.md:1024:reply.md:853:reply.md:679:reply.md:500:reply.md:310:reply.md:26:`src/ingestion/codal/pipeline.py::load_co
-dal_pdf` و 
-reply.md:1025:reply.md:854:`load_codal_pdf_from_url` 
-reply.md:1026:reply.md:855:reply.md:681:reply.md:502:reply.md:312:reply.md:30:`src/ingestion/service.py::ingest_codal_r
-eport` writer 
-reply.md:1028:reply.md:856:reply.md:682:reply.md:504:reply.md:314:reply.md:36:`reports.financial_period_id` پیش از 
-nullable 
-reply.md:1030:reply.md:858:reply.md:683:reply.md:506:reply.md:315:reply.md:39:`reports.financial_period_id` و مسیرهای 
-فراخوانی CODAL 
-reply.md:1032:reply.md:859:reply.md:684:reply.md:507:reply.md:316:reply.md:41:`financial_period_id|FinancialPeriod` در 
-کل فایل‌های 
-reply.md:1034:reply.md:861:reply.md:686:reply.md:509:reply.md:318:reply.md:43:`Report.financial_period_id` با 
-`nullable=False` و FK 
-reply.md:1036:reply.md:862:reply.md:687:`financial_periods.period_id`.
-reply.md:1037:reply.md:863:reply.md:688:reply.md:510:reply.md:319:reply.md:46:`Report.financial_period_id` استفاده 
-نشده است.
-reply.md:1038:reply.md:864:reply.md:689:reply.md:511:reply.md:320:reply.md:48:تست‌های Stage 5/6: نام 
-`financial_period_id` در DTOها 
-reply.md:1040:reply.md:867:`reports.financial_period_id` 
-reply.md:1041:reply.md:868:reply.md:693:reply.md:513:reply.md:323:reply.md:51:Report و قرارداد قدیمی را با 
-`financial_period_id` 
-reply.md:1043:reply.md:870:reply.md:695:reply.md:515:reply.md:325:reply.md:54:تابع عمومی `ingest_codal_report` یک 
-facade سازگار با 
-reply.md:1045:reply.md:871:reply.md:696:reply.md:516:reply.md:326:`src.ingestion.service.ingest_codal_report` 
-reply.md:1046:reply.md:872:reply.md:697:reply.md:517:reply.md:327:reply.md:55:delegate می‌کند. تابع `ingest_codal_pdf` 
-پس از 
-reply.md:1048:reply.md:874:reply.md:699:reply.md:518:reply.md:328:reply.md:57:توابع `load_codal_pdf` و 
-`load_codal_pdf_from_url` پس 
-reply.md:1050:reply.md:875:reply.md:701:reply.md:520:reply.md:329:reply.md:58:`src.ingestion.service.ingest_codal_repor
-t` را 
-reply.md:1052:reply.md:876:reply.md:702:reply.md:521:reply.md:330:reply.md:61:`financial_period_id` ندارند؛ این با 
-یافتهٔ قبلی 
-reply.md:1054:reply.md:878:reply.md:704:reply.md:523:reply.md:333:`Report.financial_period_id` در 
-reply.md:1055:reply.md:879:reply.md:705:reply.md:524:reply.md:334:reply.md:68:`Report.financial_period_id` تا زمان 
-تعیین تکلیف و 
-reply.md:1057:reply.md:881:reply.md:707:reply.md:526:reply.md:336:reply.md:71:Report.financial_period_id و مرز writer 
-قدیمی — 
-reply.md:1060:`src/ingestion/service.py::ingest_codal_report` است؛ 
-reply.md:1061:reply.md:884:reply.md:709:reply.md:529:reply.md:339:reply.md:76:`Report.financial_period_id` با ورودی 
-مقایسه می‌شوند؛ 
-reply.md:1063:reply.md:886:reply.md:711:reply.md:530:reply.md:340:reply.md:78:`financial_period_id=period_id` ثبت 
-می‌شود.
-reply.md:1064:reply.md:887:reply.md:712:reply.md:531:reply.md:341:reply.md:80:Report.financial_period_id (حذف تدریجی، 
-nullable و 
-reply.md:1066:reply.md:889:reply.md:714:reply.md:533:reply.md:343:reply.md:83:src/ingestion/service.py::ingest_codal_re
-port.
-reply.md:1067:reply.md:890:reply.md:715:reply.md:534:reply.md:344:reply.md:85:src/ingestion/codal/ingestion.py::ingest_
-codal_report 
-reply.md:1069:reply.md:892:reply.md:717:reply.md:535:ingest_codal_pdf 
-reply.md:1070:reply.md:893:reply.md:718:reply.md:536:reply.md:346:reply.md:88:تابع‌های load_codal_pdf و 
-load_codal_pdf_from_url را 
-reply.md:1072:reply.md:895:reply.md:720:reply.md:538:reply.md:349:financial_period_id 
-reply.md:1073:reply.md:896:reply.md:721:reply.md:539:reply.md:350:reply.md:92:Report.financial_period_id تلقی کرد.
-reply.md:1074:reply.md:897:reply.md:722:reply.md:541:Report.financial_period_id در 
-reply.md:1076:`financial_period_id` | 
-reply.md:1077:reply.md:900:reply.md:725:reply.md:544:reply.md:356:`financial_periods` 
-reply.md:1078:reply.md:901:reply.md:726:reply.md:546:`ingest_codal_report(...)` 
-reply.md:1079:reply.md:904:reply.md:729:reply.md:548:reply.md:360:load_codal_pdf_from_url  
-reply.md:1080:reply.md:905:reply.md:731:ingest_codal_report  
-reply.md:1081:reply.md:906:reply.md:732:reply.md:550:reply.md:362:reply.md:109:ingest_codal_pdf و facade سازگاری 
-ingest_codal_report 
-reply.md:1083:reply.md:908:reply.md:734:reply.md:551:reply.md:364:src/ingestion/service.py::ingest_codal_report | 
-reply.md:1084:reply.md:909:reply.md:735:reply.md:553:`service.py::ingest_codal_report`: 
-reply.md:1085:reply.md:910:reply.md:736:reply.md:555:financial_period_id به‌عنوان 
-reply.md:1086:reply.md:911:reply.md:737:reply.md:557:financial_period_id در مدل فعلی 
-reply.md:1087:reply.md:912:reply.md:738:reply.md:558:reply.md:371:reply.md:121:`src/ingestion/service.py::ingest_codal_
-report`:
-reply.md:1088:reply.md:913:reply.md:739:reply.md:560:ingest_codal_report
-reply.md:1089:reply.md:914:reply.md:740:reply.md:562:`financial_periods` — 
-reply.md:1090:reply.md:916:`reports.financial_period_id` must not be 
-reply.md:1091:reply.md:917:reply.md:743:reply.md:565:reply.md:378:`financial_periods` model 
-reply.md:1093:`reports.financial_period_id` 
-reply.md:1094:reply.md:920:reply.md:746:reply.md:567:reply.md:380:reply.md:134:`financial_period_id` را جداگانه نگه 
-می‌دارد؛ FKها 
-reply.md:1097:`financial_periods.company_id` تا 
-reply.md:1098:reply.md:924:reply.md:750:reply.md:571:reply.md:385:`Report.financial_period_id` در مدل 
-reply.md:1099:reply.md:925:reply.md:751:reply.md:572:reply.md:386:reply.md:143:pipelineهای load_codal_pdf و 
-load_codal_pdf_from_url |
-reply.md:1100:reply.md:926:reply.md:752:reply.md:573:reply.md:388:\`src/ingestion/service.py::ingest_codal_report\` | 
-reply.md:1101:reply.md:928:ingest_codal_report 
-reply.md:1102:reply.md:929:reply.md:755:reply.md:576:reply.md:390:reply.md:150:RawLineInput و ingest_codal_report 
-فعلاً حفظ؛ بعداً 
-reply.md:1104:reply.md:931:reply.md:757:reply.md:579:\`ingest_codal_report\` را 
-reply.md:1105:reply.md:932:reply.md:758:reply.md:580:reply.md:394:`service.py::ingest_codal_report` | 
-reply.md:1106:reply.md:933:reply.md:759:reply.md:581:reply.md:396:`codal/ingestion.py::ingest_codal_pdf` و 
-reply.md:1107:reply.md:934:reply.md:760:reply.md:582:reply.md:397:reply.md:162:`ingestion/service.py::ingest_codal_repo
-rt` (تابع 
-reply.md:1109:reply.md:936:reply.md:761:reply.md:584:reply.md:399:reply.md:166:`ingest_codal_report` و Stage 5 query | 
-Stage 5 
-reply.md:1111:reply.md:938:reply.md:763:reply.md:586:reply.md:402:`ingest_codal_report` 
-reply.md:1112:reply.md:939:reply.md:764:reply.md:587:reply.md:404:`financial_period_id` 
-reply.md:1113:reply.md:940:reply.md:765:reply.md:588:reply.md:406:`financial_periods` |
-reply.md:1114:reply.md:941:reply.md:767:`Report.financial_period_id` 
-reply.md:1115:reply.md:942:reply.md:768:reply.md:591:reply.md:408:reply.md:177:`ingest_codal_report` یک period_id واحد 
-را به تمام 
-reply.md:1116:reply.md:944:reply.md:770:reply.md:593:reply.md:409:reply.md:179:`src/ingestion/service.py::ingest_codal_
-report`؛ 
-reply.md:1118:reply.md:945:reply.md:772:`financial_periods` | در مسیر 
-reply.md:1119:reply.md:946:reply.md:773:reply.md:598:`Report.financial_period_id` 
-reply.md:1120:reply.md:947:reply.md:774:reply.md:599:reply.md:415:reply.md:191:محدودیت را دارد. متد 
-`ingest_codal_report` یک 
-reply.md:1122:reply.md:949:reply.md:777:`Report.financial_period_id` 
-reply.md:1124:`Report.financial_period_id` 
-reply.md:1125:reply.md:952:reply.md:780:reply.md:604:reply.md:421:reply.md:201:`src/ingestion/service.py::ingest_codal_
-report` 
-reply.md:1127:reply.md:954:reply.md:782:reply.md:606:reply.md:423:reply.md:207:`src/ingestion/service.py::ingest_codal_
-report` 
-reply.md:1129:reply.md:956:reply.md:784:reply.md:607:reply.md:425:reply.md:212:`service.py::ingest_codal_report` → 
-RawFinancialFact.
-reply.md:1130:reply.md:957:reply.md:785:reply.md:609:`codal/ingestion.py::ingest_codal_report` 
-reply.md:1132:`service.py::ingest_codal_report` می‌رسد.
-reply.md:1133:reply.md:959:reply.md:787:reply.md:612:`codal/ingestion.py::ingest_codal_pdf` 
-reply.md:1134:reply.md:960:reply.md:788:reply.md:614:`codal/pipeline.py::load_codal_pdf` و 
-reply.md:1135:reply.md:961:reply.md:789:reply.md:615:reply.md:432:reply.md:219:`load_codal_pdf_from_url` 
-reply.md:1137:reply.md:963:reply.md:791:reply.md:618:`reports.financial_period_id`، چون پیش 
-reply.md:1138:reply.md:964:reply.md:792:reply.md:619:reply.md:436:reply.md:226:`reports.financial_period_id` و تفکیک 
-قرارداد legacy 
-reply.md:1140:reply.md:966:reply.md:793:reply.md:621:`Report.financial_period_id` در ORM 
-reply.md:1141:reply.md:967:reply.md:794:reply.md:622:reply.md:439:reply.md:230:`service.py::ingest_codal_report` 
-delegate می‌کند؛ 
-reply.md:1143:reply.md:969:reply.md:797:`financial_period_id` در 
-reply.md:1144:reply.md:970:reply.md:799:`reports.financial_period_id` اشاره 
-reply.md:1145:reply.md:971:reply.md:800:reply.md:627:reply.md:445:reply.md:237:`Report.financial_period_id` مجاز نیست. 
-مسیر جدید 
-reply.md:1148:`financial_periods.company_id` تا 
-reply.md:1149:reply.md:975:reply.md:804:reply.md:631:reply.md:449:reply.md:244:`Report.financial_period_id` به‌صورت 
-optional 
-reply.md:1151:reply.md:977:reply.md:806:reply.md:633:reply.md:451:reply.md:246:writer قدیمی به 
-Report.financial_period_id — 
-reply.md:1153:reply.md:978:reply.md:807:reply.md:635:`service.py::ingest_codal_report` writer 
-reply.md:1154:reply.md:979:reply.md:808:reply.md:636:reply.md:454:reply.md:250:`Report.financial_period_id` باید با 
-ورودی یکسان 
-reply.md:1156:reply.md:981:reply.md:810:reply.md:637:reply.md:455:reply.md:253:src/ingestion/service.py::ingest_codal_r
-eport است؛ 
-reply.md:1158:reply.md:982:reply.md:812:financial_period_id 
-reply.md:1159:reply.md:983:reply.md:813:reply.md:642:Report.financial_period_id شمرده 
-reply.md:1160:reply.md:984:reply.md:814:reply.md:644:Report.financial_period_id 
-reply.md:1161:reply.md:985:reply.md:815:reply.md:645:reply.md:463:reply.md:265:`ingest_codal_report` take DTOs |
-reply.md:1162:reply.md:986:reply.md:816:reply.md:646:reply.md:465:`ingest_codal_report` accepts 
-reply.md:1166:ingest_codal_report()
-reply.md:1169:reply.md:990:reply.md:820:reply.md:650:reply.md:470:ingest_codal_report()
-reply.md:1170:reply.md:991:reply.md:821:reply.md:651:reply.md:471:reply.md:272:01_Stage1_Data_Foundation.md:278:financi
-al_period_id
-reply.md:1172:financial_periods, 
-reply.md:1173:reply.md:996:reply.md:825:reply.md:654:reply.md:475:ingest_codal_report()`
-reply.md:1175:`financial_periods`
-reply.md:1178:reply.md:1002:reply.md:830:reply.md:658:reply.md:479:reply.md:288:consumed by `ingest_codal_report`; the 
-existing 
-reply.md:1181:ingest_codal_report / 
-reply.md:1183:`ingest_codal_report` 
-reply.md:1185:ingest_codal_report()
-reply.md:1186:reply.md:1009:reply.md:838:`ingest_codal_report()` 
-reply.md:1187:reply.md:1011:`ingest_codal_report`، 
-reply.md:1188:reply.md:1012:reply.md:841:reply.md:667:reply.md:488:reply.md:298:reply.md:10:از `load_codal_pdf` و 
-PDFهای fixture 
-reply.md:1190:reply.md:1013:reply.md:842:reply.md:668:reply.md:490:`ingest_codal_report()`:
-reply.md:1191:reply.md:1014:reply.md:843:reply.md:669:reply.md:491:reply.md:300:reply.md:13:`financial_period_id` است، 
-درحالی‌که 
-reply.md:1193:reply.md:1016:reply.md:845:reply.md:671:reply.md:494:`ingest_codal_report()` 
-reply.md:1194:reply.md:1017:reply.md:846:reply.md:672:reply.md:495:reply.md:305:`ingest_codal_report`
-reply.md:1203:reply.md:1025:reply.md:854:`load_codal_pdf_from_url` 
-reply.md:1206:reply.md:1028:reply.md:856:reply.md:682:reply.md:504:reply.md:314:reply.md:36:`reports.financial_period_i
-d` پیش از 
-reply.md:1208:reply.md:1030:reply.md:858:reply.md:683:reply.md:506:reply.md:315:reply.md:39:`reports.financial_period_i
-d` و مسیرهای 
-reply.md:1210:reply.md:1032:reply.md:859:reply.md:684:reply.md:507:reply.md:316:reply.md:41:`financial_period_id|Financ
-ialPeriod` در 
-reply.md:1212:reply.md:1034:reply.md:861:reply.md:686:reply.md:509:reply.md:318:reply.md:43:`Report.financial_period_id
-` با 
-reply.md:1214:reply.md:1036:reply.md:862:reply.md:687:`financial_periods.period_id`.
-reply.md:1215:reply.md:1037:reply.md:863:reply.md:688:reply.md:510:reply.md:319:reply.md:46:`Report.financial_period_id
-` استفاده 
-reply.md:1218:`financial_period_id` در DTOها 
-reply.md:1219:reply.md:1040:reply.md:867:`reports.financial_period_id` 
-reply.md:1221:`financial_period_id` 
-reply.md:1222:reply.md:1043:reply.md:870:reply.md:695:reply.md:515:reply.md:325:reply.md:54:تابع عمومی 
-`ingest_codal_report` یک 
-reply.md:1224:reply.md:1045:reply.md:871:reply.md:696:reply.md:516:reply.md:326:`src.ingestion.service.ingest_codal_rep
-ort` 
-reply.md:1225:reply.md:1046:reply.md:872:reply.md:697:reply.md:517:reply.md:327:reply.md:55:delegate می‌کند. تابع 
-`ingest_codal_pdf` 
-reply.md:1227:reply.md:1048:reply.md:874:reply.md:699:reply.md:518:reply.md:328:reply.md:57:توابع `load_codal_pdf` و 
-reply.md:1228:`load_codal_pdf_from_url` پس 
-reply.md:1231:reply.md:1052:reply.md:876:reply.md:702:reply.md:521:reply.md:330:reply.md:61:`financial_period_id` 
-ندارند؛ این با 
-reply.md:1233:reply.md:1054:reply.md:878:reply.md:704:reply.md:523:reply.md:333:`Report.financial_period_id` در 
-reply.md:1234:reply.md:1055:reply.md:879:reply.md:705:reply.md:524:reply.md:334:reply.md:68:`Report.financial_period_id
-` تا زمان 
-reply.md:1236:reply.md:1057:reply.md:881:reply.md:707:reply.md:526:reply.md:336:reply.md:71:Report.financial_period_id 
-و مرز writer 
-reply.md:1238:reply.md:1060:`src/ingestion/service.py::ingest_codal_report` است؛ 
-reply.md:1239:reply.md:1061:reply.md:884:reply.md:709:reply.md:529:reply.md:339:reply.md:76:`Report.financial_period_id
-` با ورودی 
-reply.md:1241:reply.md:1063:reply.md:886:reply.md:711:reply.md:530:reply.md:340:reply.md:78:`financial_period_id=period
-_id` ثبت 
-reply.md:1243:reply.md:1064:reply.md:887:reply.md:712:reply.md:531:reply.md:341:reply.md:80:Report.financial_period_id 
-(حذف تدریجی، 
-reply.md:1249:reply.md:1069:reply.md:892:reply.md:717:reply.md:535:ingest_codal_pdf 
-reply.md:1250:reply.md:1070:reply.md:893:reply.md:718:reply.md:536:reply.md:346:reply.md:88:تابع‌های load_codal_pdf و 
-reply.md:1251:load_codal_pdf_from_url را 
-reply.md:1252:reply.md:1072:reply.md:895:reply.md:720:reply.md:538:reply.md:349:financial_period_id 
-reply.md:1253:reply.md:1073:reply.md:896:reply.md:721:reply.md:539:reply.md:350:reply.md:92:Report.financial_period_id 
-تلقی کرد.
-reply.md:1254:reply.md:1074:reply.md:897:reply.md:722:reply.md:541:Report.financial_period_id در 
-reply.md:1255:reply.md:1076:`financial_period_id` | 
-reply.md:1256:reply.md:1077:reply.md:900:reply.md:725:reply.md:544:reply.md:356:`financial_periods` 
-reply.md:1257:reply.md:1078:reply.md:901:reply.md:726:reply.md:546:`ingest_codal_report(...)` 
-reply.md:1258:reply.md:1079:reply.md:904:reply.md:729:reply.md:548:reply.md:360:load_codal_pdf_from_url  
-reply.md:1259:reply.md:1080:reply.md:905:reply.md:731:ingest_codal_report  
-reply.md:1260:reply.md:1081:reply.md:906:reply.md:732:reply.md:550:reply.md:362:reply.md:109:ingest_codal_pdf و facade 
-سازگاری 
-reply.md:1261:ingest_codal_report 
-reply.md:1262:reply.md:1083:reply.md:908:reply.md:734:reply.md:551:reply.md:364:src/ingestion/service.py::ingest_codal_
-report | 
-reply.md:1263:reply.md:1084:reply.md:909:reply.md:735:reply.md:553:`service.py::ingest_codal_report`: 
-reply.md:1264:reply.md:1085:reply.md:910:reply.md:736:reply.md:555:financial_period_id به‌عنوان 
-reply.md:1265:reply.md:1086:reply.md:911:reply.md:737:reply.md:557:financial_period_id در مدل فعلی 
-reply.md:1268:reply.md:1088:reply.md:913:reply.md:739:reply.md:560:ingest_codal_report
-reply.md:1269:reply.md:1089:reply.md:914:reply.md:740:reply.md:562:`financial_periods` — 
-reply.md:1270:reply.md:1090:reply.md:916:`reports.financial_period_id` must not be 
-reply.md:1271:reply.md:1091:reply.md:917:reply.md:743:reply.md:565:reply.md:378:`financial_periods` model 
-reply.md:1272:reply.md:1093:`reports.financial_period_id` 
-reply.md:1273:reply.md:1094:reply.md:920:reply.md:746:reply.md:567:reply.md:380:reply.md:134:`financial_period_id` را 
-جداگانه نگه 
-reply.md:1275:reply.md:1097:`financial_periods.company_id` تا 
-reply.md:1276:reply.md:1098:reply.md:924:reply.md:750:reply.md:571:reply.md:385:`Report.financial_period_id` در مدل 
-reply.md:1277:reply.md:1099:reply.md:925:reply.md:751:reply.md:572:reply.md:386:reply.md:143:pipelineهای 
-load_codal_pdf و 
-reply.md:1278:load_codal_pdf_from_url |
-reply.md:1279:reply.md:1100:reply.md:926:reply.md:752:reply.md:573:reply.md:388:\`src/ingestion/service.py::ingest_coda
-l_report\` | 
-reply.md:1280:reply.md:1101:reply.md:928:ingest_codal_report 
-reply.md:1281:reply.md:1102:reply.md:929:reply.md:755:reply.md:576:reply.md:390:reply.md:150:RawLineInput و 
-ingest_codal_report 
-reply.md:1283:reply.md:1104:reply.md:931:reply.md:757:reply.md:579:\`ingest_codal_report\` را 
-reply.md:1284:reply.md:1105:reply.md:932:reply.md:758:reply.md:580:reply.md:394:`service.py::ingest_codal_report` | 
-reply.md:1285:reply.md:1106:reply.md:933:reply.md:759:reply.md:581:reply.md:396:`codal/ingestion.py::ingest_codal_pdf` 
-و 
-reply.md:1288:reply.md:1109:reply.md:936:reply.md:761:reply.md:584:reply.md:399:reply.md:166:`ingest_codal_report` و 
-Stage 5 query | 
-reply.md:1290:reply.md:1111:reply.md:938:reply.md:763:reply.md:586:reply.md:402:`ingest_codal_report` 
-reply.md:1291:reply.md:1112:reply.md:939:reply.md:764:reply.md:587:reply.md:404:`financial_period_id` 
-reply.md:1292:reply.md:1113:reply.md:940:reply.md:765:reply.md:588:reply.md:406:`financial_periods` |
-reply.md:1293:reply.md:1114:reply.md:941:reply.md:767:`Report.financial_period_id` 
-reply.md:1294:reply.md:1115:reply.md:942:reply.md:768:reply.md:591:reply.md:408:reply.md:177:`ingest_codal_report` یک 
-period_id واحد 
-reply.md:1298:reply.md:1118:reply.md:945:reply.md:772:`financial_periods` | در مسیر 
-reply.md:1299:reply.md:1119:reply.md:946:reply.md:773:reply.md:598:`Report.financial_period_id` 
-reply.md:1301:`ingest_codal_report` یک 
-reply.md:1302:reply.md:1122:reply.md:949:reply.md:777:`Report.financial_period_id` 
-reply.md:1303:reply.md:1124:`Report.financial_period_id` 
-reply.md:1308:reply.md:1129:reply.md:956:reply.md:784:reply.md:607:reply.md:425:reply.md:212:`service.py::ingest_codal_
-report` → 
-reply.md:1310:reply.md:1130:reply.md:957:reply.md:785:reply.md:609:`codal/ingestion.py::ingest_codal_report` 
-reply.md:1311:reply.md:1132:`service.py::ingest_codal_report` می‌رسد.
-reply.md:1312:reply.md:1133:reply.md:959:reply.md:787:reply.md:612:`codal/ingestion.py::ingest_codal_pdf` 
-reply.md:1313:reply.md:1134:reply.md:960:reply.md:788:reply.md:614:`codal/pipeline.py::load_codal_pdf` و 
-reply.md:1314:reply.md:1135:reply.md:961:reply.md:789:reply.md:615:reply.md:432:reply.md:219:`load_codal_pdf_from_url` 
-reply.md:1315:reply.md:1137:reply.md:963:reply.md:791:reply.md:618:`reports.financial_period_id`، چون پیش 
-reply.md:1316:reply.md:1138:reply.md:964:reply.md:792:reply.md:619:reply.md:436:reply.md:226:`reports.financial_period_
-id` و تفکیک 
-reply.md:1318:reply.md:1140:reply.md:966:reply.md:793:reply.md:621:`Report.financial_period_id` در ORM 
-reply.md:1319:reply.md:1141:reply.md:967:reply.md:794:reply.md:622:reply.md:439:reply.md:230:`service.py::ingest_codal_
-report` 
-reply.md:1321:reply.md:1143:reply.md:969:reply.md:797:`financial_period_id` در 
-reply.md:1322:reply.md:1144:reply.md:970:reply.md:799:`reports.financial_period_id` اشاره 
-reply.md:1323:reply.md:1145:reply.md:971:reply.md:800:reply.md:627:reply.md:445:reply.md:237:`Report.financial_period_i
-d` مجاز نیست. 
-reply.md:1325:reply.md:1148:`financial_periods.company_id` تا 
-reply.md:1326:reply.md:1149:reply.md:975:reply.md:804:reply.md:631:reply.md:449:reply.md:244:`Report.financial_period_i
-d` به‌صورت 
-reply.md:1329:Report.financial_period_id — 
-reply.md:1330:reply.md:1153:reply.md:978:reply.md:807:reply.md:635:`service.py::ingest_codal_report` writer 
-reply.md:1331:reply.md:1154:reply.md:979:reply.md:808:reply.md:636:reply.md:454:reply.md:250:`Report.financial_period_i
-d` باید با 
-reply.md:1335:reply.md:1158:reply.md:982:reply.md:812:financial_period_id 
-reply.md:1336:reply.md:1159:reply.md:983:reply.md:813:reply.md:642:Report.financial_period_id شمرده 
-reply.md:1337:reply.md:1160:reply.md:984:reply.md:814:reply.md:644:Report.financial_period_id 
-reply.md:1338:reply.md:1161:reply.md:985:reply.md:815:reply.md:645:reply.md:463:reply.md:265:`ingest_codal_report` 
-take DTOs |
-reply.md:1339:reply.md:1162:reply.md:986:reply.md:816:reply.md:646:reply.md:465:`ingest_codal_report` accepts 
-reply.md:1340:reply.md:1166:ingest_codal_report()
-reply.md:1341:reply.md:1169:reply.md:990:reply.md:820:reply.md:650:reply.md:470:ingest_codal_report()
-reply.md:1344:reply.md:1172:financial_periods, 
-reply.md:1345:reply.md:1173:reply.md:996:reply.md:825:reply.md:654:reply.md:475:ingest_codal_report()`
-reply.md:1346:reply.md:1175:`financial_periods`
-reply.md:1347:reply.md:1178:reply.md:1002:reply.md:830:reply.md:658:reply.md:479:reply.md:288:consumed by 
-`ingest_codal_report`; the 
-reply.md:1349:reply.md:1181:ingest_codal_report / 
-reply.md:1350:reply.md:1183:`ingest_codal_report` 
-reply.md:1351:reply.md:1185:ingest_codal_report()
-reply.md:1352:reply.md:1186:reply.md:1009:reply.md:838:`ingest_codal_report()` 
-reply.md:1353:reply.md:1187:reply.md:1011:`ingest_codal_report`، 
-reply.md:1354:reply.md:1188:reply.md:1012:reply.md:841:reply.md:667:reply.md:488:reply.md:298:reply.md:10:از 
-`load_codal_pdf` و 
-reply.md:1356:reply.md:1190:reply.md:1013:reply.md:842:reply.md:668:reply.md:490:`ingest_codal_report()`:
-reply.md:1357:reply.md:1191:reply.md:1014:reply.md:843:reply.md:669:reply.md:491:reply.md:300:reply.md:13:`financial_pe
-riod_id` است، 
-reply.md:1359:reply.md:1193:reply.md:1016:reply.md:845:reply.md:671:reply.md:494:`ingest_codal_report()` 
-reply.md:1360:reply.md:1194:reply.md:1017:reply.md:846:reply.md:672:reply.md:495:reply.md:305:`ingest_codal_report`
-reply.md:1361:reply.md:1203:reply.md:1025:reply.md:854:`load_codal_pdf_from_url` 
-reply.md:1366:reply.md:1210:reply.md:1032:reply.md:859:reply.md:684:reply.md:507:reply.md:316:reply.md:41:`financial_pe
-riod_id|Financ
-reply.md:1368:reply.md:1212:reply.md:1034:reply.md:861:reply.md:686:reply.md:509:reply.md:318:reply.md:43:`Report.finan
-cial_period_id
-reply.md:1370:reply.md:1214:reply.md:1036:reply.md:862:reply.md:687:`financial_periods.period_id`.
-reply.md:1371:reply.md:1215:reply.md:1037:reply.md:863:reply.md:688:reply.md:510:reply.md:319:reply.md:46:`Report.finan
-cial_period_id
-reply.md:1373:reply.md:1218:`financial_period_id` در DTOها 
-reply.md:1374:reply.md:1219:reply.md:1040:reply.md:867:`reports.financial_period_id` 
-reply.md:1375:reply.md:1221:`financial_period_id` 
-reply.md:1377:`ingest_codal_report` یک 
-reply.md:1381:`ingest_codal_pdf` 
-reply.md:1382:reply.md:1227:reply.md:1048:reply.md:874:reply.md:699:reply.md:518:reply.md:328:reply.md:57:توابع 
-`load_codal_pdf` و 
-reply.md:1383:reply.md:1228:`load_codal_pdf_from_url` پس 
-reply.md:1384:reply.md:1231:reply.md:1052:reply.md:876:reply.md:702:reply.md:521:reply.md:330:reply.md:61:`financial_pe
-riod_id` 
-reply.md:1386:reply.md:1233:reply.md:1054:reply.md:878:reply.md:704:reply.md:523:reply.md:333:`Report.financial_period_
-id` در 
-reply.md:1387:reply.md:1234:reply.md:1055:reply.md:879:reply.md:705:reply.md:524:reply.md:334:reply.md:68:`Report.finan
-cial_period_id
-reply.md:1389:reply.md:1236:reply.md:1057:reply.md:881:reply.md:707:reply.md:526:reply.md:336:reply.md:71:Report.financ
-ial_period_id 
-reply.md:1391:reply.md:1238:reply.md:1060:`src/ingestion/service.py::ingest_codal_report` است؛ 
-reply.md:1392:reply.md:1239:reply.md:1061:reply.md:884:reply.md:709:reply.md:529:reply.md:339:reply.md:76:`Report.finan
-cial_period_id
-reply.md:1394:reply.md:1241:reply.md:1063:reply.md:886:reply.md:711:reply.md:530:reply.md:340:reply.md:78:`financial_pe
-riod_id=period
-reply.md:1396:reply.md:1243:reply.md:1064:reply.md:887:reply.md:712:reply.md:531:reply.md:341:reply.md:80:Report.financ
-ial_period_id 
-reply.md:1398:reply.md:1249:reply.md:1069:reply.md:892:reply.md:717:reply.md:535:ingest_codal_pdf 
-reply.md:1399:reply.md:1250:reply.md:1070:reply.md:893:reply.md:718:reply.md:536:reply.md:346:reply.md:88:تابع‌های 
-load_codal_pdf و 
-reply.md:1400:reply.md:1251:load_codal_pdf_from_url را 
-reply.md:1401:reply.md:1252:reply.md:1072:reply.md:895:reply.md:720:reply.md:538:reply.md:349:financial_period_id 
-reply.md:1402:reply.md:1253:reply.md:1073:reply.md:896:reply.md:721:reply.md:539:reply.md:350:reply.md:92:Report.financ
-ial_period_id 
-reply.md:1404:reply.md:1254:reply.md:1074:reply.md:897:reply.md:722:reply.md:541:Report.financial_period_id در 
-reply.md:1405:reply.md:1255:reply.md:1076:`financial_period_id` | 
-reply.md:1406:reply.md:1256:reply.md:1077:reply.md:900:reply.md:725:reply.md:544:reply.md:356:`financial_periods` 
-reply.md:1407:reply.md:1257:reply.md:1078:reply.md:901:reply.md:726:reply.md:546:`ingest_codal_report(...)` 
-reply.md:1408:reply.md:1258:reply.md:1079:reply.md:904:reply.md:729:reply.md:548:reply.md:360:load_codal_pdf_from_url  
-reply.md:1409:reply.md:1259:reply.md:1080:reply.md:905:reply.md:731:ingest_codal_report  
-reply.md:1410:reply.md:1260:reply.md:1081:reply.md:906:reply.md:732:reply.md:550:reply.md:362:reply.md:109:ingest_codal
-_pdf و facade 
-reply.md:1412:reply.md:1261:ingest_codal_report 
-reply.md:1415:reply.md:1263:reply.md:1084:reply.md:909:reply.md:735:reply.md:553:`service.py::ingest_codal_report`: 
-reply.md:1416:reply.md:1264:reply.md:1085:reply.md:910:reply.md:736:reply.md:555:financial_period_id به‌عنوان 
-reply.md:1417:reply.md:1265:reply.md:1086:reply.md:911:reply.md:737:reply.md:557:financial_period_id در مدل فعلی 
-reply.md:1418:reply.md:1268:reply.md:1088:reply.md:913:reply.md:739:reply.md:560:ingest_codal_report
-reply.md:1419:reply.md:1269:reply.md:1089:reply.md:914:reply.md:740:reply.md:562:`financial_periods` — 
-reply.md:1420:reply.md:1270:reply.md:1090:reply.md:916:`reports.financial_period_id` must not be 
-reply.md:1421:reply.md:1271:reply.md:1091:reply.md:917:reply.md:743:reply.md:565:reply.md:378:`financial_periods` 
-model 
-reply.md:1422:reply.md:1272:reply.md:1093:`reports.financial_period_id` 
-reply.md:1423:reply.md:1273:reply.md:1094:reply.md:920:reply.md:746:reply.md:567:reply.md:380:reply.md:134:`financial_p
-eriod_id` را 
-reply.md:1425:reply.md:1275:reply.md:1097:`financial_periods.company_id` تا 
-reply.md:1426:reply.md:1276:reply.md:1098:reply.md:924:reply.md:750:reply.md:571:reply.md:385:`Report.financial_period_
-id` در مدل 
-reply.md:1428:load_codal_pdf و 
-reply.md:1429:reply.md:1278:load_codal_pdf_from_url |
-reply.md:1432:reply.md:1280:reply.md:1101:reply.md:928:ingest_codal_report 
-reply.md:1434:ingest_codal_report 
-reply.md:1435:reply.md:1283:reply.md:1104:reply.md:931:reply.md:757:reply.md:579:\`ingest_codal_report\` را 
-reply.md:1436:reply.md:1284:reply.md:1105:reply.md:932:reply.md:758:reply.md:580:reply.md:394:`service.py::ingest_codal
-_report` | 
-reply.md:1437:reply.md:1285:reply.md:1106:reply.md:933:reply.md:759:reply.md:581:reply.md:396:`codal/ingestion.py::inge
-st_codal_pdf` 
-reply.md:1439:reply.md:1288:reply.md:1109:reply.md:936:reply.md:761:reply.md:584:reply.md:399:reply.md:166:`ingest_coda
-l_report` و 
-reply.md:1441:reply.md:1290:reply.md:1111:reply.md:938:reply.md:763:reply.md:586:reply.md:402:`ingest_codal_report` 
-reply.md:1442:reply.md:1291:reply.md:1112:reply.md:939:reply.md:764:reply.md:587:reply.md:404:`financial_period_id` 
-reply.md:1443:reply.md:1292:reply.md:1113:reply.md:940:reply.md:765:reply.md:588:reply.md:406:`financial_periods` |
-reply.md:1444:reply.md:1293:reply.md:1114:reply.md:941:reply.md:767:`Report.financial_period_id` 
-reply.md:1445:reply.md:1294:reply.md:1115:reply.md:942:reply.md:768:reply.md:591:reply.md:408:reply.md:177:`ingest_coda
-l_report` یک 
-reply.md:1447:reply.md:1298:reply.md:1118:reply.md:945:reply.md:772:`financial_periods` | در مسیر 
-reply.md:1448:reply.md:1299:reply.md:1119:reply.md:946:reply.md:773:reply.md:598:`Report.financial_period_id` 
-reply.md:1449:reply.md:1301:`ingest_codal_report` یک 
-reply.md:1450:reply.md:1302:reply.md:1122:reply.md:949:reply.md:777:`Report.financial_period_id` 
-reply.md:1451:reply.md:1303:reply.md:1124:`Report.financial_period_id` 
-reply.md:1454:reply.md:1310:reply.md:1130:reply.md:957:reply.md:785:reply.md:609:`codal/ingestion.py::ingest_codal_repo
-rt` 
-reply.md:1455:reply.md:1311:reply.md:1132:`service.py::ingest_codal_report` می‌رسد.
-reply.md:1456:reply.md:1312:reply.md:1133:reply.md:959:reply.md:787:reply.md:612:`codal/ingestion.py::ingest_codal_pdf`
- 
-reply.md:1457:reply.md:1313:reply.md:1134:reply.md:960:reply.md:788:reply.md:614:`codal/pipeline.py::load_codal_pdf` و 
-reply.md:1458:reply.md:1314:reply.md:1135:reply.md:961:reply.md:789:reply.md:615:reply.md:432:reply.md:219:`load_codal_
-pdf_from_url` 
-reply.md:1459:reply.md:1315:reply.md:1137:reply.md:963:reply.md:791:reply.md:618:`reports.financial_period_id`، چون 
-پیش 
-reply.md:1462:reply.md:1318:reply.md:1140:reply.md:966:reply.md:793:reply.md:621:`Report.financial_period_id` در ORM 
-reply.md:1465:reply.md:1321:reply.md:1143:reply.md:969:reply.md:797:`financial_period_id` در 
-reply.md:1466:reply.md:1322:reply.md:1144:reply.md:970:reply.md:799:`reports.financial_period_id` اشاره 
-reply.md:1469:reply.md:1325:reply.md:1148:`financial_periods.company_id` تا 
-reply.md:1472:reply.md:1329:Report.financial_period_id — 
-reply.md:1473:reply.md:1330:reply.md:1153:reply.md:978:reply.md:807:reply.md:635:`service.py::ingest_codal_report` 
-writer 
-reply.md:1476:reply.md:1335:reply.md:1158:reply.md:982:reply.md:812:financial_period_id 
-reply.md:1477:reply.md:1336:reply.md:1159:reply.md:983:reply.md:813:reply.md:642:Report.financial_period_id شمرده 
-reply.md:1478:reply.md:1337:reply.md:1160:reply.md:984:reply.md:814:reply.md:644:Report.financial_period_id 
-reply.md:1479:reply.md:1338:reply.md:1161:reply.md:985:reply.md:815:reply.md:645:reply.md:463:reply.md:265:`ingest_coda
-l_report` 
-reply.md:1481:reply.md:1339:reply.md:1162:reply.md:986:reply.md:816:reply.md:646:reply.md:465:`ingest_codal_report` 
-accepts 
-reply.md:1482:reply.md:1340:reply.md:1166:ingest_codal_report()
-reply.md:1483:reply.md:1341:reply.md:1169:reply.md:990:reply.md:820:reply.md:650:reply.md:470:ingest_codal_report()
-reply.md:1484:reply.md:1344:reply.md:1172:financial_periods, 
-reply.md:1485:reply.md:1345:reply.md:1173:reply.md:996:reply.md:825:reply.md:654:reply.md:475:ingest_codal_report()`
-reply.md:1486:reply.md:1346:reply.md:1175:`financial_periods`
-reply.md:1488:`ingest_codal_report`; the 
-reply.md:1489:reply.md:1349:reply.md:1181:ingest_codal_report / 
-reply.md:1490:reply.md:1350:reply.md:1183:`ingest_codal_report` 
-reply.md:1491:reply.md:1351:reply.md:1185:ingest_codal_report()
-reply.md:1492:reply.md:1352:reply.md:1186:reply.md:1009:reply.md:838:`ingest_codal_report()` 
-reply.md:1493:reply.md:1353:reply.md:1187:reply.md:1011:`ingest_codal_report`، 
-reply.md:1495:`load_codal_pdf` و 
-reply.md:1496:reply.md:1356:reply.md:1190:reply.md:1013:reply.md:842:reply.md:668:reply.md:490:`ingest_codal_report()`:
-reply.md:1499:reply.md:1359:reply.md:1193:reply.md:1016:reply.md:845:reply.md:671:reply.md:494:`ingest_codal_report()` 
-reply.md:1500:reply.md:1360:reply.md:1194:reply.md:1017:reply.md:846:reply.md:672:reply.md:495:reply.md:305:`ingest_cod
-al_report`
-reply.md:1501:reply.md:1361:reply.md:1203:reply.md:1025:reply.md:854:`load_codal_pdf_from_url` 
-reply.md:1506:reply.md:1370:reply.md:1214:reply.md:1036:reply.md:862:reply.md:687:`financial_periods.period_id`.
-reply.md:1509:reply.md:1373:reply.md:1218:`financial_period_id` در DTOها 
-reply.md:1510:reply.md:1374:reply.md:1219:reply.md:1040:reply.md:867:`reports.financial_period_id` 
-reply.md:1511:reply.md:1375:reply.md:1221:`financial_period_id` 
-reply.md:1512:reply.md:1377:`ingest_codal_report` یک 
-reply.md:1513:reply.md:1381:`ingest_codal_pdf` 
-reply.md:1515:`load_codal_pdf` و 
-reply.md:1516:reply.md:1383:reply.md:1228:`load_codal_pdf_from_url` پس 
-reply.md:1525:reply.md:1391:reply.md:1238:reply.md:1060:`src/ingestion/service.py::ingest_codal_report` است؛ 
-reply.md:1532:reply.md:1398:reply.md:1249:reply.md:1069:reply.md:892:reply.md:717:reply.md:535:ingest_codal_pdf 
-reply.md:1534:load_codal_pdf و 
-reply.md:1535:reply.md:1400:reply.md:1251:load_codal_pdf_from_url را 
-reply.md:1536:reply.md:1401:reply.md:1252:reply.md:1072:reply.md:895:reply.md:720:reply.md:538:reply.md:349:financial_p
-eriod_id 
-reply.md:1539:reply.md:1404:reply.md:1254:reply.md:1074:reply.md:897:reply.md:722:reply.md:541:Report.financial_period_
-id در 
-reply.md:1540:reply.md:1405:reply.md:1255:reply.md:1076:`financial_period_id` | 
-reply.md:1541:reply.md:1406:reply.md:1256:reply.md:1077:reply.md:900:reply.md:725:reply.md:544:reply.md:356:`financial_
-periods` 
-reply.md:1542:reply.md:1407:reply.md:1257:reply.md:1078:reply.md:901:reply.md:726:reply.md:546:`ingest_codal_report(...
-)` 
-reply.md:1543:reply.md:1408:reply.md:1258:reply.md:1079:reply.md:904:reply.md:729:reply.md:548:reply.md:360:load_codal_
-pdf_from_url  
-reply.md:1544:reply.md:1409:reply.md:1259:reply.md:1080:reply.md:905:reply.md:731:ingest_codal_report  
-reply.md:1547:reply.md:1412:reply.md:1261:ingest_codal_report 
-reply.md:1548:reply.md:1415:reply.md:1263:reply.md:1084:reply.md:909:reply.md:735:reply.md:553:`service.py::ingest_coda
-l_report`: 
-reply.md:1549:reply.md:1416:reply.md:1264:reply.md:1085:reply.md:910:reply.md:736:reply.md:555:financial_period_id 
-به‌عنوان 
-reply.md:1550:reply.md:1417:reply.md:1265:reply.md:1086:reply.md:911:reply.md:737:reply.md:557:financial_period_id در 
-مدل فعلی 
-reply.md:1551:reply.md:1418:reply.md:1268:reply.md:1088:reply.md:913:reply.md:739:reply.md:560:ingest_codal_report
-reply.md:1552:reply.md:1419:reply.md:1269:reply.md:1089:reply.md:914:reply.md:740:reply.md:562:`financial_periods` — 
-reply.md:1553:reply.md:1420:reply.md:1270:reply.md:1090:reply.md:916:`reports.financial_period_id` must not be 
-reply.md:1554:reply.md:1421:reply.md:1271:reply.md:1091:reply.md:917:reply.md:743:reply.md:565:reply.md:378:`financial_
-periods` 
-reply.md:1556:reply.md:1422:reply.md:1272:reply.md:1093:`reports.financial_period_id` 
-reply.md:1559:reply.md:1425:reply.md:1275:reply.md:1097:`financial_periods.company_id` تا 
-reply.md:1562:reply.md:1428:load_codal_pdf و 
-reply.md:1563:reply.md:1429:reply.md:1278:load_codal_pdf_from_url |
-reply.md:1564:reply.md:1432:reply.md:1280:reply.md:1101:reply.md:928:ingest_codal_report 
-reply.md:1565:reply.md:1434:ingest_codal_report 
-reply.md:1566:reply.md:1435:reply.md:1283:reply.md:1104:reply.md:931:reply.md:757:reply.md:579:\`ingest_codal_report\` 
-را 
-reply.md:1573:reply.md:1441:reply.md:1290:reply.md:1111:reply.md:938:reply.md:763:reply.md:586:reply.md:402:`ingest_cod
-al_report` 
-reply.md:1574:reply.md:1442:reply.md:1291:reply.md:1112:reply.md:939:reply.md:764:reply.md:587:reply.md:404:`financial_
-period_id` 
-reply.md:1575:reply.md:1443:reply.md:1292:reply.md:1113:reply.md:940:reply.md:765:reply.md:588:reply.md:406:`financial_
-periods` |
-reply.md:1576:reply.md:1444:reply.md:1293:reply.md:1114:reply.md:941:reply.md:767:`Report.financial_period_id` 
-reply.md:1579:reply.md:1447:reply.md:1298:reply.md:1118:reply.md:945:reply.md:772:`financial_periods` | در مسیر 
-reply.md:1580:reply.md:1448:reply.md:1299:reply.md:1119:reply.md:946:reply.md:773:reply.md:598:`Report.financial_period
-_id` 
-reply.md:1581:reply.md:1449:reply.md:1301:`ingest_codal_report` یک 
-reply.md:1582:reply.md:1450:reply.md:1302:reply.md:1122:reply.md:949:reply.md:777:`Report.financial_period_id` 
-reply.md:1583:reply.md:1451:reply.md:1303:reply.md:1124:`Report.financial_period_id` 
-reply.md:1586:reply.md:1455:reply.md:1311:reply.md:1132:`service.py::ingest_codal_report` می‌رسد.
-reply.md:1587:reply.md:1456:reply.md:1312:reply.md:1133:reply.md:959:reply.md:787:reply.md:612:`codal/ingestion.py::ing
-est_codal_pdf`
-reply.md:1589:reply.md:1457:reply.md:1313:reply.md:1134:reply.md:960:reply.md:788:reply.md:614:`codal/pipeline.py::load
-_codal_pdf` و 
-reply.md:1592:reply.md:1459:reply.md:1315:reply.md:1137:reply.md:963:reply.md:791:reply.md:618:`reports.financial_perio
-d_id`، چون 
-reply.md:1594:reply.md:1462:reply.md:1318:reply.md:1140:reply.md:966:reply.md:793:reply.md:621:`Report.financial_period
-_id` در ORM 
-reply.md:1595:reply.md:1465:reply.md:1321:reply.md:1143:reply.md:969:reply.md:797:`financial_period_id` در 
-reply.md:1596:reply.md:1466:reply.md:1322:reply.md:1144:reply.md:970:reply.md:799:`reports.financial_period_id` اشاره 
-reply.md:1597:reply.md:1469:reply.md:1325:reply.md:1148:`financial_periods.company_id` تا 
-reply.md:1598:reply.md:1472:reply.md:1329:Report.financial_period_id — 
-reply.md:1599:reply.md:1473:reply.md:1330:reply.md:1153:reply.md:978:reply.md:807:reply.md:635:`service.py::ingest_coda
-l_report` 
-reply.md:1601:reply.md:1476:reply.md:1335:reply.md:1158:reply.md:982:reply.md:812:financial_period_id 
-reply.md:1602:reply.md:1477:reply.md:1336:reply.md:1159:reply.md:983:reply.md:813:reply.md:642:Report.financial_period_
-id شمرده 
-reply.md:1603:reply.md:1478:reply.md:1337:reply.md:1160:reply.md:984:reply.md:814:reply.md:644:Report.financial_period_
-id 
-reply.md:1606:reply.md:1481:reply.md:1339:reply.md:1162:reply.md:986:reply.md:816:reply.md:646:reply.md:465:`ingest_cod
-al_report` 
-reply.md:1608:reply.md:1482:reply.md:1340:reply.md:1166:ingest_codal_report()
-reply.md:1609:reply.md:1483:reply.md:1341:reply.md:1169:reply.md:990:reply.md:820:reply.md:650:reply.md:470:ingest_coda
-l_report()
-reply.md:1610:reply.md:1484:reply.md:1344:reply.md:1172:financial_periods, 
-reply.md:1611:reply.md:1485:reply.md:1345:reply.md:1173:reply.md:996:reply.md:825:reply.md:654:reply.md:475:ingest_coda
-l_report()`
-reply.md:1612:reply.md:1486:reply.md:1346:reply.md:1175:`financial_periods`
-reply.md:1613:reply.md:1488:`ingest_codal_report`; the 
-reply.md:1614:reply.md:1489:reply.md:1349:reply.md:1181:ingest_codal_report / 
-reply.md:1615:reply.md:1490:reply.md:1350:reply.md:1183:`ingest_codal_report` 
-reply.md:1616:reply.md:1491:reply.md:1351:reply.md:1185:ingest_codal_report()
-reply.md:1617:reply.md:1492:reply.md:1352:reply.md:1186:reply.md:1009:reply.md:838:`ingest_codal_report()` 
-reply.md:1618:reply.md:1493:reply.md:1353:reply.md:1187:reply.md:1011:`ingest_codal_report`، 
-reply.md:1619:reply.md:1495:`load_codal_pdf` و 
-reply.md:1620:reply.md:1496:reply.md:1356:reply.md:1190:reply.md:1013:reply.md:842:reply.md:668:reply.md:490:`ingest_co
-dal_report()`:
-reply.md:1621:reply.md:1499:reply.md:1359:reply.md:1193:reply.md:1016:reply.md:845:reply.md:671:reply.md:494:`ingest_co
-dal_report()` 
-reply.md:1624:reply.md:1501:reply.md:1361:reply.md:1203:reply.md:1025:reply.md:854:`load_codal_pdf_from_url` 
-reply.md:1625:reply.md:1506:reply.md:1370:reply.md:1214:reply.md:1036:reply.md:862:reply.md:687:`financial_periods.peri
-od_id`.
-reply.md:1626:reply.md:1509:reply.md:1373:reply.md:1218:`financial_period_id` در DTOها 
-reply.md:1627:reply.md:1510:reply.md:1374:reply.md:1219:reply.md:1040:reply.md:867:`reports.financial_period_id` 
-reply.md:1628:reply.md:1511:reply.md:1375:reply.md:1221:`financial_period_id` 
-reply.md:1629:reply.md:1512:reply.md:1377:`ingest_codal_report` یک 
-reply.md:1630:reply.md:1513:reply.md:1381:`ingest_codal_pdf` 
-reply.md:1631:reply.md:1515:`load_codal_pdf` و 
-reply.md:1632:reply.md:1516:reply.md:1383:reply.md:1228:`load_codal_pdf_from_url` پس 
-reply.md:1633:reply.md:1525:reply.md:1391:reply.md:1238:reply.md:1060:`src/ingestion/service.py::ingest_codal_report` 
-است؛ 
-reply.md:1634:reply.md:1532:reply.md:1398:reply.md:1249:reply.md:1069:reply.md:892:reply.md:717:reply.md:535:ingest_cod
-al_pdf 
-reply.md:1635:reply.md:1534:load_codal_pdf و 
-reply.md:1636:reply.md:1535:reply.md:1400:reply.md:1251:load_codal_pdf_from_url را 
-reply.md:1641:reply.md:1540:reply.md:1405:reply.md:1255:reply.md:1076:`financial_period_id` | 
-reply.md:1644:reply.md:1542:reply.md:1407:reply.md:1257:reply.md:1078:reply.md:901:reply.md:726:reply.md:546:`ingest_co
-dal_report(...
-reply.md:1648:reply.md:1544:reply.md:1409:reply.md:1259:reply.md:1080:reply.md:905:reply.md:731:ingest_codal_report  
-reply.md:1649:reply.md:1547:reply.md:1412:reply.md:1261:ingest_codal_report 
-reply.md:1652:reply.md:1549:reply.md:1416:reply.md:1264:reply.md:1085:reply.md:910:reply.md:736:reply.md:555:financial_
-period_id 
-reply.md:1654:reply.md:1550:reply.md:1417:reply.md:1265:reply.md:1086:reply.md:911:reply.md:737:reply.md:557:financial_
-period_id در 
-reply.md:1656:reply.md:1551:reply.md:1418:reply.md:1268:reply.md:1088:reply.md:913:reply.md:739:reply.md:560:ingest_cod
-al_report
-reply.md:1657:reply.md:1552:reply.md:1419:reply.md:1269:reply.md:1089:reply.md:914:reply.md:740:reply.md:562:`financial
-_periods` — 
-reply.md:1658:reply.md:1553:reply.md:1420:reply.md:1270:reply.md:1090:reply.md:916:`reports.financial_period_id` must 
-not be 
-reply.md:1661:reply.md:1556:reply.md:1422:reply.md:1272:reply.md:1093:`reports.financial_period_id` 
-reply.md:1662:reply.md:1559:reply.md:1425:reply.md:1275:reply.md:1097:`financial_periods.company_id` تا 
-reply.md:1663:reply.md:1562:reply.md:1428:load_codal_pdf و 
-reply.md:1664:reply.md:1563:reply.md:1429:reply.md:1278:load_codal_pdf_from_url |
-reply.md:1665:reply.md:1564:reply.md:1432:reply.md:1280:reply.md:1101:reply.md:928:ingest_codal_report 
-reply.md:1666:reply.md:1565:reply.md:1434:ingest_codal_report 
-reply.md:1667:reply.md:1566:reply.md:1435:reply.md:1283:reply.md:1104:reply.md:931:reply.md:757:reply.md:579:\`ingest_c
-odal_report\` 
-reply.md:1675:reply.md:1576:reply.md:1444:reply.md:1293:reply.md:1114:reply.md:941:reply.md:767:`Report.financial_perio
-d_id` 
-reply.md:1676:reply.md:1579:reply.md:1447:reply.md:1298:reply.md:1118:reply.md:945:reply.md:772:`financial_periods` | 
-در مسیر 
-reply.md:1679:reply.md:1581:reply.md:1449:reply.md:1301:`ingest_codal_report` یک 
-reply.md:1680:reply.md:1582:reply.md:1450:reply.md:1302:reply.md:1122:reply.md:949:reply.md:777:`Report.financial_perio
-d_id` 
-reply.md:1681:reply.md:1583:reply.md:1451:reply.md:1303:reply.md:1124:`Report.financial_period_id` 
-reply.md:1682:reply.md:1586:reply.md:1455:reply.md:1311:reply.md:1132:`service.py::ingest_codal_report` می‌رسد.
-reply.md:1691:reply.md:1595:reply.md:1465:reply.md:1321:reply.md:1143:reply.md:969:reply.md:797:`financial_period_id` 
-در 
-reply.md:1692:reply.md:1596:reply.md:1466:reply.md:1322:reply.md:1144:reply.md:970:reply.md:799:`reports.financial_peri
-od_id` اشاره 
-reply.md:1693:reply.md:1597:reply.md:1469:reply.md:1325:reply.md:1148:`financial_periods.company_id` تا 
-reply.md:1694:reply.md:1598:reply.md:1472:reply.md:1329:Report.financial_period_id — 
-reply.md:1697:reply.md:1601:reply.md:1476:reply.md:1335:reply.md:1158:reply.md:982:reply.md:812:financial_period_id 
-reply.md:1704:reply.md:1608:reply.md:1482:reply.md:1340:reply.md:1166:ingest_codal_report()
-reply.md:1707:reply.md:1610:reply.md:1484:reply.md:1344:reply.md:1172:financial_periods, 
-reply.md:1710:reply.md:1612:reply.md:1486:reply.md:1346:reply.md:1175:`financial_periods`
-reply.md:1711:reply.md:1613:reply.md:1488:`ingest_codal_report`; the 
-reply.md:1712:reply.md:1614:reply.md:1489:reply.md:1349:reply.md:1181:ingest_codal_report / 
-reply.md:1713:reply.md:1615:reply.md:1490:reply.md:1350:reply.md:1183:`ingest_codal_report` 
-reply.md:1714:reply.md:1616:reply.md:1491:reply.md:1351:reply.md:1185:ingest_codal_report()
-reply.md:1715:reply.md:1617:reply.md:1492:reply.md:1352:reply.md:1186:reply.md:1009:reply.md:838:`ingest_codal_report()
-` 
-reply.md:1716:reply.md:1618:reply.md:1493:reply.md:1353:reply.md:1187:reply.md:1011:`ingest_codal_report`، 
-reply.md:1717:reply.md:1619:reply.md:1495:`load_codal_pdf` و 
-reply.md:1722:reply.md:1624:reply.md:1501:reply.md:1361:reply.md:1203:reply.md:1025:reply.md:854:`load_codal_pdf_from_u
-rl` 
-reply.md:1723:reply.md:1625:reply.md:1506:reply.md:1370:reply.md:1214:reply.md:1036:reply.md:862:reply.md:687:`financia
-l_periods.peri
-reply.md:1725:reply.md:1626:reply.md:1509:reply.md:1373:reply.md:1218:`financial_period_id` در DTOها 
-reply.md:1726:reply.md:1627:reply.md:1510:reply.md:1374:reply.md:1219:reply.md:1040:reply.md:867:`reports.financial_per
-iod_id` 
-reply.md:1727:reply.md:1628:reply.md:1511:reply.md:1375:reply.md:1221:`financial_period_id` 
-reply.md:1728:reply.md:1629:reply.md:1512:reply.md:1377:`ingest_codal_report` یک 
-reply.md:1729:reply.md:1630:reply.md:1513:reply.md:1381:`ingest_codal_pdf` 
-reply.md:1730:reply.md:1631:reply.md:1515:`load_codal_pdf` و 
-reply.md:1731:reply.md:1632:reply.md:1516:reply.md:1383:reply.md:1228:`load_codal_pdf_from_url` پس 
-reply.md:1732:reply.md:1633:reply.md:1525:reply.md:1391:reply.md:1238:reply.md:1060:`src/ingestion/service.py::ingest_c
-odal_report` 
-reply.md:1736:reply.md:1635:reply.md:1534:load_codal_pdf و 
-reply.md:1737:reply.md:1636:reply.md:1535:reply.md:1400:reply.md:1251:load_codal_pdf_from_url را 
-reply.md:1738:reply.md:1641:reply.md:1540:reply.md:1405:reply.md:1255:reply.md:1076:`financial_period_id` | 
-reply.md:1741:reply.md:1648:reply.md:1544:reply.md:1409:reply.md:1259:reply.md:1080:reply.md:905:reply.md:731:ingest_co
-dal_report  
-reply.md:1742:reply.md:1649:reply.md:1547:reply.md:1412:reply.md:1261:ingest_codal_report 
-reply.md:1751:reply.md:1658:reply.md:1553:reply.md:1420:reply.md:1270:reply.md:1090:reply.md:916:`reports.financial_per
-iod_id` must 
-reply.md:1753:reply.md:1661:reply.md:1556:reply.md:1422:reply.md:1272:reply.md:1093:`reports.financial_period_id` 
-reply.md:1754:reply.md:1662:reply.md:1559:reply.md:1425:reply.md:1275:reply.md:1097:`financial_periods.company_id` تا 
-reply.md:1755:reply.md:1663:reply.md:1562:reply.md:1428:load_codal_pdf و 
-reply.md:1756:reply.md:1664:reply.md:1563:reply.md:1429:reply.md:1278:load_codal_pdf_from_url |
-reply.md:1757:reply.md:1665:reply.md:1564:reply.md:1432:reply.md:1280:reply.md:1101:reply.md:928:ingest_codal_report 
-reply.md:1758:reply.md:1666:reply.md:1565:reply.md:1434:ingest_codal_report 
-reply.md:1763:reply.md:1676:reply.md:1579:reply.md:1447:reply.md:1298:reply.md:1118:reply.md:945:reply.md:772:`financia
-l_periods` | 
-reply.md:1765:reply.md:1679:reply.md:1581:reply.md:1449:reply.md:1301:`ingest_codal_report` یک 
-reply.md:1768:reply.md:1681:reply.md:1583:reply.md:1451:reply.md:1303:reply.md:1124:`Report.financial_period_id` 
-reply.md:1769:reply.md:1682:reply.md:1586:reply.md:1455:reply.md:1311:reply.md:1132:`service.py::ingest_codal_report` 
-می‌رسد.
-reply.md:1770:reply.md:1691:reply.md:1595:reply.md:1465:reply.md:1321:reply.md:1143:reply.md:969:reply.md:797:`financia
-l_period_id` 
-reply.md:1774:reply.md:1693:reply.md:1597:reply.md:1469:reply.md:1325:reply.md:1148:`financial_periods.company_id` تا 
-reply.md:1775:reply.md:1694:reply.md:1598:reply.md:1472:reply.md:1329:Report.financial_period_id — 
-reply.md:1776:reply.md:1697:reply.md:1601:reply.md:1476:reply.md:1335:reply.md:1158:reply.md:982:reply.md:812:financial
-_period_id 
-reply.md:1777:reply.md:1704:reply.md:1608:reply.md:1482:reply.md:1340:reply.md:1166:ingest_codal_report()
-reply.md:1778:reply.md:1707:reply.md:1610:reply.md:1484:reply.md:1344:reply.md:1172:financial_periods, 
-reply.md:1779:reply.md:1710:reply.md:1612:reply.md:1486:reply.md:1346:reply.md:1175:`financial_periods`
-reply.md:1780:reply.md:1711:reply.md:1613:reply.md:1488:`ingest_codal_report`; the 
-reply.md:1781:reply.md:1712:reply.md:1614:reply.md:1489:reply.md:1349:reply.md:1181:ingest_codal_report / 
-reply.md:1782:reply.md:1713:reply.md:1615:reply.md:1490:reply.md:1350:reply.md:1183:`ingest_codal_report` 
-reply.md:1783:reply.md:1714:reply.md:1616:reply.md:1491:reply.md:1351:reply.md:1185:ingest_codal_report()
-reply.md:1784:reply.md:1715:reply.md:1617:reply.md:1492:reply.md:1352:reply.md:1186:reply.md:1009:reply.md:838:`ingest_
-codal_report()
-reply.md:1786:reply.md:1716:reply.md:1618:reply.md:1493:reply.md:1353:reply.md:1187:reply.md:1011:`ingest_codal_report`
-، 
-reply.md:1787:reply.md:1717:reply.md:1619:reply.md:1495:`load_codal_pdf` و 
-reply.md:1788:reply.md:1722:reply.md:1624:reply.md:1501:reply.md:1361:reply.md:1203:reply.md:1025:reply.md:854:`load_co
-dal_pdf_from_u
-reply.md:1792:reply.md:1725:reply.md:1626:reply.md:1509:reply.md:1373:reply.md:1218:`financial_period_id` در DTOها 
-reply.md:1795:reply.md:1727:reply.md:1628:reply.md:1511:reply.md:1375:reply.md:1221:`financial_period_id` 
-reply.md:1796:reply.md:1728:reply.md:1629:reply.md:1512:reply.md:1377:`ingest_codal_report` یک 
-reply.md:1797:reply.md:1729:reply.md:1630:reply.md:1513:reply.md:1381:`ingest_codal_pdf` 
-reply.md:1798:reply.md:1730:reply.md:1631:reply.md:1515:`load_codal_pdf` و 
-reply.md:1799:reply.md:1731:reply.md:1632:reply.md:1516:reply.md:1383:reply.md:1228:`load_codal_pdf_from_url` پس 
-reply.md:1802:reply.md:1736:reply.md:1635:reply.md:1534:load_codal_pdf و 
-reply.md:1803:reply.md:1737:reply.md:1636:reply.md:1535:reply.md:1400:reply.md:1251:load_codal_pdf_from_url را 
-reply.md:1804:reply.md:1738:reply.md:1641:reply.md:1540:reply.md:1405:reply.md:1255:reply.md:1076:`financial_period_id`
- | 
-reply.md:1807:reply.md:1742:reply.md:1649:reply.md:1547:reply.md:1412:reply.md:1261:ingest_codal_report 
-reply.md:1810:reply.md:1753:reply.md:1661:reply.md:1556:reply.md:1422:reply.md:1272:reply.md:1093:`reports.financial_pe
-riod_id` 
-reply.md:1811:reply.md:1754:reply.md:1662:reply.md:1559:reply.md:1425:reply.md:1275:reply.md:1097:`financial_periods.co
-mpany_id` تا 
-reply.md:1812:reply.md:1755:reply.md:1663:reply.md:1562:reply.md:1428:load_codal_pdf و 
-reply.md:1813:reply.md:1756:reply.md:1664:reply.md:1563:reply.md:1429:reply.md:1278:load_codal_pdf_from_url |
-reply.md:1814:reply.md:1757:reply.md:1665:reply.md:1564:reply.md:1432:reply.md:1280:reply.md:1101:reply.md:928:ingest_c
-odal_report 
-reply.md:1815:reply.md:1758:reply.md:1666:reply.md:1565:reply.md:1434:ingest_codal_report 
-reply.md:1818:reply.md:1765:reply.md:1679:reply.md:1581:reply.md:1449:reply.md:1301:`ingest_codal_report` یک 
-reply.md:1819:reply.md:1768:reply.md:1681:reply.md:1583:reply.md:1451:reply.md:1303:reply.md:1124:`Report.financial_per
-iod_id` 
-reply.md:1820:reply.md:1769:reply.md:1682:reply.md:1586:reply.md:1455:reply.md:1311:reply.md:1132:`service.py::ingest_c
-odal_report` 
-reply.md:1824:reply.md:1774:reply.md:1693:reply.md:1597:reply.md:1469:reply.md:1325:reply.md:1148:`financial_periods.co
-mpany_id` تا 
-reply.md:1825:reply.md:1775:reply.md:1694:reply.md:1598:reply.md:1472:reply.md:1329:Report.financial_period_id — 
-reply.md:1828:reply.md:1777:reply.md:1704:reply.md:1608:reply.md:1482:reply.md:1340:reply.md:1166:ingest_codal_report()
-reply.md:1829:reply.md:1778:reply.md:1707:reply.md:1610:reply.md:1484:reply.md:1344:reply.md:1172:financial_periods, 
-reply.md:1830:reply.md:1779:reply.md:1710:reply.md:1612:reply.md:1486:reply.md:1346:reply.md:1175:`financial_periods`
-reply.md:1831:reply.md:1780:reply.md:1711:reply.md:1613:reply.md:1488:`ingest_codal_report`; the 
-reply.md:1832:reply.md:1781:reply.md:1712:reply.md:1614:reply.md:1489:reply.md:1349:reply.md:1181:ingest_codal_report 
-/ 
-reply.md:1833:reply.md:1782:reply.md:1713:reply.md:1615:reply.md:1490:reply.md:1350:reply.md:1183:`ingest_codal_report`
- 
-reply.md:1834:reply.md:1783:reply.md:1714:reply.md:1616:reply.md:1491:reply.md:1351:reply.md:1185:ingest_codal_report()
-reply.md:1837:reply.md:1786:reply.md:1716:reply.md:1618:reply.md:1493:reply.md:1353:reply.md:1187:reply.md:1011:`ingest
-_codal_report`
-reply.md:1839:reply.md:1787:reply.md:1717:reply.md:1619:reply.md:1495:`load_codal_pdf` و 
-reply.md:1842:reply.md:1792:reply.md:1725:reply.md:1626:reply.md:1509:reply.md:1373:reply.md:1218:`financial_period_id`
- در DTOها 
-reply.md:1843:reply.md:1795:reply.md:1727:reply.md:1628:reply.md:1511:reply.md:1375:reply.md:1221:`financial_period_id`
- 
-reply.md:1844:reply.md:1796:reply.md:1728:reply.md:1629:reply.md:1512:reply.md:1377:`ingest_codal_report` یک 
-reply.md:1845:reply.md:1797:reply.md:1729:reply.md:1630:reply.md:1513:reply.md:1381:`ingest_codal_pdf` 
-reply.md:1846:reply.md:1798:reply.md:1730:reply.md:1631:reply.md:1515:`load_codal_pdf` و 
-reply.md:1847:reply.md:1799:reply.md:1731:reply.md:1632:reply.md:1516:reply.md:1383:reply.md:1228:`load_codal_pdf_from_
-url` پس 
-reply.md:1848:reply.md:1802:reply.md:1736:reply.md:1635:reply.md:1534:load_codal_pdf و 
-reply.md:1849:reply.md:1803:reply.md:1737:reply.md:1636:reply.md:1535:reply.md:1400:reply.md:1251:load_codal_pdf_from_u
-rl را 
-reply.md:1850:reply.md:1804:reply.md:1738:reply.md:1641:reply.md:1540:reply.md:1405:reply.md:1255:reply.md:1076:`financ
-ial_period_id`
-reply.md:1852:reply.md:1807:reply.md:1742:reply.md:1649:reply.md:1547:reply.md:1412:reply.md:1261:ingest_codal_report 
-reply.md:1855:reply.md:1811:reply.md:1754:reply.md:1662:reply.md:1559:reply.md:1425:reply.md:1275:reply.md:1097:`financ
-ial_periods.co
-reply.md:1857:reply.md:1812:reply.md:1755:reply.md:1663:reply.md:1562:reply.md:1428:load_codal_pdf و 
-reply.md:1858:reply.md:1813:reply.md:1756:reply.md:1664:reply.md:1563:reply.md:1429:reply.md:1278:load_codal_pdf_from_u
-rl |
-reply.md:1861:reply.md:1815:reply.md:1758:reply.md:1666:reply.md:1565:reply.md:1434:ingest_codal_report 
-reply.md:1862:reply.md:1818:reply.md:1765:reply.md:1679:reply.md:1581:reply.md:1449:reply.md:1301:`ingest_codal_report`
- یک 
-reply.md:1867:reply.md:1824:reply.md:1774:reply.md:1693:reply.md:1597:reply.md:1469:reply.md:1325:reply.md:1148:`financ
-ial_periods.co
-reply.md:1869:reply.md:1825:reply.md:1775:reply.md:1694:reply.md:1598:reply.md:1472:reply.md:1329:Report.financial_peri
-od_id — 
-reply.md:1870:reply.md:1828:reply.md:1777:reply.md:1704:reply.md:1608:reply.md:1482:reply.md:1340:reply.md:1166:ingest_
-codal_report()
-reply.md:1871:reply.md:1829:reply.md:1778:reply.md:1707:reply.md:1610:reply.md:1484:reply.md:1344:reply.md:1172:financi
-al_periods, 
-reply.md:1872:reply.md:1830:reply.md:1779:reply.md:1710:reply.md:1612:reply.md:1486:reply.md:1346:reply.md:1175:`financ
-ial_periods`
-reply.md:1873:reply.md:1831:reply.md:1780:reply.md:1711:reply.md:1613:reply.md:1488:`ingest_codal_report`; the 
-reply.md:1874:reply.md:1832:reply.md:1781:reply.md:1712:reply.md:1614:reply.md:1489:reply.md:1349:reply.md:1181:ingest_
-codal_report 
-reply.md:1876:reply.md:1833:reply.md:1782:reply.md:1713:reply.md:1615:reply.md:1490:reply.md:1350:reply.md:1183:`ingest
-_codal_report`
-reply.md:1878:reply.md:1834:reply.md:1783:reply.md:1714:reply.md:1616:reply.md:1491:reply.md:1351:reply.md:1185:ingest_
-codal_report()
-reply.md:1881:reply.md:1839:reply.md:1787:reply.md:1717:reply.md:1619:reply.md:1495:`load_codal_pdf` و 
-reply.md:1882:reply.md:1842:reply.md:1792:reply.md:1725:reply.md:1626:reply.md:1509:reply.md:1373:reply.md:1218:`financ
-ial_period_id`
-reply.md:1884:reply.md:1843:reply.md:1795:reply.md:1727:reply.md:1628:reply.md:1511:reply.md:1375:reply.md:1221:`financ
-ial_period_id`
-reply.md:1886:reply.md:1844:reply.md:1796:reply.md:1728:reply.md:1629:reply.md:1512:reply.md:1377:`ingest_codal_report`
- یک 
-reply.md:1887:reply.md:1845:reply.md:1797:reply.md:1729:reply.md:1630:reply.md:1513:reply.md:1381:`ingest_codal_pdf` 
-reply.md:1888:reply.md:1846:reply.md:1798:reply.md:1730:reply.md:1631:reply.md:1515:`load_codal_pdf` و 
-reply.md:1889:reply.md:1847:reply.md:1799:reply.md:1731:reply.md:1632:reply.md:1516:reply.md:1383:reply.md:1228:`load_c
-odal_pdf_from_
-reply.md:1891:reply.md:1848:reply.md:1802:reply.md:1736:reply.md:1635:reply.md:1534:load_codal_pdf و 
-reply.md:1892:reply.md:1849:reply.md:1803:reply.md:1737:reply.md:1636:reply.md:1535:reply.md:1400:reply.md:1251:load_co
-dal_pdf_from_u
-reply.md:1896:reply.md:1852:reply.md:1807:reply.md:1742:reply.md:1649:reply.md:1547:reply.md:1412:reply.md:1261:ingest_
-codal_report 
-reply.md:1899:reply.md:1857:reply.md:1812:reply.md:1755:reply.md:1663:reply.md:1562:reply.md:1428:load_codal_pdf و 
-reply.md:1900:reply.md:1858:reply.md:1813:reply.md:1756:reply.md:1664:reply.md:1563:reply.md:1429:reply.md:1278:load_co
-dal_pdf_from_u
-reply.md:1902:reply.md:1861:reply.md:1815:reply.md:1758:reply.md:1666:reply.md:1565:reply.md:1434:ingest_codal_report 
-reply.md:1903:reply.md:1862:reply.md:1818:reply.md:1765:reply.md:1679:reply.md:1581:reply.md:1449:reply.md:1301:`ingest
-_codal_report`
-reply.md:1915:reply.md:1873:reply.md:1831:reply.md:1780:reply.md:1711:reply.md:1613:reply.md:1488:`ingest_codal_report`
-; the 
-reply.md:1922:reply.md:1881:reply.md:1839:reply.md:1787:reply.md:1717:reply.md:1619:reply.md:1495:`load_codal_pdf` و 
-reply.md:1927:reply.md:1886:reply.md:1844:reply.md:1796:reply.md:1728:reply.md:1629:reply.md:1512:reply.md:1377:`ingest
-_codal_report`
-reply.md:1929:reply.md:1887:reply.md:1845:reply.md:1797:reply.md:1729:reply.md:1630:reply.md:1513:reply.md:1381:`ingest
-_codal_pdf` 
-reply.md:1930:reply.md:1888:reply.md:1846:reply.md:1798:reply.md:1730:reply.md:1631:reply.md:1515:`load_codal_pdf` و 
-reply.md:1933:reply.md:1891:reply.md:1848:reply.md:1802:reply.md:1736:reply.md:1635:reply.md:1534:load_codal_pdf و 
-reply.md:1938:reply.md:1899:reply.md:1857:reply.md:1812:reply.md:1755:reply.md:1663:reply.md:1562:reply.md:1428:load_co
-dal_pdf و 
-reply.md:1941:reply.md:1902:reply.md:1861:reply.md:1815:reply.md:1758:reply.md:1666:reply.md:1565:reply.md:1434:ingest_
-codal_report 
-reply.md:1944:reply.md:1915:reply.md:1873:reply.md:1831:reply.md:1780:reply.md:1711:reply.md:1613:reply.md:1488:`ingest
-_codal_report`
-reply.md:1946:reply.md:1922:reply.md:1881:reply.md:1839:reply.md:1787:reply.md:1717:reply.md:1619:reply.md:1495:`load_c
-odal_pdf` و 
-reply.md:1951:reply.md:1930:reply.md:1888:reply.md:1846:reply.md:1798:reply.md:1730:reply.md:1631:reply.md:1515:`load_c
-odal_pdf` و 
-reply.md:1952:reply.md:1933:reply.md:1891:reply.md:1848:reply.md:1802:reply.md:1736:reply.md:1635:reply.md:1534:load_co
-dal_pdf و 
-STAGE7_MASTER_WORKING_PACKET.md:95:  | 1 — دادهٔ منبع | دادهٔ مالی ذخیره‌شده؛ `src/forecast/queries.py` آن را با 
-`Session` می‌خواند | `ingest_codal_report` در `src/ingestion/service.py` ورودی منبع را می‌نویسد؛ خروجی تحلیلی تولید 
-نمی‌کند | ingestion caller باید Session بدهد؛ سرویس در مسیر نوشتن commit/rollback می‌کند و آن را نمی‌بندد | Stage 5 
-queryها می‌توانند facts را بخوانند؛ زنجیرهٔ کامل از ingestion تا مراحل بعد اثبات نشده |
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261119013343
+Username: DESKTOP-QGC44BJ\Papa
+RunAs User: DESKTOP-QGC44BJ\Papa
+Configuration Name: 
+Machine: DESKTOP-QGC44BJ (Microsoft Windows NT 10.0.19045.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 5020
+PSVersion: 5.1.19041.6456
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.19041.6456
+BuildVersion: 10.0.19041.6456
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is D:\Winprojects\analyzer\reply.md
+PS D:\Winprojects\analyzer>
+(analyzer) cls
+PS D:\Winprojects\analyzer>
+(analyzer) python src/scripts/excel_template_annotation_audit.py --max-color-cells 1 excel/parsian_periodic.xlsx
+  L228 bottom=thin
+  A232 bottom=thin
+  B232 bottom=thin
+  C232 bottom=thin
+  D232 bottom=thin
+  E232 bottom=thin
+  F232 bottom=thin
+  G232 bottom=thin
+  H232 bottom=thin
+  I232 bottom=thin
+  J232 bottom=thin
+  K232 bottom=thin
+  L232 bottom=thin
+  A235 top=medium
+  A235 bottom=medium
+  A235 left=medium
+  A235 right=medium
+  B235 top=medium
+  B235 bottom=medium
+  C235 top=medium
+  C235 bottom=medium
+  D235 top=medium
+  D235 bottom=medium
+  E235 top=medium
+  E235 bottom=medium
+  F235 top=medium
+  F235 bottom=medium
+  G235 top=medium
+  G235 bottom=medium
+  H235 top=medium
+  H235 bottom=medium
+  I235 top=medium
+  I235 bottom=medium
+  J235 top=medium
+  J235 bottom=medium
+  K235 top=medium
+  K235 bottom=medium
+  K235 right=medium
+  A238 top=medium
+  A238 bottom=medium
+  A238 left=medium
+  A238 right=medium
+  B238 top=medium
+  B238 bottom=medium
+  B238 left=medium
+  B238 right=medium
+  C238 top=medium
+  C238 bottom=medium
+  C238 left=medium
+  C238 right=medium
+  D238 top=medium
+  D238 bottom=medium
+  D238 left=medium
+  D238 right=medium
+  E238 top=medium
+  E238 bottom=medium
+  E238 left=medium
+  E238 right=medium
+  F238 top=medium
+  F238 bottom=medium
+  F238 left=medium
+  F238 right=medium
+  G238 top=medium
+  G238 bottom=medium
+  G238 left=medium
+  G238 right=medium
+  H238 top=medium
+  H238 bottom=medium
+  H238 left=medium
+  H238 right=medium
+  I238 top=medium
+  I238 bottom=medium
+  I238 left=medium
+  I238 right=medium
+  J238 top=medium
+  J238 bottom=medium
+  J238 right=medium
+  K238 top=medium
+  K238 bottom=medium
+  K238 left=medium
+  K238 right=medium
+  A239 bottom=medium
+  A239 left=medium
+  A239 right=medium
+  B239 top=medium
+  B239 bottom=medium
+  B239 left=medium
+  B239 right=medium
+  C239 top=medium
+  C239 bottom=medium
+  C239 right=medium
+  D239 top=medium
+  D239 bottom=medium
+  D239 left=medium
+  D239 right=medium
+  E239 top=medium
+  E239 bottom=medium
+  E239 right=medium
+  F239 top=medium
+  F239 bottom=medium
+  F239 left=medium
+  F239 right=medium
+  G239 top=medium
+  G239 bottom=medium
+  G239 right=medium
+  H239 top=medium
+  H239 bottom=medium
+  H239 left=medium
+  H239 right=medium
+  I239 top=medium
+  I239 bottom=medium
+  I239 right=medium
+  J239 top=medium
+  J239 bottom=medium
+  J239 right=medium
+  K239 top=medium
+  K239 bottom=medium
+  K239 right=medium
+  A240 top=medium
+  A240 bottom=medium
+  A240 left=medium
+  A240 right=medium
+  B240 top=medium
+  B240 bottom=medium
+  B240 left=medium
+  B240 right=medium
+  C240 top=medium
+  C240 bottom=medium
+  C240 left=medium
+  C240 right=medium
+  D240 top=medium
+  D240 bottom=medium
+  D240 left=medium
+  D240 right=medium
+  E240 top=medium
+  E240 bottom=medium
+  E240 left=medium
+  E240 right=medium
+  F240 top=medium
+  F240 bottom=medium
+  F240 left=medium
+  F240 right=medium
+  G240 top=medium
+  G240 bottom=medium
+  G240 left=medium
+  G240 right=medium
+  H240 top=medium
+  H240 bottom=medium
+  H240 left=medium
+  H240 right=medium
+  I240 top=medium
+  I240 bottom=medium
+  I240 left=medium
+  I240 right=medium
+  J240 top=medium
+  J240 bottom=medium
+  J240 right=medium
+  K240 top=medium
+  K240 bottom=medium
+  K240 left=medium
+  K240 right=medium
+  A241 top=medium
+  A241 bottom=medium
+  A241 left=medium
+  A241 right=medium
+  B241 top=medium
+  B241 bottom=medium
+  B241 left=medium
+  B241 right=medium
+  C241 top=medium
+  C241 bottom=medium
+  C241 left=medium
+  C241 right=medium
+  D241 top=medium
+  D241 bottom=medium
+  D241 left=medium
+  D241 right=medium
+  E241 top=medium
+  E241 bottom=medium
+  E241 left=medium
+  E241 right=medium
+  F241 top=medium
+  F241 bottom=medium
+  F241 left=medium
+  F241 right=medium
+  G241 top=medium
+  G241 bottom=medium
+  G241 left=medium
+  G241 right=medium
+  H241 top=medium
+  H241 bottom=medium
+  H241 left=medium
+  H241 right=medium
+  I241 top=medium
+  I241 bottom=medium
+  I241 left=medium
+  I241 right=medium
+  J241 top=medium
+  J241 bottom=medium
+  J241 right=medium
+  K241 top=medium
+  K241 bottom=medium
+  K241 left=medium
+  K241 right=medium
+  A242 top=medium
+  A242 bottom=medium
+  A242 left=medium
+  A242 right=medium
+  B242 top=medium
+  B242 bottom=medium
+  B242 left=medium
+  B242 right=medium
+  C242 top=medium
+  C242 bottom=medium
+  C242 left=medium
+  C242 right=medium
+  D242 top=medium
+  D242 bottom=medium
+  D242 left=medium
+  D242 right=medium
+  E242 top=medium
+  E242 bottom=medium
+  E242 left=medium
+  E242 right=medium
+  F242 top=medium
+  F242 bottom=medium
+  F242 left=medium
+  F242 right=medium
+  G242 top=medium
+  G242 bottom=medium
+  G242 left=medium
+  G242 right=medium
+  H242 top=medium
+  H242 bottom=medium
+  H242 left=medium
+  H242 right=medium
+  I242 top=medium
+  I242 bottom=medium
+  I242 left=medium
+  I242 right=medium
+  J242 top=medium
+  J242 bottom=medium
+  J242 right=medium
+  K242 top=medium
+  K242 bottom=medium
+  K242 left=medium
+  K242 right=medium
+  A243 top=medium
+  A243 bottom=medium
+  A243 left=medium
+  A243 right=medium
+  B243 top=medium
+  B243 bottom=medium
+  B243 left=medium
+  B243 right=medium
+  C243 top=medium
+  C243 bottom=medium
+  C243 left=medium
+  C243 right=medium
+  D243 top=medium
+  D243 bottom=medium
+  D243 left=medium
+  D243 right=medium
+  E243 top=medium
+  E243 bottom=medium
+  E243 left=medium
+  E243 right=medium
+  F243 top=medium
+  F243 bottom=medium
+  F243 left=medium
+  F243 right=medium
+  G243 top=medium
+  G243 bottom=medium
+  G243 left=medium
+  G243 right=medium
+  H243 top=medium
+  H243 bottom=medium
+  H243 left=medium
+  H243 right=medium
+  I243 top=medium
+  I243 bottom=medium
+  I243 left=medium
+  I243 right=medium
+  J243 top=medium
+  J243 bottom=medium
+  J243 right=medium
+  K243 top=medium
+  K243 bottom=medium
+  K243 left=medium
+  K243 right=medium
+  A244 top=medium
+  A244 bottom=medium
+  A244 left=medium
+  A244 right=medium
+  B244 top=medium
+  B244 bottom=medium
+  B244 left=medium
+  B244 right=medium
+  C244 top=medium
+  C244 bottom=medium
+  C244 left=medium
+  C244 right=medium
+  D244 top=medium
+  D244 bottom=medium
+  D244 left=medium
+  D244 right=medium
+  E244 top=medium
+  E244 bottom=medium
+  E244 left=medium
+  E244 right=medium
+  F244 top=medium
+  F244 bottom=medium
+  F244 left=medium
+  F244 right=medium
+  G244 top=medium
+  G244 bottom=medium
+  G244 left=medium
+  G244 right=medium
+  H244 top=medium
+  H244 bottom=medium
+  H244 left=medium
+  H244 right=medium
+  I244 top=medium
+  I244 bottom=medium
+  I244 left=medium
+  I244 right=medium
+  J244 top=medium
+  J244 bottom=medium
+  J244 right=medium
+  K244 top=medium
+  K244 bottom=medium
+  K244 left=medium
+  K244 right=medium
+  A245 top=medium
+  A245 bottom=medium
+  A245 left=medium
+  A245 right=medium
+  B245 top=medium
+  B245 bottom=medium
+  B245 left=medium
+  B245 right=medium
+  C245 top=medium
+  C245 bottom=medium
+  C245 left=medium
+  C245 right=medium
+  D245 top=medium
+  D245 bottom=medium
+  D245 left=medium
+  D245 right=medium
+  E245 top=medium
+  E245 bottom=medium
+  E245 left=medium
+  E245 right=medium
+  F245 top=medium
+  F245 bottom=medium
+  F245 left=medium
+  F245 right=medium
+  G245 top=medium
+  G245 bottom=medium
+  G245 left=medium
+  G245 right=medium
+  H245 top=medium
+  H245 bottom=medium
+  H245 left=medium
+  H245 right=medium
+  I245 top=medium
+  I245 bottom=medium
+  I245 left=medium
+  I245 right=medium
+  J245 top=medium
+  J245 bottom=medium
+  J245 right=medium
+  K245 top=medium
+  K245 bottom=medium
+  K245 left=medium
+  K245 right=medium
+  A246 top=medium
+  A246 bottom=medium
+  A246 left=medium
+  A246 right=medium
+  B246 top=medium
+  B246 bottom=medium
+  B246 left=medium
+  B246 right=medium
+  C246 top=medium
+  C246 bottom=medium
+  C246 left=medium
+  C246 right=medium
+  D246 top=medium
+  D246 bottom=medium
+  D246 left=medium
+  D246 right=medium
+  E246 top=medium
+  E246 bottom=medium
+  E246 left=medium
+  E246 right=medium
+  F246 top=medium
+  F246 bottom=medium
+  F246 left=medium
+  F246 right=medium
+  G246 top=medium
+  G246 bottom=medium
+  G246 left=medium
+  G246 right=medium
+  H246 top=medium
+  H246 bottom=medium
+  H246 left=medium
+  H246 right=medium
+  I246 top=medium
+  I246 bottom=medium
+  I246 left=medium
+  I246 right=medium
+  J246 top=medium
+  J246 bottom=medium
+  J246 right=medium
+  K246 top=medium
+  K246 bottom=medium
+  K246 left=medium
+  K246 right=medium
+  A247 top=medium
+  A247 bottom=medium
+  A247 left=medium
+  A247 right=medium
+  B247 top=medium
+  B247 bottom=medium
+  B247 left=medium
+  B247 right=medium
+  C247 top=medium
+  C247 bottom=medium
+  C247 left=medium
+  C247 right=medium
+  D247 top=medium
+  D247 bottom=medium
+  D247 left=medium
+  D247 right=medium
+  E247 top=medium
+  E247 bottom=medium
+  E247 left=medium
+  E247 right=medium
+  F247 top=medium
+  F247 bottom=medium
+  F247 left=medium
+  F247 right=medium
+  G247 top=medium
+  G247 bottom=medium
+  G247 left=medium
+  G247 right=medium
+  H247 top=medium
+  H247 bottom=medium
+  H247 left=medium
+  H247 right=medium
+  I247 top=medium
+  I247 bottom=medium
+  I247 left=medium
+  I247 right=medium
+  J247 top=medium
+  J247 bottom=medium
+  J247 right=medium
+  K247 top=medium
+  K247 bottom=medium
+  K247 left=medium
+  K247 right=medium
+  A248 top=medium
+  A248 bottom=medium
+  A248 left=medium
+  A248 right=medium
+  B248 top=medium
+  B248 bottom=medium
+  B248 left=medium
+  B248 right=medium
+  C248 top=medium
+  C248 bottom=medium
+  C248 left=medium
+  C248 right=medium
+  D248 top=medium
+  D248 bottom=medium
+  D248 left=medium
+  D248 right=medium
+  E248 top=medium
+  E248 bottom=medium
+  E248 left=medium
+  E248 right=medium
+  F248 top=medium
+  F248 bottom=medium
+  F248 left=medium
+  F248 right=medium
+  G248 top=medium
+  G248 bottom=medium
+  G248 left=medium
+  G248 right=medium
+  H248 top=medium
+  H248 bottom=medium
+  H248 left=medium
+  H248 right=medium
+  I248 top=medium
+  I248 bottom=medium
+  I248 left=medium
+  I248 right=medium
+  J248 top=medium
+  J248 bottom=medium
+  J248 right=medium
+  K248 top=medium
+  K248 bottom=medium
+  K248 left=medium
+  K248 right=medium
+  A249 top=medium
+  A249 bottom=medium
+  A249 left=medium
+  A249 right=medium
+  B249 top=medium
+  B249 bottom=medium
+  B249 left=medium
+  B249 right=medium
+  C249 top=medium
+  C249 bottom=medium
+  C249 left=medium
+  C249 right=medium
+  D249 top=medium
+  D249 bottom=medium
+  D249 left=medium
+  D249 right=medium
+  E249 top=medium
+  E249 bottom=medium
+  E249 left=medium
+  E249 right=medium
+  F249 top=medium
+  F249 bottom=medium
+  F249 left=medium
+  F249 right=medium
+  G249 top=medium
+  G249 bottom=medium
+  G249 left=medium
+  G249 right=medium
+  H249 top=medium
+  H249 bottom=medium
+  H249 left=medium
+  H249 right=medium
+  I249 top=medium
+  I249 bottom=medium
+  I249 left=medium
+  I249 right=medium
+  J249 top=medium
+  J249 bottom=medium
+  J249 right=medium
+  K249 top=medium
+  K249 bottom=medium
+  K249 left=medium
+  K249 right=medium
+  A250 top=medium
+  A250 bottom=medium
+  A250 left=medium
+  A250 right=medium
+  B250 top=medium
+  B250 bottom=medium
+  B250 left=medium
+  B250 right=medium
+  C250 top=medium
+  C250 bottom=medium
+  C250 left=medium
+  C250 right=medium
+  D250 top=medium
+  D250 bottom=medium
+  D250 left=medium
+  D250 right=medium
+  E250 top=medium
+  E250 bottom=medium
+  E250 left=medium
+  E250 right=medium
+  F250 top=medium
+  F250 bottom=medium
+  F250 left=medium
+  F250 right=medium
+  G250 top=medium
+  G250 bottom=medium
+  G250 left=medium
+  G250 right=medium
+  H250 top=medium
+  H250 bottom=medium
+  H250 left=medium
+  H250 right=medium
+  I250 top=medium
+  I250 bottom=medium
+  I250 left=medium
+  I250 right=medium
+  J250 top=medium
+  J250 bottom=medium
+  J250 right=medium
+  K250 top=medium
+  K250 bottom=medium
+  K250 left=medium
+  K250 right=medium
+  A251 top=medium
+  A251 bottom=medium
+  A251 left=medium
+  A251 right=medium
+  B251 top=medium
+  B251 bottom=medium
+  B251 left=medium
+  B251 right=medium
+  C251 top=medium
+  C251 bottom=medium
+  C251 left=medium
+  C251 right=medium
+  D251 top=medium
+  D251 bottom=medium
+  D251 left=medium
+  D251 right=medium
+  E251 top=medium
+  E251 bottom=medium
+  E251 left=medium
+  E251 right=medium
+  F251 top=medium
+  F251 bottom=medium
+  F251 left=medium
+  F251 right=medium
+  G251 top=medium
+  G251 bottom=medium
+  G251 left=medium
+  G251 right=medium
+  H251 top=medium
+  H251 bottom=medium
+  H251 left=medium
+  H251 right=medium
+  I251 top=medium
+  I251 bottom=medium
+  I251 left=medium
+  I251 right=medium
+  J251 top=medium
+  J251 bottom=medium
+  J251 right=medium
+  K251 top=medium
+  K251 bottom=medium
+  K251 left=medium
+  K251 right=medium
+  A252 top=medium
+  A252 bottom=medium
+  A252 left=medium
+  A252 right=medium
+  B252 top=medium
+  B252 bottom=medium
+  B252 left=medium
+  B252 right=medium
+  C252 top=medium
+  C252 bottom=medium
+  C252 left=medium
+  C252 right=medium
+  D252 top=medium
+  D252 bottom=medium
+  D252 left=medium
+  D252 right=medium
+  E252 top=medium
+  E252 bottom=medium
+  E252 left=medium
+  E252 right=medium
+  F252 top=medium
+  F252 bottom=medium
+  F252 left=medium
+  F252 right=medium
+  G252 top=medium
+  G252 bottom=medium
+  G252 left=medium
+  G252 right=medium
+  H252 top=medium
+  H252 bottom=medium
+  H252 left=medium
+  H252 right=medium
+  I252 top=medium
+  I252 bottom=medium
+  I252 left=medium
+  I252 right=medium
+  J252 top=medium
+  J252 bottom=medium
+  J252 right=medium
+  K252 top=medium
+  K252 bottom=medium
+  K252 left=medium
+  K252 right=medium
+  A253 top=medium
+  A253 bottom=medium
+  A253 left=medium
+  A253 right=medium
+  B253 top=medium
+  B253 bottom=medium
+  B253 left=medium
+  B253 right=medium
+  C253 top=medium
+  C253 bottom=medium
+  C253 left=medium
+  C253 right=medium
+  D253 top=medium
+  D253 bottom=medium
+  D253 left=medium
+  D253 right=medium
+  E253 top=medium
+  E253 bottom=medium
+  E253 left=medium
+  E253 right=medium
+  F253 top=medium
+  F253 bottom=medium
+  F253 left=medium
+  F253 right=medium
+  G253 top=medium
+  G253 bottom=medium
+  G253 left=medium
+  G253 right=medium
+  H253 top=medium
+  H253 bottom=medium
+  H253 left=medium
+  H253 right=medium
+  I253 top=medium
+  I253 bottom=medium
+  I253 left=medium
+  I253 right=medium
+  J253 top=medium
+  J253 bottom=medium
+  J253 right=medium
+  K253 top=medium
+  K253 bottom=medium
+  K253 left=medium
+  K253 right=medium
+  A254 bottom=medium
+  A254 left=medium
+  A254 right=medium
+  B254 bottom=medium
+  B254 left=medium
+  B254 right=medium
+  C254 bottom=medium
+  C254 left=medium
+  C254 right=medium
+  D254 bottom=medium
+  D254 left=medium
+  D254 right=medium
+  E254 bottom=medium
+  E254 left=medium
+  E254 right=medium
+  F254 bottom=medium
+  F254 left=medium
+  F254 right=medium
+  G254 bottom=medium
+  G254 left=medium
+  G254 right=medium
+  H254 bottom=medium
+  H254 left=medium
+  H254 right=medium
+  I254 bottom=medium
+  I254 left=medium
+  I254 right=medium
+  J254 top=medium
+  J254 bottom=medium
+  J254 left=medium
+  J254 right=medium
+  K254 top=medium
+  K254 bottom=medium
+  K254 left=medium
+  K254 right=medium
+  A256 top=medium
+  A256 bottom=medium
+  A256 left=medium
+  A256 right=medium
+  B256 top=medium
+  B256 bottom=medium
+  B256 right=medium
+  C256 top=medium
+  C256 bottom=medium
+  C256 left=medium
+  C256 right=medium
+  D256 top=medium
+  D256 bottom=medium
+  E256 top=medium
+  E256 bottom=medium
+  F256 top=medium
+  F256 bottom=medium
+  G256 top=medium
+  G256 bottom=medium
+  H256 top=medium
+  H256 bottom=medium
+  I256 top=medium
+  I256 bottom=medium
+  I256 right=medium
+  A259 top=medium
+  A259 bottom=medium
+  A259 left=medium
+  A259 right=medium
+  B259 top=medium
+  B259 bottom=medium
+  B259 right=medium
+  C259 top=medium
+  C259 bottom=medium
+  C259 left=medium
+  C259 right=medium
+  D259 top=medium
+  D259 bottom=medium
+  E259 top=medium
+  E259 bottom=medium
+  F259 top=medium
+  F259 bottom=medium
+  G259 top=medium
+  G259 bottom=medium
+  H259 top=medium
+  H259 bottom=medium
+  I259 top=medium
+  I259 bottom=medium
+  I259 right=medium
+  A262 top=medium
+  A262 bottom=medium
+  A262 left=medium
+  A262 right=medium
+  B262 top=medium
+  B262 bottom=medium
+  B262 right=medium
+  C262 top=medium
+  C262 bottom=medium
+  C262 left=medium
+  C262 right=medium
+  D262 top=medium
+  D262 bottom=medium
+  E262 top=medium
+  E262 bottom=medium
+  F262 top=medium
+  F262 bottom=medium
+  G262 top=medium
+  G262 bottom=medium
+  H262 top=medium
+  H262 bottom=medium
+  I262 top=medium
+  I262 bottom=medium
+  I262 right=medium
+  A266 top=medium
+  A266 bottom=medium
+  A266 left=medium
+  A266 right=medium
+  B266 top=medium
+  B266 bottom=medium
+  B266 left=medium
+  B266 right=medium
+  C266 top=medium
+  C266 bottom=medium
+  C266 right=medium
+  D266 top=medium
+  D266 bottom=medium
+  D266 right=medium
+  E266 top=medium
+  E266 bottom=medium
+  E266 right=medium
+  F266 top=medium
+  F266 bottom=medium
+  F266 left=medium
+  F266 right=medium
+  A267 bottom=medium
+  A267 left=medium
+  A267 right=medium
+  B267 top=medium
+  B267 bottom=medium
+  B267 left=medium
+  B267 right=medium
+  C267 top=medium
+  C267 bottom=medium
+  C267 left=medium
+  C267 right=medium
+  D267 top=medium
+  D267 bottom=medium
+  D267 right=medium
+  E267 top=medium
+  E267 bottom=medium
+  E267 left=medium
+  E267 right=medium
+  F267 bottom=medium
+  F267 left=medium
+  F267 right=medium
+  A268 top=medium
+  A268 bottom=medium
+  A268 left=medium
+  A268 right=medium
+  B268 top=medium
+  B268 bottom=medium
+  B268 left=medium
+  B268 right=medium
+  C268 top=medium
+  C268 bottom=medium
+  C268 left=medium
+  C268 right=medium
+  D268 top=medium
+  D268 bottom=medium
+  D268 right=medium
+  E268 top=medium
+  E268 bottom=medium
+  E268 left=medium
+  E268 right=medium
+  F268 top=medium
+  F268 bottom=medium
+  F268 left=medium
+  F268 right=medium
+  A269 top=medium
+  A269 bottom=medium
+  A269 left=medium
+  A269 right=medium
+  B269 top=medium
+  B269 bottom=medium
+  B269 left=medium
+  B269 right=medium
+  C269 top=medium
+  C269 bottom=medium
+  C269 left=medium
+  C269 right=medium
+  D269 top=medium
+  D269 bottom=medium
+  D269 right=medium
+  E269 top=medium
+  E269 bottom=medium
+  E269 left=medium
+  E269 right=medium
+  F269 top=medium
+  F269 bottom=medium
+  F269 left=medium
+  F269 right=medium
+  A270 top=medium
+  A270 bottom=medium
+  A270 left=medium
+  A270 right=medium
+  B270 top=medium
+  B270 bottom=medium
+  B270 left=medium
+  B270 right=medium
+  C270 top=medium
+  C270 bottom=medium
+  C270 left=medium
+  C270 right=medium
+  D270 top=medium
+  D270 bottom=medium
+  D270 right=medium
+  E270 top=medium
+  E270 bottom=medium
+  E270 left=medium
+  E270 right=medium
+  F270 top=medium
+  F270 bottom=medium
+  F270 left=medium
+  F270 right=medium
+  A271 top=medium
+  A271 bottom=medium
+  A271 left=medium
+  A271 right=medium
+  B271 top=medium
+  B271 bottom=medium
+  B271 left=medium
+  B271 right=medium
+  C271 top=medium
+  C271 bottom=medium
+  C271 left=medium
+  C271 right=medium
+  D271 top=medium
+  D271 bottom=medium
+  D271 right=medium
+  E271 top=medium
+  E271 bottom=medium
+  E271 left=medium
+  E271 right=medium
+  F271 top=medium
+  F271 bottom=medium
+  F271 left=medium
+  F271 right=medium
+  A272 top=medium
+  A272 bottom=medium
+  A272 left=medium
+  A272 right=medium
+  B272 top=medium
+  B272 bottom=medium
+  B272 left=medium
+  B272 right=medium
+  C272 top=medium
+  C272 bottom=medium
+  C272 left=medium
+  C272 right=medium
+  D272 top=medium
+  D272 bottom=medium
+  D272 right=medium
+  E272 top=medium
+  E272 bottom=medium
+  E272 left=medium
+  E272 right=medium
+  F272 top=medium
+  F272 bottom=medium
+  F272 left=medium
+  F272 right=medium
+  A273 top=medium
+  A273 bottom=medium
+  A273 left=medium
+  A273 right=medium
+  B273 top=medium
+  B273 bottom=medium
+  B273 left=medium
+  B273 right=medium
+  C273 top=medium
+  C273 bottom=medium
+  C273 left=medium
+  C273 right=medium
+  D273 top=medium
+  D273 bottom=medium
+  D273 right=medium
+  E273 top=medium
+  E273 bottom=medium
+  E273 left=medium
+  E273 right=medium
+  F273 top=medium
+  F273 bottom=medium
+  F273 left=medium
+  F273 right=medium
+  A274 top=medium
+  A274 bottom=medium
+  A274 left=medium
+  A274 right=medium
+  B274 top=medium
+  B274 bottom=medium
+  B274 left=medium
+  B274 right=medium
+  C274 top=medium
+  C274 bottom=medium
+  C274 left=medium
+  C274 right=medium
+  D274 top=medium
+  D274 bottom=medium
+  D274 right=medium
+  E274 top=medium
+  E274 bottom=medium
+  E274 left=medium
+  E274 right=medium
+  F274 top=medium
+  F274 bottom=medium
+  F274 left=medium
+  F274 right=medium
+  A275 top=medium
+  A275 bottom=medium
+  A275 left=medium
+  A275 right=medium
+  B275 top=medium
+  B275 bottom=medium
+  B275 left=medium
+  B275 right=medium
+  C275 top=medium
+  C275 bottom=medium
+  C275 left=medium
+  C275 right=medium
+  D275 top=medium
+  D275 bottom=medium
+  D275 right=medium
+  E275 top=medium
+  E275 bottom=medium
+  E275 left=medium
+  E275 right=medium
+  F275 top=medium
+  F275 bottom=medium
+  F275 left=medium
+  F275 right=medium
+  A276 bottom=medium
+  A276 left=medium
+  A276 right=medium
+  B276 bottom=medium
+  B276 left=medium
+  B276 right=medium
+  C276 bottom=medium
+  C276 left=medium
+  C276 right=medium
+  D276 top=medium
+  D276 bottom=medium
+  D276 left=medium
+  D276 right=medium
+  E276 top=medium
+  E276 bottom=medium
+  F276 top=medium
+  F276 bottom=medium
+  G276 top=medium
+  G276 bottom=medium
+  H276 top=medium
+  H276 bottom=medium
+  I276 top=medium
+  I276 bottom=medium
+  J276 top=medium
+  J276 bottom=medium
+  J276 right=medium
+  A279 top=medium
+  A279 bottom=medium
+  A279 left=medium
+  A279 right=medium
+  B279 top=medium
+  B279 bottom=medium
+  B279 left=medium
+  B279 right=medium
+  C279 top=medium
+  C279 bottom=medium
+  C279 right=medium
+  D279 top=medium
+  D279 bottom=medium
+  D279 left=medium
+  D279 right=medium
+  E279 top=medium
+  E279 bottom=medium
+  E279 left=medium
+  E279 right=medium
+  F279 top=medium
+  F279 bottom=medium
+  F279 left=medium
+  F279 right=medium
+  A280 top=medium
+  A280 bottom=medium
+  A280 left=medium
+  A280 right=medium
+  B280 top=medium
+  B280 bottom=medium
+  B280 left=medium
+  B280 right=medium
+  C280 top=medium
+  C280 bottom=medium
+  C280 right=medium
+  D280 top=medium
+  D280 bottom=medium
+  D280 left=medium
+  D280 right=medium
+  E280 top=medium
+  E280 bottom=medium
+  E280 left=medium
+  E280 right=medium
+  F280 top=medium
+  F280 bottom=medium
+  F280 left=medium
+  F280 right=medium
+  A281 top=medium
+  A281 bottom=medium
+  A281 left=medium
+  A281 right=medium
+  B281 top=medium
+  B281 bottom=medium
+  B281 left=medium
+  B281 right=medium
+  C281 top=medium
+  C281 bottom=medium
+  C281 right=medium
+  D281 top=medium
+  D281 bottom=medium
+  D281 left=medium
+  D281 right=medium
+  E281 top=medium
+  E281 bottom=medium
+  E281 left=medium
+  E281 right=medium
+  F281 top=medium
+  F281 bottom=medium
+  F281 left=medium
+  F281 right=medium
+  A282 top=medium
+  A282 bottom=medium
+  A282 left=medium
+  A282 right=medium
+  B282 top=medium
+  B282 bottom=medium
+  B282 left=medium
+  B282 right=medium
+  C282 top=medium
+  C282 bottom=medium
+  C282 right=medium
+  D282 top=medium
+  D282 bottom=medium
+  D282 left=medium
+  D282 right=medium
+  E282 top=medium
+  E282 bottom=medium
+  E282 left=medium
+  E282 right=medium
+  F282 top=medium
+  F282 bottom=medium
+  F282 left=medium
+  F282 right=medium
+  A283 top=medium
+  A283 bottom=medium
+  A283 left=medium
+  A283 right=medium
+  B283 top=medium
+  B283 bottom=medium
+  B283 left=medium
+  B283 right=medium
+  C283 top=medium
+  C283 bottom=medium
+  C283 right=medium
+  D283 top=medium
+  D283 bottom=medium
+  D283 left=medium
+  D283 right=medium
+  E283 top=medium
+  E283 bottom=medium
+  E283 left=medium
+  E283 right=medium
+  F283 top=medium
+  F283 bottom=medium
+  F283 left=medium
+  F283 right=medium
+  A284 bottom=medium
+  A284 left=medium
+  A284 right=medium
+  B284 bottom=medium
+  B284 left=medium
+  B284 right=medium
+  C284 bottom=medium
+  D284 bottom=medium
+  E284 bottom=medium
+  F284 bottom=medium
+  F284 right=medium
+  A285 top=medium
+  A285 bottom=medium
+  A285 left=medium
+  A285 right=medium
+  B285 top=medium
+  B285 bottom=medium
+  C285 top=medium
+  C285 bottom=medium
+  D285 top=medium
+  D285 bottom=medium
+  E285 top=medium
+  E285 bottom=medium
+  F285 top=medium
+  F285 bottom=medium
+  G285 top=medium
+  G285 bottom=medium
+  H285 top=medium
+  H285 bottom=medium
+  I285 top=medium
+  I285 bottom=medium
+  I285 right=medium
+  A287 bottom=thin
+  B287 bottom=thin
+  C287 bottom=thin
+  D287 bottom=thin
+  E287 bottom=thin
+  F287 bottom=thin
+  G287 bottom=thin
+  H287 bottom=thin
+  I287 bottom=thin
+  J287 bottom=thin
+  K287 bottom=thin
+  L287 bottom=thin
+  A291 bottom=thin
+  B291 bottom=thin
+  C291 bottom=thin
+  D291 bottom=thin
+  E291 bottom=thin
+  F291 bottom=thin
+  G291 bottom=thin
+  H291 bottom=thin
+  I291 bottom=thin
+  J291 bottom=thin
+  K291 bottom=thin
+  L291 bottom=thin
+  A294 top=medium
+  A294 bottom=medium
+  A294 left=medium
+  A294 right=medium
+  B294 top=medium
+  B294 bottom=medium
+  C294 top=medium
+  C294 bottom=medium
+  D294 top=medium
+  D294 bottom=medium
+  E294 top=medium
+  E294 bottom=medium
+  F294 top=medium
+  F294 bottom=medium
+  G294 top=medium
+  G294 bottom=medium
+  H294 top=medium
+  H294 bottom=medium
+  I294 top=medium
+  I294 bottom=medium
+  J294 top=medium
+  J294 bottom=medium
+  K294 top=medium
+  K294 bottom=medium
+  K294 right=medium
+  A297 top=medium
+  A297 bottom=medium
+  A297 left=medium
+  A297 right=medium
+  B297 top=medium
+  B297 bottom=medium
+  B297 left=medium
+  B297 right=medium
+  C297 top=medium
+  C297 bottom=medium
+  C297 left=medium
+  C297 right=medium
+  D297 top=medium
+  D297 bottom=medium
+  D297 left=medium
+  D297 right=medium
+  A298 top=medium
+  A298 bottom=medium
+  A298 left=medium
+  A298 right=medium
+  B298 top=medium
+  B298 bottom=medium
+  B298 left=medium
+  B298 right=medium
+  C298 top=medium
+  C298 bottom=medium
+  C298 left=medium
+  C298 right=medium
+  D298 top=medium
+  D298 bottom=medium
+  D298 left=medium
+  D298 right=medium
+  A299 top=medium
+  A299 bottom=medium
+  A299 left=medium
+  A299 right=medium
+  B299 top=medium
+  B299 bottom=medium
+  B299 left=medium
+  B299 right=medium
+  C299 top=medium
+  C299 bottom=medium
+  C299 left=medium
+  C299 right=medium
+  D299 top=medium
+  D299 bottom=medium
+  D299 left=medium
+  D299 right=medium
+  A302 top=medium
+  A302 bottom=medium
+  A302 left=medium
+  A302 right=medium
+  B302 top=medium
+  B302 bottom=medium
+  B302 left=medium
+  B302 right=medium
+  C302 top=medium
+  C302 bottom=medium
+  C302 left=medium
+  C302 right=medium
+  D302 top=medium
+  D302 bottom=medium
+  D302 right=medium
+  E302 top=medium
+  E302 bottom=medium
+  E302 right=medium
+  A303 top=medium
+  A303 bottom=medium
+  A303 left=medium
+  A303 right=medium
+  B303 top=medium
+  B303 bottom=medium
+  B303 left=medium
+  B303 right=medium
+  C303 top=medium
+  C303 bottom=medium
+  C303 left=medium
+  C303 right=medium
+  D303 top=medium
+  D303 bottom=medium
+  D303 right=medium
+  E303 top=medium
+  E303 bottom=medium
+  E303 right=medium
+  A304 top=medium
+  A304 bottom=medium
+  A304 left=medium
+  A304 right=medium
+  B304 top=medium
+  B304 bottom=medium
+  B304 left=medium
+  B304 right=medium
+  C304 top=medium
+  C304 bottom=medium
+  C304 left=medium
+  C304 right=medium
+  D304 top=medium
+  D304 bottom=medium
+  D304 right=medium
+  E304 top=medium
+  E304 bottom=medium
+  E304 right=medium
+  A305 top=medium
+  A305 bottom=medium
+  A305 left=medium
+  A305 right=medium
+  B305 top=medium
+  B305 bottom=medium
+  B305 left=medium
+  B305 right=medium
+  C305 top=medium
+  C305 bottom=medium
+  C305 left=medium
+  C305 right=medium
+  D305 top=medium
+  D305 bottom=medium
+  D305 right=medium
+  E305 top=medium
+  E305 bottom=medium
+  E305 right=medium
+  A306 top=medium
+  A306 bottom=medium
+  A306 left=medium
+  A306 right=medium
+  B306 top=medium
+  B306 bottom=medium
+  B306 left=medium
+  B306 right=medium
+  C306 top=medium
+  C306 bottom=medium
+  C306 left=medium
+  C306 right=medium
+  D306 top=medium
+  D306 bottom=medium
+  D306 right=medium
+  E306 top=medium
+  E306 bottom=medium
+  E306 right=medium
+  A307 top=medium
+  A307 bottom=medium
+  A307 left=medium
+  A307 right=medium
+  B307 top=medium
+  B307 bottom=medium
+  B307 left=medium
+  B307 right=medium
+  C307 top=medium
+  C307 bottom=medium
+  C307 left=medium
+  C307 right=medium
+  D307 top=medium
+  D307 bottom=medium
+  D307 right=medium
+  E307 top=medium
+  E307 bottom=medium
+  E307 right=medium
+  A308 top=medium
+  A308 bottom=medium
+  A308 left=medium
+  A308 right=medium
+  B308 top=medium
+  B308 bottom=medium
+  B308 left=medium
+  B308 right=medium
+  C308 top=medium
+  C308 bottom=medium
+  C308 left=medium
+  C308 right=medium
+  D308 top=medium
+  D308 bottom=medium
+  D308 right=medium
+  E308 top=medium
+  E308 bottom=medium
+  E308 right=medium
+  A310 top=medium
+  A310 bottom=medium
+  A310 left=medium
+  A310 right=medium
+  B310 top=medium
+  B310 bottom=medium
+  B310 left=medium
+  B310 right=medium
+  C310 top=medium
+  C310 bottom=medium
+  D310 top=medium
+  D310 bottom=medium
+  E310 top=medium
+  E310 bottom=medium
+  F310 top=medium
+  F310 bottom=medium
+  G310 top=medium
+  G310 bottom=medium
+  G310 right=medium
+  A313 top=medium
+  A313 bottom=medium
+  A313 left=medium
+  A313 right=medium
+  B313 top=medium
+  B313 bottom=medium
+  B313 left=medium
+  B313 right=medium
+  C313 top=medium
+  C313 bottom=medium
+  C313 left=medium
+  C313 right=medium
+  D313 top=medium
+  D313 bottom=medium
+  D313 left=medium
+  D313 right=medium
+  E313 top=medium
+  E313 bottom=medium
+  E313 right=medium
+  F313 top=medium
+  F313 bottom=medium
+  F313 left=medium
+  F313 right=medium
+  G313 top=medium
+  G313 bottom=medium
+  G313 right=medium
+  A314 top=medium
+  A314 bottom=medium
+  A314 left=medium
+  A314 right=medium
+  B314 top=medium
+  B314 bottom=medium
+  B314 left=medium
+  B314 right=medium
+  C314 top=medium
+  C314 bottom=medium
+  C314 left=medium
+  C314 right=medium
+  D314 top=medium
+  D314 bottom=medium
+  D314 left=medium
+  D314 right=medium
+  E314 top=medium
+  E314 bottom=medium
+  E314 right=medium
+  F314 top=medium
+  F314 bottom=medium
+  F314 left=medium
+  F314 right=medium
+  G314 top=medium
+  G314 bottom=medium
+  G314 right=medium
+  A315 top=medium
+  A315 bottom=medium
+  A315 left=medium
+  A315 right=medium
+  B315 top=medium
+  B315 bottom=medium
+  B315 left=medium
+  B315 right=medium
+  C315 top=medium
+  C315 bottom=medium
+  C315 left=medium
+  C315 right=medium
+  D315 top=medium
+  D315 bottom=medium
+  D315 left=medium
+  D315 right=medium
+  E315 top=medium
+  E315 bottom=medium
+  E315 right=medium
+  F315 top=medium
+  F315 bottom=medium
+  F315 left=medium
+  F315 right=medium
+  G315 top=medium
+  G315 bottom=medium
+  G315 right=medium
+  A316 top=medium
+  A316 bottom=medium
+  A316 left=medium
+  A316 right=medium
+  B316 top=medium
+  B316 bottom=medium
+  B316 left=medium
+  B316 right=medium
+  C316 top=medium
+  C316 bottom=medium
+  C316 left=medium
+  C316 right=medium
+  D316 top=medium
+  D316 bottom=medium
+  D316 left=medium
+  D316 right=medium
+  E316 top=medium
+  E316 bottom=medium
+  E316 right=medium
+  F316 top=medium
+  F316 bottom=medium
+  F316 left=medium
+  F316 right=medium
+  G316 top=medium
+  G316 bottom=medium
+  G316 right=medium
+  A317 top=medium
+  A317 bottom=medium
+  A317 left=medium
+  A317 right=medium
+  B317 top=medium
+  B317 bottom=medium
+  B317 left=medium
+  B317 right=medium
+  C317 top=medium
+  C317 bottom=medium
+  C317 left=medium
+  C317 right=medium
+  D317 top=medium
+  D317 bottom=medium
+  D317 left=medium
+  D317 right=medium
+  E317 top=medium
+  E317 bottom=medium
+  E317 right=medium
+  F317 top=medium
+  F317 bottom=medium
+  F317 left=medium
+  F317 right=medium
+  G317 top=medium
+  G317 bottom=medium
+  G317 right=medium
+  A318 top=medium
+  A318 bottom=medium
+  A318 left=medium
+  A318 right=medium
+  B318 top=medium
+  B318 bottom=medium
+  B318 left=medium
+  B318 right=medium
+  C318 top=medium
+  C318 bottom=medium
+  C318 left=medium
+  C318 right=medium
+  D318 top=medium
+  D318 bottom=medium
+  D318 left=medium
+  D318 right=medium
+  E318 top=medium
+  E318 bottom=medium
+  E318 right=medium
+  F318 top=medium
+  F318 bottom=medium
+  F318 left=medium
+  F318 right=medium
+  G318 top=medium
+  G318 bottom=medium
+  G318 right=medium
+  A319 top=medium
+  A319 bottom=medium
+  A319 left=medium
+  A319 right=medium
+  B319 top=medium
+  B319 bottom=medium
+  B319 left=medium
+  B319 right=medium
+  C319 top=medium
+  C319 bottom=medium
+  C319 left=medium
+  C319 right=medium
+  D319 top=medium
+  D319 bottom=medium
+  D319 left=medium
+  D319 right=medium
+  E319 top=medium
+  E319 bottom=medium
+  E319 right=medium
+  F319 top=medium
+  F319 bottom=medium
+  F319 left=medium
+  F319 right=medium
+  G319 top=medium
+  G319 bottom=medium
+  G319 right=medium
+  A320 top=medium
+  A320 bottom=medium
+  A320 left=medium
+  A320 right=medium
+  B320 top=medium
+  B320 bottom=medium
+  B320 left=medium
+  B320 right=medium
+  C320 top=medium
+  C320 bottom=medium
+  C320 left=medium
+  C320 right=medium
+  D320 top=medium
+  D320 bottom=medium
+  D320 left=medium
+  D320 right=medium
+  E320 top=medium
+  E320 bottom=medium
+  E320 right=medium
+  F320 top=medium
+  F320 bottom=medium
+  F320 left=medium
+  F320 right=medium
+  G320 top=medium
+  G320 bottom=medium
+  G320 right=medium
+  A321 top=medium
+  A321 bottom=medium
+  A321 left=medium
+  A321 right=medium
+  B321 top=medium
+  B321 bottom=medium
+  B321 left=medium
+  B321 right=medium
+  C321 top=medium
+  C321 bottom=medium
+  C321 left=medium
+  C321 right=medium
+  D321 top=medium
+  D321 bottom=medium
+  D321 left=medium
+  D321 right=medium
+  E321 top=medium
+  E321 bottom=medium
+  E321 right=medium
+  F321 top=medium
+  F321 bottom=medium
+  F321 left=medium
+  F321 right=medium
+  G321 top=medium
+  G321 bottom=medium
+  G321 right=medium
+  A322 top=medium
+  A322 bottom=medium
+  A322 left=medium
+  A322 right=medium
+  B322 top=medium
+  B322 bottom=medium
+  B322 left=medium
+  B322 right=medium
+  C322 top=medium
+  C322 bottom=medium
+  C322 left=medium
+  C322 right=medium
+  D322 top=medium
+  D322 bottom=medium
+  D322 left=medium
+  D322 right=medium
+  E322 top=medium
+  E322 bottom=medium
+  E322 right=medium
+  F322 top=medium
+  F322 bottom=medium
+  F322 left=medium
+  F322 right=medium
+  G322 top=medium
+  G322 bottom=medium
+  G322 right=medium
+  A323 top=medium
+  A323 bottom=medium
+  A323 left=medium
+  A323 right=medium
+  B323 top=medium
+  B323 bottom=medium
+  B323 left=medium
+  B323 right=medium
+  C323 top=medium
+  C323 bottom=medium
+  C323 left=medium
+  C323 right=medium
+  D323 top=medium
+  D323 bottom=medium
+  D323 left=medium
+  D323 right=medium
+  E323 top=medium
+  E323 bottom=medium
+  E323 right=medium
+  F323 top=medium
+  F323 bottom=medium
+  F323 left=medium
+  F323 right=medium
+  G323 top=medium
+  G323 bottom=medium
+  G323 right=medium
+  A324 top=medium
+  A324 bottom=medium
+  A324 left=medium
+  A324 right=medium
+  B324 top=medium
+  B324 bottom=medium
+  B324 left=medium
+  B324 right=medium
+  C324 top=medium
+  C324 bottom=medium
+  C324 left=medium
+  C324 right=medium
+  D324 top=medium
+  D324 bottom=medium
+  D324 left=medium
+  D324 right=medium
+  E324 top=medium
+  E324 bottom=medium
+  E324 right=medium
+  F324 top=medium
+  F324 bottom=medium
+  F324 left=medium
+  F324 right=medium
+  G324 top=medium
+  G324 bottom=medium
+  G324 right=medium
+  A325 top=medium
+  A325 bottom=medium
+  A325 left=medium
+  A325 right=medium
+  B325 top=medium
+  B325 bottom=medium
+  B325 left=medium
+  B325 right=medium
+  C325 top=medium
+  C325 bottom=medium
+  C325 left=medium
+  C325 right=medium
+  D325 top=medium
+  D325 bottom=medium
+  D325 left=medium
+  D325 right=medium
+  E325 top=medium
+  E325 bottom=medium
+  E325 right=medium
+  F325 top=medium
+  F325 bottom=medium
+  F325 left=medium
+  F325 right=medium
+  G325 top=medium
+  G325 bottom=medium
+  G325 right=medium
+  A326 top=medium
+  A326 bottom=medium
+  A326 left=medium
+  A326 right=medium
+  B326 top=medium
+  B326 bottom=medium
+  B326 left=medium
+  B326 right=medium
+  C326 top=medium
+  C326 bottom=medium
+  C326 left=medium
+  C326 right=medium
+  D326 top=medium
+  D326 bottom=medium
+  D326 left=medium
+  D326 right=medium
+  E326 top=medium
+  E326 bottom=medium
+  E326 right=medium
+  F326 top=medium
+  F326 bottom=medium
+  F326 left=medium
+  F326 right=medium
+  G326 top=medium
+  G326 bottom=medium
+  G326 right=medium
+  A327 top=medium
+  A327 bottom=medium
+  A327 left=medium
+  A327 right=medium
+  B327 top=medium
+  B327 bottom=medium
+  B327 left=medium
+  B327 right=medium
+  C327 top=medium
+  C327 bottom=medium
+  C327 left=medium
+  C327 right=medium
+  D327 top=medium
+  D327 bottom=medium
+  D327 left=medium
+  D327 right=medium
+  E327 top=medium
+  E327 bottom=medium
+  E327 right=medium
+  F327 top=medium
+  F327 bottom=medium
+  F327 left=medium
+  F327 right=medium
+  G327 top=medium
+  G327 bottom=medium
+  G327 right=medium
+  A328 top=medium
+  A328 bottom=medium
+  A328 left=medium
+  A328 right=medium
+  B328 top=medium
+  B328 bottom=medium
+  B328 left=medium
+  B328 right=medium
+  C328 top=medium
+  C328 bottom=medium
+  C328 left=medium
+  C328 right=medium
+  D328 top=medium
+  D328 bottom=medium
+  D328 left=medium
+  D328 right=medium
+  E328 top=medium
+  E328 bottom=medium
+  E328 right=medium
+  F328 top=medium
+  F328 bottom=medium
+  F328 left=medium
+  F328 right=medium
+  G328 top=medium
+  G328 bottom=medium
+  G328 right=medium
+  A329 top=medium
+  A329 bottom=medium
+  A329 left=medium
+  A329 right=medium
+  B329 top=medium
+  B329 bottom=medium
+  B329 left=medium
+  B329 right=medium
+  C329 top=medium
+  C329 bottom=medium
+  C329 left=medium
+  C329 right=medium
+  D329 top=medium
+  D329 bottom=medium
+  D329 left=medium
+  D329 right=medium
+  E329 top=medium
+  E329 bottom=medium
+  E329 right=medium
+  F329 top=medium
+  F329 bottom=medium
+  F329 left=medium
+  F329 right=medium
+  G329 top=medium
+  G329 bottom=medium
+  G329 right=medium
+  A330 top=medium
+  A330 bottom=medium
+  A330 left=medium
+  A330 right=medium
+  B330 top=medium
+  B330 bottom=medium
+  B330 left=medium
+  B330 right=medium
+  C330 top=medium
+  C330 bottom=medium
+  C330 left=medium
+  C330 right=medium
+  D330 top=medium
+  D330 bottom=medium
+  D330 left=medium
+  D330 right=medium
+  E330 top=medium
+  E330 bottom=medium
+  E330 right=medium
+  F330 top=medium
+  F330 bottom=medium
+  F330 left=medium
+  F330 right=medium
+  G330 top=medium
+  G330 bottom=medium
+  G330 right=medium
+  A331 top=medium
+  A331 bottom=medium
+  A331 left=medium
+  A331 right=medium
+  B331 top=medium
+  B331 bottom=medium
+  B331 left=medium
+  B331 right=medium
+  C331 top=medium
+  C331 bottom=medium
+  C331 left=medium
+  C331 right=medium
+  D331 top=medium
+  D331 bottom=medium
+  D331 left=medium
+  D331 right=medium
+  E331 top=medium
+  E331 bottom=medium
+  E331 right=medium
+  F331 top=medium
+  F331 bottom=medium
+  F331 left=medium
+  F331 right=medium
+  G331 top=medium
+  G331 bottom=medium
+  G331 right=medium
+  A332 top=medium
+  A332 bottom=medium
+  A332 left=medium
+  A332 right=medium
+  B332 top=medium
+  B332 bottom=medium
+  B332 left=medium
+  B332 right=medium
+  C332 top=medium
+  C332 bottom=medium
+  C332 left=medium
+  C332 right=medium
+  D332 top=medium
+  D332 bottom=medium
+  D332 left=medium
+  D332 right=medium
+  E332 top=medium
+  E332 bottom=medium
+  E332 right=medium
+  F332 top=medium
+  F332 bottom=medium
+  F332 left=medium
+  F332 right=medium
+  G332 top=medium
+  G332 bottom=medium
+  G332 right=medium
+  A333 bottom=medium
+  A333 left=medium
+  A333 right=medium
+  B333 bottom=medium
+  B333 right=medium
+  C333 bottom=medium
+  C333 left=medium
+  C333 right=medium
+  D333 bottom=medium
+  E333 bottom=medium
+  F333 bottom=medium
+  G333 bottom=medium
+  H333 bottom=medium
+  I333 bottom=medium
+  I333 right=medium
+  A336 top=medium
+  A336 bottom=medium
+  A336 left=medium
+  A336 right=medium
+  B336 top=medium
+  B336 bottom=medium
+  B336 left=medium
+  B336 right=medium
+  C336 top=medium
+  C336 bottom=medium
+  C336 left=medium
+  C336 right=medium
+  D336 top=medium
+  D336 bottom=medium
+  D336 right=medium
+  E336 top=medium
+  E336 bottom=medium
+  E336 right=medium
+  A337 top=medium
+  A337 bottom=medium
+  A337 left=medium
+  A337 right=medium
+  B337 top=medium
+  B337 bottom=medium
+  B337 left=medium
+  B337 right=medium
+  C337 top=medium
+  C337 bottom=medium
+  C337 left=medium
+  C337 right=medium
+  D337 top=medium
+  D337 bottom=medium
+  D337 right=medium
+  E337 top=medium
+  E337 bottom=medium
+  E337 right=medium
+  A338 top=medium
+  A338 bottom=medium
+  A338 left=medium
+  A338 right=medium
+  B338 top=medium
+  B338 bottom=medium
+  B338 left=medium
+  B338 right=medium
+  C338 top=medium
+  C338 bottom=medium
+  C338 left=medium
+  C338 right=medium
+  D338 top=medium
+  D338 bottom=medium
+  D338 right=medium
+  E338 top=medium
+  E338 bottom=medium
+  E338 right=medium
+  A339 top=medium
+  A339 bottom=medium
+  A339 left=medium
+  A339 right=medium
+  B339 top=medium
+  B339 bottom=medium
+  B339 left=medium
+  B339 right=medium
+  C339 top=medium
+  C339 bottom=medium
+  C339 left=medium
+  C339 right=medium
+  D339 top=medium
+  D339 bottom=medium
+  D339 right=medium
+  E339 top=medium
+  E339 bottom=medium
+  E339 right=medium
+  A340 bottom=medium
+  A340 left=medium
+  A340 right=medium
+  B340 bottom=medium
+  B340 left=medium
+  B340 right=medium
+  C340 bottom=medium
+  C340 left=medium
+  C340 right=medium
+  D340 top=medium
+  D340 bottom=medium
+  D340 left=medium
+  D340 right=medium
+  E340 top=medium
+  E340 bottom=medium
+  E340 right=medium
+  A341 top=medium
+  A341 bottom=medium
+  A341 left=medium
+  A341 right=medium
+  B341 top=medium
+  B341 bottom=medium
+  C341 top=medium
+  C341 bottom=medium
+  D341 top=medium
+  D341 bottom=medium
+  E341 top=medium
+  E341 bottom=medium
+  F341 top=medium
+  F341 bottom=medium
+  G341 top=medium
+  G341 bottom=medium
+  G341 right=medium
+  A343 bottom=thin
+  B343 bottom=thin
+  C343 bottom=thin
+  D343 bottom=thin
+  E343 bottom=thin
+  F343 bottom=thin
+  G343 bottom=thin
+  H343 bottom=thin
+  I343 bottom=thin
+  J343 bottom=thin
+  K343 bottom=thin
+  L343 bottom=thin
+  A347 bottom=thin
+  B347 bottom=thin
+  C347 bottom=thin
+  D347 bottom=thin
+  E347 bottom=thin
+  F347 bottom=thin
+  G347 bottom=thin
+  H347 bottom=thin
+  I347 bottom=thin
+  J347 bottom=thin
+  K347 bottom=thin
+  L347 bottom=thin
+  A350 top=medium
+  A350 bottom=medium
+  A350 left=medium
+  A350 right=medium
+  B350 top=medium
+  B350 bottom=medium
+  C350 top=medium
+  C350 bottom=medium
+  D350 top=medium
+  D350 bottom=medium
+  E350 top=medium
+  E350 bottom=medium
+  F350 top=medium
+  F350 bottom=medium
+  G350 top=medium
+  G350 bottom=medium
+  H350 top=medium
+  H350 bottom=medium
+  I350 top=medium
+  I350 bottom=medium
+  J350 top=medium
+  J350 bottom=medium
+  K350 top=medium
+  K350 bottom=medium
+  K350 right=medium
+  A353 top=medium
+  A353 bottom=medium
+  A353 left=medium
+  A353 right=medium
+  B353 top=medium
+  B353 right=medium
+  C353 top=medium
+  C353 bottom=medium
+  C353 left=medium
+  C353 right=medium
+  D353 top=medium
+  D353 bottom=medium
+  E353 top=medium
+  E353 bottom=medium
+  F353 top=medium
+  F353 bottom=medium
+  F353 right=medium
+  G353 top=medium
+  G353 bottom=medium
+  G353 left=medium
+  G353 right=medium
+  H353 top=medium
+  H353 bottom=medium
+  I353 top=medium
+  I353 bottom=medium
+  I353 right=medium
+  J353 top=medium
+  J353 bottom=medium
+  J353 right=medium
+  K353 top=medium
+  K353 right=medium
+  A354 bottom=medium
+  A354 left=medium
+  B354 bottom=medium
+  B354 right=medium
+  C354 top=medium
+  C354 bottom=medium
+  C354 left=medium
+  C354 right=medium
+  D354 top=medium
+  D354 bottom=medium
+  D354 left=medium
+  D354 right=medium
+  E354 top=medium
+  E354 bottom=medium
+  E354 left=medium
+  E354 right=medium
+  F354 top=medium
+  F354 bottom=medium
+  F354 left=medium
+  F354 right=medium
+  G354 top=medium
+  G354 bottom=medium
+  G354 left=medium
+  G354 right=medium
+  H354 top=medium
+  H354 bottom=medium
+  H354 left=medium
+  H354 right=medium
+  I354 top=medium
+  I354 bottom=medium
+  I354 left=medium
+  I354 right=medium
+  J354 bottom=medium
+  K354 bottom=medium
+  K354 right=medium
+  A355 top=medium
+  A355 bottom=medium
+  A355 left=medium
+  A355 right=medium
+  B355 top=medium
+  B355 bottom=medium
+  B355 right=medium
+  C355 top=medium
+  C355 bottom=medium
+  C355 left=medium
+  C355 right=medium
+  D355 top=medium
+  D355 bottom=medium
+  D355 left=medium
+  D355 right=medium
+  E355 top=medium
+  E355 bottom=medium
+  E355 left=medium
+  E355 right=medium
+  F355 top=medium
+  F355 bottom=medium
+  F355 left=medium
+  F355 right=medium
+  G355 top=medium
+  G355 bottom=medium
+  G355 left=medium
+  G355 right=medium
+  H355 top=medium
+  H355 bottom=medium
+  H355 left=medium
+  H355 right=medium
+  I355 top=medium
+  I355 bottom=medium
+  I355 left=medium
+  I355 right=medium
+  J355 top=medium
+  J355 bottom=medium
+  J355 right=medium
+  K355 top=medium
+  K355 bottom=medium
+  K355 right=medium
+  A356 top=medium
+  A356 bottom=medium
+  A356 left=medium
+  A356 right=medium
+  B356 top=medium
+  B356 bottom=medium
+  B356 right=medium
+  C356 top=medium
+  C356 bottom=medium
+  C356 left=medium
+  C356 right=medium
+  D356 top=medium
+  D356 bottom=medium
+  D356 left=medium
+  D356 right=medium
+  E356 top=medium
+  E356 bottom=medium
+  E356 left=medium
+  E356 right=medium
+  F356 top=medium
+  F356 bottom=medium
+  F356 left=medium
+  F356 right=medium
+  G356 top=medium
+  G356 bottom=medium
+  G356 left=medium
+  G356 right=medium
+  H356 top=medium
+  H356 bottom=medium
+  H356 left=medium
+  H356 right=medium
+  I356 top=medium
+  I356 bottom=medium
+  I356 left=medium
+  I356 right=medium
+  J356 top=medium
+  J356 bottom=medium
+  J356 right=medium
+  K356 top=medium
+  K356 bottom=medium
+  K356 right=medium
+  A357 top=medium
+  A357 bottom=medium
+  A357 left=medium
+  A357 right=medium
+  B357 top=medium
+  B357 bottom=medium
+  B357 right=medium
+  C357 top=medium
+  C357 bottom=medium
+  C357 left=medium
+  C357 right=medium
+  D357 top=medium
+  D357 bottom=medium
+  D357 left=medium
+  D357 right=medium
+  E357 top=medium
+  E357 bottom=medium
+  E357 left=medium
+  E357 right=medium
+  F357 top=medium
+  F357 bottom=medium
+  F357 left=medium
+  F357 right=medium
+  G357 top=medium
+  G357 bottom=medium
+  G357 left=medium
+  G357 right=medium
+  H357 top=medium
+  H357 bottom=medium
+  H357 left=medium
+  H357 right=medium
+  I357 top=medium
+  I357 bottom=medium
+  I357 left=medium
+  I357 right=medium
+  J357 top=medium
+  J357 bottom=medium
+  J357 right=medium
+  K357 top=medium
+  K357 bottom=medium
+  K357 right=medium
+  A358 top=medium
+  A358 bottom=medium
+  A358 left=medium
+  A358 right=medium
+  B358 top=medium
+  B358 bottom=medium
+  B358 right=medium
+  C358 top=medium
+  C358 bottom=medium
+  C358 left=medium
+  C358 right=medium
+  D358 top=medium
+  D358 bottom=medium
+  D358 left=medium
+  D358 right=medium
+  E358 top=medium
+  E358 bottom=medium
+  E358 left=medium
+  E358 right=medium
+  F358 top=medium
+  F358 bottom=medium
+  F358 left=medium
+  F358 right=medium
+  G358 top=medium
+  G358 bottom=medium
+  G358 left=medium
+  G358 right=medium
+  H358 top=medium
+  H358 bottom=medium
+  H358 left=medium
+  H358 right=medium
+  I358 top=medium
+  I358 bottom=medium
+  I358 left=medium
+  I358 right=medium
+  J358 top=medium
+  J358 bottom=medium
+  J358 right=medium
+  K358 top=medium
+  K358 bottom=medium
+  K358 right=medium
+  A361 top=medium
+  A361 bottom=medium
+  A361 left=medium
+  A361 right=medium
+  B361 top=medium
+  B361 bottom=medium
+  B361 left=medium
+  B361 right=medium
+  C361 top=medium
+  C361 bottom=medium
+  C361 left=medium
+  C361 right=medium
+  A362 top=medium
+  A362 bottom=medium
+  A362 left=medium
+  A362 right=medium
+  B362 top=medium
+  B362 bottom=medium
+  B362 left=medium
+  B362 right=medium
+  C362 top=medium
+  C362 bottom=medium
+  C362 left=medium
+  C362 right=medium
+  A363 top=medium
+  A363 bottom=medium
+  A363 left=medium
+  A363 right=medium
+  B363 top=medium
+  B363 bottom=medium
+  B363 left=medium
+  B363 right=medium
+  C363 top=medium
+  C363 bottom=medium
+  C363 left=medium
+  C363 right=medium
+  A364 left=medium
+  C364 right=medium
+  A365 top=medium
+  A365 bottom=medium
+  A365 left=medium
+  A365 right=medium
+  B365 top=medium
+  B365 bottom=medium
+  B365 left=medium
+  B365 right=medium
+  C365 top=medium
+  C365 bottom=medium
+  C365 left=medium
+  C365 right=medium
+  A366 top=medium
+  A366 bottom=medium
+  A366 left=medium
+  A366 right=medium
+  B366 top=medium
+  B366 bottom=medium
+  B366 left=medium
+  B366 right=medium
+  C366 top=medium
+  C366 bottom=medium
+  C366 left=medium
+  C366 right=medium
+  A367 top=medium
+  A367 bottom=medium
+  A367 left=medium
+  A367 right=medium
+  B367 top=medium
+  B367 bottom=medium
+  B367 left=medium
+  B367 right=medium
+  C367 top=medium
+  C367 bottom=medium
+  C367 left=medium
+  C367 right=medium
+  A369 top=medium
+  A369 bottom=medium
+  A369 left=medium
+  A369 right=medium
+  B369 top=medium
+  B369 bottom=medium
+  B369 left=medium
+  B369 right=medium
+  C369 top=medium
+  C369 bottom=medium
+  C369 left=medium
+  C369 right=medium
+  A370 top=medium
+  A370 bottom=medium
+  A370 left=medium
+  A370 right=medium
+  B370 top=medium
+  B370 bottom=medium
+  B370 left=medium
+  B370 right=medium
+  C370 top=medium
+  C370 bottom=medium
+  C370 left=medium
+  C370 right=medium
+  A372 top=medium
+  A372 bottom=medium
+  A372 left=medium
+  A372 right=medium
+  B372 top=medium
+  B372 bottom=medium
+  B372 right=medium
+  C372 top=medium
+  C372 bottom=medium
+  C372 left=medium
+  C372 right=medium
+  D372 top=medium
+  D372 bottom=medium
+  E372 top=medium
+  E372 bottom=medium
+  F372 top=medium
+  F372 bottom=medium
+  F372 right=medium
+  A376 top=medium
+  A376 bottom=medium
+  A376 left=medium
+  A376 right=medium
+  B376 top=medium
+  B376 bottom=medium
+  B376 left=medium
+  B376 right=medium
+  C376 top=medium
+  C376 bottom=medium
+  C376 left=medium
+  C376 right=medium
+  A377 top=medium
+  A377 bottom=medium
+  A377 left=medium
+  A377 right=medium
+  B377 top=medium
+  B377 bottom=medium
+  B377 left=medium
+  B377 right=medium
+  C377 top=medium
+  C377 bottom=medium
+  C377 left=medium
+  C377 right=medium
+  A378 top=medium
+  A378 bottom=medium
+  A378 left=medium
+  A378 right=medium
+  B378 top=medium
+  B378 bottom=medium
+  B378 left=medium
+  B378 right=medium
+  C378 top=medium
+  C378 bottom=medium
+  C378 left=medium
+  C378 right=medium
+  A380 top=medium
+  A380 bottom=medium
+  A380 left=medium
+  A380 right=medium
+  B380 top=medium
+  B380 bottom=medium
+  B380 left=medium
+  B380 right=medium
+  C380 top=medium
+  C380 bottom=medium
+  C380 left=medium
+  C380 right=medium
+  A382 top=medium
+  A382 bottom=medium
+  A382 left=medium
+  A382 right=medium
+  B382 top=medium
+  B382 bottom=medium
+  B382 right=medium
+  C382 top=medium
+  C382 bottom=medium
+  C382 left=medium
+  C382 right=medium
+  D382 top=medium
+  D382 bottom=medium
+  E382 top=medium
+  E382 bottom=medium
+  F382 top=medium
+  F382 bottom=medium
+  F382 right=medium
+  A386 top=medium
+  A386 bottom=medium
+  A386 left=medium
+  A386 right=medium
+  B386 top=medium
+  B386 bottom=medium
+  B386 left=medium
+  B386 right=medium
+  C386 top=medium
+  C386 bottom=medium
+  C386 left=medium
+  C386 right=medium
+  A387 top=medium
+  A387 bottom=medium
+  A387 left=medium
+  A387 right=medium
+  B387 top=medium
+  B387 bottom=medium
+  B387 left=medium
+  B387 right=medium
+  C387 top=medium
+  C387 bottom=medium
+  C387 left=medium
+  C387 right=medium
+  A389 top=medium
+  A389 bottom=medium
+  A389 left=medium
+  A389 right=medium
+  B389 top=medium
+  B389 bottom=medium
+  B389 left=medium
+  B389 right=medium
+  C389 top=medium
+  C389 bottom=medium
+  C389 left=medium
+  C389 right=medium
+  A391 top=medium
+  A391 bottom=medium
+  A391 left=medium
+  A391 right=medium
+  B391 top=medium
+  B391 bottom=medium
+  B391 right=medium
+  C391 top=medium
+  C391 bottom=medium
+  C391 left=medium
+  C391 right=medium
+  D391 top=medium
+  D391 bottom=medium
+  E391 top=medium
+  E391 bottom=medium
+  F391 top=medium
+  F391 bottom=medium
+  F391 right=medium
+  A395 top=medium
+  A395 bottom=medium
+  A395 left=medium
+  A395 right=medium
+  B395 top=medium
+  B395 bottom=medium
+  B395 left=medium
+  B395 right=medium
+  C395 top=medium
+  C395 bottom=medium
+  C395 left=medium
+  C395 right=medium
+  A396 top=medium
+  A396 bottom=medium
+  A396 left=medium
+  A396 right=medium
+  B396 top=medium
+  B396 bottom=medium
+  B396 left=medium
+  B396 right=medium
+  C396 top=medium
+  C396 bottom=medium
+  C396 left=medium
+  C396 right=medium
+  A397 top=medium
+  A397 bottom=medium
+  A397 left=medium
+  A397 right=medium
+  B397 top=medium
+  B397 bottom=medium
+  B397 left=medium
+  B397 right=medium
+  C397 top=medium
+  C397 bottom=medium
+  C397 left=medium
+  C397 right=medium
+  A398 top=medium
+  A398 bottom=medium
+  A398 left=medium
+  A398 right=medium
+  B398 top=medium
+  B398 bottom=medium
+  B398 left=medium
+  B398 right=medium
+  C398 top=medium
+  C398 bottom=medium
+  C398 left=medium
+  C398 right=medium
+  A399 bottom=medium
+  A399 left=medium
+  A399 right=medium
+  B399 bottom=medium
+  B399 left=medium
+  B399 right=medium
+  C399 bottom=medium
+  C399 left=medium
+  C399 right=medium
+  A401 top=medium
+  A401 bottom=medium
+  A401 left=medium
+  A401 right=medium
+  B401 top=medium
+  B401 bottom=medium
+  B401 right=medium
+  C401 top=medium
+  C401 bottom=medium
+  C401 left=medium
+  C401 right=medium
+  D401 top=medium
+  D401 bottom=medium
+  E401 top=medium
+  E401 bottom=medium
+  F401 top=medium
+  F401 bottom=medium
+  F401 right=medium
+  A404 top=medium
+  A404 bottom=medium
+  A404 left=medium
+  A404 right=medium
+  B404 top=medium
+  B404 bottom=medium
+  B404 left=medium
+  B404 right=medium
+  C404 top=medium
+  C404 bottom=medium
+  C404 left=medium
+  C404 right=medium
+  D404 top=medium
+  D404 bottom=medium
+  D404 left=medium
+  D404 right=medium
+  E404 top=medium
+  E404 bottom=medium
+  E404 left=medium
+  E404 right=medium
+  A405 top=medium
+  A405 bottom=medium
+  A405 left=medium
+  A405 right=medium
+  B405 top=medium
+  B405 bottom=medium
+  B405 left=medium
+  B405 right=medium
+  C405 top=medium
+  C405 bottom=medium
+  C405 left=medium
+  C405 right=medium
+  D405 top=medium
+  D405 bottom=medium
+  D405 left=medium
+  D405 right=medium
+  E405 top=medium
+  E405 bottom=medium
+  E405 left=medium
+  E405 right=medium
+  A407 top=medium
+  A407 bottom=medium
+  A407 left=medium
+  A407 right=medium
+  B407 top=medium
+  B407 bottom=medium
+  B407 left=medium
+  B407 right=medium
+  C407 top=medium
+  C407 bottom=medium
+  D407 top=medium
+  D407 bottom=medium
+  E407 top=medium
+  E407 bottom=medium
+  E407 right=medium
+  A410 top=medium
+  A410 bottom=medium
+  A410 left=medium
+  A410 right=medium
+  B410 top=medium
+  B410 bottom=medium
+  C410 top=medium
+  C410 bottom=medium
+  D410 top=medium
+  D410 bottom=medium
+  E410 top=medium
+  E410 bottom=medium
+  F410 top=medium
+  F410 bottom=medium
+  G410 top=medium
+  G410 bottom=medium
+  H410 top=medium
+  H410 bottom=medium
+  I410 top=medium
+  I410 bottom=medium
+  I410 right=medium
+  A411 top=medium
+  A411 bottom=medium
+  A411 left=medium
+  A411 right=medium
+  B411 top=medium
+  B411 bottom=medium
+  C411 top=medium
+  C411 bottom=medium
+  D411 top=medium
+  D411 bottom=medium
+  E411 top=medium
+  E411 bottom=medium
+  F411 top=medium
+  F411 bottom=medium
+  G411 top=medium
+  G411 bottom=medium
+  H411 top=medium
+  H411 bottom=medium
+  I411 top=medium
+  I411 bottom=medium
+  I411 right=medium
+MERGED_RANGE_BORDER_EDGES
+  A10:A11: A10.top=medium, A11.bottom=medium, A10.left=medium, A10.right=medium, A11.left=medium, A11.right=medium
+  E10:E11: E10.top=medium, E11.bottom=medium, E10.right=medium, E11.right=medium
+  A44:E44: A44.top=medium, A44.bottom=medium, B44.top=medium, B44.bottom=medium, C44.top=medium, C44.bottom=medium, D44.
+top=medium, D44.bottom=medium, E44.top=medium, E44.bottom=medium, A44.left=medium, E44.right=medium
+  A45:E45: A45.top=medium, A45.bottom=medium, B45.top=medium, B45.bottom=medium, C45.top=medium, C45.bottom=medium, D45.
+top=medium, D45.bottom=medium, E45.top=medium, E45.bottom=medium, A45.left=medium, E45.right=medium
+  A46:E46: A46.top=medium, A46.bottom=medium, B46.top=medium, B46.bottom=medium, C46.top=medium, C46.bottom=medium, D46.
+top=medium, D46.bottom=medium, E46.top=medium, E46.bottom=medium, A46.left=medium, E46.right=medium
+  A47:E47: A47.top=medium, A47.bottom=medium, B47.top=medium, B47.bottom=medium, C47.top=medium, C47.bottom=medium, D47.
+top=medium, D47.bottom=medium, E47.top=medium, E47.bottom=medium, A47.left=medium, E47.right=medium
+  A48:E48: A48.top=medium, A48.bottom=medium, B48.top=medium, B48.bottom=medium, C48.top=medium, C48.bottom=medium, D48.
+top=medium, D48.bottom=medium, E48.top=medium, E48.bottom=medium, A48.left=medium, E48.right=medium
+  A49:E49: A49.top=medium, A49.bottom=medium, B49.top=medium, B49.bottom=medium, C49.top=medium, C49.bottom=medium, D49.
+top=medium, D49.bottom=medium, E49.top=medium, E49.bottom=medium, A49.left=medium, E49.right=medium
+  A60:A61: A60.top=medium, A60.left=medium, A61.left=medium
+  E60:E61: E60.top=medium, E61.bottom=medium, E60.right=medium, E61.right=medium
+  A79:A80: A79.top=medium, A79.left=medium, A80.left=medium
+  E79:E80: E79.top=medium, E80.bottom=medium, E79.right=medium, E80.right=medium
+  A176:A177: A176.top=medium, A177.bottom=medium, A176.left=medium, A176.right=medium, A177.left=medium, A177.right=medi
+um
+  E176:E177: E176.top=medium, E177.bottom=medium, E176.right=medium, E177.right=medium
+  A221:E221: A221.top=medium, A221.bottom=medium, B221.top=medium, B221.bottom=medium, C221.top=medium, C221.bottom=medi
+um, D221.top=medium, D221.bottom=medium, E221.top=medium, E221.bottom=medium, A221.left=medium, E221.right=medium
+  A222:E222: A222.top=medium, A222.bottom=medium, B222.top=medium, B222.bottom=medium, C222.top=medium, C222.bottom=medi
+um, D222.top=medium, D222.bottom=medium, E222.top=medium, E222.bottom=medium, A222.left=medium, E222.right=medium
+  A223:E223: A223.top=medium, A223.bottom=medium, B223.top=medium, B223.bottom=medium, C223.top=medium, C223.bottom=medi
+um, D223.top=medium, D223.bottom=medium, E223.top=medium, E223.bottom=medium, A223.left=medium, E223.right=medium
+  A224:E224: A224.top=medium, A224.bottom=medium, B224.top=medium, B224.bottom=medium, C224.top=medium, C224.bottom=medi
+um, D224.top=medium, D224.bottom=medium, E224.top=medium, E224.bottom=medium, A224.left=medium, E224.right=medium
+  A225:E225: A225.top=medium, A225.bottom=medium, B225.top=medium, B225.bottom=medium, C225.top=medium, C225.bottom=medi
+um, D225.top=medium, D225.bottom=medium, E225.top=medium, E225.bottom=medium, A225.left=medium, E225.right=medium
+  A226:E226: A226.top=medium, A226.bottom=medium, B226.top=medium, B226.bottom=medium, C226.top=medium, C226.bottom=medi
+um, D226.top=medium, D226.bottom=medium, E226.top=medium, E226.bottom=medium, A226.left=medium, E226.right=medium
+  A235:K235: A235.top=medium, A235.bottom=medium, B235.top=medium, B235.bottom=medium, C235.top=medium, C235.bottom=medi
+um, D235.top=medium, D235.bottom=medium, E235.top=medium, E235.bottom=medium, F235.top=medium, F235.bottom=medium, G235.
+top=medium, G235.bottom=medium, H235.top=medium, H235.bottom=medium, I235.top=medium, I235.bottom=medium, J235.top=mediu
+m, J235.bottom=medium, K235.top=medium, K235.bottom=medium, A235.left=medium, K235.right=medium
+  A238:A239: A238.top=medium, A239.bottom=medium, A238.left=medium, A238.right=medium, A239.left=medium, A239.right=medi
+um
+  B239:C239: B239.top=medium, B239.bottom=medium, C239.top=medium, C239.bottom=medium, B239.left=medium, C239.right=medi
+um
+  D239:E239: D239.top=medium, D239.bottom=medium, E239.top=medium, E239.bottom=medium, D239.left=medium, E239.right=medi
+um
+  F239:G239: F239.top=medium, F239.bottom=medium, G239.top=medium, G239.bottom=medium, F239.left=medium, G239.right=medi
+um
+  H239:I239: H239.top=medium, H239.bottom=medium, I239.top=medium, I239.bottom=medium, H239.left=medium, I239.right=medi
+um
+  J239:K239: J239.top=medium, J239.bottom=medium, K239.top=medium, K239.bottom=medium, K239.right=medium
+  A256:B256: A256.top=medium, A256.bottom=medium, B256.top=medium, B256.bottom=medium, A256.left=medium, B256.right=medi
+um
+  C256:I256: C256.top=medium, C256.bottom=medium, D256.top=medium, D256.bottom=medium, E256.top=medium, E256.bottom=medi
+um, F256.top=medium, F256.bottom=medium, G256.top=medium, G256.bottom=medium, H256.top=medium, H256.bottom=medium, I256.
+top=medium, I256.bottom=medium, C256.left=medium, I256.right=medium
+  A259:B259: A259.top=medium, A259.bottom=medium, B259.top=medium, B259.bottom=medium, A259.left=medium, B259.right=medi
+um
+  C259:I259: C259.top=medium, C259.bottom=medium, D259.top=medium, D259.bottom=medium, E259.top=medium, E259.bottom=medi
+um, F259.top=medium, F259.bottom=medium, G259.top=medium, G259.bottom=medium, H259.top=medium, H259.bottom=medium, I259.
+top=medium, I259.bottom=medium, C259.left=medium, I259.right=medium
+  A262:B262: A262.top=medium, A262.bottom=medium, B262.top=medium, B262.bottom=medium, A262.left=medium, B262.right=medi
+um
+  C262:I262: C262.top=medium, C262.bottom=medium, D262.top=medium, D262.bottom=medium, E262.top=medium, E262.bottom=medi
+um, F262.top=medium, F262.bottom=medium, G262.top=medium, G262.bottom=medium, H262.top=medium, H262.bottom=medium, I262.
+top=medium, I262.bottom=medium, C262.left=medium, I262.right=medium
+  A266:A267: A266.top=medium, A267.bottom=medium, A266.left=medium, A266.right=medium, A267.left=medium, A267.right=medi
+um
+  B266:C266: B266.top=medium, B266.bottom=medium, C266.top=medium, C266.bottom=medium, B266.left=medium, C266.right=medi
+um
+  D266:E266: D266.top=medium, D266.bottom=medium, E266.top=medium, E266.bottom=medium, E266.right=medium
+  F266:F267: F266.top=medium, F267.bottom=medium, F266.left=medium, F266.right=medium, F267.left=medium, F267.right=medi
+um
+  D276:J276: D276.top=medium, D276.bottom=medium, E276.top=medium, E276.bottom=medium, F276.top=medium, F276.bottom=medi
+um, G276.top=medium, G276.bottom=medium, H276.top=medium, H276.bottom=medium, I276.top=medium, I276.bottom=medium, J276.
+top=medium, J276.bottom=medium, D276.left=medium, J276.right=medium
+  B284:F284: B284.bottom=medium, C284.bottom=medium, D284.bottom=medium, E284.bottom=medium, F284.bottom=medium, B284.le
+ft=medium, F284.right=medium
+  A285:I285: A285.top=medium, A285.bottom=medium, B285.top=medium, B285.bottom=medium, C285.top=medium, C285.bottom=medi
+um, D285.top=medium, D285.bottom=medium, E285.top=medium, E285.bottom=medium, F285.top=medium, F285.bottom=medium, G285.
+top=medium, G285.bottom=medium, H285.top=medium, H285.bottom=medium, I285.top=medium, I285.bottom=medium, A285.left=medi
+um, I285.right=medium
+  A294:K294: A294.top=medium, A294.bottom=medium, B294.top=medium, B294.bottom=medium, C294.top=medium, C294.bottom=medi
+um, D294.top=medium, D294.bottom=medium, E294.top=medium, E294.bottom=medium, F294.top=medium, F294.bottom=medium, G294.
+top=medium, G294.bottom=medium, H294.top=medium, H294.bottom=medium, I294.top=medium, I294.bottom=medium, J294.top=mediu
+m, J294.bottom=medium, K294.top=medium, K294.bottom=medium, A294.left=medium, K294.right=medium
+  D302:E302: D302.top=medium, D302.bottom=medium, E302.top=medium, E302.bottom=medium, E302.right=medium
+  D303:E303: D303.top=medium, D303.bottom=medium, E303.top=medium, E303.bottom=medium, E303.right=medium
+  D304:E304: D304.top=medium, D304.bottom=medium, E304.top=medium, E304.bottom=medium, E304.right=medium
+  D305:E305: D305.top=medium, D305.bottom=medium, E305.top=medium, E305.bottom=medium, E305.right=medium
+  D306:E306: D306.top=medium, D306.bottom=medium, E306.top=medium, E306.bottom=medium, E306.right=medium
+  D307:E307: D307.top=medium, D307.bottom=medium, E307.top=medium, E307.bottom=medium, E307.right=medium
+  D308:E308: D308.top=medium, D308.bottom=medium, E308.top=medium, E308.bottom=medium, E308.right=medium
+  B310:G310: B310.top=medium, B310.bottom=medium, C310.top=medium, C310.bottom=medium, D310.top=medium, D310.bottom=medi
+um, E310.top=medium, E310.bottom=medium, F310.top=medium, F310.bottom=medium, G310.top=medium, G310.bottom=medium, B310.
+left=medium, G310.right=medium
+  F313:G313: F313.top=medium, F313.bottom=medium, G313.top=medium, G313.bottom=medium, F313.left=medium, G313.right=medi
+um
+  F314:G314: F314.top=medium, F314.bottom=medium, G314.top=medium, G314.bottom=medium, F314.left=medium, G314.right=medi
+um
+  F315:G315: F315.top=medium, F315.bottom=medium, G315.top=medium, G315.bottom=medium, F315.left=medium, G315.right=medi
+um
+  F316:G316: F316.top=medium, F316.bottom=medium, G316.top=medium, G316.bottom=medium, F316.left=medium, G316.right=medi
+um
+  F317:G317: F317.top=medium, F317.bottom=medium, G317.top=medium, G317.bottom=medium, F317.left=medium, G317.right=medi
+um
+  F318:G318: F318.top=medium, F318.bottom=medium, G318.top=medium, G318.bottom=medium, F318.left=medium, G318.right=medi
+um
+  F319:G319: F319.top=medium, F319.bottom=medium, G319.top=medium, G319.bottom=medium, F319.left=medium, G319.right=medi
+um
+  F320:G320: F320.top=medium, F320.bottom=medium, G320.top=medium, G320.bottom=medium, F320.left=medium, G320.right=medi
+um
+  F321:G321: F321.top=medium, F321.bottom=medium, G321.top=medium, G321.bottom=medium, F321.left=medium, G321.right=medi
+um
+  F322:G322: F322.top=medium, F322.bottom=medium, G322.top=medium, G322.bottom=medium, F322.left=medium, G322.right=medi
+um
+  F323:G323: F323.top=medium, F323.bottom=medium, G323.top=medium, G323.bottom=medium, F323.left=medium, G323.right=medi
+um
+  F324:G324: F324.top=medium, F324.bottom=medium, G324.top=medium, G324.bottom=medium, F324.left=medium, G324.right=medi
+um
+  F325:G325: F325.top=medium, F325.bottom=medium, G325.top=medium, G325.bottom=medium, F325.left=medium, G325.right=medi
+um
+  F326:G326: F326.top=medium, F326.bottom=medium, G326.top=medium, G326.bottom=medium, F326.left=medium, G326.right=medi
+um
+  F327:G327: F327.top=medium, F327.bottom=medium, G327.top=medium, G327.bottom=medium, F327.left=medium, G327.right=medi
+um
+  F328:G328: F328.top=medium, F328.bottom=medium, G328.top=medium, G328.bottom=medium, F328.left=medium, G328.right=medi
+um
+  F329:G329: F329.top=medium, F329.bottom=medium, G329.top=medium, G329.bottom=medium, F329.left=medium, G329.right=medi
+um
+  F330:G330: F330.top=medium, F330.bottom=medium, G330.top=medium, G330.bottom=medium, F330.left=medium, G330.right=medi
+um
+  F331:G331: F331.top=medium, F331.bottom=medium, G331.top=medium, G331.bottom=medium, F331.left=medium, G331.right=medi
+um
+  F332:G332: F332.top=medium, F332.bottom=medium, G332.top=medium, G332.bottom=medium, F332.left=medium, G332.right=medi
+um
+  A333:B333: A333.bottom=medium, B333.bottom=medium, A333.left=medium, B333.right=medium
+  C333:I333: C333.bottom=medium, D333.bottom=medium, E333.bottom=medium, F333.bottom=medium, G333.bottom=medium, H333.bo
+ttom=medium, I333.bottom=medium, C333.left=medium, I333.right=medium
+  D336:E336: D336.top=medium, D336.bottom=medium, E336.top=medium, E336.bottom=medium, E336.right=medium
+  D337:E337: D337.top=medium, D337.bottom=medium, E337.top=medium, E337.bottom=medium, E337.right=medium
+  D338:E338: D338.top=medium, D338.bottom=medium, E338.top=medium, E338.bottom=medium, E338.right=medium
+  D339:E339: D339.top=medium, D339.bottom=medium, E339.top=medium, E339.bottom=medium, E339.right=medium
+  D340:E340: D340.top=medium, D340.bottom=medium, E340.top=medium, E340.bottom=medium, D340.left=medium, E340.right=medi
+um
+  A341:G341: A341.top=medium, A341.bottom=medium, B341.top=medium, B341.bottom=medium, C341.top=medium, C341.bottom=medi
+um, D341.top=medium, D341.bottom=medium, E341.top=medium, E341.bottom=medium, F341.top=medium, F341.bottom=medium, G341.
+top=medium, G341.bottom=medium, A341.left=medium, G341.right=medium
+  A350:K350: A350.top=medium, A350.bottom=medium, B350.top=medium, B350.bottom=medium, C350.top=medium, C350.bottom=medi
+um, D350.top=medium, D350.bottom=medium, E350.top=medium, E350.bottom=medium, F350.top=medium, F350.bottom=medium, G350.
+top=medium, G350.bottom=medium, H350.top=medium, H350.bottom=medium, I350.top=medium, I350.bottom=medium, J350.top=mediu
+m, J350.bottom=medium, K350.top=medium, K350.bottom=medium, A350.left=medium, K350.right=medium
+  A353:B354: A353.top=medium, A354.bottom=medium, B353.top=medium, B354.bottom=medium, A353.left=medium, B353.right=medi
+um, A354.left=medium, B354.right=medium
+  C353:F353: C353.top=medium, C353.bottom=medium, D353.top=medium, D353.bottom=medium, E353.top=medium, E353.bottom=medi
+um, F353.top=medium, F353.bottom=medium, C353.left=medium, F353.right=medium
+  G353:I353: G353.top=medium, G353.bottom=medium, H353.top=medium, H353.bottom=medium, I353.top=medium, I353.bottom=medi
+um, G353.left=medium, I353.right=medium
+  J353:K354: J353.top=medium, J354.bottom=medium, K353.top=medium, K354.bottom=medium, K353.right=medium, K354.right=med
+ium
+  A355:B355: A355.top=medium, A355.bottom=medium, B355.top=medium, B355.bottom=medium, A355.left=medium, B355.right=medi
+um
+  J355:K355: J355.top=medium, J355.bottom=medium, K355.top=medium, K355.bottom=medium, K355.right=medium
+  A356:B356: A356.top=medium, A356.bottom=medium, B356.top=medium, B356.bottom=medium, A356.left=medium, B356.right=medi
+um
+  J356:K356: J356.top=medium, J356.bottom=medium, K356.top=medium, K356.bottom=medium, K356.right=medium
+  A357:B357: A357.top=medium, A357.bottom=medium, B357.top=medium, B357.bottom=medium, A357.left=medium, B357.right=medi
+um
+  J357:K357: J357.top=medium, J357.bottom=medium, K357.top=medium, K357.bottom=medium, K357.right=medium
+  A358:B358: A358.top=medium, A358.bottom=medium, B358.top=medium, B358.bottom=medium, A358.left=medium, B358.right=medi
+um
+  J358:K358: J358.top=medium, J358.bottom=medium, K358.top=medium, K358.bottom=medium, K358.right=medium
+  A372:B372: A372.top=medium, A372.bottom=medium, B372.top=medium, B372.bottom=medium, A372.left=medium, B372.right=medi
+um
+  C372:F372: C372.top=medium, C372.bottom=medium, D372.top=medium, D372.bottom=medium, E372.top=medium, E372.bottom=medi
+um, F372.top=medium, F372.bottom=medium, C372.left=medium, F372.right=medium
+  A382:B382: A382.top=medium, A382.bottom=medium, B382.top=medium, B382.bottom=medium, A382.left=medium, B382.right=medi
+um
+  C382:F382: C382.top=medium, C382.bottom=medium, D382.top=medium, D382.bottom=medium, E382.top=medium, E382.bottom=medi
+um, F382.top=medium, F382.bottom=medium, C382.left=medium, F382.right=medium
+  A391:B391: A391.top=medium, A391.bottom=medium, B391.top=medium, B391.bottom=medium, A391.left=medium, B391.right=medi
+um
+  C391:F391: C391.top=medium, C391.bottom=medium, D391.top=medium, D391.bottom=medium, E391.top=medium, E391.bottom=medi
+um, F391.top=medium, F391.bottom=medium, C391.left=medium, F391.right=medium
+  A401:B401: A401.top=medium, A401.bottom=medium, B401.top=medium, B401.bottom=medium, A401.left=medium, B401.right=medi
+um
+  C401:F401: C401.top=medium, C401.bottom=medium, D401.top=medium, D401.bottom=medium, E401.top=medium, E401.bottom=medi
+um, F401.top=medium, F401.bottom=medium, C401.left=medium, F401.right=medium
+  B407:E407: B407.top=medium, B407.bottom=medium, C407.top=medium, C407.bottom=medium, D407.top=medium, D407.bottom=medi
+um, E407.top=medium, E407.bottom=medium, B407.left=medium, E407.right=medium
+  A410:I410: A410.top=medium, A410.bottom=medium, B410.top=medium, B410.bottom=medium, C410.top=medium, C410.bottom=medi
+um, D410.top=medium, D410.bottom=medium, E410.top=medium, E410.bottom=medium, F410.top=medium, F410.bottom=medium, G410.
+top=medium, G410.bottom=medium, H410.top=medium, H410.bottom=medium, I410.top=medium, I410.bottom=medium, A410.left=medi
+um, I410.right=medium
+  A411:I411: A411.top=medium, A411.bottom=medium, B411.top=medium, B411.bottom=medium, C411.top=medium, C411.bottom=medi
+um, D411.top=medium, D411.bottom=medium, E411.top=medium, E411.bottom=medium, F411.top=medium, F411.bottom=medium, G411.
+top=medium, G411.bottom=medium, H411.top=medium, H411.bottom=medium, I411.top=medium, I411.bottom=medium, A411.left=medi
+um, I411.right=medium
+COLOR_ANNOTATIONS
+  A8 value='صورت سود و زیان' data_type=s style_id=13 font_color=[type=theme,theme=1] fill_color=[type=rgb,rgb=FFFF0000]
+fill_type=solid
+COLOR_CELLS_PRINTED=1
+THICK_BORDER_CELLS
+THICK_BORDER_CELLS_COUNT=0
+PS D:\Winprojects\analyzer>
+(analyzer) Stop-Transcript
 
-
+**********************
+Windows PowerShell transcript end
+End time: 20261119013427
+**********************
