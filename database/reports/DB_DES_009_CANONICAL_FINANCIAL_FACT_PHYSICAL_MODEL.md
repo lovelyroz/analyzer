@@ -792,3 +792,140 @@ B. Multi-input fact: چند observation ساختاری متمایز با roleه�
 این طرح، recommendation فیزیکی برای طراحی بعدی است و هنوز باید با متن کامل DB-DES-008 و DB-DES-014 تطبیق داده شود. نسخه‌های کامل این دو سند در مسیرهای حدس‌زده‌شدهٔ قبلی repository قابل بازیابی نبودند؛ بنابراین هیچ نام جدول موجود یا جزئیات پیاده‌سازی آن اسناد را قطعی فرض نمی‌کنیم. همچنین fixtureهای واقعی direct و multi-input هنوز در این مرحله اجرا/اثبات نشده‌اند.
 
 **نتیجه:** Gate 1/2/7/8 از نظر رابطه‌ها و integrity requirements به یک طرح منسجم رسیده‌اند، اما physical design هنوز PROPOSED / NOT IMPLEMENTATION-READY است تا (الف) DB-DES-008 و DB-DES-014 با این طرح reconcile شوند، (ب) دو fixture واقعی direct/multi-input تأیید شوند، و (ج) جزئیات SQLite composite FK/trigger و NULL uniqueness نهایی شوند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+
+## 23. بازبینی طرح فیزیکی با شواهد واقعی parsian_periodic_report_3 — 2026-11-19
+
+### 23.1 منبع شواهد و اصلاح مسیر بررسی
+فایل اصلی parsian_periodic.xlsx برای این مرحله لازم نیست؛ گزارش database/reports/parsian_periodic_report_3.md مبنای شواهد ساختاری است. گزارش، workbook با SHA-256 برابر 69186f1ad2b0e481a3588f2731b7027b0a9d9a543d1ca17fd24fc71d8c5aca06 را توصیف می‌کند: دو worksheet، 0 formula، 101 merged range در Recovered_Sheet1 و 2 در Sheet1، و جزئیات cell/style/header/row/border. عنوان داخلی فایل گزارش عبارت «Independent Re-Audit Report 2» و نام فایل report_3 است؛ این اختلاف نام‌گذاری ثبت می‌شود و در این مرحله فرض نمی‌کنیم محتوای گزارش با گزارش دیگری یکسان یا متفاوت است.
+
+### 23.2 نمونهٔ واقعی Direct Mapping: T01
+T01 در Recovered_Sheet1!A10:D42 یک نمونهٔ قابل اتکای direct mapping در سطح ساختار است:
+- عنوان جدول در A8 و دو ردیف بالاتر از مرز جدول قرار دارد؛ A10:A11 یک Header ادغام‌شدهٔ «شرح» است.
+- Headerهای B10:B11 و D10:D11 دو سطحی‌اند: تاریخ/وضعیت گزارش در سطح بالایی و audit status در سطح پایینی. C10:C42 کاملاً Black و طبق قرارداد استخراج خارج از دامنه است.
+- ردیف‌های A13:A31، A33:A34 و A36:A42 labelهای Yellow هستند؛ B و D در همین ردیف‌ها Gray و دارای مقدارند.
+- Green markerهای A12، A32 و A35 سه row group مستقل می‌سازند؛ گزارش برای هر سه، بازهٔ روشن و پیوسته ارائه می‌کند.
+- یک source coordinate مفهومی برای mapping، صرفاً «ستون B» یا «ردیف 13» نیست؛ باید این مسیر را تعیین کند: worksheet → candidate/table T01 → row-group marker A12 → row label A13 → column header path B10:B11 → value cell B13. مسیر D13 مستقل است و Header path خودش را دارد.
+- E10:E11 و مقادیر E13:E42 خارج از border هستند. تا زمان تصمیم مالک، نباید به mapping جدول T01 اضافه شوند؛ حتی اگر از نظر مکانی شبیه درصد تغییر باشند.
+
+این مثال، وجود ساختار لازم برای RowAxisPath و HeaderPath را اثبات می‌کند. مختصات دقیق A1 برای نسخهٔ Template می‌تواند locator باشد، ولی هویت معنایی پایدار باید از node/pathهای نسخه‌دار به دست آید.
+
+### 23.3 نمونهٔ واقعی Row Axis چندسطحی: T03
+T03 در Recovered_Sheet1!A79:C119 سه marker سبز دارد: A81 «دارایی‌ها»، A96 «حقوق مالکانه» و A108 «بدهی‌ها». دو گروه آخر clear هستند؛ گروه اول به‌دلیل A95 که Blue است و در span سبز اول قرار می‌گیرد ambiguous است. در نتیجه:
+- RowAxisPath باید parent group و leaf row label را جداگانه نگه دارد؛ صرف ذخیرهٔ متن A82 یا row number کافی نیست.
+- Header path B79:B80 و C79:C80 مستقل است. A79:A80 Header شرحِ merged است.
+- A95:C95 یک Header آبی دوم داخل محدودهٔ border است؛ نقش آن هنوز از گزارش قطعی نیست. نباید آن را خودکار leaf row یا آغاز sub-table فرض کرد.
+- ستون‌های D و E خارج از border هستند و داده دارند؛ ورودشان به T03 نیازمند تصمیم مالک است.
+
+این مثال نشان می‌دهد Row Axis همیشه یک گروه marker + label ساده و بدون استثنا نیست؛ مدل باید nodeهای ساختاری و وضعیت unresolved/ambiguous را پشتیبانی کند، اما هیچ mapping مبهمی قابل approval/ingestion نیست.
+
+### 23.4 نمونهٔ واقعی چندستونی و استثناهای ارزش
+T04 در Recovered_Sheet1!A130:L165 دارای 12 ستون Header، ردیف‌های Black کامل A131:L151، marker سبز A152 و labelهای A153:A165 است. 143 سلول Gray دارد که 85 موردشان blank هستند. طبق rule 7 مالک که در گزارش نقل شده، blank Gray برابر numeric zero است، نه NULL. این تبدیل باید در Interpretation rule صریح و versioned باشد؛ از رنگ/blank بودن به‌تنهایی نباید یک قاعدهٔ عمومی خارج از قرارداد مالک استخراج کرد.
+
+T06 در Recovered_Sheet1!A238:I253 چهار ستون Gray یعنی C/E/G/I و چهار ستون Black بین آن‌ها دارد؛ C248:C251 چهار Gray blank هستند و گزارش آن‌ها را با rule 7 صفر می‌داند. با این حال، معنای Headerها و ردیف‌های A243:A244 و داده‌های uncolored داخل جدول، در گزارش ابهام دارند. بنابراین T06 برای اثبات ساختار interleaved column slots مفید است، اما هنوز نمونهٔ مناسب برای SemanticMapping پذیرفته‌شده نیست.
+
+### 23.5 آیا گزارش Multi-input Fact را اثبات می‌کند؟
+خیر. گزارش نمونه‌های متعدد از یک ردیف با چند ستون مقداری و چند دوره/وضعیت را نشان می‌دهد؛ این‌ها در مدل فعلی به‌طور طبیعی observationهای جداگانه و در صورت تفاوت دوره یا وضعیت، Factهای جداگانه‌اند. گزارش هیچ محاسبه یا canonical fact واحدی را نشان نمی‌دهد که از دو یا چند input مستقل ترکیب شده باشد. بنابراین مثال واقعی Multi-input Fact هنوز نداریم و نباید چند ستون B/D یا C/E/G/I را به‌اشتباه multi-input یک Fact بنامیم.
+
+تا زمان یافتن یک rule مالی واقعی که چند ورودی را برای ساخت یک Fact واحد مصرف کند، Provenance چندردیفی همچنان یک قابلیت طراحی‌شده است، نه یک رفتار اثبات‌شده توسط این workbook. Direct mapping اثبات شده؛ multi-input mapping نیازمند مثال و قاعدهٔ مستقل است.
+
+### 23.6 اثر بر physical model
+1. RowAxis باید درختی و version-scoped باشد؛ markerها group node و yellow labels leaf/row-label node هستند، اما قابلیت nodeهای ساختاری دیگر و ambiguity را نیز لازم دارد.
+2. HeaderPath باید چندسطحی و ordered باشد و mergeها را به‌صورت ساختار Header حفظ کند؛ merged cell نباید به‌عنوان چند Header مستقل تکرار شود.
+3. ColumnSlotها در scope table/layout node تعریف شوند؛ یک جدول می‌تواند چند ColumnSlot مجاز داشته باشد و ستون‌های خارج از border فقط با rule/approval صریح وارد template می‌شوند.
+4. SemanticMapping باید intersection دقیق RowAxisPath و HeaderPath را هدف بگیرد؛ رنگ و border برای کشف/تأیید Template مفیدند، اما به‌تنهایی semantic identity یا metric mapping نیستند.
+5. Ruleهای مقدار باید وضعیت‌های numeric، blank، explicit zero، excluded/black و uncolored را از هم جدا کنند. فقط blank Gray طبق rule 7 مالک صفر می‌شود؛ blank در هر رنگ/موقعیت دیگر خودکار صفر نیست.
+6. TemplateVersion باید worksheet direction (RTL/LTR)، merged ranges، layout nodeها، header rows، border bounds و column slotهای پذیرفته‌شده را به‌عنوان ویژگی‌های ساختاری نسخه نگه دارد. رنگ‌ها می‌توانند evidence/locator برای template recognition باشند، نه شرط لازم برای هر بار استخراج پس از تثبیت TemplateVersion.
+7. نام‌های T01–T17/U01/S01 و مختصات سلول‌ها شناسه‌های audit report هستند، نه کلیدهای دائمی DB. TemplateNode IDها باید در نسخهٔ Template داخلی و stable باشند.
+
+### 23.7 مرزهای حل‌نشده و نتیجه
+گزارش 13 ابهام مالک را باز گذاشته است؛ از جمله ستون‌های بیرون border، نقش A95:D95 در T03، ردیف‌های black در T04، سلول‌های uncolored در T06، U01، T13 row 364، T17 بدون Yellow، و وضعیت Sheet1. این موارد نباید با heuristic یا رنگ‌خوانی خودکار حل شوند. گزارش همچنین بصری render نشده و RTL display فقط از metadata استنباط شده؛ پس ترتیب منطقی خواندن از روی RTL به‌تنهایی قطعی نیست.
+
+**نتیجهٔ بازبینی:** نمونه‌های واقعی اکنون برای طراحی RowAxisPath، HeaderPath، ColumnSlot و direct SemanticMapping در دست است؛ نیازی به آپلود دوبارهٔ workbook برای این مرحله نیست. Gate 7 از نظر مدل مفهومی شواهد بهتری دارد، ولی تا تعیین تکلیف ambiguityهای لازم و اثبات mapping عملی، همچنان PARTIAL/OPEN می‌ماند. Multi-input همچنان UNPROVEN. طرح فیزیکی Gateهای 1/2/7/8 هنوز PROPOSED است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 24. قرارداد شناسایی Template در V1 بر اساس Parsian — 2026-11-19
+
+### 24.1 هدف و مرز قرارداد
+
+این قرارداد مشخص می‌کند Excel Reader/Template Resolver چه زمانی می‌تواند یک ساختار را به‌عنوان Template شناخته‌شده بپذیرد، چه داده‌هایی را مجاز است وارد semantic interpretation کند و در چه شرایطی باید extraction را متوقف کند. این قرارداد به‌تنهایی به معنی تصویب Template تولیدی Parsian یا مجوز persistence نیست.
+
+سه مرحله باید مستقل بمانند:
+1. **Candidate discovery:** پیدا کردن محدوده‌ها و نشانه‌های ساختاری برای بررسی؛ خروجی آن صرفاً candidate است.
+2. **Template resolution:** تطبیق قطعی workbook با یک TemplateVersion مصوب و فعال برای همان Company و ReportType.
+3. **Semantic interpretation:** اعمال mappingهای مصوب روی تقاطع دقیق RowAxisPath و HeaderPath/ColumnSlot. کشف candidate یا شباهت ظاهری هرگز جای mapping مصوب را نمی‌گیرد.
+
+### 24.2 قرارداد حداقلی ساختار
+
+TemplateVersion پذیرفته‌شده باید دست‌کم این موارد را به‌صورت صریح و نسخه‌دار تعریف کند:
+
+- worksheetهای مشمول و محدودهٔ هر layout/table؛ worksheet اضافی یا ناشناخته نباید بی‌صدا نادیده گرفته شود.
+- مرز table و sub-table، با قواعد روشن برای شروع/پایان و تعلق هر ردیف/ستون.
+- HeaderPath مرتب و چندسطحی برای هر ColumnSlot؛ سلول mergeشده باید در مسیر Header به‌درستی resolve شود، نه اینکه مقدار خالی سلول‌های غیر-anchor به‌عنوان header مستقل تلقی شود.
+- RowAxisPath سلسله‌مراتبی برای هر ردیف معنایی؛ parent/group marker و leaf label باید قابل تمایز باشند. label یکسان زیر parentهای متفاوت، یک node معنایی واحد نیست.
+- نقش صریح هر slot/region: description, value, excluded, auxiliary یا unresolved. رنگ، border، مختصات و متن سلول‌ها شواهد candidate هستند؛ به‌تنهایی معنای مالی ایجاد نمی‌کنند.
+- جهت worksheet (RTL/LTR) فقط یک ویژگی layout است. ترتیب معنایی ستون‌ها باید در HeaderPath/ColumnSlot صریح باشد و از حدس بر مبنای نام ستون یا mirrored display ساخته نشود.
+- هر semantic mapping باید به یک مسیر کامل و یکتا متصل شود: TemplateVersion + layout/table context + RowAxisPath + ColumnSlot/HeaderPath. سپس Metric، DimensionSet، period، duration_basis، unit/measurement basis و value-state rule تعیین شوند.
+
+### 24.3 شواهد قابل‌استفاده از T01
+
+T01 در `Recovered_Sheet1!A10:D42` یک **نمونهٔ مرجع ساختاری برای direct mapping** است، نه مجوز استخراج خودکار همهٔ جدول‌های مشابه:
+
+- A10:A11 مسیر Header توضیحات را می‌سازد؛ B10:B11 و D10:D11 دو HeaderPath مستقل‌اند.
+- RowAxis از group markerهای A12/A32/A35 و leaf labelهای زرد زیر هر marker ساخته می‌شود.
+- B و D ستون‌های value candidate هستند؛ C به‌دلیل نقش Black طبق قرارداد مالک excluded است.
+- مرز bordered candidate به A:D محدود است. ستون E بیرون مرز است و تا زمان تصمیم صریح مالک وارد این Template نمی‌شود.
+- برای یک Fact در B و یک Fact در D، period/status و provenance مستقل حفظ می‌شود. وجود دو ستون به معنی دو input برای یک Fact نیست.
+- گروه‌های RowAxis در T01 clear هستند؛ شروع و پایان هر span در گزارش ثبت شده است.
+
+بنابراین T01 برای اثبات نیاز به RowAxisPath، HeaderPath چندسطحی و mapping مستقیم کافی است؛ اما هنوز نیازمند ثبت TemplateVersion و SemanticMapping مصوب در سازوکار واقعی برنامه است.
+
+### 24.4 ساختارهای پذیرفتنی، مستثنا و مسدود
+
+| ساختار / شاهد | تصمیم V1 |
+|---|---|
+| Header چندسطحی و mergeهای هم‌راستا با مسیر Header | قابل‌پذیرش، مشروط به تعریف صریح anchor/path در TemplateVersion |
+| Group marker سبز + leaf label زرد با span روشن، مانند T01 و گروه‌های روشن T03 | قابل‌مدل‌سازی به‌صورت RowAxis hierarchy؛ mapping فقط پس از تصویب معنای هر node |
+| ستون Black در نقش exclusion، مانند C در T01 | فقط وقتی در TemplateVersion صریحاً excluded تعریف شده باشد؛ رنگ detector عمومی معنای مستقل نمی‌سازد |
+| Gray value cells | value candidate؛ فقط slotهای صریحاً تعریف‌شده قابل‌تفسیرند |
+| Gray blank داخل value slot مصوب | طبق Rule 7 مالک، مقدار صفر؛ این قاعده به Gray blank محدود است و به blankهای uncolored/Blue/Black یا سلول غایب تعمیم ندارد |
+| چند ColumnSlot با HeaderPath/period/status متفاوت | Factهای مستقل؛ multi-input محسوب نمی‌شوند مگر رابطهٔ چندمنبعی جداگانه و صریحاً تعریف و اثبات شود |
+| سلول/ستون خارج از مرز table | خارج از Template مصوب، مگر اینکه مالک مرز را تغییر دهد و نسخهٔ جدید تأیید شود |
+| ساختار ناشناخته، چندمعنا یا ناسازگار با نسخهٔ ثبت‌شده | BLOCK؛ نه fallback به fuzzy mapping و نه ingest جزئیِ بی‌اعلان |
+
+### 24.5 تصمیم موردی بر شواهد Parsian
+
+- **T01:** الگوی ساختاری مرجع direct mapping؛ محدودهٔ فعلی A10:D42. ستون C excluded و E بیرون محدوده. گروه‌های A12، A32 و A35 روشن‌اند.
+- **T03:** B79:B80 و C79:C80 دو HeaderPath مستقل‌اند. گروه‌های A96 و A108 روشن‌اند. طبق تصمیم قبلی مالک، B95 و C95 تکرار Headerهای B79 و C79 هستند و نادیده گرفته می‌شوند؛ D95 خارج محدوده و غیرضروری است. بنابراین A95:D95 نه HeaderPath جدید می‌سازد و نه مرز sub-table. ردیف/سلول‌های خارج از mapping مصوب همچنان استخراج نمی‌شوند.
+- **T04:** ردیف‌های کاملاً Black از 131 تا 151 همچنان ابهام حل‌نشده‌اند؛ هیچ تصمیمی برای معنای آن‌ها جعل نمی‌شود و این بخش تا تعیین تکلیف مالک BLOCK است. 85 Gray blank در value area طبق Rule 7 مالک صفرند؛ این تصمیم مستقل از ابهام ردیف‌های Black است.
+- **T06:** طبق تصمیم قبلی مالک، سلول‌های uncolored و Black در ردیف‌های 243–244 استخراج نمی‌شوند؛ آن‌ها Fact یا ردیف معنایی محسوب نمی‌شوند. چهار Gray blank در C248:C251 طبق Rule 7 صفرند. بی‌رنگ با Gray خالی متفاوت است و حذف می‌شود.
+- **T08:** C279:F279 headerهای Blue خارج از border و مقادیر uncolored زیر آن‌ها دارد؛ اینکه یک table است یا دو table، تا تصمیم مالک BLOCK است.
+- **U01 و S01/Sheet1:** بدون red name/border (U01) یا بدون Yellow/Gray/Black/border (Sheet1) بودن، به‌تنهایی نه inclusion را ثابت می‌کند نه exclusion معنایی را. هر دو unresolved و خارج از ingest هستند تا مالک نقششان را تعیین کند.
+- **T13:** طبق تصمیم قبلی مالک، سلول‌های uncolored و Black ردیف 364 استخراج نمی‌شوند؛ آن‌ها separator یا data row جدید ایجاد نمی‌کنند. سایر ردیف‌ها فقط طبق mapping صریح Template تفسیر می‌شوند.
+- **T17:** ساختار بدون Yellow با header آبی، valueهای Gray و border نازک یک exception candidate است. Rule 8 فقط در صورت ثبت صریح این exception برای همین TemplateVersion قابل‌اعمال است؛ نبود Yellow نباید به‌طور عمومی مجاز شود.
+- **T02:** طبق تصمیم قبلی مالک، عنوان/ناحیهٔ Red مرجع تعیین محدوده است؛ Borderهای امتدادی A58:A59 و E68 محدوده را گسترش نمی‌دهند و نادیده گرفته می‌شوند.
+- **ستون‌های header آبی خارج از border در T01/T02/T03/T05/T06/T07/T08/T09/T10/T11/T12:** هنوز تصمیم صریح مالک دربارهٔ تعلق آن‌ها به جدول بازیابی نشده است؛ بنابراین فعلاً خارج از scope و extraction می‌مانند. این محدودیت اجرایی، تفسیر نهایی نیت مالک نیست.
+
+### 24.6 قواعد fail-closed برای Template Resolver و extractor
+
+1. Template Resolver باید Company، ReportType و TemplateVersion را با یک تطبیق قطعی انتخاب کند؛ fuzzy score یا شباهت نام worksheet برای پذیرش کافی نیست.
+2. fingerprint می‌تواند برای کشف تغییر ساختار استفاده شود، اما fingerprint جایگزین شناسهٔ نسخه و approval نیست. تغییر در ancestry ردیف، HeaderPath، table boundary، slot role یا merge مؤثر بر معنا باید TemplateVersion جدید ایجاد کند.
+3. اختلاف صرفاً محتوایی در سلول‌های value نباید TemplateVersion جدید بسازد، مگر آنکه به ساختار/معنا لطمه بزند.
+4. هر table/row/column ناشناخته، mapping مفقود یا چند mapping منطبق، ambiguity در Header/RowAxis، تغییر worksheet direction مؤثر بر layout، یا تغییر خارج از tolerance مصوب باید extraction را متوقف کند.
+5. هیچ cell خارج از محدودهٔ مصوب، uncolored numeric، مقدار متنی شبیه عدد، یا blank غیر Gray را صرفاً با مجاورت، رنگ نزدیک، ترتیب یا حدس به Fact تبدیل نکن.
+6. مقادیر null، zero، absent و excluded چهار حالت متمایزند. Rule 7 فقط Gray blank داخل slot value مصوب را به zero تبدیل می‌کند.
+7. هر Fact باید period و duration_basis خود را از mapping/observation مربوط به همان slot بگیرد؛ یک دورهٔ کلی برای کل ReportVersion تحمیل نشود.
+8. هیچ ReportVersion تا وقتی دقیقاً یک TemplateVersion و یک InterpretationStandardVersion سازگار و مصوب ندارد، برای ingestion پذیرفته نشود.
+9. discovery و validation باید گزارش تشخیصی قابل ممیزی تولید کنند؛ diagnostic report مجوز ingest نیست و raw workbook/cell archive را وارد DB نمی‌کند.
+
+### 24.7 معیار عبور از این مرحله و وضعیت
+
+این قرارداد، مرز رفتار V1 را روشن می‌کند اما هنوز Template تولیدی Parsian را تصویب نمی‌کند. برای بستن Gate 7 لازم است:
+- مالک ابهام‌های مؤثر را صریحاً حل کند یا آن‌ها را به‌صورت scope exclusion قطعی تأیید کند؛
+- همین قرارداد روی workbook مستقل دیگری از همان شرکت/ReportType آزموده شود تا drift ساختاری معلوم شود؛
+- دست‌کم یک fixture direct mapping end-to-end و constraintهای عدم‌ابهام آن اثبات شود؛
+- multi-input با نمونهٔ واقعی مستقل اثبات شود یا از V1 صریحاً خارج بماند؛
+- طرح با متن کامل DB-DES-008 و DB-DES-014 reconcile شود.
+
+**وضعیت:** قرارداد شناسایی Template V1 به‌صورت طراحی PROPOSED ثبت شد؛ T01 نمونهٔ direct mapping ساختاری است، T03 جزئی و مشروط است، و موارد unresolved همچنان BLOCK هستند. Gate 7 PARTIAL/OPEN؛ Gateهای فیزیکی 1/2/7/8 همچنان PROPOSED. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.

@@ -1939,3 +1939,46 @@ Reader باید read-only بماند. لایهٔ Template resolution، semantic 
 - پیش از migration دو fixture واقعی direct و multi-input و adversarial tests لازم است.
 
 این طرح هنوز PROPOSED است و باید با متن کامل DB-DES-008 و DB-DES-014 reconcile شود؛ متن کامل آن دو سند از مسیرهای حدس‌زده‌شده قبلی بازیابی نشد. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+
+## 8.89 شواهد واقعی Parsian برای Template و Semantic Mapping — 2026-11-19
+
+برای طراحی از فایل اکسل اصلی دوباره درخواست نمی‌شود؛ گزارش database/reports/parsian_periodic_report_3.md مبنای شواهد ساختاری قرار گرفت. این گزارش workbook با SHA-256 69186f1ad2b0e481a3588f2731b7027b0a9d9a543d1ca17fd24fc71d8c5aca06 را توصیف می‌کند.
+
+- T01 (Recovered_Sheet1!A10:D42) نمونهٔ Direct Mapping است: row groupهای سبز A12/A32/A35، labelهای زرد، Headerهای دو سطحی B10:B11 و D10:D11، و ستون Black C که excluded است. ستون E خارج border است و تا تصمیم مالک وارد Template نمی‌شود.
+- T03 (A79:C119) نیاز به RowAxis سلسله‌مراتبی و HeaderPath چندسطحی را نشان می‌دهد؛ marker اول به‌دلیل Blue بودن A95 ambiguous است و نباید mapping شود.
+- T04/T06 نشان می‌دهند blank Gray فقط طبق rule 7 مالک zero است؛ blankهای دیگر خودکار zero نیستند.
+- گزارش Multi-input Fact را اثبات نمی‌کند؛ ستون‌های متعدد با دوره/وضعیت متفاوت، Factهای مستقل‌اند، نه لزوماً inputهای یک Fact واحد. پس Multi-input همچنان UNPROVEN.
+- ابهام‌های مالک دربارهٔ ستون‌های خارج border، U01، Sheet1 و موارد دیگر باز می‌مانند؛ هیچ heuristic جای تصمیم صریح را نمی‌گیرد.
+
+جزئیات و اثر بر مدل فیزیکی در DB-DES-009 بخش 23 ثبت شد. نتیجه: direct mapping از نظر ساختار مستند شد؛ Gate 7 همچنان PARTIAL/OPEN و طرح فیزیکی هنوز PROPOSED است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.90 قرارداد شناسایی Template در V1 بر اساس Parsian — 2026-11-19
+
+در DB-DES-009 بخش 24، قرارداد V1 برای تفکیک Candidate Discovery، Template Resolution و Semantic Interpretation ثبت شد.
+
+- T01 در محدودهٔ A10:D42 نمونهٔ ساختاری direct mapping است: RowAxis hierarchy از marker/labelها، HeaderPath چندسطحی برای B و D، ستون C صریحاً excluded و E خارج از محدودهٔ فعلی. این نمونه هنوز معادل Template تولیدی مصوب یا persistence نیست.
+- T03 فقط بخشی قابل‌مدل‌سازی دارد؛ A96 و A108 گروه‌های روشن‌اند، ولی span گروه A81 به‌دلیل A95 آبی ambiguous و mapping وابسته به آن BLOCK است.
+- Gray blank فقط داخل value slot مصوب، طبق Rule 7 مالک، صفر است؛ blankهای دیگر یا سلول غایب به صفر تعمیم داده نمی‌شوند.
+- T04/T06/T08/T13/T17/T02 و U01/Sheet1 طبق جزئیات بخش 24 دارای استثنا یا ابهام‌اند. ستون‌های Blue خارج border در scope فعلی وارد استخراج نمی‌شوند؛ این به معنی تعیین نیت نهایی مالک نیست.
+- چند ستون با HeaderPath/period/status متفاوت Factهای مستقل هستند؛ Parsian هنوز Multi-input Fact را اثبات نمی‌کند.
+- Resolver باید exact/versioned و fail-closed باشد؛ fuzzy mapping، سلول خارج از scope و ساختار ناشناخته حق ingest ندارند.
+
+**نتیجه:** قرارداد طراحی PROPOSED است؛ Gate 7 همچنان PARTIAL/OPEN و physical design همچنان PROPOSED. برای عبور، تصمیم صریح مالک دربارهٔ ambiguityهای مؤثر، آزمون workbook مستقل، fixture direct end-to-end، تعیین تکلیف multi-input و reconciliation با متن کامل DB-DES-008/014 لازم است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.91 اعمال تصمیم‌های قبلی مالک بر ابهام‌های Parsian — 2026-11-19
+
+بازیابی گفتگوهای قبلی نشان داد بخشی از پرسش‌های بخش 13.3 گزارش Parsian قبلاً پاسخ گرفته‌اند. این تصمیم‌ها در DB-DES-009 بخش 24 اعمال شدند:
+
+- **T03:** B95 و C95 تکرار B79 و C79 و نادیده‌اند؛ D95 بیرون محدوده و غیرضروری است. بنابراین A95:D95 دیگر ابهام Header/sub-table محسوب نمی‌شود.
+- **T06:** سلول‌های uncolored و Black در ردیف‌های 243–244 استخراج نمی‌شوند.
+- **T13:** سلول‌های uncolored و Black در ردیف 364 استخراج نمی‌شوند؛ separator/data row جدید تلقی نمی‌شوند.
+- **T02:** عنوان/ناحیهٔ Red معیار محدوده است؛ Borderهای بیرونی A58:A59 و E68 محدوده را گسترش نمی‌دهند.
+- **Rule 7:** Gray blank در value slot استخراجی صفر است؛ uncolored حذف می‌شود و با Gray blank یکی نیست.
+
+**مواردی که هنوز پاسخ صریح مالک ندارند:** Blue headerهای خارج از border، ردیف‌های Black در T04، ساختار T08، وضعیت U01، استثنای T17/Rule 8، وضعیت Sheet1 و تأیید بصری/ترتیب نمایش RTL. این موارد همچنان unresolved باقی می‌مانند.
+
+**اثر:** T03/T06/T13/T02 از فهرست ابهام‌های باز به تصمیم‌های مشخص تبدیل شدند؛ این موضوع به‌تنهایی Gate 7 یا physical design را نمی‌بندد. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
