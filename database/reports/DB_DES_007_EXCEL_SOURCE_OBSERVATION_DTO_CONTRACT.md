@@ -1,7 +1,7 @@
 # DB-DES-007 — Excel Source Observation DTO Contract
 
 **Date:** 2026-11-15  
-**Status:** PARTIAL — logical DTO boundary and companion Python DTO design are defined; production implementation, additional source evidence, and user-run validation remain open.  
+**Status:** DONE — logical DTO contract and V1 observation implementation acceptance reconciled in Section 18; table-region detection remains a separate Task 033.  
 **Scope:** CODAL Excel ingestion V1. This is a logical contract, not a Python API, ORM model, physical schema, or migration specification.
 
 ## 1. Purpose and boundary
@@ -333,3 +333,19 @@ Normative interpretation for the V1 reader:
 - Formula/cache dual-pass handling and the OOXML numeric-token sidecar remain out of V1 scope. Numeric observations use the value exposed by the selected openpyxl reader profile; precision/semantic interpretation belongs to later validation and interpretation, not this structural reader.
 
 The implementation uses distinct DTO states `PRESENT_TEXT` and `PRESENT_NUMBER`, with `numeric_value` retaining the observed int/float. The visual table detector counts both states as populated literal cells. This clarification corrects the earlier misunderstanding; it is **not a change to the owner's original intent**.
+
+
+## 18. Completion reconciliation — 2026-11-19
+
+**Superseding status: DONE for the DB-DES-007 logical observation DTO contract and its V1 implementation acceptance.** The earlier PARTIAL status in Sections 12–13 predated the separately tracked implementation work and is superseded by this reconciliation.
+
+Evidence:
+- The concrete immutable DTO implementation is present in `src/ingestion/excel/dto.py`, including independent header axes/fragments, row and column observations, cell value states, diagnostics, worksheet/table observations, and workbook envelope.
+- The openpyxl reader is present in `src/ingestion/excel/reader.py`; its contract preserves literal text and native numeric values, blank-vs-zero distinction, worksheet order/visibility, merged ranges and source fingerprint, and rejects unsupported populated cell kinds at workbook scope.
+- Owner-run validation for the combined DTO/reader suite is recorded as 36 passed in 3.01s in the Master Packet; the final reader implementation report separately records 26 passed in 1.35s. These are owner-reported results; the assistant did not execute tests.
+- Owner-run Reader acceptance across the five available real workbooks is recorded in Master Packet Task 032. The report-3 OOXML audit additionally supplies direct structural/value evidence for the Parsian sample, subject to its documented workbook-version/hash limitation.
+- The owner-confirmed V1 amendment is literal direct values only; formulas are prohibited. Native numeric cells are allowed. Boolean, date-typed and Excel error cells remain unsupported unless separately approved.
+
+**Scope boundary:** visual financial table segmentation, company template extraction/matching, bounds approval and cross-period drift are not DB-DES-007 deliverables; they remain in DB-ING-006 / Task 033. No claim is made that a production financial template or semantic mapping has been approved.
+
+No ORM, schema, migration, database or financial ingestion behavior was changed by this completion reconciliation.
