@@ -286,3 +286,19 @@ DB-AUD-006 در این نوبت **PARTIAL** باقی می‌ماند. این م�
 **نتیجهٔ اصلاح‌شده:** Task 010 / DB-DES-005 برای مسیر CODAL همچنان PARTIAL است؛ مهم‌ترین شکاف‌های مشاهده‌شده، پایدار نبودن Run در تمام مراحل acquisition-to-persistence، ایجاد Run جدید به‌جای حفظ همان Run در failure، و نبود payload-conflict check برای replay با همان identity هستند. رفتار FX/OHLC خارج از حکم انطباق DB-DES-005 نگه داشته می‌شود. Task 027 / DB-AUD-006 نیز به علت نبود schema/data inventory از محیط واقعی و محدودیت‌های فوق PARTIAL می‌ماند.
 
 **تغییرات:** فقط همین سند ممیزی و Master Working Packet مستنداتی به‌روزرسانی می‌شوند. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+## 13. Crosswalk با ممیزی‌های قبلی دیتابیس و جلوگیری از تکرار کار — 2026-11-18
+
+بازخوانی Master Working Packet پس از دریافت inventory محلی نشان می‌دهد بخش مهمی از schema/data و dependency auditها پیش‌تر انجام شده‌اند و نباید دوباره درخواست/اجرا شوند:
+
+- **DB-AUD-011 / Master §8.44:** row-linkage دیتابیس محلی برای 505 `raw_financial_facts` انجام شد؛ سه جدول `mapping_decisions`، `normalized_financial_fact_inputs` و `normalized_financial_facts` در همان snapshot فاقد ردیف و فاقد ارجاع بودند.
+- **DB-AUD-015 / Master §8.52:** هر چهار جدول Normalized/Derived در همان دیتابیس محلی صفر ردیف داشتند؛ referenceهای بررسی‌شده صفر، duplicate input-link groups صفر و `PRAGMA foreign_key_check` بدون violation بود.
+- **Migration 9 / Master §8.64:** آثار قابل‌مشاهدهٔ migration 9 در دیتابیس محلی audit و cleanup شد؛ دو ستون اضافی و ledger row حذف شدند، 505 raw facts حفظ شدند و audit پس از cleanup موفق بود. implementation اصلی migration 9 و side effectهای ناشناخته تاریخی همچنان قابل اثبات نیستند.
+- **DB-AUD-012 / Master §§8.45–8.46:** inventory وابستگی PDF در working tree کامل شد؛ 5,611 فایل اسکن، 26 فایل دارای match و مرز PDF-only/shared/schema/test مشخص شد.
+- **DB-AUD-013 / Master §8.48:** gap audit آمادگی persistence اکسل انجام شد و نتیجه داد مسیر production Excel-to-canonical هنوز وجود ندارد؛ `NormalizedFinancialFact` مقصد آماده محسوب نمی‌شود.
+- **DB-PLAN-013 / Master §8.47:** طرح مرحله‌ای بازنشستگی PDF تدوین شد؛ شرط اصلی آن ساخت و اثبات مسیر Excel persistence پیش از قطع مسیر PDF است.
+
+بنابراین عبارت بخش 12 مبنی بر اینکه schema/data inventory محلی هنوز انجام نشده، بیش از حد کلی بود. **ممیزی‌های هدفمند فوق برای snapshot محلی انجام شده‌اند**؛ آنچه هنوز اثبات نشده، وضعیت سایر محیط‌ها/backupها و مصرف‌کنندگان بیرون از working tree بررسی‌شده است. این گزارش درخواست تکرار آن ممیزی‌های محلی را نمی‌دهد.
+
+**مسیر بعدی پروژه:** ادامهٔ Phase 0 از DB-PLAN-013 و بستن gateهای طراحی DB-DES-009 است؛ نه تکرار PDF dependency audit، RawFact linkage یا Normalized/Derived local linkage. اولین gate اجرایی-مستندی که باید بسته شود، inventory تمام مصرف‌کنندگان `reports.financial_period_id` پیش از nullable کردن/جابه‌جایی آن است. سپس gateهای ReportVersion source revision/standard binding، dimension scope، company-consistency و provenance granularity به‌ترتیب بررسی می‌شوند.
+
+هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای در این crosswalk تغییر نکرد و تستی اجرا نشد.
