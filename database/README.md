@@ -76,3 +76,5 @@
 - [DB_DES_010_STAGE5_FINANCIAL_FACT_QUERY_MIGRATION_CONTRACT.md](reports/DB_DES_010_STAGE5_FINANCIAL_FACT_QUERY_MIGRATION_CONTRACT.md) — قرارداد انتقال Stage 5 به FinancialFact با PIT، ابعاد، دوره‌های Jalali و provenance.
 
 | [DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md](reports/DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md) | قرارداد پیشنهادی تاریخ‌های جلالی، INSTANT/DURATION و تفکیک YTD از بازه مالی |
+
+- [DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md](reports/DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md) — تطبیق Architecture V1.3 و قراردادهای زمانی؛ تعارض مالکیت YTD و موارد باز months_length و Fiscal Calendar.
