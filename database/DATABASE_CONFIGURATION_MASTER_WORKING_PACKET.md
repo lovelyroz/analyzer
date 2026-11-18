@@ -1788,3 +1788,14 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 **محدودیت دامنه:** Header dictionary تأییدشدهٔ فعلی برای periodic reports بانکی است و به سایر صنایع تعمیم داده نمی‌شود. Header dictionary جایگزین Metric-level semantic mapping نیست.
 
 **وضعیت Gate 1:** تعریف منطقی Bundle و scope آن بسته شد؛ relational component schema، approval workflow و قیدهای physical سازگاری هنوز باز هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 17 گزارش DB-DES-009 ثبت شده است.
+
+
+### 8.78 تصمیم Gate 2 از DB-DES-009 — Scope و Versioning کاتالوگ Dimension — 2026-11-18
+
+**تصمیم:** تعریف Dimension و هویت memberها در کاتالوگ global و پایدار قرار می‌گیرد؛ اما global بودن شناسه به معنی مجاز بودن در همهٔ صنایع یا report familyها نیست. InterpretationStandardVersion مشخص می‌کند کدام Dimension و کدام member برای کدام Metric، Template/node و context مجاز است. Memberهای واقعاً مشترک قابل reuse هستند؛ memberهای مختص شرکت/صنعت/report family شناسهٔ مستقل دارند و فقط در Bundleهای مجاز reference می‌شوند.
+
+Dimension فقط برای محور اقتصادی value-defining استفاده می‌شود. عنوان ردیف/جدول/worksheet، ColumnSlot، unit/currency، period، temporal basis، report type و source version به‌خودی‌خود Dimension نیستند. Dimension نباید برای حل ambiguity یا collision ناشی از mapping ناقص ساخته شود. اگر مفهوم بین صنایع متفاوت است، کد Dimension مستقل لازم است؛ label مشابه دلیل اشتراک معنایی نیست.
+
+**Versioning:** Dimension code و member identity پس از approval immutable هستند. تغییر معنای مفهوم/member شناسهٔ جدید می‌خواهد. تغییر alias/display/applicability در InterpretationStandardVersion جدید pin می‌شود. member بازنشسته حذف یا reuse نمی‌شود و برای facts تاریخی باقی می‌ماند؛ Bundle جدید فقط در صورت مجاز بودن می‌تواند آن را به‌کار ببرد. DimensionSet از member identityهای مرتب‌شده و canonical ساخته می‌شود؛ هر Dimension در یک set حداکثر یک member دارد و Fact بدون Dimension از empty set یکتا استفاده می‌کند.
+
+**وضعیت Gate 2:** logical scope/versioning بسته شد؛ physical allowed-value relations، canonical set serialization و approval workflow باز هستند. کاتالوگ واقعی همهٔ صنایع از پیش ساخته نمی‌شود و فقط با شواهد/نیاز استاندارد به‌صورت incremental توسعه می‌یابد. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 18 گزارش DB-DES-009 ثبت شده است.
