@@ -1830,3 +1830,14 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 **مانع فعلی:** metadata واقعی endpoint یا download manifest گزارش Excel CODAL در repository وجود ندارد؛ فیلد رسمی revision و رفتار correction/restatement قابل اثبات نیست. برای بستن gate باید metadata واقعی حداقل یک گزارش اصلی و یک نسخه اصلاحی/بازانتشارشده بررسی شود. اگر چنین evidence در دسترس نباشد، ingestion باید fail closed کند و gate باز بماند.
 
 **وضعیت Gate 4:** تفکیک مفهومی بسته شد، اما source-issued revision key و source publication metadata مسیر Excel **OPEN / EVIDENCE BLOCKED** است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 20 گزارش DB-DES-009 ثبت شده است.
+
+
+### 8.81 تطبیق Gateهای 9 و 10 از DB-DES-009 با ممیزی‌های قبلی — 2026-11-18
+
+**Gate 9 — Consumer inventory:** DB-AUD-014 / §8.50، inventory مصرف‌کنندگان source را تکمیل کرده است: تنها reader تولیدی NormalizedFinancialFact، Stage 5 query است؛ writer تولیدی Normalized/NormalizedInput/Derived در branch بررسی‌شده وجود ندارد. DB-AUD-015 / §8.52 نیز چهار جدول Normalized/Derived را در snapshot دیتابیس محلی صفر ردیف و بدون linkage/reference/duplicate و بدون FK violation گزارش کرده؛ 505 RawFinancialFact حفظ شده‌اند. بنابراین source inventory و local snapshot linkage COMPLETE هستند، ولی محیط‌های دیگر/backupها/external consumers اثبات نشده‌اند. Stage 5 query و تست‌هایش باید در انتقال آینده حفظ شوند.
+
+**Gate 10 — Migration 9:** DB-AUD-010 و §8.64 آثار قابل‌مشاهدهٔ Migration 9 را در دیتابیس محلی reconcile و cleanup کرده‌اند: دو ستون اضافه و ledger row حذف، 505 RawFinancialFact حفظ، backup پیش از cleanup ساخته و audit پس از cleanup تأیید شده است. implementation اصلی Migration 9 پیدا نشده و runner فعلی فقط تا نسخهٔ 8 است؛ side effectهای تاریخی ناشناخته قابل نفی نیستند. Migration 9 جایگزین ساخته نمی‌شود و cleanup محلی تکرار نمی‌شود.
+
+**اثر بر DB-DES-009:** طراحی additive می‌تواند ادامه یابد؛ حذف legacy، backfill خودکار یا migration مخرب نیازمند مجوز مستقل و audit دقیق محیط مقصد است.
+
+**وضعیت:** Gate 9 برای source و local snapshot بسته است؛ coverage محیط‌های بیرونی محدودیت دارد. Gate 10 فقط برای local visible state بسته و از نظر historical lineage/other targets PARTIAL / OPEN است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
