@@ -39,6 +39,30 @@ def get_json(path: str, params: dict[str, str] | None = None):
         return url, response.status, json.loads(raw)
 
 
+
+def get_annual_filings(symbol: str):
+    """Fetch CODAL annual financial-statement filing metadata for one exact symbol."""
+    params = {
+        "Symbol": symbol, "Category": "1", "LetterType": "6", "Length": "12",
+        "PageNumber": "1", "Audited": "true", "NotAudited": "true",
+        "Consolidatable": "true", "NotConsolidatable": "true",
+        "Childs": "true", "Mains": "true", "Publisher": "false", "search": "true",
+    }
+    query = urllib.parse.urlencode(params)
+    url = f"https://search.codal.ir/api/search/v2/q?{query}"
+    request = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.8",
+        "Referer": "https://www.codal.ir/",
+        "Origin": "https://www.codal.ir",
+        "sec-fetch-site": "same-site",
+        "sec-fetch-mode": "cors",
+    })
+    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        payload = json.loads(response.read().decode("utf-8-sig"))
+        return url, response.status, payload
+
 def main() -> int:
     lines = [
         "# CODAL fiscal-year metadata live audit",
@@ -100,6 +124,32 @@ def main() -> int:
                     "- Unexpected response: "
                     + json.dumps(values, ensure_ascii=False)[:4000]
                 )
+
+            time.sleep(PAUSE_SECONDS)
+            search_url, search_status, search_result = get_annual_filings(symbol)
+            letters = search_result.get("Letters", []) if isinstance(search_result, dict) else []
+            lines += [
+                "",
+                f"## Annual financial-statement filings — {symbol}",
+                f"- URL: {search_url}",
+                f"- HTTP status: {search_status}",
+                f"- Total matches reported by CODAL: {search_result.get('Total') if isinstance(search_result, dict) else 'invalid'}",
+                f"- Page count reported by CODAL: {search_result.get('Page') if isinstance(search_result, dict) else 'invalid'}",
+                f"- Records on first page: {len(letters) if isinstance(letters, list) else 'invalid'}",
+            ]
+            if isinstance(letters, list):
+                for letter in letters:
+                    if isinstance(letter, dict):
+                        lines.append("  - " + json.dumps({
+                            "tracing_no": letter.get("TracingNo"),
+                            "symbol": letter.get("Symbol"),
+                            "company_name": letter.get("CompanyName"),
+                            "title": letter.get("Title"),
+                            "sent": letter.get("SentDateTime"),
+                            "published": letter.get("PublishDateTime"),
+                            "letter_code": letter.get("LetterCode"),
+                            "url": letter.get("Url"),
+                        }, ensure_ascii=False))
 
     except urllib.error.HTTPError as exc:
         lines += [
