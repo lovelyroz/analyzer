@@ -1814,3 +1814,19 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 **باقی‌مانده:** physical CHECK/validation برای duration_basis، applicability نسبت به Metric، months_length برای بازه‌های نامنظم، منبع معتبر fiscal calendar و adversarial tests. این‌ها گیت‌های implementation هستند، نه ابهام در مالکیت temporal basis.
 
 **وضعیت Gate 3:** logical ownership بسته و قبلاً ACCEPTED است؛ implementation gates باز هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 19 گزارش DB-DES-009 ثبت شده است.
+
+
+### 8.80 بررسی Gate 4 از DB-DES-009 — هویت Revision منبع CODAL — 2026-11-18
+
+بررسی `src/models/report.py`، `src/ingestion/codal/acquisition.py`، `src/ingestion/codal/adapter.py`، `src/ingestion/codal/pipeline.py` و Excel `dto.py/reader.py` نشان داد:
+- Report فعلی `codal_tracking_id` و `source_url` دارد.
+- ReportVersion تاریخ انتشار، شماره داخلی، restated و supersedes دارد؛ source-issued revision key و fingerprint را persist نمی‌کند.
+- writer legacy از `(codal_tracking_id, publication_datetime)` برای replay استفاده می‌کند؛ این قرارداد برای مسیر PDF/legacy است و هنوز به‌عنوان identity معتبر مسیر Excel اثبات نشده است. payload conflict با همان identity نیز guard ندارد.
+- PDF acquisition hash و source URL/path را موقتاً دارد، اما URL/path و hash منبع revision identity نیستند.
+- Excel Reader فقط source_ref، filename، format، SHA-256 و byte length را observe می‌کند؛ CODAL revision metadata یا source publication time را resolve نمی‌کند.
+
+**قرارداد منطقی:** Report identity، source revision identity و source artifact fingerprint سه مفهوم جدا هستند. SHA-256 فقط fingerprint/integrity است. همان revision key + همان hash replay است؛ همان revision key + hash متفاوت conflict است؛ revision key جدید و معتبر ReportVersion جدید می‌سازد. filename/path/download URL/ingestion timestamp یا hash نباید به‌عنوان revision key استفاده شوند.
+
+**مانع فعلی:** metadata واقعی endpoint یا download manifest گزارش Excel CODAL در repository وجود ندارد؛ فیلد رسمی revision و رفتار correction/restatement قابل اثبات نیست. برای بستن gate باید metadata واقعی حداقل یک گزارش اصلی و یک نسخه اصلاحی/بازانتشارشده بررسی شود. اگر چنین evidence در دسترس نباشد، ingestion باید fail closed کند و gate باز بماند.
+
+**وضعیت Gate 4:** تفکیک مفهومی بسته شد، اما source-issued revision key و source publication metadata مسیر Excel **OPEN / EVIDENCE BLOCKED** است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 20 گزارش DB-DES-009 ثبت شده است.
