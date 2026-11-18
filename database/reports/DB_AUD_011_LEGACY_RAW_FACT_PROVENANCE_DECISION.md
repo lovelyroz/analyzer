@@ -109,3 +109,42 @@ Run from repository root:
 `python src/scripts/audit_legacy_raw_fact_links.py`
 
 The resulting counts are required before any legacy-table retirement decision. Zero references do not by themselves authorize deletion.
+
+
+## 10. Row-linkage audit result and disposition
+
+The owner ran `src/scripts/audit_legacy_raw_fact_links.py` against the local database and supplied the resulting `reply.md`.
+
+| Referencing table | Total rows | Non-NULL raw_fact_id | Distinct raw facts referenced |
+|---|---:|---:|---:|
+| `mapping_decisions` | 0 | 0 | 0 |
+| `normalized_financial_fact_inputs` | 0 | 0 | 0 |
+| `normalized_financial_facts` | 0 | 0 | 0 |
+
+All 505 raw facts have zero references in each table and zero combined references. No dangling non-NULL references were found. No rows were changed.
+
+### Interpretation
+
+- The three FK-bearing downstream tables exist in the inspected local database, but are empty.
+- There are no current normalized facts or mapping decisions in these tables whose lineage would be lost by removing the 505 raw facts.
+- This is a statement about the current database snapshot only. It does not prove that other databases, environments, exports, backups, or uninspected consumers have no dependency.
+- The result does not authorize deletion: the current source still contains a PDF-oriented CODAL path that writes new `RawFinancialFact` rows.
+- The Excel package currently exposes source observation DTOs and a reader; the inspected package does not establish a production Excel-to-canonical persistence route.
+
+### Updated disposition
+
+1. Keep all 505 legacy rows and all five provenance columns unchanged for now.
+2. Do not add, alter, or drop ORM fields or migrations as part of this audit.
+3. Treat the current three downstream tables as empty legacy schema in this local database; do not build new Excel ingestion on top of their raw-fact FK design without an explicit architecture decision.
+4. Before retiring `raw_financial_facts`, separately decide and implement the already-planned retirement of the PDF extraction/ingestion path, including public facades, pipeline entry points, callers, tests, and migration-runner imports. A write-capable legacy path must not remain after its target table is retired.
+5. Before any destructive migration, re-run the linkage audit against the exact database being migrated and verify all relevant environments/backups and any external consumers.
+6. Preserve report/version metadata only if its role in the new Excel model is explicitly defined; zero downstream raw-fact links do not establish that Report/ReportVersion are unused.
+
+### Completion status
+
+- Current local row-linkage counts: **COMPLETE**.
+- Current PDF-oriented write path confirmed in source: **PRESENT**.
+- Production Excel-to-canonical persistence path: **NOT ESTABLISHED**.
+- Legacy raw-fact retirement: **NOT AUTHORIZED**.
+- Migration 9 source/revision reconciliation: **OPEN**.
+- ORM changes, migrations, data updates, and tests: **NONE**.
