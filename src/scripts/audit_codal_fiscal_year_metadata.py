@@ -1,6 +1,7 @@
 """Read-only probe of CODAL issuer and fiscal-year-end metadata.
 
-Writes a compact audit report to reply.md. Does not modify the project database.
+Annual filing search excludes subsidiary issuers (Childs=false) and includes
+main-company filings (Mains=true). Writes reply.md; never accesses the database.
 """
 from __future__ import annotations
 
@@ -46,7 +47,7 @@ def get_annual_filings(symbol: str):
         "Symbol": symbol, "Category": "1", "LetterType": "6", "Length": "12",
         "PageNumber": "1", "Audited": "true", "NotAudited": "true",
         "Consolidatable": "true", "NotConsolidatable": "true",
-        "Childs": "true", "Mains": "true", "Publisher": "false", "search": "true",
+        "Childs": "false", "Mains": "true", "Publisher": "false", "search": "true",
     }
     query = urllib.parse.urlencode(params)
     url = f"https://search.codal.ir/api/search/v2/q?{query}"
@@ -130,12 +131,13 @@ def main() -> int:
             letters = search_result.get("Letters", []) if isinstance(search_result, dict) else []
             lines += [
                 "",
-                f"## Annual financial-statement filings — {symbol}",
+                f"## Annual financial-statement filings — {symbol} (main issuer; subsidiaries excluded)",
                 f"- URL: {search_url}",
                 f"- HTTP status: {search_status}",
                 f"- Total matches reported by CODAL: {search_result.get('Total') if isinstance(search_result, dict) else 'invalid'}",
                 f"- Page count reported by CODAL: {search_result.get('Page') if isinstance(search_result, dict) else 'invalid'}",
                 f"- Records on first page: {len(letters) if isinstance(letters, list) else 'invalid'}",
+                "- Query scope: Childs=false, Mains=true",
             ]
             if isinstance(letters, list):
                 for letter in letters:
