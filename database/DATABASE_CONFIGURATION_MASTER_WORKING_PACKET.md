@@ -1176,3 +1176,21 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **وضعیت:** inventory محلی COMPLETE؛ مرز اجزا IDENTIFIED؛ بازنشستگی PDF NOT IMPLEMENTED؛ بازنشستگی RawFinancialFact NOT AUTHORIZED؛ Migration 9 reconciliation OPEN؛ هیچ کد، ORM، Migration یا داده تغییر نکرده و هیچ تستی اجرا نشده است.
 
 **گام بعدی:** تهیه طرح اجرایی محدود برای بازنشستگی PDF بدون حذف RawFinancialFact، FKها، persistence FX/OHLC یا قراردادهای دیگر؛ اجرای کد تنها پس از تأیید دامنه.
+
+
+### 8.47 طرح مرحله‌ای بازنشستگی PDF — DB-PLAN-013 — 2026-11-18
+
+گزارش طرح: `database/reports/DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md`
+
+بر اساس DB-AUD-012، بازنشستگی مسیر PDF باید از بازنشستگی RawFinancialFact جدا باشد. طرح پیشنهادی چهار مرز دارد:
+
+1. **Phase 0 — Excel persistence:** تعیین مسیر end-to-end از Excel Reader و Company Table Layout Template تا ذخیره canonical، همراه با provenance و تست‌های قرارداد. تا عبور از این مرحله، مسیر عملیاتی PDF قطع نشود.
+2. **Phase 1 — تفکیک persistence:** جداکردن مسئولیت Report/ReportVersion از ذخیره RawLineInput به RawFinancialFact؛ بدون تغییر FX/OHLC و بدون Migration.
+3. **Phase 2 — انتقال callerها به Excel:** انتقال ورودی عملیاتی به pipeline مبتنی بر template و اثبات آن با یک گزارش واقعی.
+4. **Phase 3 — حذف PDF:** حذف acquisition/extraction/adapter/parser/pipeline و تست‌ها و dependencyهای صرفاً PDF پس از نبود caller و عبور از gateهای قبلی.
+
+بازنشستگی RawFinancialFact، سه FK، مدل‌ها و Migration به Phase 4 مستقل موکول می‌شود و در این طرح مجاز نیست. 505 رکورد فعلی و ستون‌های provenance حفظ می‌شوند. فایل مشترک `service.py` و توابع FX/OHLC حفظ می‌شوند. تست‌های Stage 1 و Stage 5 که قرارداد schema، FK، preservation یا عدم تغییر ورودی‌ها را بررسی می‌کنند، نباید به‌عنوان تست PDF حذف شوند.
+
+**وضعیت:** طرح DRAFTED؛ هیچ پیاده‌سازی، ORM، Migration، داده یا تستی تغییر نکرده و تستی اجرا نشده است. مسیر Excel-to-canonical هنوز NOT ESTABLISHED و Migration 9 reconciliation همچنان OPEN است.
+
+**گام بعدی:** Phase 0؛ طراحی مقصد persistence برای Excel و تعیین دقیق نقش قابل reuse برای Report/ReportVersion در معماری جدید.
