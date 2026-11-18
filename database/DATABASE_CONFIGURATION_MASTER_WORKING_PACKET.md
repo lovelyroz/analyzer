@@ -1741,3 +1741,21 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 **شرط‌های پذیرش قبل از اجرا:** audit read-only mismatchهای دادهٔ موجود؛ migration additive و idempotent؛ تست معتبر و ناسازگار برای INSERT/UPDATE و تغییر هویت والد؛ و فعال بودن PRAGMA foreign_keys روی هر connection تست و production. trigger جدید دادهٔ ناسازگار قبلی را اصلاح نمی‌کند و نباید بدون audit روی legacy tables نصب شود.
 
 **وضعیت Gate 6:** تصمیم طراحی Trigger + Service Validation انتخاب شد؛ gate انتخاب معماری بسته است. پیاده‌سازی، migration، ORM، audit دیتابیس مقصد و تست پذیرش باز هستند و هنوز مجوز اجرا ندارند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 14 گزارش DB-DES-009 آمده است.
+
+
+### 8.75 بررسی Gate 7 از DB-DES-009 — کفایت Provenance مستقیم و چندمنبعی — 2026-11-18
+
+اسناد و فایل‌های بررسی‌شده:
+- `DB-DES-008_COMPANY_TABLE_TEMPLATE_RELATIONAL_SCHEMA_PROPOSAL.md`
+- `DB-DES-014_HIERARCHICAL_HEADER_AND_SEMANTIC_COLUMN_MAPPING.md`
+- `DB-DES-003_REPORT_PERIOD_CONTRACT.md`
+- `src/ingestion/excel/dto.py` و `src/ingestion/excel/reader.py`
+- `src/models/normalized_provenance.py` (صرفاً برای تمایز مدل legacy)
+
+**نتیجه:** Provenance جدید می‌تواند با یک ردیف به‌ازای هر منبع مستقل، هم Fact مستقیم و هم Fact چندمنبعی را پوشش دهد. شناسهٔ ساختاری از Template Node و ColumnSlot می‌آید؛ شناسهٔ معنایی باید به mapping immutable نسخه‌داری اشاره کند که هم row-axis path و هم Header path کامل را به Metric/Dimension/Period/temporal basis/unit/value semantics متصل کند. مختصات دقیق سلول فقط locator تشخیصی است و نباید شرط دائمی اعتبار Fact یا کلید اصلی هویت باشد.
+
+**شکاف باز:** DB-DES-014 معنای row/column intersection را در سطح منطقی تعریف کرده، اما physical schema نسخه‌دار برای row-axis path و SemanticMapping هنوز تکمیل نشده است. DB-DES-008 نیز ساختار فیزیکی layout و column slots را پوشش می‌دهد، نه تمام row-axis semantic identity. پس صرف وجود `semantic_mapping_id` در جدول Provenance کافی نیست مگر اینکه مدل مقصد محتوای کامل و immutable mapping را تضمین کند.
+
+**تصمیم طراحی:** الگوی یک provenance row برای هر منبع ورودی مستقل پذیرفته می‌شود؛ برای direct یک منبع و برای multi-input چند منبع با input_role مصوب. ساختار پیشنهادی DB-DES-009 حفظ می‌شود، اما طراحی فیزیکی SemanticMapping/row-axis و آزمون نمونه‌های direct و multi-input پیش‌شرط بستن gate است. cell coordinate دائمی یا raw-cell storage اضافه نمی‌شود.
+
+**وضعیت Gate 7:** منطق provenance پذیرفته شد؛ physical design همچنان PARTIAL / OPEN است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 15 گزارش DB-DES-009 ثبت شده است.
