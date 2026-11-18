@@ -1,6 +1,6 @@
 ﻿**********************
 Windows PowerShell transcript start
-Start time: 20261119014507
+Start time: 20261119014710
 Username: DESKTOP-QGC44BJ\Papa
 RunAs User: DESKTOP-QGC44BJ\Papa
 Configuration Name: 
@@ -18,35 +18,14 @@ SerializationVersion: 1.1.0.1
 **********************
 Transcript started, output file is D:\Winprojects\analyzer\reply.md
 PS D:\Winprojects\analyzer>
-(analyzer) Get-Content template_annotation_audit_full.txt -Tail 40
-  F326:G326: F326.top=medium, F326.bottom=medium, G326.top=medium, G326.bottom=medium, F326.left=medium, G326.right=medium
-  F327:G327: F327.top=medium, F327.bottom=medium, G327.top=medium, G327.bottom=medium, F327.left=medium, G327.right=medium
-  F328:G328: F328.top=medium, F328.bottom=medium, G328.top=medium, G328.bottom=medium, F328.left=medium, G328.right=medium
-  F329:G329: F329.top=medium, F329.bottom=medium, G329.top=medium, G329.bottom=medium, F329.left=medium, G329.right=medium
-  F330:G330: F330.top=medium, F330.bottom=medium, G330.top=medium, G330.bottom=medium, F330.left=medium, G330.right=medium
-  F331:G331: F331.top=medium, F331.bottom=medium, G331.top=medium, G331.bottom=medium, F331.left=medium, G331.right=medium
-  F332:G332: F332.top=medium, F332.bottom=medium, G332.top=medium, G332.bottom=medium, F332.left=medium, G332.right=medium
-  A333:B333: A333.bottom=medium, B333.bottom=medium, A333.left=medium, B333.right=medium
-  C333:I333: C333.bottom=medium, D333.bottom=medium, E333.bottom=medium, F333.bottom=medium, G333.bottom=medium, H333.bottom=medium, I333.bottom=medium, C333.left=medium, I333.right=medium
-  D336:E336: D336.top=medium, D336.bottom=medium, E336.top=medium, E336.bottom=medium, E336.right=medium
-  D337:E337: D337.top=medium, D337.bottom=medium, E337.top=medium, E337.bottom=medium, E337.right=medium
-  D338:E338: D338.top=medium, D338.bottom=medium, E338.top=medium, E338.bottom=medium, E338.right=medium
-  D339:E339: D339.top=medium, D339.bottom=medium, E339.top=medium, E339.bottom=medium, E339.right=medium
-  D340:E340: D340.top=medium, D340.bottom=medium, E340.top=medium, E340.bottom=medium, D340.left=medium, E340.right=medium
-  A341:G341: A341.top=medium, A341.bottom=medium, B341.top=medium, B341.bottom=medium, C341.top=medium, C341.bottom=medium, D341.top=medium, D341.bottom=medium, E341.top=medium, E341.bottom=medium, F341.top=medium, F341.bottom=medium, G341.top=medium, G341.bottom=medium, A341.left=medium, G341.right=medium
-  A350:K350: A350.top=medium, A350.bottom=medium, B350.top=medium, B350.bottom=medium, C350.top=medium, C350.bottom=medium, D350.top=medium, D350.bottom=medium, E350.top=medium, E350.bottom=medium, F350.top=medium, F350.bottom=medium, G350.top=medium, G350.bottom=medium, H350.top=medium, H350.bottom=medium, I350.top=medium, I350.bottom=medium, J350.top=medium, J350.bottom=medium, K350.top=medium, K350.bottom=medium, A350.left=medium, K350.right=medium
-  A353:B354: A353.top=medium, A354.bottom=medium, B353.top=medium, B354.bottom=medium, A353.left=medium, B353.right=medium, A354.left=medium, B354.right=medium
-  C353:F353: C353.top=medium, C353.bottom=medium, D353.top=medium, D353.bottom=medium, E353.top=medium, E353.bottom=medium, F353.top=medium, F353.bottom=medium, C353.left=medium, F353.right=medium
-  G353:I353: G353.top=medium, G353.bottom=medium, H353.top=medium, H353.bottom=medium, I353.top=medium, I353.bottom=medium, G353.left=medium, I353.right=medium
-  J353:K354: J353.top=medium, J354.bottom=medium, K353.top=medium, K354.bottom=medium, K353.right=medium, K354.right=medium
-  A355:B355: A355.top=medium, A355.bottom=medium, B355.top=medium, B355.bottom=medium, A355.left=medium, B355.right=medium
-  J355:K355: J355.top=medium, J355.bottom=medium, K355.top=medium, K355.bottom=medium, K355.right=medium
-  A356:B356: A356.top=medium, A356.bottom=medium, B356.top=medium, B356.bottom=medium, A356.left=medium, B356.right=medium
-  J356:K356: J356.top=medium, J356.bottom=medium, K356.top=medium, K356.bottom=medium, K356.right=medium
-  A357:B357: A357.top=medium, A357.bottom=medium, B357.top=medium, B357.bottom=medium, A357.left=medium, B357.right=medium
-  J357:K357: J357.top=medium, J357.bottom=medium, K357.top=medium, K357.bottom=medium, K357.right=medium
-  A358:B358: A358.top=medium, A358.bottom=medium, B358.top=medium, B358.bottom=medium, A358.left=medium, B358.right=medium
-  J358:K358: J358.top=medium, J358.bottom=medium, K358.top=medium, K358.bottom=medium, K358.right=medium
+(analyzer) Get-Item template_annotation_audit_full.txt | Format-List Length,LastWriteTime; Get-Content template_annotation_audit_full.txt -Tail 12
+
+
+Length        : 290866
+LastWriteTime : 11/19/2026 1:37:18 AM
+
+
+
   A372:B372: A372.top=medium, A372.bottom=medium, B372.top=medium, B372.bottom=medium, A372.left=medium, B372.right=medium
   C372:F372: C372.top=medium, C372.bottom=medium, D372.top=medium, D372.bottom=medium, E372.top=medium, E372.bottom=medium, F372.top=medium, F372.bottom=medium, C372.left=medium, F372.right=medium
   A382:B382: A382.top=medium, A382.bottom=medium, B382.top=medium, B382.bottom=medium, A382.left=medium, B382.right=medium
@@ -63,5 +42,5 @@ PS D:\Winprojects\analyzer>
 (analyzer) Stop-Transcript
 **********************
 Windows PowerShell transcript end
-End time: 20261119014530
+End time: 20261119014727
 **********************
