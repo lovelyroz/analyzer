@@ -1,6 +1,6 @@
 # CODAL fiscal-year metadata live audit
 
-- Retrieved UTC: 2026-11-18T09:59:02.448989+00:00
+- Retrieved UTC: 2026-11-18T10:03:11.914152+00:00
 - Mode: read-only; no database access or mutation
 - Symbols requested: فولاد, زفارس
 
@@ -111,3 +111,47 @@
   - {"tracing_no": 1282791, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "صورت‌های مالی  سال مالی منتهی به ۱۴۰۰/۱۲/۲۹ (حسابرسی نشده)", "sent": "۱۴۰۳/۰۹/۲۰ ۱۷:۴۶:۴۱", "published": "۱۴۰۳/۰۹/۲۰ ۱۷:۴۶:۴۱", "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=4YdR5OOObOOOKYpOOObOOOOxHQQQaQQQmOOObOOOqSPX0w%3d%3d&rt=8&let=6&ct=0&ft=-1"}
   - {"tracing_no": 1282752, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "صورت‌های مالی  سال مالی منتهی به ۱۳۹۹/۱۲/۳۰ (حسابرسی نشده)", "sent": "۱۴۰۳/۰۹/۲۰ ۱۶:۵۰:۴۱", "published": "۱۴۰۳/۰۹/۲۰ ۱۶:۵۰:۴۱", "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=ciOOObOOOvOOObOOOcqJQQQaQQQRbWYHBnbdYwPQ%3d%3d&rt=8&let=6&ct=0&ft=-1"}
   - {"tracing_no": 1281478, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "صورت‌های مالی  سال مالی منتهی به ۱۳۹۸/۱۲/۲۹ (حسابرسی نشده)", "sent": "۱۴۰۳/۰۹/۱۸ ۱۵:۰۶:۵۷", "published": "۱۴۰۳/۰۹/۱۸ ۱۵:۰۶:۵۷", "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=aZNNHpNdcSsNU9JkvzO99A%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+
+## ZFars filings for exact year-end 1404/09/30 (Length filter omitted)
+- URL: https://search.codal.ir/api/search/v2/q?Symbol=%D8%B2%D9%81%D8%A7%D8%B1%D8%B3&Category=1&LetterType=6&YearEndToDate=1404%2F09%2F30&PageNumber=1&Audited=true&NotAudited=true&Consolidatable=true&NotConsolidatable=true&Childs=false&Mains=true&Publisher=false&search=true
+- HTTP status: 200
+- Total matches reported by CODAL: 11
+- Records on first page: 11
+  - {"tracing_no": 1491963, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "صورت‌های مالی  سال مالی منتهی به ۱۴۰۴/۰۹/۳۰ (حسابرسی شده)", "sent": "۱۴۰۴/۱۲/۰۷ ۱۵:۰۴:۵۷", "published": "۱۴۰۴/۱۲/۰۷ ۱۵:۰۴:۵۷", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=OEK3uUqVTfwW2JVdOOObOOOX0iOA%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1473546, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "صورت‌های مالی  سال مالی منتهی به ۱۴۰۴/۰۹/۳۰ (حسابرسی نشده)", "sent": "۱۴۰۴/۱۱/۳۰ ۱۸:۲۳:۳۵", "published": "۱۴۰۴/۱۱/۳۰ ۱۸:۲۳:۳۵", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=ds246roEZTBML8IJJk9N8g%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1431044, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۶ ماهه منتهی به  ۱۴۰۴/۰۳/۳۱ (حسابرسی نشده)(اصلاحیه)", "sent": "۱۴۰۴/۰۸/۱۲ ۱۸:۰۱:۴۲", "published": "۱۴۰۴/۰۸/۱۲ ۱۸:۰۱:۴۲", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=h8EYmOkRTgSQQQaQQQhOOObOOOVsDZl7DQ%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1430867, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۹ ماهه منتهی به  ۱۴۰۴/۰۶/۳۱ (حسابرسی نشده)(اصلاحیه)", "sent": "۱۴۰۴/۰۸/۱۲ ۱۵:۴۷:۴۴", "published": "۱۴۰۴/۰۸/۱۲ ۱۵:۴۷:۴۴", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=Bwoad6OOObOOObby10SIXK92RRgw%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1428292, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۹ ماهه منتهی به  ۱۴۰۴/۰۶/۳۱ (حسابرسی نشده)(اصلاحیه)", "sent": "۱۴۰۴/۰۸/۰۷ ۱۶:۲۷:۴۶", "published": "۱۴۰۴/۰۸/۰۷ ۱۶:۲۷:۴۶", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=OOObOOOXlBSeGT5W9MGrZFLsWRYw%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1427635, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۶ ماهه منتهی به  ۱۴۰۴/۰۳/۳۱ (حسابرسی نشده)(اصلاحیه)", "sent": "۱۴۰۴/۰۸/۰۷ ۱۶:۰۰:۱۶", "published": "۱۴۰۴/۰۸/۰۷ ۱۶:۰۰:۱۶", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=w3SsiOOObOOOt0ZDg9V1ttvSdO7w%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1425415, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۹ ماهه منتهی به  ۱۴۰۴/۰۶/۳۱ (حسابرسی نشده)(اصلاحیه)", "sent": "۱۴۰۴/۰۸/۰۳ ۱۸:۱۳:۰۲", "published": "۱۴۰۴/۰۸/۰۳ ۱۸:۱۳:۰۲", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=n1VziBhzaFNOOObOOObl4V2qcY9w%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1424594, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۳ ماهه منتهی به  ۱۴۰۳/۱۲/۳۰ (حسابرسی نشده)", "sent": "۱۴۰۴/۰۸/۰۳ ۱۸:۰۴:۲۹", "published": "۱۴۰۴/۰۸/۰۳ ۱۸:۰۴:۲۹", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=CkPmtmkzKiLAPdnHe8O82A%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1416827, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۶ ماهه منتهی به  ۱۴۰۴/۰۳/۳۱ (حسابرسی شده)", "sent": "۱۴۰۴/۰۸/۰۳ ۱۶:۵۳:۳۲", "published": "۱۴۰۴/۰۸/۰۳ ۱۶:۵۳:۳۲", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=OOObOOO0gvwLhzQQQaQQQ40i5AeKGGaFmg%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1424663, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۹ ماهه منتهی به  ۱۴۰۴/۰۶/۳۱ (حسابرسی نشده)", "sent": "۱۴۰۴/۰۸/۰۳ ۱۰:۲۹:۲۹", "published": "۱۴۰۴/۰۸/۰۳ ۱۰:۲۹:۲۹", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=kobHNp6xlOOObOOOaiGLj46lyV5g%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1375900, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۶ ماهه منتهی به  ۱۴۰۴/۰۳/۳۱ (حسابرسی نشده)", "sent": "۱۴۰۴/۰۴/۳۰ ۱۷:۴۹:۵۵", "published": "۱۴۰۴/۰۴/۳۰ ۱۷:۴۹:۵۵", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=9MPueMPBeJoVyEK7cocQmw%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+
+## ZFars filings for exact year-end 1403/10/30 (Length filter omitted)
+- URL: https://search.codal.ir/api/search/v2/q?Symbol=%D8%B2%D9%81%D8%A7%D8%B1%D8%B3&Category=1&LetterType=6&YearEndToDate=1403%2F10%2F30&PageNumber=1&Audited=true&NotAudited=true&Consolidatable=true&NotConsolidatable=true&Childs=false&Mains=true&Publisher=false&search=true
+- HTTP status: 200
+- Total matches reported by CODAL: 0
+- Records on first page: 0
+
+## ZFars filings for exact year-end 1403/09/30 (Length filter omitted)
+- URL: https://search.codal.ir/api/search/v2/q?Symbol=%D8%B2%D9%81%D8%A7%D8%B1%D8%B3&Category=1&LetterType=6&YearEndToDate=1403%2F09%2F30&PageNumber=1&Audited=true&NotAudited=true&Consolidatable=true&NotConsolidatable=true&Childs=false&Mains=true&Publisher=false&search=true
+- HTTP status: 200
+- Total matches reported by CODAL: 2
+- Records on first page: 2
+  - {"tracing_no": 1318073, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۱۱ ماهه منتهی به  ۱۴۰۳/۰۹/۳۰ (حسابرسی شده)", "sent": "۱۴۰۴/۰۱/۲۵ ۱۳:۵۳:۴۷", "published": "۱۴۰۴/۰۱/۲۵ ۱۳:۵۳:۴۷", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=Rr8aFzXOOObOOOvLFND39raU7shw%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+  - {"tracing_no": 1307167, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۱۱ ماهه منتهی به  ۱۴۰۳/۰۹/۳۰ (حسابرسی نشده)", "sent": "۱۴۰۳/۱۱/۲۳ ۱۵:۵۰:۱۹", "published": "۱۴۰۳/۱۱/۲۳ ۱۵:۵۰:۱۹", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=7OOObOOOp0IwL2DwgaLIefb4uMDw%3d%3d&rt=8&let=6&ct=0&ft=-1"}
+
+## ZFars filings for exact year-end 1402/12/29 (Length filter omitted)
+- URL: https://search.codal.ir/api/search/v2/q?Symbol=%D8%B2%D9%81%D8%A7%D8%B1%D8%B3&Category=1&LetterType=6&YearEndToDate=1402%2F12%2F29&PageNumber=1&Audited=true&NotAudited=true&Consolidatable=true&NotConsolidatable=true&Childs=false&Mains=true&Publisher=false&search=true
+- HTTP status: 200
+- Total matches reported by CODAL: 0
+- Records on first page: 0
+
+## ZFars filings for exact year-end 1402/10/30 (Length filter omitted)
+- URL: https://search.codal.ir/api/search/v2/q?Symbol=%D8%B2%D9%81%D8%A7%D8%B1%D8%B3&Category=1&LetterType=6&YearEndToDate=1402%2F10%2F30&PageNumber=1&Audited=true&NotAudited=true&Consolidatable=true&NotConsolidatable=true&Childs=false&Mains=true&Publisher=false&search=true
+- HTTP status: 200
+- Total matches reported by CODAL: 1
+- Records on first page: 1
+  - {"tracing_no": 1282955, "symbol": "زفارس", "company_name": "کشت و صنعت و دامپروری پگاه فارس", "title": "اطلاعات و صورت‌های مالی میاندوره‌ای  دوره ۱۰ ماهه منتهی به  ۱۴۰۲/۱۰/۳۰ (حسابرسی نشده)", "sent": "۱۴۰۳/۰۹/۲۱ ۱۴:۳۱:۱۲", "published": "۱۴۰۳/۰۹/۲۱ ۱۴:۳۱:۱۲", "period_length": null, "year_end_to_date": null, "letter_code": "ن-۱۰", "url": "/Reports/Decision.aspx?LetterSerial=0FEJH2z6PQSsjkYOOObOOOOCMQug%3d%3d&rt=8&let=6&ct=0&ft=-1"}
