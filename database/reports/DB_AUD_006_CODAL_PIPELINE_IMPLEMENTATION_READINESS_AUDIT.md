@@ -302,3 +302,31 @@ DB-AUD-006 در این نوبت **PARTIAL** باقی می‌ماند. این م�
 **مسیر بعدی پروژه:** ادامهٔ Phase 0 از DB-PLAN-013 و بستن gateهای طراحی DB-DES-009 است؛ نه تکرار PDF dependency audit، RawFact linkage یا Normalized/Derived local linkage. اولین gate اجرایی-مستندی که باید بسته شود، inventory تمام مصرف‌کنندگان `reports.financial_period_id` پیش از nullable کردن/جابه‌جایی آن است. سپس gateهای ReportVersion source revision/standard binding، dimension scope، company-consistency و provenance granularity به‌ترتیب بررسی می‌شوند.
 
 هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای در این crosswalk تغییر نکرد و تستی اجرا نشد.
+
+## 14. بررسی مصرف‌کنندگان `reports.financial_period_id` و مسیرهای فراخوانی CODAL — 2026-11-18
+
+### 14.1 تفکیک شناسه‌های هم‌نام
+خروجی جست‌وجوی محلی کاربر برای `financial_period_id|FinancialPeriod` در کل فایل‌های `*.py` و `*.sql` زیر repository، موارد زیر را نشان داد:
+- `src/models/report.py`: ستون `Report.financial_period_id` با `nullable=False` و FK به `financial_periods.period_id`.
+- `src/ingestion/service.py`: writer مرکزی CODAL، هم period شرکت را validate می‌کند و هم شناسه را در Report و تمام RawFinancialFactهای نسخهٔ گزارش می‌نویسد.
+- `src/forecast/queries.py`: query تولیدی Forecast، دوره را از `NormalizedFinancialFact.period_id` به `FinancialPeriod` join می‌کند؛ در این query از `Report.financial_period_id` استفاده نشده است.
+- `src/evaluation/*` و بسیاری از تست‌های Stage 5/6: نام `financial_period_id` در DTOها و مدل‌های ارزیابی به‌عنوان شناسهٔ دورهٔ observation/forecast استفاده شده است؛ این موارد به‌تنهایی مصرف ستون `reports.financial_period_id` نیستند.
+- تست‌های Stage 1 و CODAL، ساخت Report و قرارداد قدیمی را با `financial_period_id` اجباری می‌آزمایند؛ تست‌های PDF نیز رابطهٔ Report با FinancialPeriod را assert می‌کنند.
+
+### 14.2 مسیرهای فراخوانی مشاهده‌شده
+بررسی فایل‌های کامل زیر:
+- `src/ingestion/codal/ingestion.py`: تابع عمومی `ingest_codal_report` یک facade سازگار با گذشته است و به `src.ingestion.service.ingest_codal_report` delegate می‌کند. تابع `ingest_codal_pdf` پس از extraction همین facade را فراخوانی می‌کند.
+- `src/ingestion/codal/pipeline.py`: توابع `load_codal_pdf` و `load_codal_pdf_from_url` پس از acquisition/extraction/validation، writer مرکزی `src.ingestion.service.ingest_codal_report` را فراخوانی می‌کنند.
+- `src/ingestion/excel/reader.py` و `src/ingestion/excel/dto.py`: در نسخهٔ بررسی‌شده، reader/DTO اکسل هیچ فراخوانی writer CODAL و هیچ ارجاعی به `financial_period_id` ندارند؛ این با یافتهٔ قبلی DB-AUD-013 مبنی بر نبود production Excel-to-canonical persistence هم‌راستا است.
+- تست‌های `test_codal_extraction.py`، `test_codal_pdf_extraction.py` و تست‌های Stage 1 مستقیماً writer یا مدل Report را با قرارداد فعلی می‌آزمایند.
+
+این بررسی یک نقشهٔ محدود و مبتنی بر فایل‌های کامل نام‌برده و خروجی جست‌وجوی محلی است؛ به علت ناموفق بودن GitHub code search و محدودیت inventory بیرون از `src/`، ادعای اثبات تمام call-siteهای پویا یا بیرونی نمی‌شود.
+
+### 14.3 نتیجهٔ معماری برای gate فعلی
+1. `Report.financial_period_id` در حال حاضر یک فیلد الزامی و بخشی از قرارداد writer قدیمی CODAL است؛ حذف یا nullable کردن آن بدون جایگزینی قرارداد legacy باعث شکستن مسیر موجود و تست‌های مربوط می‌شود.
+2. writer فعلی یک `period_id` واحد می‌گیرد و آن را به تمام `RawFinancialFact`های یک ReportVersion نسبت می‌دهد. این رفتار برای ورودی Excel چندستونی/چنددوره‌ای قابل تعمیم نیست و نباید به‌عنوان قرارداد ingestion جدید حفظ شود.
+3. `RawFinancialFact.period_id` و `NormalizedFinancialFact.period_id` دورهٔ هر Fact را نگه می‌دارند؛ Forecast نیز از دورهٔ Normalized Fact استفاده می‌کند. این شواهد از مدل fact-level period پشتیبانی می‌کنند.
+4. بنابراین مسیر جدید Excel باید writer/contract مستقل یا نسخهٔ توسعه‌یافته‌ای داشته باشد که برای هر Fact دورهٔ خودش را دریافت و اعتبارسنجی کند. `Report.financial_period_id` تا زمان تعیین تکلیف و بازنشستگی کنترل‌شدهٔ مسیر legacy باید حفظ شود؛ اگر در مدل نهایی باقی بماند، نقش آن باید صرفاً metadata دورهٔ اصلی/نمایشی گزارش باشد و نباید مرجع دورهٔ مقادیر تلقی شود.
+5. هنوز دربارهٔ nullable شدن نهایی ستون، migration، backfill یا تغییر ORM تصمیم اجرایی گرفته نشده است. تصمیم به این موارد موکول به تکمیل gateهای DB-DES-009 و طراحی coexistence/retirement مسیر legacy است.
+
+**وضعیت این گام:** شواهد لازم برای تفکیک مسیر legacy CODAL از نیاز جدید Excel به‌دست آمده، اما gate کامل inventory مصرف‌کنندگان repository-wide هنوز به‌دلیل محدودیت‌های بالا «محدود/مشروط» است. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
