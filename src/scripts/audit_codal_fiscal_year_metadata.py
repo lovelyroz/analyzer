@@ -68,11 +68,8 @@ def get_annual_filings(symbol: str):
 def get_filings_for_year_end(symbol: str, year_end: str):
     """Fetch main-issuer financial-statement filings for one exact Jalali year-end."""
     params = {
-        "Symbol": symbol, "Category": "1", "LetterType": "6",
-        "YearEndToDate": year_end, "PageNumber": "1",
-        "Audited": "true", "NotAudited": "true",
-        "Consolidatable": "true", "NotConsolidatable": "true",
-        "Childs": "false", "Mains": "true", "Publisher": "false", "search": "true",
+        "Symbol": symbol, "YearEndToDate": year_end, "PageNumber": "1",
+        "Childs": "false", "Mains": "true", "search": "true",
     }
     query = urllib.parse.urlencode(params)
     url = f"https://search.codal.ir/api/search/v2/q?{query}"
@@ -177,12 +174,10 @@ def main() -> int:
                             "url": letter.get("Url"),
                         }, ensure_ascii=False))
 
-        # Focused ZFars checks: query each selected year-end explicitly.
-        # Length is intentionally omitted here; CODAL uses it as a period-month
-        # filter, not as a page-size setting.
+        # Broad ZFars checks: omit Category, LetterType and Length so the
+        # exact dates can be traced across filing types, not only annual FS.
         focused_year_ends = (
-            "1404/09/30", "1403/10/30", "1403/09/30",
-            "1402/12/29", "1402/10/30",
+            "1403/10/30", "1402/12/29", "1403/09/30",
         )
         for year_end in focused_year_ends:
             time.sleep(PAUSE_SECONDS)
@@ -190,10 +185,11 @@ def main() -> int:
             letters = payload.get("Letters", []) if isinstance(payload, dict) else []
             lines += [
                 "",
-                f"## ZFars filings for exact year-end {year_end} (Length filter omitted)",
+                f"## ZFars filings for exact date {year_end} (all filing categories/types)",
                 f"- URL: {url}",
                 f"- HTTP status: {status}",
                 f"- Total matches reported by CODAL: {payload.get('Total') if isinstance(payload, dict) else 'invalid'}",
+                "- Query scope: no Category, LetterType or Length filter; Childs=false, Mains=true",
                 f"- Records on first page: {len(letters) if isinstance(letters, list) else 'invalid'}",
             ]
             if isinstance(letters, list):
