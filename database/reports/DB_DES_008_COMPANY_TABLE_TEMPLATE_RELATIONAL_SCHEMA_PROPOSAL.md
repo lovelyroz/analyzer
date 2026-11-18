@@ -252,3 +252,59 @@ These are separate tasks/gates. Do not begin implementation solely from this pro
 ## 8. Status
 
 DB-DES-008 is a design proposal only. No code, ORM, migration, test, or database data has changed. It does not close DB-ING-006 / Task 033. Task 033 remains PARTIAL.
+
+
+## 9. Gray extraction-span ownership audit — 2026-11-18
+
+A coordinate-level reconciliation was performed from section 3 of `PARSIAN_PERIODIC_ANNOTATION_MAP_DRAFT.md` against the candidate parent/sub-table bounds and owner-confirmed gray-only extraction rule. This is a reconciliation of the recorded Markdown coordinate inventory; the assistant did not open the XLSX directly. All counts remain provisional until the owner approves the candidate geometry and the source workbook is validated.
+
+### 9.1 Count reconciliation
+
+The 17 table entries in the annotation map resolve to 459 gray target cells, matching the owner-supplied audit total. Compressing consecutive gray rows independently for each source column yields 60 vertical extraction spans. No span crosses an unannotated row gap.
+
+| Table | Gray cells | Assigned to child sub-tables | Assigned to parent only | Total spans |
+|---|---:|---:|---:|---:|
+| T01 | 56 | 56 | 0 | 6 |
+| T02 | 12 | 10 | 2 | 4 |
+| T03 | 70 | 70 | 0 | 6 |
+| T04 | 143 | 143 | 0 | 11 |
+| T05 | 66 | 66 | 0 | 6 |
+| T06 | 48 | 0 | 48 | 8 |
+| T07 | 7 | 7 | 0 | 1 |
+| T08 | 4 | 0 | 4 | 1 |
+| T09 | 6 | 0 | 6 | 1 |
+| T10 | 18 | 18 | 0 | 1 |
+| T11 | 3 | 0 | 3 | 1 |
+| T12 | 12 | 0 | 12 | 3 |
+| T13 | 3 | 3 | 0 | 3 |
+| T14 | 2 | 0 | 2 | 1 |
+| T15 | 1 | 0 | 1 | 1 |
+| T16 | 3 | 0 | 3 | 1 |
+| T17 | 5 | 0 | 5 | 5 |
+| **Total** | **459** | **373** | **86** | **60** |
+
+The 60 spans comprise 36 child-owned spans and 24 parent-owned spans. T02's gray cells at row 62 remain parent-owned; its rows 64–68 fall within its green-marker child. All gray cells in the other listed child partitions are assigned to the corresponding child. Tables without a green-marker child retain their gray spans at the parent node.
+
+### 9.2 Required ownership rule
+
+To prevent duplicate extraction:
+
+1. Every positive extraction coordinate belongs to exactly one `template_layout_node`.
+2. If a gray coordinate lies inside a validated child SUBTABLE, assign it to that child node. Otherwise assign it to the parent TABLE node.
+3. A parent-table request resolves the parent's own spans plus the spans of its descendants, each coordinate exactly once. A sub-table request resolves only that sub-table's own spans and any descendants it may have under a future explicitly approved extension.
+4. Do not persist the same coordinate as both a parent span and a child span. Header inheritance does not change extraction-span ownership.
+5. The validator must reject overlapping spans across nodes within the same worksheet/template version, not merely overlaps within one node. It must also reject a span outside its node's BODY range, outside the node's bounds, or mapped to an undefined/inherited-unresolved column slot.
+6. A span is a contiguous vertical run in one source column. Split it at every non-gray row, including black or uncolored cells. A blank gray cell remains inside the span and is extracted as zero.
+
+This makes parent-level retrieval a hierarchical query over node ownership, rather than duplicate persistence of parent and child targets.
+
+### 9.3 Limits and acceptance conditions
+
+- The 459-cell and 60-span reconciliation is based on the Markdown coordinate inventory and must not be represented as a fresh XLSX audit or production approval.
+- Candidate bounds and child partitions remain unapproved except for the owner's reported spot checks.
+- Before serialization, an owner-approved coordinate map must be used to regenerate spans, and an independent validator must prove: total target-cell count equals 459 for this sample; every target is inside exactly one node; no non-gray coordinate is included; all blank-gray coordinates remain included; and parent queries equal the union of parent-owned plus descendant-owned targets without duplicates.
+- The current 60-span count is an expected result for the present candidate map, not a permanent schema invariant. A corrected annotation or approved layout revision may change it.
+
+### 9.4 Design consequence
+
+Keep `template_extraction_span.node_id` as the exclusive owner of each target. Add a cross-node overlap validation at TemplateVersion/worksheet scope. Parent retrieval must traverse the node hierarchy and union descendant spans; do not materialize duplicate parent copies of child spans. This is a refinement of DB-DES-008's proposed extraction-span model and does not authorize ORM, migration, runtime code, or production Template records.
