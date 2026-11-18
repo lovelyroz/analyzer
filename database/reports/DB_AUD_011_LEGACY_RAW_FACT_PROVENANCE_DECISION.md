@@ -83,3 +83,29 @@ This is required before deciding whether the legacy raw-fact table is retained i
 - Migration 9 source/revision reconciliation: **OPEN**.
 - Downstream row-linkage audit: **NEXT**.
 - ORM changes, migrations, data updates, and tests: **NONE**.
+
+## 8. Confirmed current persistence path
+
+The current GitHub source was inspected after the local audit:
+
+- `src/ingestion/service.py` imports `RawFinancialFact`.
+- `ingest_codal_report(...)` creates one `RawFinancialFact` object for each `RawLineInput` and calls `session.add_all(facts)`.
+- The created records include `source_section`, `source_row`, and `source_column`.
+- `src/ingestion/codal/adapter.py` is explicitly a PDF extraction boundary and produces `RawLineInput` values from PDF extraction.
+- The current migration runner imports `RawFinancialFact` and has migrations only through version 8.
+
+Therefore, the currently inspected CODAL persistence route writes to `raw_financial_facts`; it is the legacy PDF-oriented route, not evidence that the new Excel pipeline has been implemented. A separate production Excel-to-canonical persistence path was not established by this inspection.
+
+## 9. Row-linkage audit script
+
+A second read-only script was added:
+
+`src/scripts/audit_legacy_raw_fact_links.py`
+
+It counts downstream rows and distinct raw facts referenced by `mapping_decisions`, `normalized_financial_fact_inputs`, and `normalized_financial_facts`; computes per-raw-fact and combined linkage distributions; and checks dangling non-NULL references. It does not change the database and writes its report to `reply.md`.
+
+Run from repository root:
+
+`python src/scripts/audit_legacy_raw_fact_links.py`
+
+The resulting counts are required before any legacy-table retirement decision. Zero references do not by themselves authorize deletion.
