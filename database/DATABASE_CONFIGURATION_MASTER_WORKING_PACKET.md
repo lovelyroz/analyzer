@@ -44,7 +44,7 @@
 - تاریخ واقعی شروع/پایان باید از گزارش منبع یا تقویم مالی معتبر همان شرکت تعیین شود؛ شروع سال مالی را فروردین ۱ فرض نکنید.
 - `fiscal_year` برچسب سال مالی شرکت است؛ `fiscal_quarter` در صورت کاربرد ۱ تا ۴ است.
 - `period_type` طول/ماهیت دورهٔ دادهٔ منبع را توصیف می‌کند، نه تناوب انتشار گزارش.
-- `months_length` طول بازه را مشخص می‌کند؛ برای `INSTANT` برابر صفر است. `is_ytd` فقط برای Flow/DURATION کاربرد دارد و برای INSTANT/Stock نامربوط است.
+- `months_length` طول بازه را مشخص می‌کند؛ برای `INSTANT` برابر صفر است. `duration_basis=YTD|STANDALONE` در سطح FinancialFact و فقط برای DURATION کاربرد دارد؛ برای INSTANT نامربوط/NULL است.
 - الگوی متداول گزارش‌های تجمعی: Q1 = QUARTER/3/YTD، Q2 = SEMI_ANNUAL/6/YTD، Q3 = NINE_MONTH/9/YTD، Q4 = ANNUAL/12/YTD؛ اما این الگو نباید بدون شواهد به هر گزارش تحمیل شود.
 - گزارش منتشرشده در پایان فصل الزاماً مقدار مستقل همان فصل را ندارد؛ ممکن است مقدار YTD یا standalone باشد. از عنوان/زمان انتشار به‌تنهایی نتیجه‌گیری نکنید.
 - مقدار مستقل فصل اگر صریحاً در منبع گزارش شده باشد، Fact منبع و قابل ذخیره است؛ مقدار مستقل محاسبه‌شده از تفاضل گزارش‌های YTD فقط در runtime می‌ماند. تفاضل تنها با دوره‌ها و نسخه‌های سازگار در زنجیرهٔ همان سال مالی مجاز است.
@@ -1374,3 +1374,26 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **گام بعدی:** تأیید مالک برای تغییر مالکیت YTD از FinancialPeriod به FinancialFact؛ سپس یک amendment هماهنگ در Architecture و DB-DES-003/009/010/011. پس از آن، شواهد دوره‌های نامنظم و مدل Fiscal Calendar بررسی شوند. Migration 9 همچنان gate مستقل و باز است.
 
 **وضعیت:** reconciliation audit COMPLETE؛ قرارداد normative و اسناد پشتیبان هنوز نیازمند amendment هماهنگ و تأیید مالک؛ هیچ کد، ORM، Migration، داده یا تست تغییر نکرده و تستی اجرا نشده است.
+
+
+### 8.56 تصمیم فنی و amendment هماهنگ مالکیت YTD — 2026-11-18
+
+تصمیم فنی نهایی: **YTD/Standalone در سطح FinancialFact ذخیره می‌شود، نه FinancialPeriod.** این تصمیم به‌عنوان اصلاح قرارداد معماری اعمال شد؛ پرسش تأیید از مالک لازم نیست.
+
+- FinancialPeriod: شرکت، تاریخ دقیق شروع/پایان جلالی، temporal_kind، fiscal labels و period_type؛ بدون `is_ytd`.
+- FinancialFact: `duration_basis=YTD|STANDALONE` برای Factهای DURATION که این تمایز برایشان کاربرد دارد؛ برای INSTANT مقدار NULL/NOT_APPLICABLE.
+- هویت FinancialPeriod فقط بر اساس شرکت + temporal_kind + تاریخ دقیق شروع و پایان است؛ basis بخشی از کلید دوره نیست.
+- Standalone گزارش‌شده از منبع می‌تواند ذخیره شود؛ Standalone حاصل تفاضل YTD و TTM فقط runtime هستند و ذخیره نمی‌شوند.
+- Stage 5 باید basis را از FinancialFact بخواند و سازگاری آن را با temporal_kind، Metric و بازه واقعی کنترل کند.
+
+**Amendment هماهنگ اسناد انجام شد:**
+1. `12_Database_Architecture_V1.1.md` — قرارداد normative FinancialPeriod و DB-DES-003 rules اصلاح شد.
+2. `database/reports/DB_DES_003_REPORT_PERIOD_CONTRACT.md` — قواعد دوره و YTD/Standalone اصلاح شد؛ سند همچنان PARTIAL به‌علت gateهای دیگر.
+3. `database/reports/DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md` — فیلد basis از FinancialPeriod حذف و به FinancialFact اضافه شد.
+4. `database/reports/DB_DES_010_STAGE5_FINANCIAL_FACT_QUERY_MIGRATION_CONTRACT.md` — projection و validation fact-level basis صریح شد.
+5. `database/reports/DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md` — وضعیت به ACCEPTED DESIGN DECISION تغییر یافت.
+6. `database/reports/DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md` — نتیجه تصمیم و gateهای باقی‌مانده ثبت شد.
+
+**موارد باز برای ادامه طراحی:** قاعده months_length برای بازه‌های نامنظم، منبع و lifecycle تقویم مالی هر شرکت، محل provenance نقش PRIMARY/COMPARATIVE/UNKNOWN، Migration 9، و اعتبارسنجی با workbook دوره بعد. این موارد مانع ORM/Migration هستند.
+
+هیچ ORM، Migration، runtime code، schema یا داده‌ای تغییر نکرده است؛ تستی اجرا نشده است.
