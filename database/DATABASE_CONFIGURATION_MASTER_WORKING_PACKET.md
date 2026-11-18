@@ -2052,3 +2052,18 @@ DB-DES-009 بخش 28 ثبت کرد:
 - مقایسهٔ T01 و T03 نشان می‌دهد قرارداد باید هم INSTANT و هم DURATION، HeaderPath، RowAxisPath و structural non-data row را پشتیبانی کند.
 
 قدم بعدی: تدوین قرارداد معنایی مشترک و سپس تطبیق آن با DB-DES-008/013/014 و DB-ING-006/Task 033. این مرحله فقط مستندات را تغییر داد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.96 تثبیت قرارداد معنایی مشترک Template و Interpretation — 2026-11-19
+
+DB-DES-009 بخش 29 پس از تطبیق با DB-DES-008/011/013/014 و وضعیت DB-ING-006، قرارداد منطقی مشترک را ثبت کرد:
+
+- TemporalType فقط INSTANT/DURATION است و از Metric و Interpretation Standard مصوب می‌آید؛ FinancialPeriod بازهٔ واقعی Jalali را نگه می‌دارد و duration_basis فقط در سطح Factهای DURATION و به‌صورت YTD/STANDALONE معنا دارد.
+- هر ColumnSlot دارای HeaderPath مرتب و مستقل است؛ هر مشاهده با RowAxisPath کامل یا AlternativeRowIdentity صریح و نسخه‌دار resolve می‌شود. نقش‌های ساختاری ردیف از Metric و aggregation role جدا هستند.
+- واحد، currency، scale و measurement basis در scope معنایی mapping تعیین می‌شوند. note «به میلیون» به‌تنهایی currency را اثبات نمی‌کند؛ واحد صریح ردیف مانند EPS می‌تواند rule مستقل داشته باشد.
+- نقش‌های COMPONENT/SUBTOTAL/TOTAL/RATIO_OR_PER_SHARE/BALANCE_CONTROL/MEMORANDUM/NON_ADDITIVE برای جلوگیری از double-counting به‌عنوان قرارداد مفهومی پیشنهاد شدند؛ enum و catalog فیزیکی هنوز تصویب نشده‌اند.
+- هر تقاطع RowAxis/Header باید دقیقاً یک SemanticMapping نسخه‌دار داشته باشد؛ نبود یا تعدد mapping، temporal/unit ambiguity و provenance ناقص موجب توقف می‌شود. Multi-input همچنان UNPROVEN است.
+
+**نتیجه:** قرارداد منطقی مشترک DEFINED و آمادهٔ بررسی طراحی فیزیکی است، نه آمادهٔ پیاده‌سازی. Gate 7 PARTIAL/OPEN و Gate 8 PROPOSED/OPEN باقی می‌مانند. Task 033 نیز PARTIAL است؛ گزارش متنی Parsian جای اجرای detector/reader روی workbook bytes، تأیید نهایی template، workbook مستقل دورهٔ بعد و fixture end-to-end را نمی‌گیرد.
+
+**قدم بعدی:** ایجاد Mapping Decision Matrix محدود به T01 و T03 در سطح هر RowAxisPath × ColumnSlot، با وضعیت PROVEN/PROPOSED/BLOCKED برای Metric، Dimension، HeaderPath، period، duration_basis، unit/scale، aggregation و provenance؛ سپس انتخاب یک direct mapping قابل‌اثبات برای fixture end-to-end. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
