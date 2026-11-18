@@ -1691,3 +1691,18 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 **Replay CODAL:** کلید موجود `(codal_tracking_id, publication_datetime)` است. replay یکسان در تست corpus طی سه چرخه بررسی شده، اما payload متعارض با همان identity در کد guard ندارد و تست موجود نیز آن سناریو را اثبات نمی‌کند.
 
 **وضعیت:** Task 010 / DB-DES-005 و Task 027 / DB-AUD-006 همچنان PARTIAL هستند. inventory محلی تمام فایل‌های Python زیر `src/` و matchهای الگوی انتخاب‌شده را پوشش می‌دهد، اما callهای پویا، reflection، entrypointهای بیرون از `src/` و SQL مستقیم خارج از الگو را نفی نمی‌کند. schema/data inventory محیط واقعی هنوز انجام نشده است. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+### 8.72 تطبیق وضعیت ممیزی DB-AUD-006 با کارهای تکمیل‌شدهٔ قبلی و تعیین مسیر بعدی — 2026-11-18
+
+بازخوانی Master Working Packet نشان داد ممیزی‌های هدفمند زیر پیش‌تر انجام شده‌اند و نباید دوباره درخواست یا اجرا شوند:
+- DB-AUD-011 / §8.44: linkage تعداد 505 RawFinancialFact در دیتابیس محلی؛ سه جدول downstream بررسی‌شده خالی و بدون ارجاع بودند.
+- DB-AUD-015 / §8.52: چهار جدول Normalized/Derived در snapshot محلی صفر ردیف، referenceهای بررسی‌شده صفر، duplicate groups صفر و foreign_key_check بدون violation.
+- Migration 9 / §8.64: آثار قابل‌مشاهده در دیتابیس محلی audit و cleanup شد؛ دو ستون اضافی و ledger row حذف و 505 RawFinancialFact حفظ شدند. implementation اصلی و side effectهای تاریخی ناشناخته قابل اثبات نیستند.
+- DB-AUD-012 / §§8.45–8.46: inventory وابستگی PDF در working tree تکمیل شد؛ 5,611 فایل اسکن و 26 فایل دارای match بودند.
+- DB-AUD-013 / §8.48: gap audit آمادگی Excel persistence انجام شد؛ production Excel-to-canonical هنوز NOT ESTABLISHED است.
+- DB-PLAN-013 / §8.47: طرح مرحله‌ای بازنشستگی PDF موجود است و ساخت/اثبات Excel persistence را پیش‌شرط قطع مسیر PDF می‌داند.
+
+پس عبارت بخش 8.71 مبنی بر انجام‌نشدن schema/data inventory باید دقیق خوانده شود: **ممیزی‌های هدفمند دیتابیس محلی انجام شده‌اند**؛ وضعیت سایر محیط‌ها، backupها و مصرف‌کنندگان بیرونی هنوز اثبات نشده است. تکرار ممیزی‌های محلی DB-AUD-011/015 یا PDF dependency audit در این مرحله لازم نیست.
+
+**قدم بعدی:** ادامهٔ Phase 0 از DB-PLAN-013 و بستن gateهای طراحی DB-DES-009. اولین مورد: inventory تمام مصرف‌کنندگان `reports.financial_period_id`، چون پیش از nullable کردن یا انتقال این فیلد باید تمام readerها/writerها مشخص شوند. پس از آن gateهای source revision و ReportVersion standard binding، dimension scope، company consistency و provenance granularity بررسی می‌شوند.
+
+این crosswalk فقط مستنداتی بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
