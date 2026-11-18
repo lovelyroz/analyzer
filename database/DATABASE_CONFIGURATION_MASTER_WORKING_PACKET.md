@@ -1604,3 +1604,24 @@ DB-DES-014 defines the logical contract for interpreting multi-level Excel heade
 **Evidence limits:** No actual Parsian Header/metric mapping is approved by this document. Candidate bounds, 15 provisional child Header inheritances, and annotation inventory remain unapproved; an independent later-period workbook and owner-approved Header/row-axis inventory are still required.
 
 **Status:** DB-DES-014 is a design proposal only. It does not close DB-ING-006 / Task 033 and authorizes no ORM, migration, runtime, database, or test changes.
+
+
+### 8.68 DB-DES-015 — Parsian T03 / Total Assets Mapping Proof (2026-11-18)
+
+**Document:** `database/reports/DB_DES_015_PARSIAN_T03_TOTAL_ASSETS_MAPPING_PROOF.md`  
+**Commit:** `594ebb83872cbe8895aae5103582c5b07ea52de1`
+
+A one-row/two-column mapping proof was drafted for T03 (`صورت وضعیت مالی`), child candidate `دارایی‌ها`, row `جمع دارایی‌ها` (A94), and comparative value slots B94/C94.
+
+The candidate structural paths are:
+- B: `[دوره منتهی به ۱۴۰۳/۰۶/۳۱, حسابرسی نشده]`
+- C: `[تجدید ارائه شده ۱۴۰۲/۱۲/۲۹, حسابرسی شده]`
+- Row: `[دارایی‌ها, جمع دارایی‌ها]`
+
+The semantic candidate is company-level total assets, temporal kind INSTANT, with no duration basis. B and C have different measurement dates and audit-status qualifiers; they must not be collapsed into one period or lose their source/version provenance.
+
+**Critical evidence limitation:** literal cell values/header evidence comes from the detailed report-3 audit of an earlier workbook package (SHA `69186f1ad2b0e481a3588f2731b7027b0a9d9a543d1ca17fd24fc71d8c5aca06`), while the corrected workbook SHA is `95f94e739632e48ae6552c562ecbf6c3e8182848718d17977f69bc984a6638b0`. No retained-sheet XML hash proves byte identity. The corrected annotation map confirms B82:C94 are gray extraction coordinates, but the literal target values and all header/row text still require direct confirmation against the corrected XLSX.
+
+**Admission remains blocked:** source unit/scale is not explicit in the recorded Header evidence; do not infer Rial or a multiplier from numeric magnitude. T03 bounds/child partition, industry/entity scope, stable metric code, dimension policy, ReportVersion provenance, and independent later-period validation also remain open.
+
+**Result:** PARTIAL PROOF only. DB-ING-006 / Task 033 remains PARTIAL. No ORM, migration, runtime, database, or test changes are authorized or made.
