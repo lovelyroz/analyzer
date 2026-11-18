@@ -59,3 +59,4 @@
 
 - [DB_AUD_010_RUNTIME_SQLITE_MIGRATION_RECONCILIATION.md](reports/DB_AUD_010_RUNTIME_SQLITE_MIGRATION_RECONCILIATION.md) — مغایرت Migration 9 دیتابیس محلی با runner فعلی مخزن.
 - [DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md](reports/DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md) — ممیزی پنج فیلد provenance قدیمی، ارجاعات ORM/کد و تصمیم موقت حفظ داده‌ها.
+- [DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md](reports/DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md) — ارزیابی پنج فیلد provenance قدیمی، وابستگی‌های downstream و مسیر persistence فعلی.
