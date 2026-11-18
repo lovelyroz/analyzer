@@ -1212,3 +1212,25 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **وضعیت:** Phase 0 gap audit COMPLETE؛ Excel-to-canonical persistence NOT ESTABLISHED؛ مسیر PDF production نباید پیش از آماده‌شدن مسیر جایگزین قطع شود؛ Migration 9 reconciliation OPEN؛ هیچ تستی اجرا نشده است.
 
 **گام بعدی:** DB-DES برای مدل فیزیکی canonical FinancialFact و provenance حداقلی، با تصمیم صریح درباره بازطراحی NormalizedFinancialFact در برابر مدل جایگزین و سازگاری migration.
+
+
+### 8.49 طراحی مدل فیزیکی FinancialFact canonical و provenance — DB-DES-009 — 2026-11-18
+
+گزارش پیشنهاد: `database/reports/DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md`
+
+**پیشنهاد اصلی:** مسیر جدید Excel از جدول افزایشی `financial_facts` به‌عنوان مقصد canonical استفاده کند؛ `normalized_financial_facts` فعلی در این مرحله بازطراحی درجا نشود. علت: جدول فعلی `value_irr NUMERIC(30,4)`، کلید یکتای بدون Dimension، و وابستگی‌های legacy دارد؛ تغییر درجا آن را با Migration 9 حل‌نشده و مصرف‌کنندگان قدیمی گره می‌زند.
+
+**مدل پیشنهادی:**
+- حفظ Report/ReportVersion به‌عنوان هویت گزارش و نسخهٔ منتشرشده؛ افزودن fingerprint منبع، source revision key، شناسهٔ دقیق Company Table Template Version و interpretation-standard version.
+- طراحی مجدد FinancialPeriod با تاریخ‌های جلالی authoritative و تفکیک INSTANT/DURATION؛ تاریخ Gregorian موجود بدون شواهد تبدیل نشود.
+- حفظ FinancialMetric به‌عنوان کاتالوگ هویت Metric.
+- ساخت Dimension catalog و DimensionSet canonical؛ کلید یکتای fact شامل ReportVersion + FinancialPeriod + Metric + DimensionSet است.
+- جدول `financial_facts` با مقدار SQLite INTEGER، حالت‌های مجزای REPORTED_VALUE / REPORTED_NULL / ZERO_FALLBACK، و unit/currency/basis منبع و canonical.
+- جدول `financial_fact_provenance` برای lineage چندورودی به TableNode / ColumnSlot / semantic mapping؛ بدون RawFinancialFact، آرشیو workbook یا الزام دائمی مختصات سلول.
+- حفظ اتمیک بودن ReportVersion + تمام Facts + provenance + COMPLETED Run طبق DB-DES-005.
+
+**سازگاری و محدودیت:** هیچ dual-write به NormalizedFinancialFact انجام نشود. هیچ backfill خودکاری از raw/normalized legacy صورت نگیرد. تمام جدول‌ها، ردیف‌ها، ستون‌ها و FKهای قدیمی فعلاً حفظ شوند. بازنشستگی آن‌ها فقط در Task مستقل و پس از reconciliation Migration 9، بررسی مصرف‌کنندگان و ممیزی محیط/backup ممکن است.
+
+**گیت‌های پیش از ORM/Migration:** تعیین interpretation-standard bundle و تک‌نسخه‌ای بودن آن برای ReportVersion؛ scope/versioning دیکشنری Dimensionها؛ محل نهایی YTD؛ منبع CODAL revision identity؛ مصرف‌کنندگان Report primary period؛ راهکار composite FK/trigger برای consistency شرکت؛ کفایت provenance ساختاری برای factهای چندسلولی؛ inventory کامل consumerهای Normalized/Derived؛ reconciliation Migration 9.
+
+**وضعیت:** DB-DES-009 PROPOSED؛ هیچ کد، ORM، Migration، داده یا تست تغییر نکرده است. این طرح هنوز مجوز پیاده‌سازی فیزیکی نیست و گیت‌های فوق باید پیش از آن بسته شوند.
