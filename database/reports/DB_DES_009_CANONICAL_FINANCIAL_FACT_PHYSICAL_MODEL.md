@@ -576,3 +576,27 @@ Filename، local path، download URL، ingestion timestamp یا SHA-256 به‌�
 برای بستن این gate باید metadata واقعی یک یا چند گزارش Excel از CODAL (یا پاسخ رسمی endpoint/download manifest که فایل از آن دریافت می‌شود) بررسی شود؛ حداقل یک گزارش اصلی و یک نسخهٔ اصلاحی/بازانتشارشده لازم است تا تفاوت Report identity، revision identity، publication time و file fingerprint قابل مشاهده باشد. اگر نمونهٔ اصلاحی در دسترس نیست، gate تا دریافت شواهد باز می‌ماند.
 
 **نتیجه Gate 4:** قرارداد منطقی تفکیک Report identity، source revision identity و artifact fingerprint تعیین شد؛ اما source-issued key و metadata واقعی مسیر Excel هنوز اثبات نشده است. Gate 4 **OPEN / EVIDENCE BLOCKED** است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 21. تطبیق Gateهای 9 و 10 با ممیزی‌های تکمیل‌شده — 2026-11-18
+
+### Gate 9 — Normalized/Derived consumer inventory
+این gate قبلاً در DB-AUD-014 / Master §8.50 انجام شده است:
+- تنها reader مستقیم runtime/production برای `NormalizedFinancialFact`، Stage 5 از طریق `src/forecast/queries.py` است.
+- writer تولیدی برای `NormalizedFinancialFact` در branch بررسی‌شده پیدا نشد؛ CODAL فعلی فقط RawFinancialFact می‌نویسد و Excel canonical writer هنوز وجود ندارد.
+- `NormalizedFinancialFactInput` و جدول‌های Derived reader/writer تولیدی ندارند؛ صرفاً مدل/metadata/migration و تست‌های legacy به آن‌ها ارجاع می‌دهند.
+- Stage 5 consumer و تست‌های مربوط نباید به‌علت خالی بودن DB حذف شوند؛ در انتقال آینده باید PIT، ReportVersion selection، Dimension، provenance و رفتار عددی حفظ شود.
+- DB-AUD-015 / Master §8.52 ممیزی دیتابیس محلی را تکمیل کرد: چهار جدول Normalized/Derived در snapshot محلی صفر ردیف داشتند؛ linkage/reference و duplicate groups بررسی‌شده صفر و foreign_key_check بدون violation بود؛ 505 RawFinancialFact حفظ شدند.
+
+**نتیجه Gate 9:** source consumer inventory برای branch بررسی‌شده COMPLETE و local snapshot linkage COMPLETE است. وضعیت محیط‌های دیگر، backupها و consumerهای خارجی اثبات نشده است. این gate مانع طراحی additive مقصد جدید نیست، اما حذف legacy tables یا مهاجرت destructive را مجاز نمی‌کند.
+
+### Gate 10 — Migration 9 lineage reconciliation
+این gate با DB-AUD-010 و Master §8.64 فقط تا حد آثار قابل‌مشاهدهٔ دیتابیس محلی پیش رفته است:
+- implementation اصلی Migration 9 در repository/runner پیدا نشد؛ runner فعلی تا Migration 8 است.
+- آثار قابل‌مشاهدهٔ local DB cleanup شد: دو ستون اضافه و ledger row نسخه 9 حذف شدند، 505 RawFinancialFact حفظ شدند و audit پس از cleanup موفق بود.
+- backup محلی قبل از cleanup در مسیر ثبت‌شدهٔ Master §8.64 نگهداری شده است.
+- چون source implementation و provenance تاریخی Migration 9 در دسترس نیست، side effectهای تاریخی ناشناخته قابل نفی نیستند.
+
+**نتیجه Gate 10:** local visible-state reconciliation COMPLETE؛ historical source/side-effect reconciliation و target-environment/backup verification همچنان PARTIAL / OPEN هستند. Migration 9 جایگزین ساخته نمی‌شود و برای ادامهٔ کار، دوباره‌سازی migration یا تکرار cleanup محلی لازم نیست.
+
+**اثر بر DB-DES-009:** additive design و توسعهٔ جدول جدید `financial_facts` می‌تواند در سطح طراحی ادامه یابد؛ هیچ حذف/بازنویسی legacy، backfill خودکار یا migration مخرب تا زمان مجوز مستقل و audit محیط مقصد مجاز نیست. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
