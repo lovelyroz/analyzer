@@ -2038,3 +2038,17 @@ DB-DES-009 بخش 27 برای T01 ثبت کرد:
 - period/duration_basis، canonical Metric/Dimension، sign/aggregation policy و CODAL revision provenance هنوز برای ingestion نهایی BLOCKED یا ناقص‌اند.
 
 T01 اکنون یک structural fixture با RowAxis/ColumnSlot مشخص است، نه TemplateVersion مصوب production. قدم بعدی بررسی T03 با همین روش است. این مرحله فقط مستندات را تغییر داد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.95 ثبت Row-level Semantic Mapping برای T03 و مقایسه با T01
+
+DB-DES-009 بخش 28 ثبت کرد:
+- T03 دارای دو ColumnSlot مستقل B/C و سه RowAxis parent node با 35 leaf row است.
+- A95:C95 به‌عنوان Header/مرز داخلی غیرمالی ثبت شد؛ B95/C95 تکرار Header و نادیده گرفته می‌شوند؛ گروه دارایی‌ها در ردیف 94 خاتمه می‌یابد.
+- D/E بیرون محدوده T03 هستند و با وجود داده، extraction نمی‌شوند.
+- عنوان «صورت وضعیت مالی» temporal type از نوع INSTANT را به‌عنوان candidate قوی مطرح می‌کند؛ این rule تا تصویب Interpretation Standard هنوز PROPOSED است. duration_basis فقط برای DURATION معنی دارد.
+- scale «میلیون» مشاهده شده، ولی currency نامعلوم است.
+- جمع دارایی‌ها، جمع حقوق مالکانه و جمع بدهی‌ها نیازمند metric/aggregation policy و کنترل double-counting هستند؛ معادله ترازنامه می‌تواند invariant اعتبارسنجی باشد، نه مجوز تولید داده.
+- مقایسهٔ T01 و T03 نشان می‌دهد قرارداد باید هم INSTANT و هم DURATION، HeaderPath، RowAxisPath و structural non-data row را پشتیبانی کند.
+
+قدم بعدی: تدوین قرارداد معنایی مشترک و سپس تطبیق آن با DB-DES-008/013/014 و DB-ING-006/Task 033. این مرحله فقط مستندات را تغییر داد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
