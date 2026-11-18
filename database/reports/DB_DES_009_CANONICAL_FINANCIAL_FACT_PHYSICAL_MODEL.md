@@ -932,3 +932,86 @@ T01 در `Recovered_Sheet1!A10:D42` یک **نمونهٔ مرجع ساختاری 
 - reconciliation با قراردادهای DB-DES-008/013/014 و مسیر DB-ING-006 / Task 033 حفظ شود.
 
 **وضعیت:** قرارداد شناسایی Template V1 به‌صورت طراحی PROPOSED ثبت شد؛ T01 نمونهٔ direct mapping ساختاری است و T03 برای proof محدود شواهد Header/RowAxis دارد. تصمیم‌های مالک دربارهٔ T02/T03/T06/T13/T17، Black/uncolored، U01 و Sheet1 اعمال شده‌اند. موارد باز اصلی دیگر صرفاً annotation نیستند: تأیید نهایی تمام 17 مرز و 15 partition (spot-check قبلی blanket approval نیست)، تعیین currency/unit و temporal basis برای T01، تعیین unit/scale برای T03، تثبیت provenance و ranking نسخه‌های گزارش، و workbook مستقل دورهٔ بعد. Gate 7 PARTIAL/OPEN؛ Gateهای فیزیکی 1/2/7/8 همچنان PROPOSED. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 25. ممیزی پوشش کامل Candidateها و Partitionهای Parsian — 2026-11-19
+
+### 25.1 هدف و روش
+
+این مرحله معیار بخش 24.7 را به یک ماتریس قابل‌ردیابی تبدیل می‌کند: هر 17 محدودهٔ T01 تا T17 و هر 15 marker سبز/partition به‌صورت جداگانه ارزیابی شده‌اند. مبنای شواهد، گزارش `database/reports/parsian_periodic_report_3.md` است که عنوان داخلی آن «Independent Re-Audit Report 2» است؛ هویت workbook با SHA-256 ثبت‌شده در بخش 23 و 24 تطبیق داده شده است.
+
+این ممیزی سه موضوع را از هم جدا می‌کند:
+- **تشخیص ساختاری:** آیا محدوده و نقش‌های سلولی از شواهد گزارش قابل تعیین‌اند؟
+- **تصمیم مالک:** آیا قواعد خاص این workbook صریحاً تعیین تکلیف شده‌اند؟
+- **آمادگی Semantic Mapping:** آیا Metric، Dimension، واحد/مقیاس، دوره و provenance به‌اندازهٔ کافی معلوم‌اند؟
+
+تأیید ساختاری به‌تنهایی تأیید معنای مالی یا مجوز ingestion نیست. هرجا تصمیم مالک یا معنای مالی در اسناد موجود اثبات نشده، مورد باز می‌ماند.
+
+### 25.2 ماتریس 17 محدوده
+
+| Candidate | محدودهٔ گزارش | نتیجهٔ ساختاری بر مبنای شواهد و تصمیم‌های ثبت‌شده | وضعیت برای Semantic Mapping |
+|---|---|---|---|
+| T01 | A10:D42 | الگوی Direct Mapping؛ RowAxis سه گروه A12/A32/A35؛ B و D دو ColumnSlot مستقل؛ C excluded؛ E خارج محدوده | **STRUCTURE ACCEPTED / SEMANTICS OPEN**؛ واحد و temporal basis هر ستون باید جداگانه تثبیت شود |
+| T02 | A60:D68 | محدوده با عنوان قرمز A58 تعیین می‌شود؛ امتداد Border در A58/A59 و E68 محدوده را توسعه نمی‌دهد؛ C excluded؛ A62 ردیف مستقل پیش از marker A63 است | **STRUCTURE ACCEPTED / SEMANTICS OPEN**؛ E خارج محدوده |
+| T03 | A79:C119 | Header چندسطحی B/C؛ سه گروه A81/A96/A108؛ B95 و C95 تکرار Headerهای B79/C79 و نادیده گرفته می‌شوند؛ D/E خارج محدوده | **PARTIAL**؛ مرز معنایی گروه اول باید با تصمیم ثبت‌شده دربارهٔ A95 سازگار باشد؛ Metric/Dimension و واحد/مقیاس باز |
+| T04 | A130:L165 | ردیف‌های Black از 131 تا 151 در کل A:L excluded؛ marker A152 و ردیف‌های زرد بعد از آن؛ Gray blankهای داخل slot مصوب طبق Rule 7 صفر | **STRUCTURE ACCEPTED WITH OWNER RULES / SEMANTICS OPEN**؛ هیچ مقدار Black نباید استخراج شود |
+| T05 | A176:D213 | الگوی دو ColumnSlot مقداری B/D و ستون Black میانی C؛ سه marker سبز در A178/A182/A191؛ E بیرون محدوده | **STRUCTURE IDENTIFIED / OWNER SCOPE CHECK**؛ mapping دوره/وضعیت دو ستون مستقل است؛ E خارج محدوده و بدون مجوز جداگانه |
+| T06 | A238:I253 | چهار ColumnSlot Gray متناوب C/E/G/I؛ ستون‌های Black B/D/F/H excluded؛ A243:A244 و مقادیر uncolored هم‌ردیف طبق تصمیم مالک excluded؛ C248:C251 Gray blank طبق Rule 7 صفر | **STRUCTURE ACCEPTED WITH OWNER RULES / SEMANTICS OPEN**؛ J:K خارج محدوده؛ Header/Metric/Dimension هنوز نیازمند mapping |
+| T07 | A266:C275 | B Black و excluded؛ C تنها value slot؛ marker A268 و ردیف‌های زرد A269:A275؛ D:F بیرون محدوده | **STRUCTURE IDENTIFIED / SEMANTICS OPEN**؛ ستون‌های بیرونی D:F وارد نمی‌شوند |
+| T08 | A279:B283 | محدودهٔ مستقل دارای Header A:B، چهار ردیف Yellow و چهار Gray value در B؛ C:F خارج محدوده و شامل جدول/اطلاعات uncolored دیگری است | **STRUCTURE ACCEPTED FOR A:B ONLY / SEMANTICS OPEN**؛ C:F جزو این Template نیست |
+| T09 | A302:C308 | B Black و excluded؛ C value slot؛ D:E خارج محدوده؛ Header شامل دورهٔ سال مالی | **STRUCTURE IDENTIFIED / SEMANTICS OPEN**؛ معنای دوره و Metricها باید صریح map شوند |
+| T10 | A313:D332 | B:C Black و excluded؛ D value slot؛ marker A314 و 18 ردیف Yellow؛ E:G خارج محدوده | **STRUCTURE IDENTIFIED / SEMANTICS OPEN**؛ چند Header/دوره در محدوده‌های بیرونی، بدون approval قابل ingest نیستند |
+| T11 | A336:C339 | B Black و excluded؛ C value slot؛ سه ردیف Yellow؛ D:E خارج محدوده | **STRUCTURE IDENTIFIED / SEMANTICS OPEN** |
+| T12 | A353:I358 | A:B نقش شرح/ردیف و Header ادغام‌شده؛ C:F Black و excluded؛ G:I سه value slot؛ J:K خارج محدوده | **STRUCTURE IDENTIFIED / SEMANTICS OPEN**؛ هر یک از G/H/I مسیر Header مستقل دارد |
+| T13 | A361:C367 | B Black و excluded؛ C value slot؛ markerهای A362 و A366؛ ردیف 364 طبق تصمیم مالک حذف می‌شود و separator یا row node نیست | **STRUCTURE ACCEPTED WITH OWNER RULES / SEMANTICS OPEN** |
+| T14 | A376:C378 | B Black و excluded؛ C value slot؛ دو ردیف Yellow | **STRUCTURE IDENTIFIED / SEMANTICS OPEN** |
+| T15 | A386:C387 | B Black و excluded؛ C value slot؛ یک ردیف Yellow | **STRUCTURE IDENTIFIED / SEMANTICS OPEN** |
+| T16 | A395:C398 | B Black و excluded؛ C value slot؛ سه ردیف Yellow؛ Border نازک اما پیوسته و قابل‌تشخیص است | **STRUCTURE IDENTIFIED / SEMANTICS OPEN**؛ thin border به‌تنهایی دلیل رد نیست |
+| T17 | A404:E405 | استثنای مصوب بدون Yellow: Header آبی ردیف 404 و پنج مقدار Gray ردیف 405؛ Border نازک و پیوسته؛ عنوان قرمز A403 یک ردیف بالاتر است | **STRUCTURE ACCEPTED AS EXPLICIT EXCEPTION / SEMANTICS OPEN**؛ این استثنا عمومی نیست |
+
+**نتیجهٔ ماتریس:** 17 محدوده از نظر مکان‌یابی در گزارش قابل‌شناسایی‌اند؛ اما «قابل‌شناسایی» مساوی «TemplateVersion تولیدی مصوب» نیست. T01 بهترین fixture برای Direct Mapping است. T03 به‌دلیل Header داخلی، T06 به‌دلیل ستون‌های متناوب و ردیف‌های خارج از slot، و T17 به‌دلیل استثنای بدون Yellow باید fixtureهای صریح و جداگانه باشند. T05 و هر ناحیه‌ای که ستون‌های بیرونی دارد تا زمانی که تصمیم مالک برای آن ستون‌ها مستند نشده، فقط در محدودهٔ bordered فعلی قابل‌استفاده است.
+
+### 25.3 دفتر ثبت 15 Partition مبتنی بر Green Marker
+
+گزارش 15 marker سبز را در 8 candidate ثبت می‌کند. شمارش: T01=3، T02=1، T03=3، T04=1، T05=3، T07=1، T10=1، T13=2؛ جمعاً 15.
+
+| Candidate | Marker | Partition rows بر مبنای marker بعدی/پایان محدوده | تصمیم ساختاری |
+|---|---|---|---|
+| T01 | A12 — عملیات در حال تداوم | ردیف‌های زرد 13–31 | پذیرفته؛ parent group مستقل |
+| T01 | A32 — عملیات متوقف شده | ردیف 33–34 | پذیرفته؛ parent group مستقل |
+| T01 | A35 — سود (زیان) پایه هر سهم | ردیف‌های 36–42 | پذیرفته؛ parent group مستقل |
+| T02 | A63 — سایر اقلام سود و زیان جامع | ردیف‌های 64–68؛ A62 بیرون این partition و یک ردیف مستقل است | پذیرفته؛ A62 به marker بعدی منتسب نشود |
+| T03 | A81 — دارایی‌ها | ردیف‌های زرد 82–94؛ A95 Header تکراری/ساختاری است و leaf مالی نیست | پذیرفته با مرز پایان پیش از A95 |
+| T03 | A96 — حقوق مالکانه | ردیف‌های زرد 97–107 | پذیرفته |
+| T03 | A108 — بدهی‌ها | ردیف‌های زرد 109–119 | پذیرفته |
+| T04 | A152 | ردیف‌های زرد 153–165؛ ردیف‌های Black 131–151 خارج از partition استخراجی‌اند | پذیرفته؛ Black block به RowAxis داده‌ای تبدیل نشود |
+| T05 | A178 | ردیف‌های زرد 179–181 | پذیرفته؛ value columns B/D مستقل |
+| T05 | A182 | ردیف‌های زرد 183–190 | پذیرفته؛ value columns B/D مستقل |
+| T05 | A191 | ردیف‌های زرد 192–213 | پذیرفته؛ value columns B/D مستقل |
+| T07 | A268 — سپرده‌های ریالی | ردیف‌های زرد 269–275 | پذیرفته |
+| T10 | A314 — درآمد تسهیلات اعطایی | ردیف‌های زرد 315–332 | پذیرفته |
+| T13 | A362 — سایر درآمدهای عملیاتی | ردیف A363؛ A364 حذف است و partition را نمی‌شکند | پذیرفته با حذف صریح A364 |
+| T13 | A366 — سایر هزینه‌های عملیاتی | ردیف A367 | پذیرفته |
+
+Partitionها فقط ساختار RowAxis را تعیین می‌کنند؛ عنوان Green به‌تنهایی Metric، Dimension یا حسابداری‌بودن ردیف را اثبات نمی‌کند. ردیف‌های جمع/زیرجمع نیز فقط در صورت mapping صریح و سیاست عدم‌دوباره‌شماری می‌توانند Fact شوند.
+
+### 25.4 موارد خارج از مجموعهٔ 17 candidate
+
+- **U01 (A297:D299):** table candidate بدون عنوان قرمز، border، Yellow یا Gray؛ مقادیر uncolored. طبق قاعدهٔ fail-closed، وارد Template استخراجی V1 نمی‌شود.
+- **S01 / Sheet1:** شیت آزمایشی حذف‌شده طبق تصمیم مالک؛ هیچ بخشی از آن وارد Template نمی‌شود.
+- **ستون‌های بیرون مرز:** دادهٔ uncolored بیرون border صرفاً به‌دلیل هم‌ردیفی یا شباهت Header وارد candidate نمی‌شود. گسترش هر محدوده فقط با تصمیم مالک و TemplateVersion جدید مجاز است.
+
+### 25.5 مواردی که واقعاً هنوز Gate 7 را باز نگه می‌دارند
+
+1. تعیین Metric/Dimension و unit/scale برای هر ColumnSlot منتخب؛ به‌خصوص T01، T03، T04 و T06.
+2. تعیین دورهٔ Jalali و duration_basis مستقل برای هر ستون مقداری؛ متن Header باید به rule صریح و بدون حدس تبدیل شود.
+3. اثبات provenance و ranking نسخه‌های audited/restated از metadata واقعی CODAL؛ رنگ/متن Header به‌تنهایی provenance منبع را اثبات نمی‌کند.
+4. تأیید همین قرارداد روی workbook مستقل دیگری از همان Company و ReportType برای سنجش layout drift.
+5. ساخت fixture end-to-end direct mapping و constraintهای رد ambiguity. Multi-input یا باید با مثال واقعی و rule مالی مستقل اثبات شود یا صریحاً از V1 خارج بماند.
+6. reconcile نهایی با DB-DES-008/013/014 و DB-ING-006/Task 033؛ تا وقتی متن کامل اسناد مرجع در دسترس و تطبیق داده نشده، این مرحله بسته اعلام نمی‌شود.
+
+### 25.6 تصمیم اجرایی بعدی
+
+دیگر لازم نیست 17 محدوده و 15 marker را از ابتدا با کاربر مرور کنیم. قدم بعدی باید یک **Semantic Mapping Readiness Matrix** محدود به ColumnSlotهای استخراجی باشد: برای هر slot، ثبت شود که HeaderPath، RowAxisPath، Metric، Dimension، unit/scale، Jalali period، duration_basis و provenance چه چیزی را اثبات می‌کنند و چه چیزی هنوز نامعلوم است. موارد نامعلوم به‌صورت BLOCKED باقی می‌مانند؛ هیچ مقدار مالی با حدس تکمیل نمی‌شود.
+
+**وضعیت:** پوشش ساختاری 17/17 candidate و 15/15 partition بر مبنای گزارش و تصمیم‌های ثبت‌شده مستند شد. این به معنی approval نهایی همهٔ Templateها یا semantic mapping نیست. Gate 7 همچنان PARTIAL / OPEN؛ physical design همچنان PROPOSED. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
