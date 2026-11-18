@@ -1673,3 +1673,21 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 **وضعیت Taskها:** DB-DES-005 / Task 010 همچنان PARTIAL و DB-AUD-006 / Task 027 همچنان PARTIAL است. این گام فقط مستنداتی بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد. Migration یا حذف/بازنویسی legacy مجاز نشده است.
 
 **گام بعدی دقیق:** تکمیل repository-wide caller/import inventory با دسترسی به فهرست کامل فایل‌ها و بررسی transaction/session boundary تمام writerها و helperها؛ سپس schema/data inventory فقط از محیط‌های واقعیِ در دسترس و مجاز. تا تکمیل این دو، طرح migration قابل تصویب نیست.
+
+### 8.71 تکمیل Repository Inventory و اصلاح دامنهٔ ممیزی DB-AUD-006 — 2026-11-18
+
+کاربر inventory تمام فایل‌های Python زیر `src/` و خروجی جست‌وجوی الگوهای ingestion/transaction را اجرا و ارائه کرد. نقشهٔ callerها و نتیجهٔ اصلاح‌شده در بخش 12 سند `reports/DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md` ثبت شد.
+
+**نقشهٔ مسیر CODAL:**
+- `codal/ingestion.py::ingest_codal_report` فقط facade است و به writer مرکزی `service.py::ingest_codal_report` می‌رسد.
+- `codal/ingestion.py::ingest_codal_pdf` extraction و سپس persistence را انجام می‌دهد؛ extraction failure با Run جدید FAILED ثبت می‌شود و STARTED پایدار پیش از extraction ندارد.
+- `codal/pipeline.py::load_codal_pdf` و `load_codal_pdf_from_url` acquisition/extraction/validation را پیش از writer اجرا می‌کنند؛ failureهای این مراحل Run جدید FAILED ثبت می‌کنند، نه ادامهٔ یک STARTED پایدار.
+- writer مرکزی CODAL در success همان Run و Report/ReportVersion/RawFinancialFact را commit می‌کند؛ در persistence exception، Run اولیه rollback و Run جدید FAILED ساخته می‌شود.
+
+**Callerهای FX و Market:** facadeهای FX و OHLC به writerهای مرکزی خود delegate می‌کنند. FX/OHLC در کد مشاهده‌شده امکان ثبت بخشی از ردیف‌های معتبر با `records_failed > 0` را دارند؛ این رفتار صرفاً ثبت مشاهده است و به‌عنوان نقض DB-DES-005 طبقه‌بندی نمی‌شود، زیرا DB-DES-005 قرارداد ingestion مالی CODAL است و قرارداد مستقل FX/Market باید مبنای قضاوت باشد.
+
+**Run Tracker:** در inventory جست‌وجوشدهٔ `src/`، `start_run`، `complete_run` و `fail_run` فقط در تعریف‌های `common/run_tracker.py` دیده شدند و call-site مصرف‌کننده‌ای مشاهده نشد؛ بنابراین helperها مسیر اجرایی اثبات‌شده نیستند.
+
+**Replay CODAL:** کلید موجود `(codal_tracking_id, publication_datetime)` است. replay یکسان در تست corpus طی سه چرخه بررسی شده، اما payload متعارض با همان identity در کد guard ندارد و تست موجود نیز آن سناریو را اثبات نمی‌کند.
+
+**وضعیت:** Task 010 / DB-DES-005 و Task 027 / DB-AUD-006 همچنان PARTIAL هستند. inventory محلی تمام فایل‌های Python زیر `src/` و matchهای الگوی انتخاب‌شده را پوشش می‌دهد، اما callهای پویا، reflection، entrypointهای بیرون از `src/` و SQL مستقیم خارج از الگو را نفی نمی‌کند. schema/data inventory محیط واقعی هنوز انجام نشده است. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
