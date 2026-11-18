@@ -105,6 +105,24 @@ Before production reliance:
 - Confirm request availability/rate limits and whether the endpoint can be consumed reliably from the project's deployment environment. Third-party client documentation reports that CODAL may block or time out from non-Iranian network exits; this is an operational risk, not a contract guarantee.
 - Do not add a third-party MCP dependency to the analyzer application. The integration was used only to discover and inspect the underlying CODAL request pattern.
 
+## 7. Local live-validation probe
+
+A read-only project script was added: `src/scripts/audit_codal_fiscal_year_metadata.py`.
+
+It queries the CODAL issuer directory and fiscal-year-end endpoint for two probe symbols:
+- فولاد — comparison case with Esfand year-end;
+- زفارس — non-Farvardin year-end candidate, to be verified by the issuer directory response.
+
+The script writes the raw, timestamped result to `reply.md`, uses only Python standard-library modules, and does not access or modify the project database. It includes a two-second pause between fiscal-year endpoint calls and reports HTTP/rate-limit errors without retry loops.
+
+Run locally:
+
+```powershell
+python src/scripts/audit_codal_fiscal_year_metadata.py
+```
+
+After it completes, sync/commit `reply.md` and report `reply.md is updated`. The returned issuer names and year-end lists must be inspected before treating زفارس as the non-Farvardin comparison case.
+
 ## 7. Outcome
 
 **Decision:** Adopt the CODAL fiscal-year-end list as the leading candidate source for company-specific fiscal-year discovery and historical cross-checking, subject to direct live validation and official-filing reconciliation.
