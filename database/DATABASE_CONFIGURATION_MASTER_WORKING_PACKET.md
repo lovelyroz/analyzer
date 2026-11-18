@@ -1706,3 +1706,20 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 **قدم بعدی:** ادامهٔ Phase 0 از DB-PLAN-013 و بستن gateهای طراحی DB-DES-009. اولین مورد: inventory تمام مصرف‌کنندگان `reports.financial_period_id`، چون پیش از nullable کردن یا انتقال این فیلد باید تمام readerها/writerها مشخص شوند. پس از آن gateهای source revision و ReportVersion standard binding، dimension scope، company consistency و provenance granularity بررسی می‌شوند.
 
 این crosswalk فقط مستنداتی بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+
+### 8.73 بررسی مصرف‌کنندگان `reports.financial_period_id` و تفکیک قرارداد legacy CODAL از Excel — 2026-11-18
+
+خروجی جست‌وجوی محلی کاربر در کل `*.py` و `*.sql` زیر repository و بررسی فایل‌های کامل `service.py`، `report.py`، `normalized.py`، `forecast/queries.py`، `codal/ingestion.py`، `codal/pipeline.py` و Excel reader/DTO این نتیجه را می‌دهد:
+
+- ستون `Report.financial_period_id` در ORM اجباری است (`nullable=False`) و writer قدیمی CODAL آن را مقداردهی و در replay identity validation می‌کند.
+- facade در `codal/ingestion.py` به writer مرکزی `service.py::ingest_codal_report` delegate می‌کند؛ PDF wrapper پس از extraction از آن استفاده می‌کند. مسیرهای `codal/pipeline.py` نیز پس از acquisition/extraction/validation مستقیماً writer مرکزی را فراخوانی می‌کنند.
+- writer مرکزی یک `period_id` واحد می‌گیرد، شرکت/دوره را validate می‌کند، همان دوره را روی Report قرار می‌دهد و همان شناسه را برای تمام `RawFinancialFact`های همان ReportVersion می‌نویسد.
+- Forecast از `NormalizedFinancialFact.period_id` به `FinancialPeriod` join می‌کند؛ این مسیر به ستون Report وابسته نیست.
+- نام `financial_period_id` در evaluation/forecast observation DTOها و تست‌های Stage 5/6 لزوماً به ستون `reports.financial_period_id` اشاره ندارد؛ این دو مفهوم باید در تحلیل وابستگی از هم جدا بمانند.
+- Excel reader/DTO بررسی‌شده فعلاً writer یا period binding ندارد؛ این با نتیجهٔ DB-AUD-013 مبنی بر نبود مسیر production Excel-to-canonical persistence سازگار است.
+
+**تصمیم طراحی موقت این gate:** مسیر legacy CODAL تا زمان retirement/migration کنترل‌شده به قرارداد فعلی نیاز دارد؛ بنابراین nullable کردن یا حذف فوری `Report.financial_period_id` مجاز نیست. مسیر جدید Excel باید دوره را در سطح هر Fact تعیین کند و نباید یک دورهٔ واحد را به تمام facts یک ReportVersion تحمیل کند. اگر فیلد Report در مدل نهایی باقی بماند، فقط metadata دورهٔ اصلی/نمایشی گزارش است و مرجع authoritative دورهٔ هر مقدار نیست.
+
+**محدودیت:** این بررسی، فایل‌های مشخص‌شده و خروجی جست‌وجوی محلی را پوشش می‌دهد؛ callهای پویا، reflection، entrypointهای بیرون از `src/` و تمام SQLهای خارج از الگو را نفی نمی‌کند. پس gate به‌صورت bounded/conditional ثبت می‌شود، نه اثبات کامل repository-wide. هنوز migration، nullable change، backfill یا تغییر ORM تصویب/اجرا نشده است.
+
+هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد. جزئیات و شواهد در بخش 14 گزارش DB-AUD-006 ثبت شده است.
