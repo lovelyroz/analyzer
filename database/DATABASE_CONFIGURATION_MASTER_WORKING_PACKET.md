@@ -1234,3 +1234,24 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **گیت‌های پیش از ORM/Migration:** تعیین interpretation-standard bundle و تک‌نسخه‌ای بودن آن برای ReportVersion؛ scope/versioning دیکشنری Dimensionها؛ محل نهایی YTD؛ منبع CODAL revision identity؛ مصرف‌کنندگان Report primary period؛ راهکار composite FK/trigger برای consistency شرکت؛ کفایت provenance ساختاری برای factهای چندسلولی؛ inventory کامل consumerهای Normalized/Derived؛ reconciliation Migration 9.
 
 **وضعیت:** DB-DES-009 PROPOSED؛ هیچ کد، ORM، Migration، داده یا تست تغییر نکرده است. این طرح هنوز مجوز پیاده‌سازی فیزیکی نیست و گیت‌های فوق باید پیش از آن بسته شوند.
+
+
+### 8.50 ممیزی مصرف‌کنندگان Normalized و Derived FinancialFact — DB-AUD-014 — 2026-11-18
+
+گزارش: `database/reports/DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md`
+
+**نتیجه ممیزی source در branch فعلی:**
+- تنها مصرف‌کنندهٔ runtime/production مستقیم `NormalizedFinancialFact`، `src/forecast/queries.py` در مسیر Stage 5 است. این Query مقدار، ReportVersion، Metric و Period را می‌خواند، publication cutoff را اعمال می‌کند و `ForecastInputRef` می‌سازد. `src/forecast/service.py::generate_forecast` این Queryها را فراخوانی و محاسبات مشتق‌شده را در حافظه انجام می‌دهد.
+- هیچ writer تولیدی برای `NormalizedFinancialFact` پیدا نشد. مسیر CODAL فعلی در `src/ingestion/service.py` فقط `RawFinancialFact` می‌نویسد؛ Excel Reader نیز هنوز canonical writer ندارد.
+- `NormalizedFinancialFactInput` در source عملیاتی reader/writer ندارد؛ فقط مدل legacy، metadata/migration و تست معماری چند Raw input از آن استفاده می‌کنند.
+- برای `DerivedFinancialFact` و `DerivedFinancialFactInput` نیز runtime reader/writer تولیدی پیدا نشد. این دو جدول فقط در مدل/metadata، Migration 2 و تست‌های schema دیده شدند. ذخیره‌سازی derived output با سیاست مصوب runtime-only هم‌راستا نیست؛ در pipeline جدید نباید از آن‌ها استفاده شود.
+- `src/migrations/runner.py` و `src/scripts/init_db.py` مدل‌های قدیمی را برای ثبت metadata import می‌کنند؛ حذف importها یا جدول‌ها اکنون bootstrap و migration تاریخی را تغییر می‌دهد.
+- تست‌های مهم وابستگی: `test_stage1_database_architecture.py` (یک NormalizedFact با دو Raw input)، `test_stage1_rules.py` (quality/status و migration compatibility)، `test_stage1_database_integrity.py` (حفظ ردیف legacy طی migration)، و `test_stage5_forecast.py` (Query واقعی Stage 5، PIT و عدم تغییر input rows). این تست‌ها تست صرفاً PDF نیستند و نباید در بازنشستگی PDF حذف شوند.
+
+**اثر بر DB-DES-009:** مقصد جدید `financial_facts` حفظ می‌شود؛ تنها نقطهٔ خواندن production که باید بعداً منتقل شود Stage 5 query است. انتقال باید dimension-aware باشد و PIT، انتخاب ReportVersion و provenance را حفظ کند. هیچ dual-write یا backfill خودکار پیشنهاد نمی‌شود. تبدیل Integer به float در query نیز باید در قرارداد مهاجرت Stage 5 بررسی شود.
+
+**گپ مهم داده‌ای:** ممیزی DB-AUD-011 فقط لینک‌های RawFact در سه جدول `mapping_decisions`، `normalized_financial_fact_inputs` و `normalized_financial_facts` را شمرده بود. جدول `derived_financial_fact_inputs` نیز FK به `normalized_financial_facts` دارد، ولی تعداد ردیف‌ها و linkage آن و نیز شمارش کل دو جدول Derived در دیتابیس محلی هنوز معلوم نیست. صفر بودن linkage قبلی این گپ را پوشش نمی‌دهد.
+
+**گام بعدی:** اسکریپت read-only برای شمارش و linkage کامل Normalized/Derived در دیتابیس هدف؛ سپس قرارداد انتقال Queryهای Stage 5 به `financial_facts`.
+
+**وضعیت:** source consumer inventory COMPLETE؛ local DB linkage PARTIAL/PENDING؛ هیچ ORM، Migration، کد runtime، داده یا تستی تغییر نکرد و تستی اجرا نشد.
