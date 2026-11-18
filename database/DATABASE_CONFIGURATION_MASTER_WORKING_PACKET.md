@@ -1759,3 +1759,14 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 **تصمیم طراحی:** الگوی یک provenance row برای هر منبع ورودی مستقل پذیرفته می‌شود؛ برای direct یک منبع و برای multi-input چند منبع با input_role مصوب. ساختار پیشنهادی DB-DES-009 حفظ می‌شود، اما طراحی فیزیکی SemanticMapping/row-axis و آزمون نمونه‌های direct و multi-input پیش‌شرط بستن gate است. cell coordinate دائمی یا raw-cell storage اضافه نمی‌شود.
 
 **وضعیت Gate 7:** منطق provenance پذیرفته شد؛ physical design همچنان PARTIAL / OPEN است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 15 گزارش DB-DES-009 ثبت شده است.
+
+
+### 8.76 بررسی Gate 8 از DB-DES-009 — یک TemplateVersion و یک Interpretation Bundle برای هر ReportVersion — 2026-11-18
+
+**تحلیل هویت:** ReportVersion به یک Report متصل است و Report یک Company و یک ReportType دارد. Template شرکت/نوع گزارش در DB-DES-008 کل workbook را پوشش می‌دهد، نه فقط یک جدول. شرکت در دامنهٔ V1 یک Industry دارد. DB-DES-014 نیز الزام می‌کند هر ReportVersion دقیقاً یک InterpretationStandardVersion داشته باشد؛ این bundle می‌تواند چند semantic mapping version مرتبط را در خود بسته‌بندی کند.
+
+**تصمیم طراحی V1:** هر ReportVersion دقیقاً یک TemplateVersion و یک Interpretation Bundle دارد. وجود چند worksheet، table/sub-table، Metric، Dimension، comparative period یا multi-input provenance این تعداد را افزایش نمی‌دهد؛ تمام این موارد درون همان template و bundle پوشش داده می‌شوند. تمام facts و provenanceهای آن ReportVersion باید از همان دو binding استفاده کنند.
+
+اگر workbook واقعاً چند report family مستقل را در یک واحد انتشار ترکیب کند، در V1 نباید چند binding را روی یک ReportVersion مخلوط کنیم؛ تا تعریف قرارداد و شواهد واقعی، ورودی باید reject/quarantine یا به واحدهای گزارش مستقل تفکیک شود. بازپردازش با template/standard متفاوت نیز نباید نسخهٔ پذیرفته‌شده را overwrite کند و به مسیر reclassification کنترل‌شده نیاز دارد.
+
+**وضعیت Gate 8:** در سطح logical design بسته شد. Physical binding، ReportType catalog و محتوای دقیق Interpretation Bundle هنوز جزو طراحی physical schema و gateهای بعدی هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 16 گزارش DB-DES-009 ثبت شده است.
