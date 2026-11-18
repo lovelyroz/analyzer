@@ -695,3 +695,30 @@ Filename، local path، download URL، ingestion timestamp یا SHA-256 به‌�
 - اگر شناسهٔ stream رسمی وجود ندارد، تعریف Report identity باید جداگانه و بر اساس شواهد شرکت/ReportType/period/نوع صورت/تلفیقی-غیرتلفیقی و رابطهٔ اصلاحیه طراحی شود؛ هیچ composite key حدسی در این مرحله پذیرفته نیست.
 
 **نتیجه به‌روزشده Gate 4:** فیلدهای source filing candidate شناسایی شدند و `LetterSerial` به‌عنوان candidate اصلی source revision key توصیه می‌شود؛ اما زوج واقعی original/correction و semantics فعلی `codal_tracking_id` هنوز بررسی نشده‌اند. Gate 4 از EVIDENCE BLOCKED به **PARTIAL / SOURCE-FIELD CANDIDATES IDENTIFIED; REPORT-GROUPING UNVERIFIED** تغییر می‌کند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 21. بازبینی تجمیعی آمادگی پیاده‌سازی Gateهای 7 و 8 — 2026-11-19
+
+برای جلوگیری از بررسی تکراری و پراکنده، Gate 7 (Provenance) و Gate 8 (binding نسخهٔ گزارش) به‌صورت یک بسته بازبینی شدند؛ چون هر دو به هویت ساختاری/معنایی واحد ReportVersion وابسته‌اند.
+
+### 21.1 شواهد اجرایی فعلی
+- `src/ingestion/excel/reader.py` صریحاً Reader را read-only معرفی می‌کند: ساختار workbook و literal values را مشاهده می‌کند، financial semantics را تفسیر نمی‌کند و persistence ندارد.
+- `src/ingestion/excel/dto.py` observationهای immutable شامل CellRef/CellRange، worksheet، Header fragments/axes، RowObservation، ColumnObservation و TableObservation را تعریف می‌کند. این DTOها source locator و ساختار مشاهده‌شده را حمل می‌کنند؛ stable TemplateVersion، row-axis semantic identity، SemanticMapping ID یا InterpretationStandardVersion تولید نمی‌کنند.
+- `src/migrations/runner.py` مدل‌های فعلی Report/ReportVersion، Company/Industry، FinancialPeriod، FinancialMetric و مدل‌های legacy را import می‌کند؛ در inventory مدل‌های importشده، مدل‌های TemplateVersion، InterpretationStandardVersion، SemanticMapping یا FinancialFact جدید دیده نشد.
+- مسیرهای شناخته‌شدهٔ `src/ingestion/excel` شامل Reader/DTO هستند؛ در مسیرهای مورد بررسی، Excel-to-canonical persistence حاضر نیست. این با DB-AUD-013 هم‌راستاست.
+- تلاش برای بازیابی فایل‌های طراحی مرجع DB-DES-008 و DB-DES-014 از مسیرهای حدس‌زده‌شده در `database/reports/` به 404 رسید؛ بنابراین در این گام محتوای کامل آن دو سند مستقلاً بازخوانی نشد و برای آن‌ها فقط به خلاصه/تصمیم‌های ثبت‌شده در این سند و Master Packet تکیه شده است.
+
+### 21.2 نتیجهٔ تجمیعی Gate 7
+تصمیم منطقی قبلی پابرجاست: یک provenance row برای هر منبع ورودی مستقل؛ چند provenance row برای Fact چندمنبعی؛ ترکیب هویت ساختاری Template node/ColumnSlot با semantic mapping نسخه‌دار؛ cell coordinate فقط locator تشخیصی و نه هویت دائمی. بااین‌حال physical row-axis hierarchy، semantic mapping identity/versioning و uniqueness واقعی چند ورودی هنوز طراحی و با نمونهٔ واقعی direct + multi-input اثبات نشده است.
+
+**Gate 7: PARTIAL / OPEN.** این مرحله نباید با ساختن یک جدول provenance ساده و اتصال به شناسهٔ mapping ناقص بسته شود. تا وقتی semantic mapping تمام row path و header path و context را immutable pin نکند، provenance قابل‌ممیزی نیست.
+
+### 21.3 نتیجهٔ تجمیعی Gate 8
+تصمیم منطقی قبلی پابرجاست: هر ReportVersion پذیرفته‌شده دقیقاً یک TemplateVersion و یک InterpretationStandardVersion دارد؛ bundle می‌تواند چند semantic mapping/version reference را در خود نگه دارد. Workbook چند worksheet/table/period یا Fact چندمنبعی، به‌تنهایی مجوز چند binding نیست. ورودی با چند report family ناسازگار باید پیش از پذیرش تفکیک یا reject/quarantine شود.
+
+**Gate 8: CLOSED در سطح logical design؛ OPEN در physical implementation.** باید schema، NOT NULL، immutability، FK/composite-FK یا trigger سازگاری TemplateVersion داخل Interpretation bundle و bindingهای ReportVersion را enforce کند. Reprocessing با Template/Bundle جدید نباید نسخهٔ پذیرفته‌شده را درجا overwrite کند.
+
+### 21.4 جمع‌بندی مرز Reader و persistence
+Reader فعلی درست در مرز مشاهده متوقف می‌شود؛ این کمبود نیست و نباید با افزودن منطق معنایی/DB به Reader برطرف شود. مرحلهٔ بعد باید لایه‌های مستقل را طراحی کند: (1) Template matching/version resolution، (2) interpretation bundle و semantic mapping، (3) period/dimension/value validation، (4) canonical writer و provenance persistence. تا آن زمان DTOهای فعلی صرفاً observation باقی می‌مانند.
+
+این بازبینی static/read-only بود. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
