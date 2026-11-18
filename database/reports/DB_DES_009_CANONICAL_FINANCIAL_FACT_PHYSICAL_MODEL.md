@@ -1229,3 +1229,106 @@ Scale note «به میلیون» در A78 ثبت شده؛ currency نامعلو�
 **قدم بعدی:** تثبیت قرارداد معنایی مشترک برای Template/Interpretation: تعریف صریح TemporalType (INSTANT/DURATION)، scope واحد/scale، HeaderPath، RowAxisPath، structural non-data rows و metric aggregation role؛ سپس reconciliation با DB-DES-008/013/014 و DB-ING-006/Task 033. تا آن زمان Gate 7 PARTIAL/OPEN و physical design PROPOSED باقی می‌مانند.
 
 هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 29. قرارداد معنایی مشترک برای Template و Interpretation — 2026-11-19
+
+### 29.1 هدف و مرز
+
+این بخش نتیجهٔ تطبیق T01/T03 با DB-DES-008، DB-DES-011، DB-DES-013 و DB-DES-014 است. هدف، تثبیت قرارداد منطقی مشترک پیش از هر تصمیم نهایی دربارهٔ جدول‌های فیزیکی Semantic Mapping است.
+
+این قرارداد ساختار فیزیکی Template را از معنای مالی جدا نگه می‌دارد؛ معنای هر مشاهده را در تقاطع RowAxis و HeaderPath و در context جدول تعیین می‌کند؛ و با temporal contract پذیرفته‌شدهٔ DB-DES-011 سازگار است. این بخش هیچ مجوزی برای تکمیل حدسی، ingestion، ORM، migration یا تغییر DB ایجاد نمی‌کند.
+
+### 29.2 قرارداد TemporalType و FinancialPeriod
+
+1. TemporalType فقط دو مقدار کنترل‌شده دارد: INSTANT و DURATION.
+2. نوع زمانی از معنای canonical Metric و rule مصوب Interpretation Standard تعیین می‌شود؛ عنوان فایل، عنوان کلی گزارش، شماره فصل یا محل سلول به‌تنهایی کافی نیست.
+3. FinancialPeriod بازهٔ واقعی Jalali را نگه می‌دارد: INSTANT تاریخ شروع و پایان یکسان دارد؛ DURATION تاریخ شروع و پایان واقعی و معتبر دارد.
+4. duration_basis فقط به Fact از نوع DURATION تعلق دارد و برای هر Fact باید صریحاً YTD یا STANDALONE باشد، هرجا که این تمایز برای Metric کاربرد دارد.
+5. برای INSTANT، duration_basis برابر NULL / NOT_APPLICABLE است؛ مقدار ساختگی مانند STANDALONE برای آن ذخیره نمی‌شود.
+6. Header که فقط تاریخ پایان را نشان می‌دهد، نه شروع بازه را اثبات می‌کند و نه YTD/STANDALONE را. تاریخ‌های واقعی و basis باید با rule مصوب report family/template و شواهد معتبر حل شوند.
+7. نوع زمانی در سطح ReportVersion به‌صورت یک مقدار مشترک تحمیل نمی‌شود؛ یک گزارش می‌تواند Factهای INSTANT و DURATION داشته باشد. هر mapping باید نوع زمانی سازگار با Metric خود را resolve کند.
+
+**اعمال به fixtureها:** T01 صورت سود و زیان، candidate از نوع DURATION است ولی بازه و basis آن هنوز تصویب نشده؛ T03 صورت وضعیت مالی، candidate قوی INSTANT است ولی rule آن تا تصویب Interpretation Standard نهایی نیست.
+
+### 29.3 قرارداد HeaderPath و ColumnSlot
+
+1. ColumnSlot هویت فیزیکی یک موقعیت ستونی در یک layout node است؛ به‌تنهایی Metric یا FinancialFact نیست.
+2. HeaderPath برای هر slot، زنجیرهٔ مرتب و کامل Headerها از بالاترین سطح مؤثر تا سطح leaf است.
+3. سلول mergeشده از anchor و topology مصوب resolve می‌شود؛ سلول‌های خالی ناشی از merge، Header مستقل یا مقدار جایگزین تولید نمی‌کنند.
+4. Header inheritance فقط طبق OWN/INHERIT در DB-DES-008 و با یکسان بودن کامل تعداد/ترتیب ستون، HeaderPath، واحد/scale، temporal meaning، scenario و slot role مجاز است.
+5. Headerهای تاریخ، وضعیت حسابرسی، تجدید ارائه، سناریو، نوع سنجه و واحد باید در مسیر کامل یا rule مصوب قابل بازیابی باشند؛ هر slot مستقل resolve می‌شود.
+6. ستون خارج از bounds یا فاقد extraction span مصوب، حتی اگر داده یا Header داشته باشد، وارد mapping نمی‌شود.
+
+### 29.4 قرارداد RowAxisPath و ردیف‌های غیرمالی
+
+1. RowAxisPath زنجیرهٔ مرتب parent-to-leaf از تمام ancestorهای مؤثر تا ردیف داده است؛ نگهداری صرف leaf label کافی نیست.
+2. هر node ساختاری باید نقش کنترل‌شده داشته باشد؛ حداقل نقش‌های منطقی:
+   - GROUP_HEADER: عنوان گروه/والد؛
+   - DATA_ROW: ردیف دارای مشاهدهٔ مالی؛
+   - COLUMN_HEADER: Header ستونی یا Header تکرارشدهٔ داخلی؛
+   - SEPARATOR: جداکنندهٔ ساختاری؛
+   - EXCLUDED: خارج از scope استخراج.
+3. این نقش‌ها، نقش ساختاری‌اند و نباید با Metric، subtotal یا aggregation role یکی شوند.
+4. Header داخلی تکراری مانند B95/C95 در T03 باید به‌عنوان ساختار Header/boundary ثبت شود، نه leaf مالی و نه Header جدید مستقل برای ColumnSlot.
+5. ردیف‌های Black/uncolored و هر سلول خارج از extraction mask، طبق تصمیم‌های مالک و قرارداد Template از mapping کنار گذاشته می‌شوند.
+6. استثنای فاقد Yellow مانند T17 نباید با RowAxis جعلی normalize شود. برای آن، mapping فقط با یک AlternativeRowIdentity صریح و نسخه‌دار که از Header/ساختار مصوب به‌دست آمده باشد مجاز است؛ تا آن زمان BLOCKED است.
+7. RowAxisPath و HeaderPath هر دو بخشی از کلید scope معنایی‌اند. هیچ row label یا column label به‌تنهایی کلید mapping نیست.
+
+### 29.5 قرارداد Unit, Currency, Scale و Measurement Basis
+
+1. هر SemanticMapping باید واحد canonical، currency در صورت پولی بودن، scale و measurement basis لازم را به‌طور صریح تعیین کند.
+2. این ویژگی‌ها به سطح mapping در تقاطع RowAxisPath و HeaderPath تعلق دارند؛ نباید به کل ReportVersion یا کل workbook تعمیم داده شوند.
+3. یادداشت واحد در سطح جدول فقط وقتی برای یک mapping قابل اعمال است که scope آن به همان table/node و slot/ردیف اثبات و در rule ثبت شده باشد.
+4. واحد صریح یک ردیف می‌تواند بر یادداشت عمومی جدول تقدم داشته باشد، مشروط بر اینکه این تقدم در rule مصوب مشخص باشد. مثال T01: EPS ردیف‌های 36–41 صریحاً Rial هستند؛ note «به میلیون» به‌تنهایی مجوز تبدیل آن‌ها به میلیون واحد پولی نیست.
+5. «میلیون» scale را نشان می‌دهد، نه currency را. از آن نمی‌توان ریال/تومان یا ارز دیگر را حدس زد.
+6. فرمت عددی Excel، بزرگی مقدار، صنعت شرکت یا مجاورت سلول‌ها به‌تنهایی مبنای استنتاج واحد/scale نیست.
+7. اگر هر یک از واحد، currency، scale یا measurement basis لازم نامعلوم یا متعارض باشد، همان mapping BLOCKED می‌ماند و هیچ Fact canonical تولید نمی‌شود.
+
+### 29.6 قرارداد Metric Role و Aggregation
+
+1. مفهوم مالی هر DATA_ROW با canonical Metric و در صورت نیاز DimensionSet تعیین می‌شود؛ label منبع به‌تنهایی شناسهٔ Metric نیست.
+2. نقش تجمیعی Metric/ردیف باید جدا از نقش ساختاری RowAxis ثبت شود. نقش‌های منطقی پیشنهادی برای catalog/mapping:
+   - COMPONENT: جزء/قلم مستقل؛
+   - SUBTOTAL: جمع میانی؛
+   - TOTAL: جمع نهایی یا کل؛
+   - RATIO_OR_PER_SHARE: نسبت، نرخ یا مقدار به‌ازای هر سهم/واحد؛
+   - BALANCE_CONTROL: مقدار یا رابطهٔ کنترلی؛
+   - MEMORANDUM: قلم یادداشتی/اطلاعاتی غیرقابل‌جمع؛
+   - NON_ADDITIVE: مقدار غیرجمع‌پذیر یا دارای قاعدهٔ تجمیع خاص.
+3. این فهرست، قرارداد مفهومی برای جلوگیری از double-counting است؛ هنوز catalog نهایی یا enum فیزیکی تصویب نشده است.
+4. SUBTOTAL و TOTAL می‌توانند در صورت نیاز به‌عنوان Fact ورودی مستقل حفظ شوند، اما در aggregationهای runtime نباید هم‌زمان با اجزای تشکیل‌دهنده دوباره‌شماری شوند.
+5. RATIO_OR_PER_SHARE، نرخ‌ها و EPS با جمع سادهٔ اقلام قابل‌تجمیع نیستند.
+6. کنترل‌هایی مانند Assets = Liabilities + Equity فقط invariant اعتبارسنجی‌اند؛ این روابط مجوز محاسبه و پرکردن مقدار missing یا جایگزینی منبع نیستند.
+7. هر mapping باید sign convention، additive/non-additive behavior و duplicate/double-count policy لازم را روشن کند؛ نبود آن مانع approval همان mapping است.
+
+### 29.7 قرارداد SemanticMapping و Provenance
+
+هر mapping قابل‌تصویب باید دست‌کم به این context نسخه‌دار و کامل مقید باشد:
+- InterpretationStandardVersion و TemplateVersion؛
+- company/report family و layout/table/sub-table node؛
+- RowAxisPath کامل یا AlternativeRowIdentity مصوب؛
+- ColumnSlot و HeaderPath کامل؛
+- canonical FinancialMetric و DimensionSet؛
+- TemporalType، FinancialPeriod و duration_basis در صورت کاربرد؛
+- unit، currency، scale و measurement basis؛
+- value-state policy و aggregation/sign policy؛
+- source revision/audit provenance موردنیاز.
+
+برای هر تقاطع استخراجی باید دقیقاً یک mapping مصوب وجود داشته باشد. صفر یا بیش از یک match، ambiguity و reject است. Provenance هر ورودی مستقل حفظ می‌شود؛ چند ColumnSlot یا چند تاریخ به‌خودی‌خود Multi-input Fact نیستند. Multi-input تا ارائهٔ نمونهٔ واقعی و تعریف صریح رابطهٔ چندمنبعی UNPROVEN می‌ماند.
+
+### 29.8 Reconciliation با اسناد موجود و وضعیت Task 033
+
+- **DB-DES-008:** مالک ساختار فیزیکی Template، layout node، Header binding، ColumnSlot و extraction span باقی می‌ماند. این قرارداد معنای Metric را داخل ColumnSlot قرار نمی‌دهد و RowAxisPath را به‌عنوان لایهٔ معنایی مستقل لازم می‌داند.
+- **DB-DES-011:** مرجع قطعی TemporalType، FinancialPeriod و fact-level duration_basis است؛ این بخش آن را با Header/Metric mapping پیوند می‌دهد، نه اینکه جایگزین کند.
+- **DB-DES-013:** Template Resolver باید دقیق، نسخه‌دار و fail-closed بماند. شناسایی candidate یا شباهت ظاهری هرگز SemanticMapping را جایگزین نمی‌کند؛ عدم تطبیق قطعی یا ساختار ناشناخته، کل گزارش را متوقف می‌کند.
+- **DB-DES-014:** قرارداد دو‌محورهٔ RowAxisPath + HeaderPath و mapping نسخه‌دار حفظ می‌شود؛ این بخش نقش‌های ساختاری و aggregation و temporal/unit scope را صریح‌تر می‌کند، بدون اینکه schema فیزیکی را نهایی کند.
+- **DB-ING-006 / Task 033:** همچنان PARTIAL است. گزارش متنی Parsian برای تحلیل ساختار و تصمیم‌های مالک مبنای این مرحله است، اما جای اجرای detector/reader روی bytes فایل، تأیید نهایی bounds/template، مقایسه با workbook مستقل دورهٔ بعد و fixture end-to-end را نمی‌گیرد. هیچ heuristic عمومی یا نتیجهٔ ساختاری به‌تنهایی این gate را نمی‌بندد.
+
+### 29.9 تصمیم نهایی این مرحله
+
+- قرارداد معنایی مشترک در سطح منطقی **DEFINED / PROPOSED FOR PHYSICAL DESIGN** است.
+- T01 و T03 دو fixture مکمل برای DURATION و INSTANT، RowAxis سلسله‌مراتبی، HeaderPath مستقل، scope واحد و aggregation هستند؛ هیچ‌کدام مجوز ingestion نهایی نیستند.
+- Gate 7 همچنان PARTIAL/OPEN؛ Gate 8 و طراحی فیزیکی همچنان PROPOSED/OPEN.
+- گام بعدی: ساخت ماتریس تصمیم mapping برای T01/T03 در سطح row/slot، با وضعیت هر فیلد (PROVEN / PROPOSED / BLOCKED) و ruleهای لازم؛ سپس انتخاب کوچک‌ترین direct mapping بدون ابهام برای fixture end-to-end، مشروط به بسته‌شدن پیش‌نیازهای Task 033 و provenance.
+- هیچ کد، ORM، schema، migration، دیتابیس یا تستی در این مرحله تغییر نکرد/اجرا نشد.
