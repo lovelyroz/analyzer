@@ -480,3 +480,42 @@ Bundle باید مجموعه‌ای از rule/version referenceها باشد، �
 این تعریف، محتوای منطقی Bundle و scope آن را مشخص می‌کند؛ طراحی relational جزئی جدول‌های component/reference، workflow تأیید و قیدهای سازگاری ReportVersion هنوز باید در physical schema نهایی شود.
 
 **وضعیت Gate 1:** در سطح logical definition بسته شد؛ physical catalog/bundle schema و approval workflow باز هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 18. بررسی Gate 2 — Scope و Versioning کاتالوگ Dimension — 2026-11-18
+
+### 18.1 مرز مفهومی Dimension
+- Dimension فقط وقتی ثبت می‌شود که یک محور مصوب، هویت اقتصادی یک observation را از observation دیگر جدا کند؛ مانند محصول/گروه محصول یا نوع مشتری/سپرده، در صورتی که در استاندارد همان گزارش تأیید شده باشد.
+- عنوان ردیف، نام جدول، نام worksheet، ستون، واحد، ارز، دوره، temporal basis و report type به‌طور خودکار Dimension نیستند. این‌ها به‌ترتیب ممکن است ساختار، Metric، unit/currency، period یا metadata باشند.
+- اگر دو ردیف به دو Metric مستقل تعلق دارند، نباید صرفاً برای جا دادن آن‌ها در یک Metric به Dimension تبدیل شوند. اگر یک Metric واحد برای چند گروه اقتصادی گزارش شده، Dimension فقط با mapping مصوب ایجاد می‌شود.
+- Dimension نباید برای پنهان کردن تکرار مبهم یا حل collision ناشی از mapping ناقص ساخته شود.
+
+### 18.2 تصمیم دربارهٔ Scope
+**تعریف Dimension به‌صورت کاتالوگ مشترک و global نگهداری شود؛ کاربرد و دامنهٔ مجاز آن در InterpretationStandardVersion تعیین شود.**
+- یک Dimension code جهانی و پایدار دارد، اما global بودن شناسه به معنی قابل‌استفاده بودن آن در همهٔ صنایع/گزارش‌ها نیست.
+- هر Interpretation Bundle تعیین می‌کند کدام Dimension برای کدام report family، table/node، Metric و context قابل استفاده است و کدام memberها مجازند.
+- Dimension concept فقط زمانی بین صنایع مشترک است که معنای اقتصادی آن واقعاً یکسان باشد. اصطلاحات کلی و مبهم مانند SEGMENT نباید بدون تعریف دقیق مشترک استفاده شوند؛ در صورت تفاوت معنا، Dimension codeهای مستقل تعریف شوند.
+- Dimension value/member نیز شناسهٔ پایدار global دارد. Memberهای مشترک با معنای یکسان می‌توانند در چند Bundle reuse شوند؛ memberهای company/industry/report-family-specific با شناسهٔ مستقل ساخته می‌شوند و فقط از طریق Bundleهای مجاز قابل استفاده‌اند. از scope polymorphic و مبهم روی خود Fact پرهیز می‌شود.
+- نیاز نیست از ابتدا Dimensionها یا valueهای همهٔ صنایع/شرکت‌ها ساخته شوند؛ کاتالوگ به‌صورت incremental و فقط بر اساس شواهد workbook و نیاز استاندارد توسعه می‌یابد.
+
+### 18.3 هویت و Versioning
+1. `dimension_code` و هویت معنایی Dimension پس از approval immutable هستند؛ تغییر واقعی مفهوم، Dimension جدید می‌خواهد.
+2. هر member با `dimension_id + stable value_code` هویت می‌گیرد؛ تغییر معنای اقتصادی member، member جدید می‌خواهد، نه ویرایش درجا یا reuse کد قدیمی.
+3. تغییر صرف display label یا alias می‌تواند در نسخهٔ جدید InterpretationStandard/alias mapping ثبت شود؛ label متنی به‌تنهایی هویت member نیست.
+4. retired member حذف نمی‌شود و ID آن reuse نمی‌شود. Bundleهای تاریخی همچنان می‌توانند آن را reference کنند؛ Bundle جدید استفاده از آن را فقط در صورت مجاز بودن صریح ادامه می‌دهد.
+5. تغییر allowed-value scope، alias، normalization یا ruleهای applicability باید در InterpretationStandardVersion جدید pin شود؛ این تغییر نباید معنی Facts پذیرفته‌شدهٔ قبلی را بازنویسی کند.
+6. DimensionSet با ترکیب canonical و مرتب‌شدهٔ member identityها ساخته می‌شود؛ display text، ترتیب ورود یا worksheet coordinate در canonical key دخالت ندارند. برای Fact بدون Dimension یک empty set یکتا استفاده می‌شود.
+7. در V1، هر Dimension در یک DimensionSet حداکثر یک member دارد، مگر اینکه یک استاندارد مشخص و مصوب خلاف آن را لازم بداند؛ member تکراری برای یک Dimension در یک set رد می‌شود.
+
+### 18.4 قیدهای کاربرد و عدم‌تداخل
+- Interpretation Bundle باید مشخص کند Dimension روی چه Metricها و contextهایی قابل استفاده است؛ صرف وجود Dimension در global catalog مجوز استفاده نیست.
+- اگر یک مقدار بدون Dimension و با Dimensionهای مختلف گزارش شده، این دو observation فقط وقتی جداگانه پذیرفته می‌شوند که ساختار و استاندارد آن تمایز اقتصادی را اثبات کنند.
+- Dimension برای تفکیک comparative/current period، YTD/standalone، source version، audit/restatement، unit/currency یا table position استفاده نمی‌شود؛ این‌ها هویت/ویژگی‌های مستقل خود را دارند.
+- اگر یک Dimension یا member هنوز تعریف/تأیید نشده باشد، سیستم نباید آن را از متن مشابه حدس بزند یا به OTHER_* تبدیل کند؛ ورودی in-scope مبهم رد/قرنطینه می‌شود.
+
+### 18.5 نتیجه Gate 2
+**تصمیم طراحی:** Dimension definitions و member identities کاتالوگ global و پایدار دارند؛ scope کاربرد و allowed values در InterpretationStandardVersion محدود و نسخه‌دار می‌شود. Memberهای مختص شرکت/صنعت/خانوادهٔ گزارش شناسهٔ مستقل می‌گیرند و فقط از Bundleهای مجاز قابل دسترسی‌اند. بازنشستگی به معنی حذف نیست و تغییر معنا نیازمند identity جدید است.
+
+Physical schema دقیق scope/allowed-value relations، approval workflow و canonical DimensionSet serialization هنوز باید طراحی شود. هیچ catalog یا Dimension واقعی از روی نمونه‌های ناقص فعلی به‌صورت production ساخته نمی‌شود.
+
+**وضعیت Gate 2:** در سطح logical scope/versioning بسته شد؛ physical schema و approval workflow باز هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
