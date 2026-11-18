@@ -333,3 +333,38 @@ The following must be resolved before ORM/migration implementation:
 - No ORM, migration, data or test change is performed by this proposal.
 
 **Current result:** DB-DES-009 proposal drafted. Owner review and resolution of the listed implementation gates are required before physical implementation. No code, ORM, migration, data or tests changed.
+
+
+## 14. بررسی فنی Gate 6 — Company Consistency با SQLite — 2026-11-18
+
+### 14.1 وضعیت فعلی مدل و زیرساخت
+- `FinancialPeriod` دارای `company_id` و FK ساده به `companies.company_id` است؛ کلید یکتای فعلی آن `(company_id, fiscal_year, period_type, end_date)` است و کلید یکتای `(period_id, company_id)` ندارد.
+- `Report` نیز `company_id` و `financial_period_id` را جداگانه نگه می‌دارد؛ FKها به‌تنهایی تضمین نمی‌کنند که دورهٔ گزارش متعلق به همان شرکت باشد.
+- `ReportVersion` از طریق `report_id` به Report و سپس Company می‌رسد.
+- `RawFinancialFact` در مدل legacy هم `company_id`، `report_version_id` و `period_id` را جداگانه دارد و در سطح DB رابطهٔ برابری شرکت را enforce نمی‌کند. writer فعلی CODAL این سازگاری را در Python بررسی می‌کند؛ این کنترل برای direct SQL کافی نیست.
+- `src/core/database.py` روی engine اصلی پروژه با SQLAlchemy connect event، `PRAGMA foreign_keys=ON` را اجرا می‌کند. Migration runner نیز از `engine.begin()` و SQL خام برای migrationها استفاده می‌کند. در تست‌ها engineهای مستقل با `create_engine("sqlite:///:memory:")` ساخته می‌شوند و listener مربوط به engine اصلی را خودکار به ارث نمی‌برند.
+- در migrationهای فعلی نمونه‌ای از ایجاد trigger دیده نشد؛ اما runner اجرای SQL خام را پشتیبانی می‌کند. Triggerهای SQLite را می‌توان در migration با `CREATE TRIGGER` ساخت؛ SQLAlchemy ORM برای تعریف آن‌ها به‌تنهایی کافی نیست و باید DDL صریح migration و تست جداگانه داشته باشد.
+
+### 14.2 ارزیابی دو راهکار
+**Composite Foreign Key:** برای enforce کردن برابری شرکت، باید company identity در هر دو سمت کلید مرکب قابل ارجاع باشد. در مدل فعلی `ReportVersion` شرکت را مستقیم نگه نمی‌دارد و از Report به آن می‌رسد؛ `financial_facts` نیز طبق پیشنهاد فعلی company_id تکراری ندارد. بنابراین راهکار composite FK بدون denormalization اضافی یا تغییر چند parent table به‌سادگی قابل اعمال نیست. اضافه کردن company_id فقط برای ساخت FK، هزینهٔ تکرار داده و مسیرهای update/immutability را افزایش می‌دهد.
+
+**SQLite Trigger + Service Validation:** چون شرکت از زنجیرهٔ `FinancialFact → ReportVersion → Report → Company` قابل استخراج است و FinancialPeriod نیز company_id مستقل دارد، trigger می‌تواند دو مسیر را join و برابری را در خود DB enforce کند؛ نیازی به ذخیرهٔ مجدد company_id روی FinancialFact نیست. Service validation نیز پیام خطای زودهنگام و قابل‌فهم‌تری می‌دهد، اما جای trigger را نمی‌گیرد.
+
+### 14.3 توصیهٔ طراحی
+برای جدول جدید `financial_facts`، **SQLite triggers به‌همراه service validation** توصیه می‌شود؛ company_id در FinancialFact تکرار نشود، مگر آنکه بعداً نیاز query/کارایی با benchmark واقعی ثابت شود.
+
+حداقل پوشش triggerها:
+1. پیش از INSERT در `financial_facts`، شرکت ReportVersion (از مسیر Report) با شرکت FinancialPeriod مقایسه شود؛ نبود هر یک از دو مسیر نیز باید رد شود و FKهای معمولی همچنان برقرار بمانند.
+2. پیش از UPDATE ستون‌های `report_version_id` یا `period_id` در `financial_facts`، همان invariant دوباره کنترل شود.
+3. پس از ایجاد Fact، تغییر هویت رابطه‌ای والدها نباید invariant را بی‌صدا خراب کند. سیاست پیشنهادی این است که تغییر `reports.company_id`، `report_versions.report_id` یا `financial_periods.company_id` تا وقتی Fact وابسته وجود دارد ممنوع باشد؛ اصلاح هویت با ساخت رکورد صحیح و مسیر اصلاح کنترل‌شده انجام شود، نه reassignment خام.
+4. اگر `Report.financial_period_id` در مدل نهایی به‌صورت optional metadata باقی بماند، trigger جداگانه باید در صورت non-NULL بودن، تطابق شرکت Report و FinancialPeriod را enforce کند؛ NULL بودن این metadata نباید مانع ثبت Fact دارای period_id مستقل شود.
+5. حذف parentها باید با FKهای معمولی و رفتار RESTRICT/NO ACTION محافظت شود؛ cascade ناخواسته برای دادهٔ مالی مجاز نیست.
+
+### 14.4 شروط پیش از بستن کامل gate
+- پیش از نصب trigger روی دیتابیس واقعی، audit read-only باید تمام ردیف‌های موجود را از نظر mismatch شرکت بررسی کند؛ trigger جدید دادهٔ ناسازگار موجود را خودبه‌خود اصلاح نمی‌کند.
+- DDL باید idempotent باشد (`DROP/CREATE` کنترل‌شده یا `CREATE TRIGGER IF NOT EXISTS` با versioning دقیق) و در migration مستقل/additive قرار گیرد.
+- تست باید INSERT ناسازگار، UPDATE ناسازگار، تغییر هویت والد پس از ایجاد Fact، و حالت معتبر را پوشش دهد.
+- تست trigger باید با SQLite واقعی اجرا شود. تست FKهای معمولی باید روی هر connection تست نیز صریحاً `PRAGMA foreign_keys=ON` داشته باشد؛ در غیر این صورت تست ممکن است constraintهای FK را بی‌اثر اجرا کند.
+- هیچ‌یک از این triggerها نباید قبل از ممیزی داده و طراحی migration به جداول legacy اعمال شود.
+
+**نتیجه Gate 6:** انتخاب راهکار در سطح طراحی انجام شد: Trigger + Service Validation برای `financial_facts`، بدون denormalized company_id. Gate از نظر انتخاب معماری قابل بستن است، اما پیاده‌سازی، DDL، migration، audit دیتابیس مقصد و تست‌های پذیرش همچنان باز و غیرمجاز هستند تا مجوز مرحلهٔ اجرا صادر شود. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
