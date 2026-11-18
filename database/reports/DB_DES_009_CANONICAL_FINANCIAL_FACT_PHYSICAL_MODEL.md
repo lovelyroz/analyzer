@@ -101,17 +101,17 @@ Required logical fields:
 - `end_year_jalali`, `end_month_jalali`, `end_day_jalali`
 - `fiscal_year`, optional `fiscal_quarter`
 - `months_length`
-- nullable `is_ytd` where not applicable
+- no YTD/standalone field; FinancialPeriod identifies only actual dates and temporal shape
 
 Constraints:
-- INSTANT: start = end, months_length = 0, is_ytd is not applicable/NULL.
-- DURATION: start <= end, months_length > 0; YTD must be explicitly true/false when applicable to a flow value.
+- INSTANT: start = end, months_length = 0; no duration basis exists on the period or its INSTANT facts.
+- DURATION: start <= end; the source-supported interval and months_length rules apply. Each applicable FinancialFact carries `duration_basis=YTD` or `STANDALONE`.
 - fiscal quarter, if present, is 1–4.
 - unique logical period identity: company + temporal_kind + exact Jalali start + exact Jalali end. Period type/fiscal labels are validated attributes, not substitutes for exact dates.
 - no TTM source-period rows; TTM is runtime-only.
 - do not migrate existing Gregorian Date values by guessing their Jalali meaning. Existing data requires a separate evidence-based migration plan.
 
-If one FinancialPeriod can legitimately be shared across metrics with different YTD applicability, the period row should represent temporal shape and actual dates while YTD/standalone belongs to the fact's temporal interpretation. This must be reconciled with DB-DES-003 before implementation; do not force an ambiguous global `is_ytd` onto all facts.
+FinancialPeriod is reusable by facts that describe the same company, temporal kind and exact Jalali dates. It never stores YTD/standalone. This is a resolved design decision: `duration_basis` belongs on each applicable FinancialFact, not on a shared period row.
 
 ## 5. Dimension identity
 
@@ -154,6 +154,7 @@ Table: `financial_facts`
 | `fact_id` | INTEGER PK | Yes |
 | `report_version_id` | FK to publishing ReportVersion | Yes |
 | `period_id` | FK to actual Jalali FinancialPeriod | Yes |
+| `duration_basis` | `YTD` or `STANDALONE` for applicable DURATION values; NULL / NOT_APPLICABLE for INSTANT | Conditional
 | `metric_id` | FK to stable FinancialMetric | Yes |
 | `dimension_set_id` | FK to approved dimension set; empty set when no dimensions | Yes |
 | `value_integer` | SQLite INTEGER canonical value; NULL only for explicit NULL state | Conditional |
@@ -294,7 +295,7 @@ The following must be resolved before ORM/migration implementation:
 
 1. **Interpretation standard catalog:** confirm the exact logical bundle represented by `interpretation_standard_version_id` (industry + report type/family + semantic/temporal/value mapping version) and whether it can be singular for one ReportVersion.
 2. **Dimension catalog scope:** define which dimensions are globally shared versus industry/report-family scoped, and how approved values are versioned/retired without changing historical meaning.
-3. **Temporal ownership:** reconcile whether `is_ytd` belongs on FinancialPeriod or on a fact-level temporal interpretation, because one ReportVersion can contain facts with different temporal bases and one period may be reused.
+3. **Temporal basis constraints:** implement the resolved fact-level `duration_basis`; validate applicability against FinancialPeriod temporal_kind and the approved metric definition.
 4. **Source revision key:** establish the CODAL source identifier/revision fields available in the actual acquisition contract; do not infer revision from SHA-256.
 5. **Report primary period:** inspect consumers before making current `reports.financial_period_id` nullable or moving it.
 6. **Company consistency constraints:** choose composite FK/trigger strategy after examining SQLite migration patterns and SQLAlchemy model support.
@@ -308,7 +309,7 @@ The following must be resolved before ORM/migration implementation:
 | Question | Recommendation | Status |
 |---|---|---|
 | Reuse Report / ReportVersion? | Yes, extend; ReportVersion remains publication/revision anchor | PROPOSED |
-| Reuse FinancialPeriod as-is? | No; redesign to authoritative Jalali + INSTANT/DURATION | PROPOSED |
+| Reuse FinancialPeriod as-is? | No; redesign to authoritative Jalali + INSTANT/DURATION, without YTD field | PROPOSED |
 | Reuse FinancialMetric? | Yes, retain stable identity; extend semantic constraints/catalog separately | PROPOSED |
 | Redesign NormalizedFinancialFact in place? | No, not in this transition; preserve as legacy | PROPOSED |
 | Create a new FinancialFact table? | Yes: `financial_facts` | PROPOSED |
