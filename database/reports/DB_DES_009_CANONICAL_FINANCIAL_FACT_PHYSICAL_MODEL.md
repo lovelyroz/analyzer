@@ -410,3 +410,31 @@ DB-DES-014 قرارداد منطقی row-axis path و SemanticMappingRule را �
 4. physical schema مربوط به row-axis و SemanticMapping باید پیش از ORM/Migration طراحی و با یک نمونهٔ واقعی direct و یک نمونهٔ multi-input اثبات شود.
 
 **نتیجه:** Gate 7 در سطح قرارداد منطقی تا حد زیادی حل شده، اما از نظر physical provenance **PARTIAL / OPEN** می‌ماند تا مدل نسخه‌دار row-axis و semantic mapping و مثال‌های پذیرش مشخص شوند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 16. بررسی Gate 8 — کفایت یک TemplateVersion و یک Interpretation Bundle برای هر ReportVersion — 2026-11-18
+
+### 16.1 زنجیرهٔ هویت
+- هر `ReportVersion` به دقیقاً یک `Report` متصل است.
+- هر `Report` یک `company_id` و یک `report_type` دارد؛ بنابراین هر نسخه از یک شرکت و یک خانواده/نوع گزارش به ارث می‌برد.
+- Template در DB-DES-008 در scope شرکت + report type تعریف می‌شود و TemplateVersion تمام ساختار workbook را پوشش می‌دهد: worksheetها، parent tableها، sub-tableها، Headerها، column slotها و extraction spanها. Template به یک جدول منفرد محدود نیست.
+- شرکت در دامنهٔ فعلی به یک Industry تعلق دارد؛ بنابراین استاندارد تفسیر می‌تواند در scope شرکت/industry + report family بسته‌بندی شود.
+- DB-DES-014 صریحاً می‌خواهد هر ReportVersion پذیرفته‌شده در Excel pipeline دقیقاً یک interpretation-standard version داشته باشد؛ آن bundle می‌تواند به semantic mapping versionهای متعدد و مرتبط با TemplateVersion ارجاع دهد.
+
+### 16.2 آزمون مفهومی سناریوها
+- وجود چند worksheet، چند table/sub-table، چند Metric، چند Dimension یا چند FinancialPeriod در یک workbook، به‌تنهایی نیاز به چند TemplateVersion یا چند Interpretation Bundle ایجاد نمی‌کند؛ یک TemplateVersion تمام layout همان workbook و یک bundle تمام mapping ruleهای مصوب آن report family را پوشش می‌دهد.
+- مقادیر comparative و primary در دوره‌های مختلف همچنان زیر همان ReportVersion منتشرکننده قرار می‌گیرند؛ تفاوت دوره و نقش زمانی در mapping/fact است، نه در هویت TemplateVersion.
+- یک Fact چندمنبعی می‌تواند چند provenance row داشته باشد؛ این امر نیز به معنی چند interpretation bundle نیست، مشروط بر اینکه تمام ورودی‌ها تحت همان نسخهٔ استاندارد و template تفسیر شوند.
+- اگر یک workbook واقعاً دو report family مستقل یا دو ساختار ناسازگار را در یک واحد انتشار ترکیب کند، نباید برای یک ReportVersion چند template/standard را بی‌قاعده مخلوط کرد. ابتدا باید identity/report-family آن ورودی تعیین شود؛ در V1 چنین ورودی‌ای تا زمان تعریف قرارداد مشخص باید reject/quarantine شود یا به واحدهای گزارش مستقل تقسیم شود، نه اینکه یک ReportVersion چند bundle بگیرد.
+- تغییر Template یا Interpretation Bundle در بازپردازش همان ReportVersion، نسخهٔ جدیدی از همان انتشار محسوب نمی‌شود و نباید بی‌صدا روی نسخهٔ پذیرفته‌شده overwrite شود؛ reprocessing/reclassification باید مسیر کنترل‌شده و audit trail مستقل داشته باشد.
+
+### 16.3 تصمیم طراحی
+برای V1، هر ReportVersion دقیقاً:
+1. به یک Report و در نتیجه یک Company و یک ReportType تعلق دارد؛
+2. به یک TemplateVersion که کل workbook را پوشش می‌دهد bind می‌شود؛
+3. به یک InterpretationStandardVersion واحد bind می‌شود؛ این bundle می‌تواند مجموعه‌ای از semantic mapping versionهای متعدد را در خود ارجاع دهد؛
+4. تمام FinancialFactها و provenanceهای آن نسخه باید با همین دو binding سازگار باشند.
+
+یک workbook چندجدولی/چنددوره‌ای دلیل کافی برای چند binding نیست. چند binding فقط در صورتی قابل طرح است که بعداً شواهد واقعی از یک واحد انتشار با چند report family مستقل ارائه شود؛ چنین موردی در scope فعلی تثبیت نشده است.
+
+**نتیجه Gate 8:** فرض یک TemplateVersion + یک Interpretation Bundle برای هر ReportVersion در scope فعلی پذیرفته می‌شود و gate در سطح logical design بسته است. Physical schema باید bindingهای NOT NULL/immutable و ارجاع bundle به mapping versionهای مربوط را enforce کند. ReportType catalog و جزئیات physical bundle هنوز باید در gateهای catalog/implementation طراحی شوند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
