@@ -1,4 +1,24 @@
-﻿(analyzer) PS D:\Winprojects\analyzer> Get-Content template_annotation_audit_full.txt -Tail 40
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261119014507
+Username: DESKTOP-QGC44BJ\Papa
+RunAs User: DESKTOP-QGC44BJ\Papa
+Configuration Name: 
+Machine: DESKTOP-QGC44BJ (Microsoft Windows NT 10.0.19045.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 5020
+PSVersion: 5.1.19041.6456
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.19041.6456
+BuildVersion: 10.0.19041.6456
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is D:\Winprojects\analyzer\reply.md
+PS D:\Winprojects\analyzer>
+(analyzer) Get-Content template_annotation_audit_full.txt -Tail 40
   F326:G326: F326.top=medium, F326.bottom=medium, G326.top=medium, G326.bottom=medium, F326.left=medium, G326.right=medium
   F327:G327: F327.top=medium, F327.bottom=medium, G327.top=medium, G327.bottom=medium, F327.left=medium, G327.right=medium
   F328:G328: F328.top=medium, F328.bottom=medium, G328.top=medium, G328.bottom=medium, F328.left=medium, G328.right=medium
@@ -39,3 +59,9 @@
   A410:I410: A410.top=medium, A410.bottom=medium, B410.top=medium, B410.bottom=medium, C410.top=medium, C410.bottom=medium, D410.top=medium, D410.bottom=medium, E410.top=medium, E410.bottom=medium, F410.top=medium, F410.bottom=medium, G410.top=medium, G410.bottom=medium, H410.top=medium, H410.bottom=medium, I410.top=medium, I410.bottom=medium, A410.left=medium, I410.right=medium
   A411:I411: A411.top=medium, A411.bottom=medium, B411.top=medium, B411.bottom=medium, C411.top=medium, C411.bottom=medium, D411.top=medium, D411.bottom=medium, E411.top=medium, E411.bottom=medium, F411.top=medium, F411.bottom=medium, G411.top=medium, G411.bottom=medium, H411.top=medium, H411.bottom=medium, I411.top=medium, I411.bottom=medium, A411.left=medium, I411.right=medium
 COLOR_ANNOTATIONS
+PS D:\Winprojects\analyzer>
+(analyzer) Stop-Transcript
+**********************
+Windows PowerShell transcript end
+End time: 20261119014530
+**********************
