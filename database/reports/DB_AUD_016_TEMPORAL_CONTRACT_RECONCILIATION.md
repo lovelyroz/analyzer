@@ -9,7 +9,7 @@
 
 The four supporting design documents are broadly aligned on the business rules, but they are **not yet fully reconciled with the normative Architecture V1.3**. The central conflict is temporal ownership:
 
-- Architecture V1.3 and DB-DES-003 currently describe `is_ytd` as a FinancialPeriod attribute.
+- At audit time, Architecture V1.3 and DB-DES-003 described `is_ytd` as a FinancialPeriod attribute; this conflict has since been corrected by the coordinated amendment recorded below.
 - DB-DES-009 already identifies this as unresolved and says YTD may need to move to fact-level interpretation.
 - DB-DES-010 requires every duration observation to expose a `duration_basis`.
 - DB-DES-011 recommends `duration_basis` on FinancialFact, because a shared FinancialPeriod identifies actual dates/shape and must not carry a value-specific accumulation meaning.
@@ -19,7 +19,7 @@ The four supporting design documents are broadly aligned on the business rules, 
 ## 2. Normative hierarchy and change control
 
 Architecture V1.3 explicitly states that it is the normative architecture entry point and supporting documents do not override its approved decisions. Therefore:
-- DB-DES-011 cannot silently supersede Architecture's approved `is_ytd` placement.
+- DB-DES-011 did not silently supersede Architecture; the coordinated amendment explicitly changed the normative Architecture and all supporting contracts.
 - This audit records a proposed architectural amendment; it does not itself amend the normative contract.
 - DB-DES-003 remains PARTIAL and is a supporting logical contract.
 - DB-DES-009 and DB-DES-010 remain physical/query proposals, not implementation authorization.
@@ -146,14 +146,14 @@ The following are consistent across the reviewed documents and existing owner de
 - Unknown/ambiguous dates or temporal meaning must fail closed.
 - No calculated outputs are persisted.
 
-## 10. Required document changes after owner acceptance
+## 10. Coordinated document amendments — completed
 
-Apply one coordinated documentation amendment:
-1. Architecture V1.3: replace global FinancialPeriod `is_ytd` wording with fact-level `duration_basis`; preserve all other approved period rules.
-2. DB-DES-003: update Sections 3, 4, 6 and 10 to the same ownership; keep comparative and PIT semantics unchanged.
-3. DB-DES-009: make the FinancialPeriod field list exclude `is_ytd`; add `duration_basis` to FinancialFact; resolve months_length irregular-span policy; specify where comparative role metadata lives.
-4. DB-DES-010: make duration_basis part of query projection, metric binding and comparability checks; distinguish source basis from runtime-derived standalone values.
-5. DB-DES-011: mark the ownership recommendation as reconciled after those edits; retain open evidence gates.
+Completed in the coordinated documentation update:
+1. Architecture V1.3: global FinancialPeriod `is_ytd` removed; fact-level `duration_basis` established.
+2. DB-DES-003: period and YTD/standalone semantics updated; comparative and PIT semantics retained.
+3. DB-DES-009: FinancialPeriod excludes `is_ytd`; FinancialFact includes `duration_basis`.
+4. DB-DES-010: duration_basis is required in query projection and validation.
+5. DB-DES-011: status changed to ACCEPTED DESIGN DECISION; remaining implementation gates retained.
 
 Do not perform partial edits that leave Architecture and supporting documents contradictory.
 
@@ -170,4 +170,4 @@ Until these gates are met, no ORM, migration, data migration, destructive legacy
 
 ## 12. Status
 
-The reconciliation audit is complete and the fact-level duration_basis decision has been applied consistently to Architecture and supporting contracts. DB-DES-003 remains PARTIAL because fiscal-calendar, irregular interval, comparative-role and source-evidence gates remain open. No code, ORM, migration, database rows, or tests changed.
+The reconciliation audit is complete. The fact-level duration_basis decision has been applied consistently to Architecture and supporting contracts. DB-DES-003 remains PARTIAL because fiscal-calendar, irregular interval, comparative-role and source-evidence gates remain open. No code, ORM, migration, database rows, or tests changed.
