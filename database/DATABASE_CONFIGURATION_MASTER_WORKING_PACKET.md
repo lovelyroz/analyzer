@@ -2016,3 +2016,12 @@ Reader باید read-only بماند. لایهٔ Template resolution، semantic 
 - قدم بعدی Semantic Mapping Readiness Matrix در سطح ColumnSlot است. Multi-input تا اثبات مثال واقعی یا تصمیم صریح برای خروج از V1، UNPROVEN باقی می‌ماند.
 
 این مرحله فقط مستندات طراحی/پیشرفت را به‌روزرسانی کرد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.93 ماتریس آمادگی Semantic Mapping در سطح 40 ColumnSlot — 2026-11-19
+
+پس از تکمیل ممیزی 17 candidate و 15 partition، DB-DES-009 بخش 26 ماتریس آمادگی 40 ColumnSlot را ثبت کرد. برای هر candidate، HeaderPath/RowAxis evidence، وضعیت Metric/Dimension، واحد/مقیاس و period/duration_basis مشخص شده است.
+
+نتیجه: 40/40 slot از نظر موقعیت ساختاری قابل‌شناسایی‌اند، اما هیچ‌یک صرفاً با گزارش ساختاری برای ingestion نهایی از تمام ابعاد semantic و provenance اثبات نشده‌اند. T01 بهترین fixture ساختاری direct mapping است؛ T03 fixture دوم برای HeaderPath چندسطحی و RowAxis گروهی است. T17 نیازمند alternative row identity صریح است. Multi-input همچنان UNPROVEN است.
+
+قدم بعدی: ایجاد Mapping Decision Register محدود به T01 و T03 و تعیین فیلدهای semantic لازم برای یک direct mapping قابل‌آزمایش. Provenance واقعی CODAL همچنان مانع مستقل ingestion نهایی است. این مرحله فقط مستندات را تغییر داد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
