@@ -1553,3 +1553,31 @@ python src/scripts/audit_codal_fiscal_year_metadata.py
 **محدودیت:** این شمارش از coordinate inventory در Markdown انجام شده و ممیزی مستقیم مجدد XLSX نیست. candidate bounds هنوز به‌طور کامل توسط مالک تأیید نشده‌اند؛ spot-check قبلی به‌عنوان approval کامل تلقی نمی‌شود. تعداد 60 span فقط نتیجهٔ نقشهٔ فعلی است و invariant دائمی نیست.
 
 **وضعیت Task 033 / DB-ING-006:** همچنان PARTIAL. این گام، ابهام مالکیت span و خطر double extraction را در طراحی DB-DES-008 برطرف می‌کند؛ اما مجوز ORM، migration، runtime matcher، تولید Template production یا ingestion نیست. تستی اجرا نشد و هیچ کد/ORM/schema/migration/data تغییر نکرد.
+
+
+### 8.66 قرارداد تطبیق قطعی و Fail-Closed فایل Excel — DB-DES-013 — 2026-11-18
+
+سند جدید: `database/reports/DB_DES_013_DETERMINISTIC_EXCEL_TEMPLATE_MATCHING_CONTRACT.md`
+
+**قرارداد V1:**
+- ورودی Matcher فقط پس از تعیین قطعی company، report family، ReportVersion و دقیقاً یک TemplateVersion دارای وضعیت APPROVED فراهم می‌شود.
+- شناسایی Worksheet، جدول مادر و زیرجدول فقط با قواعد صریح و versioned انجام می‌شود؛ هر مورد باید دقیقاً یک match داشته باشد.
+- اعتبارسنجی ساختار شامل Header path/order، merged-cell geometry، تعداد و ترتیب ستون‌ها، ترتیب و موجودیت nodeها، containment و fingerprint مصوب است.
+- هیچ fuzzy matching، امتیاز شباهت، انتخاب نزدیک‌ترین/اولین candidate، LLM، heuristic مبتنی بر مقادیر مالی یا fallback خاموش مجاز نیست.
+- رنگ و Border فقط در مرحله ساخت/بازبینی یک‌باره Template کاربرد دارند؛ در گزارش‌های بعدی برای matching استفاده نمی‌شوند.
+- مختصات نمونه baseline و provenance هستند. جابه‌جایی در گزارش بعدی فقط با relocation rule قطعی و قبلاً اعتبارسنجی‌شده مجاز است؛ در غیر این صورت گزارش رد می‌شود.
+- کل گزارش یک واحد پذیرش است. نبودن، تکرار یا ابهام در هر Worksheet/Table/SubTable الزامی، کل گزارش را رد می‌کند. هیچ partial ingestion مجاز نیست.
+- extraction plan باید قبل از persistence به‌طور کامل اعتبارسنجی شود؛ سپس semantic/period/value validation تکمیل و facts در یک transaction ذخیره شوند. هر خطا rollback کامل ایجاد می‌کند.
+- خروجی Matcher فقط `MATCHED` با coordinate map کامل و معتبر، یا `REJECTED` با diagnostics قطعی است.
+
+**گیت‌های باز که از روی نمونه فعلی حدس زده نمی‌شوند:**
+1. قاعده هویت Worksheet در گزارش‌های بعدی.
+2. ثبات عنوان جدول‌ها و aliasهای مجاز.
+3. اجزای fingerprint ثابت و اجزای دارای variation مجاز.
+4. سیاست relocation و میزان جابه‌جایی واقعی جدول‌ها.
+5. سیاست Worksheet/Table اضافی.
+6. approval کامل ۱۷ parent bounds و ۱۵ child partitions.
+7. تأیید inheritance یا header override برای هر زیرجدول.
+8. مقایسه با یک فایل مستقل از دوره بعد پارسیان برای drift validation.
+
+**وضعیت:** DB-DES-013 به‌عنوان قرارداد طراحی ثبت شد؛ DB-ING-006 / Task 033 همچنان PARTIAL است. این تغییر فقط مستندات است؛ ORM، Migration، runtime code، دیتابیس و تست‌ها تغییر نکردند. تا بسته‌شدن گیت‌ها، Matcher production، Template production و ingestion مجاز نیستند.
