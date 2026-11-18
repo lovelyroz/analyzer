@@ -85,3 +85,5 @@
 - [DB_AUD_017_FISCAL_CALENDAR_SOURCE_AND_LIFECYCLE_AUDIT.md](reports/DB_AUD_017_FISCAL_CALENDAR_SOURCE_AND_LIFECYCLE_AUDIT.md) — ممیزی شواهد منبع، مدل فعلی Company و چرخه عمر سال مالی اختصاصی هر شرکت.
 
 - [DB_DES_012_COMPANY_FISCAL_YEAR_LOGICAL_MODEL.md](reports/DB_DES_012_COMPANY_FISCAL_YEAR_LOGICAL_MODEL.md) — مدل منطقی سال مالی واقعی هر شرکت، شواهد، تغییر سال مالی و ارتباط با FinancialPeriod.
+
+- [DB_AUD_018_CODAL_FISCAL_YEAR_METADATA_CAPABILITY_AUDIT.md](reports/DB_AUD_018_CODAL_FISCAL_YEAR_METADATA_CAPABILITY_AUDIT.md) — بررسی endpoint فهرست پایان سال مالی CODAL و قواعد اعتبارسنجی آن با صورت‌های مالی سالانه.
