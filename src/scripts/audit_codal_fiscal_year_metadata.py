@@ -12,7 +12,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-BASE = "https://codal.ir/api/search/v1"
+BASE = "https://search.codal.ir/api/search/v1"
 SYMBOLS = ("فولاد", "زفارس")
 TIMEOUT_SECONDS = 25
 PAUSE_SECONDS = 2
@@ -26,7 +26,12 @@ def get_json(path: str, params: dict[str, str] | None = None):
         url,
         headers={
             "User-Agent": "analyzer-codal-metadata-audit/1.0",
-            "Accept": "application/json",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.8",
+            "Referer": "https://www.codal.ir/",
+            "Origin": "https://www.codal.ir",
+            "sec-fetch-site": "same-site",
+            "sec-fetch-mode": "cors",
         },
     )
     with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
