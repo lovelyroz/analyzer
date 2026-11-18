@@ -1332,3 +1332,58 @@ Scale note «به میلیون» در A78 ثبت شده؛ currency نامعلو�
 - Gate 7 همچنان PARTIAL/OPEN؛ Gate 8 و طراحی فیزیکی همچنان PROPOSED/OPEN.
 - گام بعدی: ساخت ماتریس تصمیم mapping برای T01/T03 در سطح row/slot، با وضعیت هر فیلد (PROVEN / PROPOSED / BLOCKED) و ruleهای لازم؛ سپس انتخاب کوچک‌ترین direct mapping بدون ابهام برای fixture end-to-end، مشروط به بسته‌شدن پیش‌نیازهای Task 033 و provenance.
 - هیچ کد، ORM، schema، migration، دیتابیس یا تستی در این مرحله تغییر نکرد/اجرا نشد.
+
+## 30. T01/T03 Mapping Decision Matrix — 2026-11-19
+
+### 30.1 Scope and counting
+
+This matrix consolidates the row-level registers in Sections 27–28 and the shared contract in Section 29. It is a decision/readiness matrix, not an approved production mapping catalog.
+
+- T01: 28 leaf rows × 2 independent slots (B, D) = 56 source observations.
+- T03: 35 leaf rows × 2 independent slots (B, C) = 70 source observations.
+- Combined: 63 row identities and 126 independent row-slot observations.
+- T03 row 95 is a structural boundary/header repeat, not a leaf row. B95/C95 duplicate B79/C79 and are ignored.
+- T01 C, T01 E, T03 D/E, all black/uncolored cells and all coordinates outside the approved candidate masks are excluded. Gray blank → zero applies only within a confirmed value slot; neither T01 nor T03 has a Gray blank.
+
+### 30.2 Slot-level decision matrix
+
+| Table / slot | Header evidence | RowAxis / source labels | Temporal decision | Unit / scale | Metric / aggregation | Provenance | Current disposition |
+|---|---|---|---|---|---|---|---|
+| T01 / B | PROVEN: period end 1403/06/31; unaudited | PROVEN structurally: A12/A32/A35 and 28 leaves | BLOCKED: DURATION candidate; exact start and YTD vs STANDALONE unresolved | PARTIAL: scale note «به million»; currency unresolved; EPS rows 36–41 explicitly Rial; row 42 unresolved | BLOCKED: canonical Metric IDs, sign rules and subtotal/result/EPS double-count policy not approved | BLOCKED: CODAL filing/revision identity and full source ranking not attached | Not ingestible |
+| T01 / D | PROVEN: 1402/12/29; audited + restated | Same 28 leaf identities; independent observation from B | BLOCKED: actual comparison interval and relation to B not approved | Same row-scoped unit constraints as T01/B | BLOCKED: same row catalog and aggregation rules; no automatic comparability | BLOCKED: restatement/revision identity and ranking require source metadata | Not ingestible |
+| T03 / B | PROVEN: period end 1403/06/31; unaudited | PROVEN structurally: A81/A96/A108 and 35 leaves; row 95 excluded from leaf axis | PROPOSED: INSTANT candidate from balance-sheet semantics; rule approval required | PARTIAL: scale note «به million»; currency unresolved | BLOCKED: canonical Metric IDs; totals rows 94/107/118/119 need balance/control and double-count rules | BLOCKED: CODAL filing/revision identity not attached | Not ingestible |
+| T03 / C | PROVEN: 1402/12/29; audited + restated | Same 35 leaf identities; independent observation from B | PROPOSED: INSTANT candidate; date semantics require approved rule | Same row-scoped unit constraints as T03/B | BLOCKED: same metric and total/control rules; not safe to aggregate totals with components | BLOCKED: restatement/revision identity and ranking require source metadata | Not ingestible |
+
+### 30.3 Row-family decision matrix
+
+| Row family | T01 rows | T03 rows | Structural state | Financial interpretation state |
+|---|---|---|---|---|
+| Group headers | A12, A32, A35 | A81, A96, A108 | PROVEN as parent RowAxis nodes | Not FinancialFacts; do not assign Metric |
+| Ordinary leaf candidates | 13–14, 16–17, 19–21, 24–27, 29–30, 33, 36–41 | 82–93, 97–106, 109–117 | PROVEN labels and row positions | Metric IDs and any required dimensions still require approved catalog mapping |
+| Subtotal/result/total candidates | 15, 18, 22–23, 28, 31–34 | 94, 107, 118–119 | PROVEN source labels/positions | PROPOSED roles only; explicit metric role, sign and double-count policy required before approval |
+| Non-additive / per-share | 36–41 | None specifically identified in current row register | PROVEN row labels; Rial explicitly present | EPS definition, numerator/denominator basis and temporal rule remain BLOCKED |
+| Unknown measurement basis | 42 (capital) | Currency/scale scope across table | PROVEN row identity / table note only | BLOCKED until source unit and measurement basis are evidenced |
+| Structural non-data row | None additional in T01 register | 95 | PROVEN non-leaf boundary; duplicate B95/C95 ignored | Never map as a FinancialFact |
+
+### 30.4 Explicit decisions and non-decisions
+
+1. The 126 row-slot observations are independent source observations. No pair of comparative/audited/restated columns is a multi-input Fact.
+2. HeaderPath and RowAxisPath are structurally identified for these fixtures; their presence does not approve canonical Metric, Dimension, temporal basis or unit.
+3. T01's period remains BLOCKED, not merely “six-month YTD”, until exact interval and basis are supported by authoritative report metadata or an approved company/report-family rule.
+4. T03's INSTANT classification is PROPOSED, not approved solely by its title. The accounting/interpretation rule must be versioned.
+5. «به million» is a scale note, not currency evidence. Do not infer Rial/Toman. EPS rows with explicit Rial remain row-specific exceptions; capital row 42 is blocked.
+6. Total/subtotal labels are source evidence. Their aggregation roles remain unapproved until catalog mapping and double-count behavior are explicit.
+7. The source report's audit/restatement header is not sufficient revision provenance. CODAL filing identity, correction linkage and publication ranking must be resolved separately.
+8. No direct mapping in these fixtures currently satisfies all mandatory fields for canonical ingestion. This is a valid fail-closed result, not a reason to weaken admission.
+
+### 30.5 Task 033 progress disposition
+
+The T01/T03 mapping decision matrix is now complete as a readiness artifact. It resolves the next design sub-step promised in Section 29. It does not close DB-ING-006 / Task 033 because:
+- the full set of 17 table and 15 sub-table candidate bounds has only spot-check evidence, not explicit owner approval of every range;
+- the report-3 source hash refers to the earlier workbook version containing the experimental Sheet1; the final retained-workbook byte identity is therefore not established by that report;
+- a genuinely independent Parsian periodic workbook from another reporting period is still required for drift validation;
+- deterministic extraction against an approved TemplateVersion and owner-run end-to-end acceptance have not yet been demonstrated.
+
+The next execution step is not another broad audit: obtain/record explicit approval or correction of the 17+15 coordinate register, then run the existing annotation/template utility on the final retained workbook and compare it with the report-3 evidence. After that, validate the same Template against an independent-period workbook. Do not design or implement financial semantic ingestion from these candidates while the above gates remain open.
+
+No code, ORM, schema, migration, database data or tests changed/run in this step.
