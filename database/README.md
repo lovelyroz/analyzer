@@ -74,3 +74,5 @@
 - اسکریپت read-only برای تکمیل linkage جداول Normalized/Derived: `src/scripts/audit_normalized_derived_fact_links.py` — اجرا از ریشه پروژه با `python src/scripts/audit_normalized_derived_fact_links.py`؛ خروجی در `reply.md`.
 - [DB_AUD_015_LOCAL_NORMALIZED_DERIVED_FACT_LINKAGE_RESULTS.md](reports/DB_AUD_015_LOCAL_NORMALIZED_DERIVED_FACT_LINKAGE_RESULTS.md) — نتایج شمارش و linkage جداول Normalized/Derived در دیتابیس محلی (snapshot مورخ 2026-11-18).
 - [DB_DES_010_STAGE5_FINANCIAL_FACT_QUERY_MIGRATION_CONTRACT.md](reports/DB_DES_010_STAGE5_FINANCIAL_FACT_QUERY_MIGRATION_CONTRACT.md) — قرارداد انتقال Stage 5 به FinancialFact با PIT، ابعاد، دوره‌های Jalali و provenance.
+
+| [DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md](reports/DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md) | قرارداد پیشنهادی تاریخ‌های جلالی، INSTANT/DURATION و تفکیک YTD از بازه مالی |
