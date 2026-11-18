@@ -208,3 +208,52 @@ DB-AUD-006 در این نوبت **PARTIAL** باقی می‌ماند. این م�
 - مسیر PDF به‌عنوان مسیر V1 Excel معرفی نشود.
 
 **تست اجرا نشد؛ هیچ کد، ORM، schema، migration یا داده‌ای در این Task تغییر نکرد.**
+
+
+## 11. تکمیل محدود ممیزی مرز Transaction در کدهای موجود — 2026-11-18
+
+**دامنهٔ این تکمیل:** بازخوانی مستقیم چهار فایل اجرایی/کمکی و یک مجموعه تست؛ این بخش inventory کامل repository یا call-siteها نیست.
+
+فایل‌های بازبینی‌شده:
+- `src/ingestion/service.py`
+- `src/ingestion/market/ingestion.py`
+- `src/ingestion/fx/ingestion.py`
+- `src/ingestion/common/run_tracker.py`
+- `src/tests/test_codal_extraction.py`
+
+### 11.1 CODAL — `ingest_codal_report`
+
+- Run با وضعیت STARTED به Session اضافه و flush می‌شود، اما پیش از پردازش در transaction مستقل commit نمی‌شود.
+- در مسیر موفق، Report/ReportVersion، تمام RawFinancialFactها و COMPLETED شدن همان Run با یک `session.commit()` ثبت می‌شوند؛ این بخش از نظر موفقیت یک مرز transaction مشترک دارد، اما STARTED مستقل و پایدار نیست.
+- در exception، کل Session rollback می‌شود؛ بنابراین Run اولیه نیز از بین می‌رود. سپس یک IngestionRun جدید با وضعیت FAILED ساخته و commit می‌شود. این رفتار با DB-DES-005 که حفظ همان Run را لازم می‌داند، منطبق نیست.
+- replay بر اساس Report و publication_datetime تشخیص داده می‌شود؛ payload ورودی با payload ذخیره‌شده مقایسه نمی‌شود. در نتیجه، اجرای دوباره با محتوای متفاوت می‌تواند بدون conflict به مسیر COMPLETED برسد و تعداد RawFinancialFactهای موجود را به‌عنوان `records_updated` گزارش کند.
+- `str(exc)` مستقیماً در `error_log` قرار می‌گیرد؛ sanitization خطا اثبات نشده است.
+
+### 11.2 Market/OHLC — `ingest_ohlc_csv`
+
+- Run ابتدا STARTED و flush می‌شود؛ commit نهایی، رکوردهای MarketDaily و وضعیت Run را با هم ثبت می‌کند.
+- خطاهای parse، OHLC نامعتبر و شرکت ناشناخته به‌صورت ردیفی شمرده و از حلقه عبور داده می‌شوند؛ ردیف‌های معتبر دیگر همچنان ذخیره می‌شوند و Run با وضعیت COMPLETED حتی در صورت `records_failed > 0` commit می‌شود. این رفتار با قاعدهٔ رد کل Ingestion Unit در DB-DES-005 تعارض دارد.
+- رکورد موجود با هویت شرکت و تاریخ جلالی update می‌شود؛ در این مسیر، source revision یا payload conflict بررسی نمی‌شود.
+- در exception، Session rollback و Run جدید FAILED ساخته می‌شود؛ Run اولیه حفظ نمی‌شود. شمارنده‌های Run شکست‌خورده نیز صفر ثبت می‌شوند، حتی اگر parsing پیش از exception انجام شده باشد.
+
+### 11.3 FX — `ingest_fx_rates` و adapter facade
+
+- `src/ingestion/fx/ingestion.py` فایل XLSX را به DTO تبدیل می‌کند و سپس writer مشترک `ingest_fx_rates` را فراخوانی می‌کند؛ در facade مشاهده‌شده transaction مستقلی وجود ندارد.
+- writer برای هر ورودی نامعتبر خطا را جمع می‌کند و به پردازش ورودی‌های بعدی ادامه می‌دهد؛ ورودی‌های معتبر می‌توانند persist شوند و Run با وضعیت COMPLETED، حتی با `records_failed > 0`، commit شود. این رفتار نیز با fail-whole-unit در DB-DES-005 ناسازگار است.
+- رکورد موجود بر اساس هویت فعلی FX پیدا و مقدار/منبع آن overwrite می‌شود؛ source revision و payload conflict در این مسیر بررسی نمی‌شوند.
+- در exception، Session rollback و Run جدید FAILED ثبت می‌شود؛ STARTED اولیه حفظ نمی‌شود. exception خام نیز در error_log نوشته می‌شود.
+
+### 11.4 Shared run tracker
+
+- `start_run` فقط add/flush انجام می‌دهد.
+- `complete_run` فقط فیلدهای همان Run را تغییر می‌دهد و commit ندارد.
+- `fail_run` یک Run جدید می‌سازد و خودش `session.commit()` اجرا می‌کند؛ بنابراین اگر از داخل serviceای با transaction فعال فراخوانی شود، می‌تواند transaction ownership را از service خارج کند.
+- GitHub code search برای یافتن call-siteهای این helperها و writerها در این نوبت نتیجه‌ای برنگرداند؛ بنابراین استفاده/عدم استفادهٔ آن‌ها در تمام repository اثبات نشده است.
+
+### 11.5 شواهد تست و نتیجهٔ crosswalk
+
+تست‌های خوانده‌شده در `test_codal_extraction.py` مسیر PDF→RawFinancialFact و برخی خطاهای acquisition/extraction را پوشش می‌دهند. این تست‌ها به‌تنهایی موارد زیر را اثبات نمی‌کنند: حفظ همان Run در failure، rollback کل batch پس از خطای یک ردیف، payload-based replay/conflict، concurrency، canonical Excel writer یا atomicity کامل مطابق DB-DES-005. تستی اجرا نشد.
+
+**نتیجه:** در سه writer بازبینی‌شده (CODAL، OHLC و FX)، چند تعارض مستقیم با DB-DES-005 مشاهده شد؛ به‌ویژه دوام STARTED Run، ثبت FAILED روی همان Run و رد کامل batch در برابر خطای سخت. این یافته‌ها برای اثبات عدم انطباق همین مسیرهای بازبینی‌شده کافی‌اند، اما به معنی inventory کامل تمام ingestion call-siteها نیستند.
+
+**وضعیت:** DB-DES-005 / Task 010 و DB-AUD-006 / Task 027 همچنان PARTIAL. این تکمیل صرفاً مستنداتی است؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد. گام بعدی برای بستن ممیزی، تکمیل inventory تمام callerها و transaction/session boundaries از روی repository tree و سپس دریافت schema/data inventory مجاز از محیط‌های واقعی است.
