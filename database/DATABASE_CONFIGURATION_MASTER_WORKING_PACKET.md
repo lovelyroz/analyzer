@@ -1255,3 +1255,20 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **گام بعدی:** اسکریپت read-only برای شمارش و linkage کامل Normalized/Derived در دیتابیس هدف؛ سپس قرارداد انتقال Queryهای Stage 5 به `financial_facts`.
 
 **وضعیت:** source consumer inventory COMPLETE؛ local DB linkage PARTIAL/PENDING؛ هیچ ORM، Migration، کد runtime، داده یا تستی تغییر نکرد و تستی اجرا نشد.
+
+
+### 8.51 آماده‌سازی ممیزی read-only جداول Normalized و Derived در دیتابیس محلی — DB-AUD-014 — 2026-11-18
+
+بر اساس گپ شناسایی‌شده در ممیزی مصرف‌کنندگان، اسکریپت زیر اضافه شد:
+
+`src/scripts/audit_normalized_derived_fact_links.py`
+
+این اسکریپت در حالت SQLite read-only، تعداد ردیف‌های چهار جدول `normalized_financial_facts`، `normalized_financial_fact_inputs`، `derived_financial_facts` و `derived_financial_fact_inputs` را گزارش می‌کند؛ تمام FK/referenceهای مرتبط، از جمله `derived_financial_fact_inputs.normalized_fact_id` و `derived_input_fact_id` را می‌شمارد؛ توزیع linkage به‌ازای هر رکورد مقصد، گروه‌های لینک تکراری و خروجی `PRAGMA foreign_key_check` را نیز ارائه می‌دهد. نبود جدول/ستون را صریح گزارش می‌کند و آن را صفر فرض نمی‌کند.
+
+**اقدام مالک:** پس از sync از مخزن، از ریشه پروژه اجرا شود:
+
+`python src/scripts/audit_normalized_derived_fact_links.py`
+
+سپس اعلام شود `reply.md is updated` تا خروجی بررسی شود. دیتابیس فقط read-only باز می‌شود؛ هیچ schema یا rowای تغییر نمی‌کند.
+
+**وضعیت:** source consumer inventory COMPLETE؛ اسکریپت ممیزی محلی CREATED؛ اجرای مالک و شواهد دیتابیس PENDING؛ هیچ ORM، Migration، داده یا تستی تغییر نکرده و تستی اجرا نشده است.
