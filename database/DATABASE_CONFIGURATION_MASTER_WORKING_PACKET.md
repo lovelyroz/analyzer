@@ -1079,3 +1079,19 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 **تصمیم ایمنی:** تمام 505 رکورد و پنج ستون فعلی بدون تغییر حفظ شوند. هیچ‌یک در Migration بعدی حذف نشود. تا تعیین تکلیف Migration 9 نیز ORM را صرفاً برای mirror کردن دو ستون غایب در GitHub تغییر ندهیم. مسیر PDF/legacy از مسیر Excel جدید جدا بررسی شود.
 
 **گام بعدی:** ممیزی read-only ارتباط سطری 505 raw fact با سه جدول downstream، شمارش orphan/linked/multiple-linked و بررسی اینکه مسیر persistence اکسل فعلی هنوز RawFinancialFact می‌نویسد یا نه. تا پایان این ممیزی، بازنشستگی جدول legacy تصمیم‌گیری نمی‌شود. هیچ ORM، Migration، داده یا تستی در این گام تغییر نکرد.
+
+### 8.43 تعیین مسیر persistence فعلی و آماده‌سازی ممیزی linkage رکوردهای legacy — 2026-11-18
+
+بررسی source code فعلی GitHub نشان داد `src/ingestion/service.py::ingest_codal_report` مستقیماً برای هر `RawLineInput` یک `RawFinancialFact` می‌سازد و با `session.add_all` در `raw_financial_facts` ذخیره می‌کند. این مسیر از `src/ingestion/codal/adapter.py` تغذیه می‌شود که صراحتاً مرز استخراج PDF است. بنابراین مسیر CODAL فعلی legacy/PDF-oriented است؛ وجود مسیر production مستقل Excel-to-canonical در این بررسی اثبات نشد. Runner نیز در source فعلی تا Migration 8 پیش می‌رود.
+
+برای تعیین اثر احتمالی بازنشستگی جدول legacy، اسکریپت read-only زیر اضافه شد:
+
+`src/scripts/audit_legacy_raw_fact_links.py`
+
+این اسکریپت تعداد رکوردها و raw_factهای distinct ارجاع‌شده در سه جدول downstream، توزیع تعداد ارجاع به‌ازای هر raw fact، مجموع ارجاعات و dangling referenceها را محاسبه می‌کند؛ هیچ داده یا schemaای را تغییر نمی‌دهد و خروجی را در `reply.md` می‌نویسد.
+
+**اقدام مالک:** پس از sync آخرین تغییرات، از ریشه پروژه اجرا شود:
+
+`python src/scripts/audit_legacy_raw_fact_links.py`
+
+سپس اعلام شود `reply.md is updated`. تا دریافت نتیجه، جدول و داده‌های legacy حفظ می‌شوند. حتی raw fact بدون ارجاع نیز صرفاً بر مبنای شمارش linkage قابل حذف نیست. گزارش DB-AUD-011 نیز مسیر persistence و این گام بعدی را ثبت کرده است. هیچ ORM، Migration، داده یا تستی تغییر نکرده است.
