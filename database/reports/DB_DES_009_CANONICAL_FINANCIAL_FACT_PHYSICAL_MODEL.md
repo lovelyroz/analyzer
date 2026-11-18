@@ -722,3 +722,73 @@ Filename، local path، download URL، ingestion timestamp یا SHA-256 به‌�
 Reader فعلی درست در مرز مشاهده متوقف می‌شود؛ این کمبود نیست و نباید با افزودن منطق معنایی/DB به Reader برطرف شود. مرحلهٔ بعد باید لایه‌های مستقل را طراحی کند: (1) Template matching/version resolution، (2) interpretation bundle و semantic mapping، (3) period/dimension/value validation، (4) canonical writer و provenance persistence. تا آن زمان DTOهای فعلی صرفاً observation باقی می‌مانند.
 
 این بازبینی static/read-only بود. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+## 22. طرح فیزیکی یکپارچه برای Template، Interpretation، Dimension و Provenance — 2026-11-19
+
+### 22.1 اصل طراحی و مرز مسئولیت‌ها
+این طرح، Gateهای 1، 2، 7 و 8 را به یک زنجیرهٔ قابل enforce تبدیل می‌کند:
+
+`ReportVersion → TemplateVersion → InterpretationStandardVersion → SemanticMapping → FinancialFact → FinancialFactProvenance`
+
+- TemplateVersion فقط ساختار فیزیکی workbook را نسخه‌بندی می‌کند؛ worksheet/table/sub-table، مسیر سلسله‌مراتبی ردیف‌ها، مسیر Headerها و ColumnSlotها.
+- InterpretationStandardVersion معنای مالی را نسخه‌بندی می‌کند؛ mapping دقیق row/header intersection به Metric، Dimension، دوره، temporal basis، unit/basis و value-state rules.
+- Dimension catalog هویت مفاهیم و memberها را نگه می‌دارد؛ Bundle فقط دامنهٔ مجاز کاربرد آن‌ها را pin می‌کند.
+- FinancialFact مقدار canonical را نگه می‌دارد؛ Provenance اتصال Fact به source structure و semantic mapping دقیق را نگه می‌دارد.
+- Reader/DTO همچنان observation موقت است و نباید Template، Interpretation، Dimension یا Fact را خودش ایجاد/تأیید کند.
+
+### 22.2 ساختار فیزیکی TemplateVersion و Row Axis
+پیشنهاد می‌شود ساختار موجود DB-DES-008 با این الزامات تطبیق داده شود؛ نام جدول‌های زیر نام منطقی پیشنهادی‌اند و پیش از migration باید با نام‌گذاری نهایی DB-DES-008 reconcile شوند:
+
+1. `templates`: هویت پایدار Template در scope Company + ReportType؛ قید UNIQUE روی این scope مطابق تصمیم DB-DES-008.
+2. `template_versions`: نسخهٔ immutable با `template_version_id`, `template_id`, `version_number`, lifecycle/approval metadata؛ UNIQUE(`template_id`, `version_number`). هر نسخه تمام workbook layout را پوشش می‌دهد.
+3. `template_layout_nodes`: درخت worksheet/table/sub-table و سایر containerهای ساختاری؛ هر node به یک TemplateVersion تعلق دارد و parent آن نیز باید در همان نسخه باشد. node identity باید stable داخل همان TemplateVersion باشد؛ cell coordinates فقط attributes/locators همان نسخه‌اند.
+4. `template_row_axis_nodes` یا معادل آن: مسیر سلسله‌مراتبی row-axis را به‌صورت parent-child ذخیره کند؛ هر node به layout node/table و TemplateVersion دقیق متصل باشد. هویت معنایی یک ردیف باید از مسیر کامل root-to-leaf حاصل شود، نه فقط label نهایی یا row index.
+5. `template_column_slots`: ستون معنایی/فیزیکی پایدار در scope layout node و TemplateVersion؛ هر slot می‌تواند به Header path ساختاریافته متصل باشد. شماره ستون و A1 coordinate فقط locator نسخه‌ای‌اند، نه هویت دائمی بین TemplateVersionها.
+6. Header path باید component/levelهای ordered و parent relationship را حفظ کند؛ flatten کردن چندسطحی Header به یک رشتهٔ آزاد، semantic identity کافی نیست.
+
+هر FK میان child structure و parent structure باید علاوه بر ID، TemplateVersion scope را نیز ثابت کند؛ در SQLite این کار با UNIQUE composite parent keys و composite FKs انجام شود، یا در مواردی که طراحی موجود مانع آن است، triggerهای محدود و صریح به‌همراه service validation.
+
+### 22.3 Interpretation Bundle و Semantic Mapping
+پیشنهاد می‌شود:
+
+1. `interpretation_standard_versions`: شامل `interpretation_standard_version_id`, `template_version_id`, `version_number`, status، approval metadata و lifecycle؛ UNIQUE(`template_version_id`, `version_number`). Bundle به یک TemplateVersion دقیق مقید است.
+2. یک کلید یکتای مرکب روی (`interpretation_standard_version_id`, `template_version_id`) در جدول Bundle ایجاد شود تا ReportVersion بتواند با composite FK ثابت کند Template متصل به آن دقیقاً همان Template داخل Bundle است.
+3. `semantic_mapping_rules`: هر rule متعلق به یک InterpretationStandardVersion و به یک layout node، row-axis path دقیق، Header path/ColumnSlot دقیق و یک FinancialMetric متصل باشد. mapping باید دقیقاً یک تفسیر داشته باشد؛ چندمعنایی یا match صرفاً fuzzy در پذیرش ممنوع است.
+4. هر mapping علاوه بر Metric باید به ruleهای نسخه‌دار period/temporal، Dimension assignment، unit/measurement basis و value-state دسترسی مشخص داشته باشد؛ این اجزا می‌توانند child tables یا versioned rule references باشند، اما نباید در JSON آزاد و غیرقابل‌اعتبارسنجی پنهان شوند.
+5. `report_versions` برای ورودی‌های Excel پذیرفته‌شده هر دو `template_version_id` و `interpretation_standard_version_id` را NOT NULL نگه دارد. FK مرکب ReportVersion به Bundle باید برابری TemplateVersion را enforce کند. رکوردهای تاریخی legacy می‌توانند طی دورهٔ گذار NULL بمانند؛ این استثنا برای ورودی جدید Excel مجاز نیست.
+6. Bundle و mappingهای استفاده‌شده immutable باشند. تغییر layout، TemplateVersion جدید و Bundle سازگار می‌خواهد؛ تغییر صرف معنا/period/unit/value rule بدون تغییر layout، Bundle جدید می‌خواهد. بازپردازش نباید binding نسخهٔ پذیرفته‌شده را درجا عوض کند.
+
+### 22.4 Dimension Catalog و مجازبودن در Bundle
+ساختار relational پیشنهادی:
+
+- `financial_dimensions`: Dimension identity global با `dimension_code` یکتا و تعریف معنایی immutable.
+- `financial_dimension_values`: memberهای پایدار هر Dimension؛ علاوه بر PK، UNIQUE(`dimension_value_id`, `dimension_id`) برای enforce کردن تعلق value به Dimension.
+- `interpretation_dimension_rules`: اتصال Bundle به Dimensionهای مجاز، با scope کاربرد مثل Metric و layout/mapping context در صورت نیاز واقعی؛ global بودن catalog به معنی مجازبودن عمومی نیست.
+- `interpretation_dimension_allowed_values`: در صورت محدودیت memberها، allowed valueها را به rule/Bundle متصل کند و با composite FK ثابت کند value متعلق به همان Dimension است.
+- `financial_dimension_sets`: یک parent canonical با `canonical_key` یکتا؛ empty set با کلید canonical `[]` برای Factهای بدون Dimension.
+- `financial_dimension_set_members`: هر ردیف شامل dimension_set_id، dimension_id و dimension_value_id؛ UNIQUE(`dimension_set_id`, `dimension_id`) تا هر Dimension حداکثر یک member در هر set داشته باشد؛ composite FK به (`dimension_value_id`, `dimension_id`) برای جلوگیری از اتصال value به Dimension اشتباه.
+
+Canonical key فقط از codeهای مصوب و به ترتیب قطعی ساخته شود؛ display label، ترتیب ورود و مختصات سلول در آن دخالت نکنند. اعتبارسنجی سرویس باید ثابت کند members دقیقاً canonical_key را بازتولید می‌کنند و هر member برای همان Bundle مجاز است. Dimension/member جدید هنگام ingestion و از روی متن خام ساخته نمی‌شود.
+
+### 22.5 اتصال Fact و Provenance و کلیدهای یکتا
+- Fact فقط به ReportVersion، FinancialPeriod، FinancialMetric و DimensionSet متصل می‌شود؛ company_id تکراری نمی‌شود.
+- هویت Fact طبق تصمیم بخش 6.4 برابر (`report_version_id`, `period_id`, `metric_id`, `dimension_set_id`) باقی می‌ماند. Scenario یا هر تمایز value-defining دیگر باید به‌صورت Dimension مصوب وارد DimensionSet شود؛ افزودن ستون آزاد scenario به‌تنهایی مجاز نیست مگر کلید یکتا و قرارداد معنایی هم‌زمان بازطراحی شود.
+- هر Provenance row به یک Fact، یک Template layout node، یک ColumnSlot در صورت کاربرد، و یک SemanticMapping دقیق وصل می‌شود. Composite FK/trigger باید ثابت کند همهٔ این ارجاع‌ها از همان TemplateVersion و InterpretationStandardVersion متصل به ReportVersion هستند.
+- UNIQUE provenance پیشنهادی: (`fact_id`, `template_node_id`, `column_slot_id`, `semantic_mapping_id`, `input_role`)؛ nullable slot نباید uniqueness را در SQLite تضعیف کند. برای موارد بدون slot باید identity صریح/جایگزین یا partial unique indexهای مجزا طراحی شود؛ اتکا به UNIQUE مرکب شامل NULL کافی نیست.
+- Fact مستقیم یک provenance با DIRECT دارد؛ Fact چندمنبعی چند provenance با roleهای مصوب دارد. اگر دو observation مستقل با همین structural identity و role ممکن باشند، مدل باید یک source-observation identity نسخه‌دار اضافه کند؛ مختصات سلول نباید بدون اثبات به کلید دائمی تبدیل شود.
+- هر Fact پذیرفته‌شده حداقل یک provenance معتبر دارد. این قید cross-table با service validation و در صورت نیاز trigger/transaction-level validation enforce می‌شود؛ CHECK سادهٔ همان جدول برای آن کافی نیست.
+
+### 22.6 قواعد پذیرش و سناریوهای لازم برای اثبات
+پیش از migration، حداقل دو fixture واقعی از workbookهای تأییدشده لازم است:
+
+A. Direct fact: یک مقدار از یک row-axis path و یک Header/ColumnSlot به یک Metric/Period/DimensionSet نگاشت شود؛ زنجیرهٔ کامل ReportVersion تا Provenance بدون ambiguity قابل query باشد.
+
+B. Multi-input fact: چند observation ساختاری متمایز با roleهای مشخص به یک Fact واحد وصل شوند؛ duplicate link رد شود و هر input مستقل حفظ شود.
+
+همچنین adversarial cases باید شامل این موارد باشند: row label تکراری در دو table؛ Header مشابه با parent path متفاوت؛ slot یا row node از TemplateVersion دیگر؛ mapping از Bundle دیگر؛ Dimension value متعلق به Dimension اشتباه؛ member مجازنشده در Bundle؛ duplicate fact با payload متفاوت؛ provenance با slot NULL و duplicate؛ تغییر Template/Bundle پس از پذیرش؛ و ReportVersion با دو report family ناسازگار.
+
+### 22.7 وضعیت و محدودیت
+این طرح، recommendation فیزیکی برای طراحی بعدی است و هنوز باید با متن کامل DB-DES-008 و DB-DES-014 تطبیق داده شود. نسخه‌های کامل این دو سند در مسیرهای حدس‌زده‌شدهٔ قبلی repository قابل بازیابی نبودند؛ بنابراین هیچ نام جدول موجود یا جزئیات پیاده‌سازی آن اسناد را قطعی فرض نمی‌کنیم. همچنین fixtureهای واقعی direct و multi-input هنوز در این مرحله اجرا/اثبات نشده‌اند.
+
+**نتیجه:** Gate 1/2/7/8 از نظر رابطه‌ها و integrity requirements به یک طرح منسجم رسیده‌اند، اما physical design هنوز PROPOSED / NOT IMPLEMENTATION-READY است تا (الف) DB-DES-008 و DB-DES-014 با این طرح reconcile شوند، (ب) دو fixture واقعی direct/multi-input تأیید شوند، و (ج) جزئیات SQLite composite FK/trigger و NULL uniqueness نهایی شوند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
