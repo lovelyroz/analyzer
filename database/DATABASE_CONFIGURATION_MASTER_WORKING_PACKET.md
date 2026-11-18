@@ -1939,3 +1939,17 @@ Reader باید read-only بماند. لایهٔ Template resolution، semantic 
 - پیش از migration دو fixture واقعی direct و multi-input و adversarial tests لازم است.
 
 این طرح هنوز PROPOSED است و باید با متن کامل DB-DES-008 و DB-DES-014 reconcile شود؛ متن کامل آن دو سند از مسیرهای حدس‌زده‌شده قبلی بازیابی نشد. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+
+## 8.89 شواهد واقعی Parsian برای Template و Semantic Mapping — 2026-11-19
+
+برای طراحی از فایل اکسل اصلی دوباره درخواست نمی‌شود؛ گزارش database/reports/parsian_periodic_report_3.md مبنای شواهد ساختاری قرار گرفت. این گزارش workbook با SHA-256 69186f1ad2b0e481a3588f2731b7027b0a9d9a543d1ca17fd24fc71d8c5aca06 را توصیف می‌کند.
+
+- T01 (Recovered_Sheet1!A10:D42) نمونهٔ Direct Mapping است: row groupهای سبز A12/A32/A35، labelهای زرد، Headerهای دو سطحی B10:B11 و D10:D11، و ستون Black C که excluded است. ستون E خارج border است و تا تصمیم مالک وارد Template نمی‌شود.
+- T03 (A79:C119) نیاز به RowAxis سلسله‌مراتبی و HeaderPath چندسطحی را نشان می‌دهد؛ marker اول به‌دلیل Blue بودن A95 ambiguous است و نباید mapping شود.
+- T04/T06 نشان می‌دهند blank Gray فقط طبق rule 7 مالک zero است؛ blankهای دیگر خودکار zero نیستند.
+- گزارش Multi-input Fact را اثبات نمی‌کند؛ ستون‌های متعدد با دوره/وضعیت متفاوت، Factهای مستقل‌اند، نه لزوماً inputهای یک Fact واحد. پس Multi-input همچنان UNPROVEN.
+- ابهام‌های مالک دربارهٔ ستون‌های خارج border، U01، Sheet1 و موارد دیگر باز می‌مانند؛ هیچ heuristic جای تصمیم صریح را نمی‌گیرد.
+
+جزئیات و اثر بر مدل فیزیکی در DB-DES-009 بخش 23 ثبت شد. نتیجه: direct mapping از نظر ساختار مستند شد؛ Gate 7 همچنان PARTIAL/OPEN و طرح فیزیکی هنوز PROPOSED است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
