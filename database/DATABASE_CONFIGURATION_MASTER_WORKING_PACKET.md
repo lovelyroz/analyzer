@@ -10,7 +10,7 @@
 
 **سند معماری مبنا:** `../12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-17 — Taskهای 031/032 DONE هستند. Task 033 PARTIAL و بر مبنای Company Table Layout Template ادامه دارد. re-audit اصلاح‌شدهٔ مالک برای نمونه Parsian فقط یک worksheet معتبر، `Recovered_Sheet1`، را ثبت می‌کند؛ `Sheet1` شیت آزمایشی حذف‌شده بوده و تمام یافته‌های آن خارج از scope است. ممیزی اصلاح‌شده 17 عنوان قرمز، 15 نشانگر سبز، 459 سلول خاکستری (89 blank) و شواهد رنگی آبی/زرد را ثبت کرده است؛ اما شمارش صفر سلول مشکی کامل نیست، زیرا گزارش مستقیم OOXML قبلی 492 سلول مشکی Theme-based را در شیت اصلی نشان می‌دهد. گزارش 3 همچنین 17 مستطیل مرزی پیوسته برای candidateهای اصلی ارائه می‌کند؛ bounds در حد شواهد نمونه‌اند و هنوز تأیید مالک/Template نهایی نیستند. جزئیات در `reports/PARSIAN_PERIODIC_REPORT_3_STRUCTURAL_REVIEW.md` و نقشه اولیه ثبت شده‌اند. گزارش‌های 1 تا 3 ممیزی‌های همان workbook نمونه‌اند، نه workbook مستقل دوم؛ برای سنجش drift هنوز گزارش XLSX دوره‌ای دیگری از پارسیان لازم است. دستیار فقط گزارش‌های Markdown را بررسی کرده، XLSX را مستقیم باز نکرده و تست اجرا نکرده است.
+آخرین بازنگری: 2026-11-18 — Taskهای 031/032 DONE هستند. Task 033 PARTIAL و بر مبنای Company Table Layout Template ادامه دارد. re-audit اصلاح‌شدهٔ مالک برای نمونه Parsian فقط یک worksheet معتبر، `Recovered_Sheet1`، را ثبت می‌کند؛ `Sheet1` شیت آزمایشی حذف‌شده بوده و تمام یافته‌های آن خارج از scope است. ممیزی اصلاح‌شده 17 عنوان قرمز، 15 نشانگر سبز، 459 سلول خاکستری (89 blank) و شواهد رنگی آبی/زرد را ثبت کرده است؛ اما شمارش صفر سلول مشکی کامل نیست، زیرا گزارش مستقیم OOXML قبلی 492 سلول مشکی Theme-based را در شیت اصلی نشان می‌دهد. گزارش 3 همچنین 17 مستطیل مرزی پیوسته برای candidateهای اصلی ارائه می‌کند؛ bounds در حد شواهد نمونه‌اند و هنوز تأیید مالک/Template نهایی نیستند. جزئیات در `reports/PARSIAN_PERIODIC_REPORT_3_STRUCTURAL_REVIEW.md` و نقشه اولیه ثبت شده‌اند. گزارش‌های 1 تا 3 ممیزی‌های همان workbook نمونه‌اند، نه workbook مستقل دوم؛ برای سنجش drift هنوز گزارش XLSX دوره‌ای دیگری از پارسیان لازم است. دستیار فقط گزارش‌های Markdown را بررسی کرده، XLSX را مستقیم باز نکرده و تست اجرا نکرده است.
 
 ## 2. قواعد مدیریت Taskها
 
@@ -1651,3 +1651,25 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 **Evidence limitation:** report 3's detailed cell inventory is for the earlier workbook SHA `69186f1ad2b0e481a3588f2731b7027b0a9d9a543d1ca17fd24fc71d8c5aca06`; the corrected workbook SHA is `95f94e739632e48ae6552c562ecbf6c3e8182848718d17977f69bc984a6638b0`. The structural review confirms that the old detailed report cannot prove retained-sheet byte identity. Literal values and header text require direct confirmation against the corrected workbook.
 
 **Result:** PARTIAL PROOF only. DB-ING-006 / Task 033 remains PARTIAL. No ORM, migration, runtime code, database data, or tests changed; no ingestion is authorized.
+
+### 8.70 تکمیل محدود DB-AUD-006: تطبیق مرز Transaction سرویس‌های CODAL، Market و FX — 2026-11-18
+
+گزارش تکمیلی در `reports/DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md`، بخش 11 ثبت شد. بازبینی مستقیم این فایل‌ها انجام شد:
+- `src/ingestion/service.py`
+- `src/ingestion/market/ingestion.py`
+- `src/ingestion/fx/ingestion.py`
+- `src/ingestion/common/run_tracker.py`
+- `src/tests/test_codal_extraction.py`
+
+**یافته‌های اجرایی قطعی در مسیرهای بازبینی‌شده:**
+1. CODAL، OHLC و FX، Run اولیه را STARTED و flush می‌کنند، اما در exception آن transaction rollback می‌شود و یک Run جدید FAILED ساخته می‌شود؛ بنابراین هویت همان Run در failure حفظ نمی‌شود.
+2. OHLC و FX خطاهای ردیفی را skip می‌کنند و می‌توانند دادهٔ معتبر بخشی از ورودی را همراه Run با وضعیت COMPLETED و `records_failed > 0` commit کنند؛ این با fail-whole-unit در DB-DES-005 تعارض دارد.
+3. CODAL replay برابری payload را بررسی نمی‌کند؛ FX و OHLC نیز در مسیر بازبینی‌شده رکورد موجود را بدون source-revision/payload-conflict proof به‌روزرسانی می‌کنند.
+4. helper `fail_run` در `run_tracker.py` خودش commit می‌کند؛ در صورت استفاده درون یک service، transaction ownership باید بررسی شود. call-siteهای آن در این نوبت به‌طور کامل قابل جست‌وجو نبودند.
+5. تست‌های موجود CODAL، مسیر PDF→RawFinancialFact و برخی خطاهای acquisition/extraction را پوشش می‌دهند؛ پذیرش کامل DB-DES-005 را اثبات نمی‌کنند.
+
+**محدودیت:** GitHub code search برای inventory کامل call-siteها نتیجهٔ قابل استفاده نداد؛ این ممیزی فقط فایل‌های نام‌برده را اثبات می‌کند. schema و دادهٔ واقعی DB نیز بررسی نشدند.
+
+**وضعیت Taskها:** DB-DES-005 / Task 010 همچنان PARTIAL و DB-AUD-006 / Task 027 همچنان PARTIAL است. این گام فقط مستنداتی بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد. Migration یا حذف/بازنویسی legacy مجاز نشده است.
+
+**گام بعدی دقیق:** تکمیل repository-wide caller/import inventory با دسترسی به فهرست کامل فایل‌ها و بررسی transaction/session boundary تمام writerها و helperها؛ سپس schema/data inventory فقط از محیط‌های واقعیِ در دسترس و مجاز. تا تکمیل این دو، طرح migration قابل تصویب نیست.
