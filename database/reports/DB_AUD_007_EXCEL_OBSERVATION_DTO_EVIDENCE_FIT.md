@@ -1,7 +1,7 @@
 # DB-AUD-007 — Excel Observation DTO Evidence-Fit Assessment
 
 **Date:** 2026-11-15  
-**Status:** PARTIAL — assessment based exclusively on the existing Markdown audit DB-AUD-002; no workbook was opened in this task.  
+**Status:** DONE — evidence-fit assessment completed; closure reconciliation and later validation evidence recorded in Section 7.  
 **Related contract:** DB-DES-007 — `DB_DES_007_EXCEL_SOURCE_OBSERVATION_DTO_CONTRACT.md`  
 **Purpose:** Validate whether the logical DTO contract can preserve the structures and ambiguities already documented for four Excel workbooks, and identify any necessary refinements before selecting a Python library or implementing an adapter.
 
@@ -134,3 +134,20 @@ These scenarios are logical acceptance cases for future adapter/interpretation t
 - execute user-owned tests and record results before marking DB-DES-007 complete.
 
 **Scope statement:** This report relies only on existing Markdown audit evidence. No XLSX file was opened or inspected in this task. No code, tests, ORM, schema, migration, or database data were changed. Tests were not run.
+
+
+## 7. Completion reconciliation — 2026-11-19
+
+**Superseding status: DONE for DB-AUD-007 evidence-fit assessment.** The assessment completed its assigned comparison of the logical DTO contract against the four documented workbook patterns and identified the required orthogonal header-axis, row/column context, temporal-evidence and presentation-status refinements. Those refinements were incorporated into DB-DES-007 and the concrete DTO design.
+
+Additional closure evidence now available:
+- Owner-run DTO/Reader validation is recorded in the Master Packet and DB-ING-005 implementation report.
+- Owner-run Reader acceptance across five real workbooks is recorded under Task 032.
+- `parsian_periodic_report_3.md` contains a direct OOXML/openpyxl inspection of the Parsian workbook version it identifies, including sheet metadata, merged ranges, literal cell types, fills and borders. Its source hash/version limitation remains explicit; it is not treated as a second-period workbook.
+- The DTO implementation preserves unresolved structural and temporal evidence instead of resolving financial meaning in the reader.
+
+**Limitations retained (not blockers for this assessment):** no evidence is claimed for unobserved Excel features such as formulas (prohibited in V1), macros, external links or hidden worksheets; Boolean/date-typed/error values remain unsupported; and the four-workbook crosswalk still relies on previously documented audit evidence for three samples. These are documented coverage limits, not unfinished work in the evidence-fit assessment.
+
+The remaining template-specific work—17 candidate bounds approval, template versioning/matching and independent-period drift validation—belongs to DB-ING-006 / Task 033 and is not transferred to DB-AUD-007.
+
+No code, tests, ORM, schema, migration or database data changed in this assessment reconciliation. The assistant did not execute tests.
