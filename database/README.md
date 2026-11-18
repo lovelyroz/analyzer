@@ -72,3 +72,4 @@
 - [DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md](reports/DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md) — inventory مصرف‌کنندگان runtime، وابستگی Stage 5 و گپ linkage جداول Derived.
 
 - اسکریپت read-only برای تکمیل linkage جداول Normalized/Derived: `src/scripts/audit_normalized_derived_fact_links.py` — اجرا از ریشه پروژه با `python src/scripts/audit_normalized_derived_fact_links.py`؛ خروجی در `reply.md`.
+- [DB_AUD_015_LOCAL_NORMALIZED_DERIVED_FACT_LINKAGE_RESULTS.md](reports/DB_AUD_015_LOCAL_NORMALIZED_DERIVED_FACT_LINKAGE_RESULTS.md) — نتایج شمارش و linkage جداول Normalized/Derived در دیتابیس محلی (snapshot مورخ 2026-11-18).
