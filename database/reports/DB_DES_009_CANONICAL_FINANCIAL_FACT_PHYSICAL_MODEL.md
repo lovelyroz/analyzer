@@ -368,3 +368,45 @@ The following must be resolved before ORM/migration implementation:
 - هیچ‌یک از این triggerها نباید قبل از ممیزی داده و طراحی migration به جداول legacy اعمال شود.
 
 **نتیجه Gate 6:** انتخاب راهکار در سطح طراحی انجام شد: Trigger + Service Validation برای `financial_facts`، بدون denormalized company_id. Gate از نظر انتخاب معماری قابل بستن است، اما پیاده‌سازی، DDL، migration، audit دیتابیس مقصد و تست‌های پذیرش همچنان باز و غیرمجاز هستند تا مجوز مرحلهٔ اجرا صادر شود. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 15. بررسی Gate 7 — کفایت Provenance ساختاری و معنایی — 2026-11-18
+
+### 15.1 شواهد بررسی‌شده
+- `DB-DES-008` ساختار فیزیکی Template را با شناسه‌های پایدار `template_layout_node`، `template_column_slot`، Header binding و extraction span پیشنهاد می‌کند. مختصات A1 فقط locator است؛ هویت معنایی نیست.
+- `DB-DES-014` قرارداد معنایی را تکمیل می‌کند: معنای Fact در تقاطع row-axis path و column Header path تعیین می‌شود. Mapping باید به TemplateVersion، layout node، Header definition/path، ColumnSlot، row-axis path، Metric، Dimension، دوره و temporal/value semantics مقید باشد. هیچ column به‌تنهایی Metric نیست و هیچ row label به‌تنهایی در همهٔ جدول‌ها معنای ثابت ندارد.
+- Excel Reader DTO فعلی `CellRef`، `RowObservation`، `ColumnObservation`، `TableObservation` و Header fragmentهای چندسطری/ادغام‌شده را به‌صورت immutable observation نگه می‌دارد. این DTOها مختصات و روابط مشاهده‌شده را ثبت می‌کنند، اما stable template IDs یا semantic mapping IDs تولید نمی‌کنند؛ این جداسازی با نقش read-only Reader سازگار است.
+- مدل legacy `normalized_financial_fact_inputs` فقط پل میان NormalizedFact و RawFact/MappingDecision است و برای قرارداد جدید نباید به‌عنوان طرح فیزیکی مرجع استفاده شود.
+
+### 15.2 کفایت ساختار پیشنهادی DB-DES-009
+فیلدهای پیشنهادی `financial_fact_provenance`:
+- `fact_id`
+- `input_role`
+- `template_node_id`
+- `column_slot_id` در موارد مرتبط
+- `semantic_mapping_id` یا مرجع immutable معادل
+- `source_locator` اختیاری و صرفاً تشخیصی
+
+این ساختار **از نظر منطقی کفایت می‌کند، مشروط به اینکه** `semantic_mapping_id` به یک mapping نسخه‌دار و دقیق اشاره کند که row-axis path کامل، Header path کامل، context جدول/زیرجدول، معنای Metric/Dimension، period و temporal basis، واحد/مبنای اندازه‌گیری و value semantics را در scope همان TemplateVersion و interpretation standard مشخص کند. در این صورت نیازی به ذخیرهٔ دائمی row index یا cell coordinate روی هر Fact نیست؛ semantic mapping هویت معنایی را اثبات می‌کند و template node/column slot هویت ساختاری را.
+
+برای Provenance:
+- Fact مستقیم: یک ردیف provenance با `input_role=DIRECT`.
+- Fact دارای چند observation ورودی: یک ردیف برای هر منبع مستقل، با نقش مصوب همان ورودی (مانند COMPONENT/TOTAL/SUBTOTAL)؛ تمام ردیف‌ها به یک Fact متصل می‌شوند.
+- هر ردیف provenance باید به ساختار و mapping دقیق همان ReportVersion و نسخه‌های Template/Interpretation متصل باشد.
+- مختصات سلول/محدوده می‌تواند برای عیب‌یابی موقت ثبت شود، اما نه شرط اعتبار Fact است و نه هویت پایدار آن.
+- raw cell value، raw row، workbook archive و legacy raw_fact_id/mapping_decision_id در این رابطه وارد نمی‌شوند.
+
+### 15.3 شکاف فیزیکی حل‌نشده
+DB-DES-014 قرارداد منطقی row-axis path و SemanticMappingRule را تعریف کرده، اما physical schema کامل برای ذخیرهٔ سلسله‌مراتب row-axis و mappingهای نسخه‌دار هنوز طراحی/تصویب نشده است. DB-DES-008 نیز عمدتاً layout node، range، Header binding، ColumnSlot و extraction span را تعریف می‌کند و به‌تنهایی row-axis semantic identity را کامل نمی‌کند.
+
+بنابراین `semantic_mapping_id` فقط زمانی یک مرجع کافی است که جدول/مدل SemanticMapping واقعاً کل row-axis path و Header path را به‌شکل immutable و قابل اعتبارسنجی نگه دارد؛ یک شناسه به جدول mapping ناقص یا mapping متکی بر متن آزاد، این شرط را برآورده نمی‌کند.
+
+همچنین پیش از physical design باید اثبات شود که برای چند ورودی یک Fact، ترکیب `fact_id + structural source identity + input_role` جلوی duplicate link را می‌گیرد و هر منبع متمایز را بدون ابهام حفظ می‌کند. اگر دو ورودی متمایز بتوانند دقیقاً همین هویت را داشته باشند، باید identity تکمیلیِ نسخه‌دار تعریف شود؛ نه اینکه مختصات سلول به‌صورت پیش‌فرض به کلید دائمی تبدیل شود.
+
+### 15.4 تصمیم و وضعیت Gate 7
+1. الگوی یک ردیف provenance برای هر منبع ورودی مستقل و چند ردیف برای Fact چندمنبعی تأیید طراحی می‌شود.
+2. `template_node_id` و `column_slot_id` هویت ساختاری را می‌دهند؛ `semantic_mapping_id` باید هویت کامل row/column semantic intersection را ثابت کند.
+3. ذخیرهٔ دائمی مختصات دقیق سلول یا raw cell data الزامی نیست.
+4. physical schema مربوط به row-axis و SemanticMapping باید پیش از ORM/Migration طراحی و با یک نمونهٔ واقعی direct و یک نمونهٔ multi-input اثبات شود.
+
+**نتیجه:** Gate 7 در سطح قرارداد منطقی تا حد زیادی حل شده، اما از نظر physical provenance **PARTIAL / OPEN** می‌ماند تا مدل نسخه‌دار row-axis و semantic mapping و مثال‌های پذیرش مشخص شوند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
