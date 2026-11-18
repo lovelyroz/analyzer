@@ -100,6 +100,21 @@ def main() -> None:
 
     lines.extend([
         "",
+        "## Git history search across local refs",
+        "",
+        "### Commits adding/removing the exact Migration 9 identifier",
+        "",
+        git("log", "--all", "--format=%H%x09%ad%x09%s", "--date=iso-strict", "-S" + "codal_excel_source_metadata", "--", ".") or "(no matching commit found in local refs)",
+        "",
+        "### History of src/migrations/runner.py",
+        "",
+        git("log", "--all", "-30", "--format=%H%x09%ad%x09%s", "--date=iso-strict", "--", "src/migrations/runner.py") or "(no runner.py history found)",
+        "",
+        "### Local branches and tags",
+        "",
+        git("branch", "-a", "--no-color") or "(no branches listed)",
+        git("tag", "--list") or "(no tags listed)",
+        "",
         "## Migration directory files",
         "",
     ])
