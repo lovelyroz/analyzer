@@ -1457,6 +1457,22 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **وضعیت:** قید ۱۲ماهه پذیرفته و در طراحی منطقی V1 الزام‌آور شد. هیچ ORM، Migration، کد، داده یا تستی تغییر نکرده است.
 
 
+### 8.61 اسکریپت بررسی زنده متادیتای سال مالی CODAL — 2026-11-18
+
+اسکریپت read-only زیر اضافه شد:
+
+`src/scripts/audit_codal_fiscal_year_metadata.py`
+
+این اسکریپت فهرست ناشران CODAL و endpoint پایان سال مالی را برای دو نماد آزمایشی فولاد و زفارس بررسی می‌کند و خروجی timestamped را در `reply.md` می‌نویسد. هیچ اتصال یا تغییری در دیتابیس پروژه ندارد و فقط از کتابخانه استاندارد Python استفاده می‌کند.
+
+فرمان اجرا:
+
+```powershell
+python src/scripts/audit_codal_fiscal_year_metadata.py
+```
+
+زفارس فقط یک کاندیدای بررسی سال مالی غیر اسفندی است؛ هویت ناشر و تاریخ‌های بازگشتی باید از خروجی زنده تأیید شوند. پس از اجرا، `reply.md` را sync/commit کن و اعلام کن `reply.md is updated`.
+
 ### 8.60 ممیزی قابلیت متادیتای سال مالی CODAL — DB-AUD-018 — 2026-11-18
 
 گزارش: `database/reports/DB_AUD_018_CODAL_FISCAL_YEAR_METADATA_CAPABILITY_AUDIT.md`
