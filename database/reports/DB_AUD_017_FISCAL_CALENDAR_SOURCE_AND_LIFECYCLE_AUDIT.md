@@ -127,3 +127,19 @@ Before physical schema/ORM/migration work:
 **Not decided by this audit:** exact physical table/column names, whether to introduce a separate calendar-definition/version parent, FK placement, fiscal-year label convention, and migration mechanics. Those require the remaining source and Migration 9 evidence.
 
 **No implementation authorization:** this audit changes no ORM, migration, runtime code, database rows, workbook, or tests.
+
+
+## 9. Owner clarification — every fiscal year is twelve months (2026-11-18)
+
+The owner has clarified the domain rule: **each fiscal year is exactly twelve Jalali calendar months**. This is a project-level constraint and supersedes the earlier exploratory wording in Sections 5 and 7 that allowed a short or long transition fiscal year.
+
+Consequences:
+- Every approved CompanyFiscalYear interval must represent exactly twelve consecutive Jalali calendar months. This is a calendar-month rule, not a fixed 365-day duration; leap-year day counts may differ.
+- Short/long transition fiscal years are not part of the V1 model.
+- A company-specific fiscal-year boundary may differ from Farvardin 1, but its annual intervals must still each span twelve Jalali months.
+- If a reported or official fiscal-year change appears to require a period shorter or longer than twelve months, the system must not normalize it, silently accept it, or create a short/long CompanyFiscalYear. Treat the affected calendar/report as unresolved and stop automated fiscal classification until the owner-approved policy and source evidence reconcile the apparent conflict.
+- Approved years remain immutable; the next approved year must be checked against the preceding interval. Gaps, overlaps, or a shifted boundary that cannot be reconciled as consecutive twelve-month intervals are validation failures, not automatic transition periods.
+
+This rule also means that a change in fiscal-year closing month cannot be represented by simply inserting a short/long transition year. The V1 system must fail closed on such a case rather than inventing a bridge.
+
+**Supersession:** This Section 9 supersedes any earlier statement in this report that suggested an approved short/long transition year.
