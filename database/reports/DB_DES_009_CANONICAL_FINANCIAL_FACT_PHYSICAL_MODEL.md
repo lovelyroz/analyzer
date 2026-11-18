@@ -542,3 +542,37 @@ Physical schema دقیق scope/allowed-value relations، approval workflow و ca
 4. نمونهٔ workbook دورهٔ بعد و adversarial tests در مرحلهٔ implementation لازم‌اند؛ این سند ادعای اجرای آن‌ها را ندارد.
 
 **نتیجه Gate 3:** مالکیت fact-level `duration_basis` قبلاً ACCEPTED و اسناد هماهنگ شده‌اند؛ Gate 3 در سطح logical ownership بسته است. physical constraints، metric applicability، fiscal-calendar evidence و تست‌ها همچنان implementation gates هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 20. بررسی Gate 4 — CODAL Source Revision Identity — 2026-11-18
+
+### 20.1 شواهد واقعی کد فعلی
+- `Report` فعلی `codal_tracking_id` و `source_url` دارد؛ اولی در سطح Report unique است.
+- `ReportVersion` فعلی `publication_datetime`، `version_number`، `is_restated` و `supersedes_version_id` دارد، اما source-issued revision key و source content fingerprint ندارد.
+- writer فعلی CODAL برای replay نسخه از `(codal_tracking_id, publication_datetime)` استفاده می‌کند. این قرارداد legacy است و تست موجود نسخه‌های دارای publication_datetime متفاوت را نشان می‌دهد؛ اما منبع metadata مستقل برای revision را اثبات نمی‌کند و payload متعارض با همان identity را نیز guard نمی‌کند.
+- `AcquiredSource` در مسیر PDF دارای `source_url`، `codal_tracking_id`، `content_sha256` و `source_identity` است. در local acquisition، source_identity مسیر فایل است و در URL acquisition، URL؛ هیچ‌یک به‌تنهایی source-issued revision identity نیست. Hash فعلاً فقط در acquisition محاسبه می‌شود و به ReportVersion persist نمی‌شود.
+- `CodalExtractionResult`، `codal_tracking_id` و `publication_datetime` را به‌عنوان پارامتر ورودی دریافت/منتقل می‌کند؛ در این مسیر استخراج‌شده از metadata رسمی CODAL به‌صورت مستقل اثبات نشده‌اند.
+- Excel `SourceArtifactObservation` فعلی `source_ref`، `file_name`، `format`، `sha256` و `byte_length` را مشاهده می‌کند؛ اما CODAL letter/revision identity و source publication datetime در آن وجود ندارد. Reader فعلی read-only است و این داده‌ها را از API CODAL resolve نمی‌کند.
+
+### 20.2 تفکیک سه هویت
+1. **Report identity:** هویت پایدار جریان گزارش شرکت/ReportType؛ CODAL tracking identifier می‌تواند بخشی از آن باشد، مشروط بر تأیید معنای واقعی فیلد در منبع.
+2. **ReportVersion/source revision identity:** شناسهٔ یک انتشار یا اصلاح مشخص از همان Report که باید از metadata رسمی منبع یا composite key اثبات‌شده به‌دست آید.
+3. **Source artifact fingerprint:** SHA-256 و byte length برای تشخیص یکسان/متفاوت بودن bytes فایل؛ fingerprint ابزار integrity/replay conflict است، نه جایگزین source revision identity.
+
+Filename، local path، download URL، ingestion timestamp یا SHA-256 به‌تنهایی source revision key نیستند. publication datetime نیز باید زمان انتشار منبع باشد، نه زمان دانلود/پردازش.
+
+### 20.3 قرارداد پذیرش پیشنهادی
+- اگر CODAL یک شناسهٔ رسمی و پایدار برای letter/revision منتشر می‌کند، همان شناسه با scope مناسب در ReportVersion ذخیره شود؛ نام فیلد منبع تا زمان مشاهدهٔ payload واقعی قطعی نشود.
+- اگر منبع شناسهٔ revision مستقل ندارد، فقط پس از بررسی payload واقعی و اثبات یکتایی/معنای آن می‌توان composite key مانند `(codal_tracking_id, source_publication_datetime)` را پذیرفت. این fallback هنوز برای مسیر Excel تأیید نشده است.
+- یک ReportVersion پذیرفته‌شده باید source revision key و artifact fingerprint را با هم نگه دارد.
+- همان source revision key + همان fingerprint = replay بدون تغییر.
+- همان source revision key + fingerprint متفاوت = hard conflict/quarantine؛ نه overwrite و نه ساخت نسخهٔ جدید بدون شواهد اینکه منبع واقعاً revision جدیدی منتشر کرده است.
+- source revision key جدید و معتبر = ReportVersion جدید؛ نسخهٔ قبلی و facts/provenance آن حفظ می‌شوند.
+- اگر source identity یا source publication datetime لازم ناموجود/مبهم باشد، ingestion باید fail closed کند؛ از hash یا زمان ingestion برای پر کردن آن استفاده نشود.
+
+### 20.4 شکاف شواهد و اقدام لازم
+در repository فعلی، CODAL API response/metadata contract برای Excel acquisition وجود ندارد؛ مسیر acquisition بررسی‌شده PDF-only است و Excel Reader فقط fingerprint فایل را می‌گیرد. بنابراین هنوز نمی‌توان نام فیلدهای واقعی CODAL، scope یکتایی آن‌ها یا رفتارشان در correction/restatement را تعیین کرد.
+
+برای بستن این gate باید metadata واقعی یک یا چند گزارش Excel از CODAL (یا پاسخ رسمی endpoint/download manifest که فایل از آن دریافت می‌شود) بررسی شود؛ حداقل یک گزارش اصلی و یک نسخهٔ اصلاحی/بازانتشارشده لازم است تا تفاوت Report identity، revision identity، publication time و file fingerprint قابل مشاهده باشد. اگر نمونهٔ اصلاحی در دسترس نیست، gate تا دریافت شواهد باز می‌ماند.
+
+**نتیجه Gate 4:** قرارداد منطقی تفکیک Report identity، source revision identity و artifact fingerprint تعیین شد؛ اما source-issued key و metadata واقعی مسیر Excel هنوز اثبات نشده است. Gate 4 **OPEN / EVIDENCE BLOCKED** است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
