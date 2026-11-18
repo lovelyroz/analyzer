@@ -1581,3 +1581,26 @@ python src/scripts/audit_codal_fiscal_year_metadata.py
 8. مقایسه با یک فایل مستقل از دوره بعد پارسیان برای drift validation.
 
 **وضعیت:** DB-DES-013 به‌عنوان قرارداد طراحی ثبت شد؛ DB-ING-006 / Task 033 همچنان PARTIAL است. این تغییر فقط مستندات است؛ ORM، Migration، runtime code، دیتابیس و تست‌ها تغییر نکردند. تا بسته‌شدن گیت‌ها، Matcher production، Template production و ingestion مجاز نیستند.
+
+
+### 8.67 DB-DES-014 — Hierarchical Header and Semantic Column Mapping Contract (2026-11-18)
+
+**Document:** `database/reports/DB_DES_014_HIERARCHICAL_HEADER_AND_SEMANTIC_COLUMN_MAPPING.md`  
+**Commit:** `b0ddb11754aabc46972dff06d1dcc48cbbf9c216`
+
+DB-DES-014 defines the logical contract for interpreting multi-level Excel headers and mapping row/column intersections to canonical FinancialFacts. It preserves the separation already required by DB-DES-008:
+
+- Header definitions preserve ordered levels, exact source ranges, merged-cell geometry, and a resolved full path for each ColumnSlot. Flattened header text alone is not a unique identity.
+- Blank header cells are not forward-filled unless a deterministic approved structural rule (such as an actual merged range) establishes their meaning.
+- Duplicate leaf labels are acceptable only when full paths/context distinguish them and each resolves uniquely.
+- Matching uses finite deterministic normalization and explicitly approved versioned aliases; no fuzzy matching or inferred synonyms.
+- Semantic mapping uses the complete context: report/template scope, layout node, full column Header path, row-axis path, and required qualifiers. A ColumnSlot or row label alone is not a FinancialMetric.
+- Header INHERIT remains valid only when the complete column meaning/order/unit/scale/temporal/scenario interpretation is unchanged. Otherwise the child uses a complete OWN definition. Extraction-span ownership remains exclusive and independent.
+- Temporal mapping follows DB-DES-011: actual Jalali interval is distinct from fact-level YTD/STANDALONE basis; publication cadence or quarter labels alone do not establish basis.
+- Units, currency, scale, measurement basis, dimensions, scenario, and value semantics must be explicit. Unknown or ambiguous in-scope mapping rejects the whole report.
+- Approved semantic mapping versions are immutable and bound through the ReportVersion's approved interpretation-standard provenance.
+- The bank-specific Header dictionary decision remains bank-scoped; DB-DES-014 does not extend it to other industries.
+
+**Evidence limits:** No actual Parsian Header/metric mapping is approved by this document. Candidate bounds, 15 provisional child Header inheritances, and annotation inventory remain unapproved; an independent later-period workbook and owner-approved Header/row-axis inventory are still required.
+
+**Status:** DB-DES-014 is a design proposal only. It does not close DB-ING-006 / Task 033 and authorizes no ORM, migration, runtime, database, or test changes.
