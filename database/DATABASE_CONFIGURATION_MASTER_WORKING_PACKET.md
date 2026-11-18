@@ -1856,3 +1856,18 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 **محدودیت:** Parsian coordinates و row-axis فعلی هنوز candidate/provisional هستند و workbook مستقل دورهٔ بعد برای drift validation در این بررسی وجود نداشت. پیش از تصویب physical schema باید یک جدول در دو workbook مستقل، همراه یک direct و یک multi-input fact، بدون cell-coordinate identity دائمی اثبات شود.
 
 **وضعیت Gate 7:** physical proposal مشخص‌تر شد، اما evidence validation و نمونه‌های پذیرش هنوز باز هستند؛ Gate 7 همچنان PARTIAL / OPEN است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 22 گزارش DB-DES-009 ثبت شده است.
+
+
+### 8.83 تکمیل شواهد CODAL برای Gate 4 و کشف ریسک Report identity — 2026-11-18
+
+بررسی دو مرجع فنی عمومیِ غیررسمی دربارهٔ Search API کدال نشان داد پاسخ filing معمولاً شامل `TracingNo` عددی، `Url` دارای `LetterSerial`، `PublishDateTime`، `SentDateTime`، `Title`، `LetterCode` و `ExcelUrl` است. در این منابع `TracingNo` و `LetterSerial` شناسه‌های یکتای filing معرفی شده‌اند؛ LetterSerial کلید دسترسی مستقیم به Excel است. منابع:
+- https://github.com/amirziveh/codal-skill/blob/master/SKILL.md
+- https://mohsenebrahimyir.github.io/codal-tsetmc/codal.html
+
+این‌ها منابع reverse-engineered و غیررسمی‌اند؛ باید payload واقعی CODAL و یک زوج original/correction بررسی شود.
+
+**توصیه به‌روزشده:** `LetterSerial` candidate اصلی `source_revision_key` و `TracingNo` شناسهٔ عددی cross-reference باشد؛ `PublishDateTime` و در صورت نیاز `SentDateTime` از metadata منبع حفظ شوند. SHA-256 فقط fingerprint فایل باقی می‌ماند. رفتار correction و رابطهٔ filing جدید با filing قبلی هنوز اثبات نشده است.
+
+**ریسک مدل فعلی:** `Report.codal_tracking_id` در مدل فعلی unique است و writer از آن برای grouping چند ReportVersion استفاده می‌کند. اگر مقدار آن همان TracingNo باشد، چون TracingNo شناسهٔ هر filing است، برای هویت پایدار Report stream مناسب نیست. باید قبل از تغییر schema مشخص شود این فیلد دقیقاً از کدام فیلد CODAL پر می‌شود و CODAL چگونه اصلاحیه را به گزارش قبلی مرتبط می‌کند. هیچ Report identity composite یا حدسی در این مرحله تعریف نمی‌شود.
+
+**وضعیت Gate 4:** PARTIAL — candidate source fields شناسایی شدند، اما original/correction relationship و معنای `codal_tracking_id` هنوز نیازمند payload واقعی‌اند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 23 گزارش DB-DES-009 ثبت شده است.
