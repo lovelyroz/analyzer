@@ -66,3 +66,6 @@
 
 - [DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md](reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md) — تفکیک اولیه اجزای PDF-only از persistence مشترک، FKهای legacy، تست‌ها و inventory محلی در انتظار اجرا.
 - اسکریپت read-only: `src/scripts/audit_codal_pdf_dependencies.py`.
+
+
+- [DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md](reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md) — ممیزی مسیر PDF تکمیل‌شده با inventory محلی؛ تفکیک PDF-only از قراردادهای legacy و schema.
