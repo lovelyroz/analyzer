@@ -1889,3 +1889,12 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 **محدودیت:** GitHub code search در این نوبت callerهای کامل را برنگرداند؛ بنابراین فهرست call-siteها هنوز بسته نشده است. بررسی static/read-only بود؛ تست یا تغییر کد/مدل/schema/migration/DB انجام نشد.
 
 **وضعیت Gate 5:** OPEN — وابستگی مستقیم writer و مدل ثبت شد؛ inventory تمام call-siteها و تصمیم نهایی دربارهٔ نقش ستون هنوز باقی است.
+
+
+## 8.85 تکمیل inventory ایستا برای Gate 5 — 2026-11-18
+
+خروجی جست‌وجوی PowerShell در تمام فایل‌های Python repository (به‌استثنای .git، محیط‌های مجازی و __pycache__) بررسی شد. writer مرکزی src/ingestion/service.py::ingest_codal_report است؛ facade در src/ingestion/codal/ingestion.py و pipelineهای PDF در src/ingestion/codal/pipeline.py به آن متصل‌اند. packageها این APIها را export می‌کنند. ارجاع‌های تستی نیز قرارداد فعلی را پوشش می‌دهند.
+
+کاربردهای financial_period_id در src/evaluation مربوط به دورهٔ observation/evaluation هستند و نباید بدون اثبات رابطه، مصرف ستون Report.financial_period_id شمرده شوند. در محدودهٔ فایل‌های Python بررسی‌شده، مصرف‌کنندهٔ تولیدی مستقلی برای ستون Report جدا از writer legacy احراز نشد؛ اما این نتیجه شامل فایل‌های غیر Python، کد بیرون repository یا فراخوانی پویا نیست.
+
+**نتیجه:** ستون Report.financial_period_id و قرارداد writer legacy فعلاً حفظ می‌شوند. writer جدید Excel باید period را در سطح هر observation/fact تعیین کند. نقش نهایی ستون Report و تصمیم nullable/remove هنوز باز است و به بررسی وابستگی‌های باقیمانده و طرح بازنشستگی legacy موکول می‌شود. این بررسی read-only بود؛ تست یا تغییر کد/مدل/schema/migration/DB انجام نشد.
