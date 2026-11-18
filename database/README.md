@@ -60,3 +60,9 @@
 - [DB_AUD_010_RUNTIME_SQLITE_MIGRATION_RECONCILIATION.md](reports/DB_AUD_010_RUNTIME_SQLITE_MIGRATION_RECONCILIATION.md) — مغایرت Migration 9 دیتابیس محلی با runner فعلی مخزن.
 - [DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md](reports/DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md) — ممیزی پنج فیلد provenance قدیمی، ارجاعات ORM/کد و تصمیم موقت حفظ داده‌ها.
 - [DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md](reports/DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md) — ارزیابی پنج فیلد provenance قدیمی، وابستگی‌های downstream و مسیر persistence فعلی.
+
+
+## ممیزی مسیر PDF در CODAL
+
+- [DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md](reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md) — تفکیک اولیه اجزای PDF-only از persistence مشترک، FKهای legacy، تست‌ها و inventory محلی در انتظار اجرا.
+- اسکریپت read-only: `src/scripts/audit_codal_pdf_dependencies.py`.
