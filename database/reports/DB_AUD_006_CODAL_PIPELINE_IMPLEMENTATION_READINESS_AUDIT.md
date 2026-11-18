@@ -373,3 +373,22 @@ DB-AUD-006 در این نوبت **PARTIAL** باقی می‌ماند. این م�
 **تصمیم فعلی بدون تغییر:** ستون و قرارداد legacy دست‌نخورده می‌مانند. طراحی writer اکسل باید period هر observation/fact را مستقل تعیین کند و نباید period واحد Report را به همهٔ factها تعمیم دهد. تعیین نقش نهایی ستون Report و هرگونه nullable/remove فقط پس از بررسی وابستگی‌های باقی‌مانده و طراحی coexistence/retirement انجام می‌شود.
 
 این گام فقط جست‌وجو و بازبینی ایستا بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+
+
+## 16. بررسی ایستای فایل‌های غیر Python برای Gate 5 — 2026-11-19
+
+کاربر جست‌وجوی repository-wide را در فایل‌های غیر Python شامل SQL، Markdown، اسکریپت‌ها و فایل‌های پیکربندی اجرا و خروجی را در `reply.md` ثبت کرد. الگوی جست‌وجو شامل `financial_period_id`، `reports.financial_period_id`، `financial_periods` و نام writerها و loaderهای قدیمی CODAL بود.
+
+نتیجهٔ تفکیک مسیرهای منطبق:
+- مسیرهای منطبقِ غیر Python که در خروجی قابل شناسایی بودند، همگی مستندات Markdown بودند: گزارش‌های DB-AUD/DB-DES/DB-PLAN/DB-STD، Master Working Packet، مستندات Stage، دستورالعمل handoff و implementation status.
+- هیچ فایل SQL یا اسکریپت اجرایی غیر Python در فهرست مسیرهای منطبق مشاهده نشد.
+- ارجاع‌های مستنداتی به `financial_period_id`، `ingest_codal_report` و `financial_periods` توصیف قراردادها و تصمیم‌های معماری‌اند و به‌تنهایی مصرف‌کنندهٔ اجرایی ستون `reports.financial_period_id` محسوب نمی‌شوند.
+- اسناد معماری هدف، از جمله `DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md` و `12_Database_Architecture_V1.1.md`، period در سطح Fact را مرجع دورهٔ مقدار می‌دانند و period در سطح Report را metadata توصیفی/اصلی تلقی می‌کنند؛ این تصمیم طراحی، وابستگی writer legacy موجود را حذف نمی‌کند.
+
+محدودیت مهم خروجی: دستور جست‌وجو فایل مقصد `reply.md` را از دامنهٔ جست‌وجو خارج نکرده بود؛ بنابراین بخشی از خروجی شامل بازجست‌وجوی محتوای قبلی و تکرار نتایج است. مسیرهای تکراری `reply.md` به‌عنوان شاهد مستقل شمرده نشدند. این ممیزی فقط static search در working tree و فایل‌های متنیِ مشمول الگوی دستور است و فراخوانی پویا، فایل‌های خارج از repository، داده‌های runtime یا مصرف‌کنندگان بیرونی را اثباتاً پوشش نمی‌دهد.
+
+### نتیجهٔ Gate 5 پس از بررسی غیر Python
+
+در شواهد فعلی، مصرف‌کنندهٔ اجرایی مستقل دیگری برای ستون `Report.financial_period_id` از فایل‌های غیر Python احراز نشد؛ شواهد اجرایی مستقیم همچنان به writer قدیمی CODAL و facade/pipelineهای متصل به آن محدود است. این نتیجه، به‌معنای اثبات نبود هرگونه مصرف‌کننده در تمام محیط‌ها نیست.
+
+**تصمیم بدون تغییر:** ستون و قرارداد legacy فعلاً حفظ می‌شوند. writer جدید Excel باید دوره را برای هر observation/fact تعیین کند. nullable/remove یا تغییر نقش ستون Report تا تکمیل بررسی callerهای بیرونی و طرح coexistence/retirement مجاز نیست. این گام read-only بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
