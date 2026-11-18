@@ -1723,3 +1723,21 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 **محدودیت:** این بررسی، فایل‌های مشخص‌شده و خروجی جست‌وجوی محلی را پوشش می‌دهد؛ callهای پویا، reflection، entrypointهای بیرون از `src/` و تمام SQLهای خارج از الگو را نفی نمی‌کند. پس gate به‌صورت bounded/conditional ثبت می‌شود، نه اثبات کامل repository-wide. هنوز migration، nullable change، backfill یا تغییر ORM تصویب/اجرا نشده است.
 
 هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد. جزئیات و شواهد در بخش 14 گزارش DB-AUD-006 ثبت شده است.
+
+
+### 8.74 ارزیابی Gate 6 از DB-DES-009 — تضمین سازگاری شرکت با SQLite — 2026-11-18
+
+فایل‌های بررسی‌شده: `src/models/entity.py`، `src/models/period.py`، `src/models/report.py`، `src/models/normalized.py`، `src/core/database.py`، `src/migrations/runner.py`، `src/tests/test_stage1_database_integrity.py` و گزارش فیزیکی DB-DES-009.
+
+**وضعیت فعلی:**
+- Company از FinancialPeriod و Report قابل دسترسی است؛ ReportVersion از طریق Report به Company می‌رسد.
+- FKهای سادهٔ موجود، تطابق شرکت ReportVersion با FinancialPeriod را تضمین نمی‌کنند. writer فعلی CODAL فقط در لایهٔ Python بخشی از این سازگاری را کنترل می‌کند.
+- مدل پیشنهادی `financial_facts` company_id تکراری ندارد و شرکت را از مسیر ReportVersion/Report به‌دست می‌آورد.
+- Composite FK در ساختار فعلی مستلزم denormalization یا تغییر چند parent key است؛ صرف افزودن یک FK مرکب به مدل فعلی کافی نیست.
+- Migration runner از SQL خام پشتیبانی می‌کند و می‌تواند DDL trigger را اجرا کند. Engine اصلی پروژه PRAGMA foreign_keys را در connect event روشن می‌کند؛ engineهای مستقل تست این listener را به ارث نمی‌برند و باید صریحاً تنظیم شوند.
+
+**توصیهٔ معماری:** برای `financial_facts` جدید، company_id را تکرار نکنیم. تطابق شرکت را با SQLite BEFORE INSERT و BEFORE UPDATE trigger روی Fact، به‌علاوه service validation enforce کنیم. برای جلوگیری از خراب شدن invariant پس از ثبت Fact، تغییر `reports.company_id`، `report_versions.report_id` و `financial_periods.company_id` تا وقتی Fact وابسته وجود دارد باید ممنوع باشد. اگر `Report.financial_period_id` به‌صورت optional metadata باقی ماند، در صورت non-NULL بودن تطابق شرکت آن نیز کنترل شود.
+
+**شرط‌های پذیرش قبل از اجرا:** audit read-only mismatchهای دادهٔ موجود؛ migration additive و idempotent؛ تست معتبر و ناسازگار برای INSERT/UPDATE و تغییر هویت والد؛ و فعال بودن PRAGMA foreign_keys روی هر connection تست و production. trigger جدید دادهٔ ناسازگار قبلی را اصلاح نمی‌کند و نباید بدون audit روی legacy tables نصب شود.
+
+**وضعیت Gate 6:** تصمیم طراحی Trigger + Service Validation انتخاب شد؛ gate انتخاب معماری بسته است. پیاده‌سازی، migration، ORM، audit دیتابیس مقصد و تست پذیرش باز هستند و هنوز مجوز اجرا ندارند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 14 گزارش DB-DES-009 آمده است.
