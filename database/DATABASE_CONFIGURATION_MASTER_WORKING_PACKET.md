@@ -1157,3 +1157,22 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **وضعیت:** ممیزی source در GitHub انجام شد؛ inventory کامل local PENDING؛ مسیر PDF PRESENT؛ بازنشستگی مسیر PDF و جدول RawFinancialFact هنوز انجام نشده؛ هیچ ORM، Migration، داده یا تستی تغییر نکرده و تستی اجرا نشده است. مغایرت Migration 9 نیز OPEN باقی می‌ماند.
 
 **گام بعدی:** مالک اسکریپت inventory را اجرا و `reply.md` را به‌روزرسانی کند؛ سپس تمام callerها و importهای کشف‌شده طبقه‌بندی و طرح بازنشستگی مرحله‌ای تهیه شود. هیچ حذف کدی تا آن زمان انجام نشود.
+
+
+### 8.46 تکمیل inventory وابستگی PDF در working tree — DB-AUD-012 — 2026-11-18
+
+مالک اسکریپت `src/scripts/audit_codal_pdf_dependencies.py` را اجرا کرد. خروجی `reply.md`: 5,611 فایل متنی/کد اسکن‌شده، 26 فایل دارای تطبیق، 131 خط در production source، 121 خط در tests و 24 خط در scripts. دیتابیس باز نشده، source تغییر نکرده و تستی اجرا نشده است. شمارش خطوط خام است و comment/docstringها را نیز ممکن است شامل شود.
+
+**طبقه‌بندی نهایی:**
+- PDF-only: acquisition، pdf_extract، adapter، pipeline، parser مبتنی بر pypdf و facade استخراج PDF.
+- CODAL legacy: validator و numbers برای قرارداد RawLine و متن/عدد متنی؛ این اجزا را نباید به Reader جدید Excel تحمیل کرد.
+- Shared: `service.py` شامل RawFinancialFact persistence در کنار FX/OHLC است؛ فقط بخش CODAL legacy قابل بررسی است، نه کل فایل.
+- Schema/bootstrap: RawFinancialFact و FKهایش در مدل‌ها، `migrations/runner.py` و `scripts/init_db.py` حضور دارند.
+- Public API: `src/ingestion/__init__.py` و `src/ingestion/codal/__init__.py` exportهای legacy دارند.
+- PDF tests باید از تست‌های مدل/Schema جدا شوند. تست‌های Stage1 و تست Stage5 علاوه بر مسیر legacy، قرارداد FK، حفظ داده و عدم تغییر ورودی‌ها را بررسی می‌کنند؛ حذف یک‌جای آن‌ها مجاز نیست.
+
+**تصمیم معماری:** بازنشستگی PDF extraction/acquisition از بازنشستگی RawFinancialFact/schema جداست. صفر بودن ارجاعات در snapshot فعلی دیتابیس، دلیل کافی برای حذف مدل/جدول/FK نیست. مسیر PDF فعلاً حذف نمی‌شود تا طرح مرحله‌ای و تغییرات caller/API/test مشخص شوند. مسیر Excel-to-canonical production نیز هنوز احراز نشده است.
+
+**وضعیت:** inventory محلی COMPLETE؛ مرز اجزا IDENTIFIED؛ بازنشستگی PDF NOT IMPLEMENTED؛ بازنشستگی RawFinancialFact NOT AUTHORIZED؛ Migration 9 reconciliation OPEN؛ هیچ کد، ORM، Migration یا داده تغییر نکرده و هیچ تستی اجرا نشده است.
+
+**گام بعدی:** تهیه طرح اجرایی محدود برای بازنشستگی PDF بدون حذف RawFinancialFact، FKها، persistence FX/OHLC یا قراردادهای دیگر؛ اجرای کد تنها پس از تأیید دامنه.
