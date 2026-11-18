@@ -1,6 +1,6 @@
 # DB-DES-012 — Temporal Contract Reconciliation Audit
 
-**Status:** RECONCILIATION AUDIT COMPLETE — proposed amendments identified; owner/architecture approval and source-evidence gates remain open  
+**Status:** RECONCILIATION AUDIT COMPLETE — fact-level duration_basis decision accepted and coordinated document amendments applied; source-evidence and implementation gates remain open  
 **Date:** 2026-11-18  
 **Scope:** Reconcile normative Architecture V1.3, DB-DES-003, DB-DES-009, DB-DES-010 and DB-DES-011 before ORM/migration  
 **No implementation:** no ORM, migration, runtime code, database rows, or tests changed.
@@ -14,7 +14,7 @@ The four supporting design documents are broadly aligned on the business rules, 
 - DB-DES-010 requires every duration observation to expose a `duration_basis`.
 - DB-DES-011 recommends `duration_basis` on FinancialFact, because a shared FinancialPeriod identifies actual dates/shape and must not carry a value-specific accumulation meaning.
 
-**Recommended resolution:** approve DB-DES-011's ownership model. FinancialPeriod stores actual Jalali interval and temporal kind; FinancialFact stores the value's duration basis. Then amend Architecture V1.3, DB-DES-003, DB-DES-009 and DB-DES-010 consistently. Until that approval and source-evidence review, none of the documents should be treated as implementation-ready physical schema.
+**Decision applied:** YTD/standalone belongs to each applicable FinancialFact as `duration_basis`; FinancialPeriod stores only actual Jalali interval, temporal kind and period classification. Architecture V1.3, DB-DES-003, DB-DES-009, DB-DES-010 and DB-DES-011 were amended in a coordinated documentation sequence. The amendments resolve ownership, but do not make the physical schema implementation-ready: source-evidence and fiscal-calendar gates remain open.
 
 ## 2. Normative hierarchy and change control
 
@@ -24,7 +24,7 @@ Architecture V1.3 explicitly states that it is the normative architecture entry 
 - DB-DES-003 remains PARTIAL and is a supporting logical contract.
 - DB-DES-009 and DB-DES-010 remain physical/query proposals, not implementation authorization.
 
-The safe order is: owner accepts the temporal ownership change → Architecture and supporting contracts are amended together → remaining source-evidence and Migration 9 gates are closed → only then physical ORM/migration design can proceed.
+The sequence completed for this decision is: technical ownership rule selected → Architecture and supporting contracts amended together. Remaining source-evidence, fiscal-calendar and Migration 9 gates must close before physical ORM/migration design can proceed.
 
 ## 3. Reconciliation matrix
 
@@ -33,7 +33,7 @@ The safe order is: owner accepts the temporal ownership change → Architecture 
 | Calendar authority | Jalali | Jalali | Jalali redesign | Jalali ordering | Jalali | Consistent; Jalali components are authoritative |
 | Actual period identity | Company + shape + exact dates | Same | Jalali period FK | Period series by Jalali dates | Company + kind + exact dates | Consistent |
 | INSTANT/DURATION | Both required | Both required | Both required | Metric-specific expected kind | Both required | Consistent |
-| YTD ownership | FinancialPeriod `is_ytd` | FinancialPeriod `is_ytd` | Explicitly unresolved | Fact-level duration_basis needed | FinancialFact duration_basis | **Conflict; recommend fact-level** |
+| YTD ownership | FinancialPeriod `is_ytd` | FinancialPeriod `is_ytd` | Explicitly unresolved | Fact-level duration_basis needed | FinancialFact duration_basis | **RESOLVED: fact-level duration_basis** |
 | Standalone source | Explicitly reported standalone may be stored | Same | Needs fact-level temporal interpretation | Comparable standalone inputs | STANDALONE basis | Consistent after ownership change |
 | Standalone derived from YTD | Runtime only | Runtime only | Runtime-only calculations | Runtime-only | Runtime-only | Consistent |
 | TTM | Runtime only, not source period | Same | Not source period | Query/analytical window | Runtime only | Consistent |
@@ -159,16 +159,15 @@ Do not perform partial edits that leave Architecture and supporting documents co
 
 ## 11. Remaining gates before implementation
 
-1. Owner acceptance of fact-level `duration_basis` (this changes an approved Architecture contract).
-2. Source-evidence check for irregular/non-whole-month DURATION intervals and months_length constraint.
-3. Identify authoritative fiscal-calendar source and lifecycle.
-4. Decide physical representation of PRIMARY/COMPARATIVE/UNKNOWN role, if retained.
-5. Resolve Migration 9 lineage discrepancy (local DB has migration 9; repository runner previously showed only 1–8).
-6. Validate temporal headers and dates against a later-period workbook from a company already represented by an approved template.
-7. Specify adversarial tests: non-calendar fiscal year, same period with different value bases, Q4/full-year, comparative period published in a later ReportVersion, PIT restatement, instant/flow mismatch, irregular interval and incomplete YTD differencing chain.
+1. Source-evidence check for irregular/non-whole-month DURATION intervals and months_length constraint.
+2. Identify authoritative fiscal-calendar source and lifecycle.
+3. Decide physical representation of PRIMARY/COMPARATIVE/UNKNOWN role, if retained.
+4. Resolve Migration 9 lineage discrepancy (local DB has migration 9; repository runner previously showed only 1–8).
+5. Validate temporal headers and dates against a later-period workbook from a company already represented by an approved template.
+6. Specify adversarial tests: non-calendar fiscal year, same period with different value bases, Q4/full-year, comparative period published in a later ReportVersion, PIT restatement, instant/flow mismatch, irregular interval and incomplete YTD differencing chain.
 
 Until these gates are met, no ORM, migration, data migration, destructive legacy cleanup, or production PDF retirement is authorized.
 
 ## 12. Status
 
-The reconciliation audit is complete and the proposed amendment set is explicit. Architecture and supporting contracts are not yet fully reconciled; DB-DES-003 remains PARTIAL. No code, ORM, migration, database rows, or tests changed.
+The reconciliation audit is complete and the fact-level duration_basis decision has been applied consistently to Architecture and supporting contracts. DB-DES-003 remains PARTIAL because fiscal-calendar, irregular interval, comparative-role and source-evidence gates remain open. No code, ORM, migration, database rows, or tests changed.
