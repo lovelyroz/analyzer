@@ -519,3 +519,26 @@ Bundle باید مجموعه‌ای از rule/version referenceها باشد، �
 Physical schema دقیق scope/allowed-value relations، approval workflow و canonical DimensionSet serialization هنوز باید طراحی شود. هیچ catalog یا Dimension واقعی از روی نمونه‌های ناقص فعلی به‌صورت production ساخته نمی‌شود.
 
 **وضعیت Gate 2:** در سطح logical scope/versioning بسته شد؛ physical schema و approval workflow باز هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 19. تطبیق Gate 3 با تصمیم پذیرفته‌شدهٔ DB-DES-011 — Temporal Basis در سطح Fact — 2026-11-18
+
+بازخوانی DB-DES-011 و DB-AUD-016 نشان می‌دهد مالکیت temporal basis قبلاً به‌صورت هماهنگ در Architecture V1.3، DB-DES-003، DB-DES-009، DB-DES-010 و DB-DES-011 حل شده است؛ این gate نباید دوباره به‌عنوان تصمیم باز مطرح شود.
+
+**قاعدهٔ قطعی طراحی:**
+- FinancialPeriod فقط هویت بازه/لحظهٔ واقعی را نگه می‌دارد: شرکت، INSTANT/DURATION و تاریخ‌های دقیق جلالی.
+- `duration_basis` متعلق به هر FinancialFact از نوع DURATION است و در موارد قابل‌اعمال باید صریحاً `YTD` یا `STANDALONE` باشد.
+- برای INSTANT، duration_basis برابر NULL/NOT_APPLICABLE است؛ FALSE یا STANDALONE ساختگی ثبت نمی‌شود.
+- YTD از ابتدای واقعی سال مالی شرکت تا پایان دوره است؛ سال مالی در دامنهٔ پروژه ۱۲ ماه متوالی دارد، اما ماه شروع آن نباید بدون مدرک به ماه ۱ فرض شود.
+- Standalone فقط وقتی Fact منبع است که منبع آن را گزارش کرده باشد؛ تفاضل YTD برای ساخت standalone فقط محاسبهٔ runtime است و persist نمی‌شود.
+- TTM دورهٔ منبع نیست و runtime-only باقی می‌ماند.
+- Metric definition/binding باید temporal kindهای مجاز و basisهای مجاز/الزامی خود را مشخص کند. Stock با INSTANT و Flow با DURATION سازگار می‌شود؛ Rate/Ratio طبق معنای منبع تعیین می‌شود و default عمومی ندارد.
+- دوره و basis نامشخص یا متعارض، پذیرش کل واحد ingestion را متوقف می‌کند؛ هیچ دوره یا YTD حدس زده نمی‌شود.
+
+**باقی‌ماندهٔ فنی، نه ابهام مالکیت:**
+1. physical schema باید قید کند duration_basis برای INSTANT فقط NULL و برای DURATIONهای نیازمند basis فقط YTD/STANDALONE باشد؛ applicability نهایی با Metric binding اعتبارسنجی شود.
+2. `months_length` برای INSTANT صفر است؛ برای DURATION فقط طول دقیق ماه تقویمی ثبت می‌شود و در بازهٔ نامنظم می‌تواند NULL باشد، مشروط به شواهد V1 و پشتیبانی query.
+3. منبع authoritative تاریخ شروع سال مالی هر شرکت و fiscal-calendar lifecycle باید از شواهد/تنظیمات مصوب تعیین شود. سال مالی ۱۲ ماهه است، اما start month ممکن است شرکت‌به‌شرکت متفاوت باشد.
+4. نمونهٔ workbook دورهٔ بعد و adversarial tests در مرحلهٔ implementation لازم‌اند؛ این سند ادعای اجرای آن‌ها را ندارد.
+
+**نتیجه Gate 3:** مالکیت fact-level `duration_basis` قبلاً ACCEPTED و اسناد هماهنگ شده‌اند؛ Gate 3 در سطح logical ownership بسته است. physical constraints، metric applicability، fiscal-calendar evidence و تست‌ها همچنان implementation gates هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
