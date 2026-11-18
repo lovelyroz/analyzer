@@ -1953,3 +1953,17 @@ Reader باید read-only بماند. لایهٔ Template resolution، semantic 
 - ابهام‌های مالک دربارهٔ ستون‌های خارج border، U01، Sheet1 و موارد دیگر باز می‌مانند؛ هیچ heuristic جای تصمیم صریح را نمی‌گیرد.
 
 جزئیات و اثر بر مدل فیزیکی در DB-DES-009 بخش 23 ثبت شد. نتیجه: direct mapping از نظر ساختار مستند شد؛ Gate 7 همچنان PARTIAL/OPEN و طرح فیزیکی هنوز PROPOSED است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 8.90 قرارداد شناسایی Template در V1 بر اساس Parsian — 2026-11-19
+
+در DB-DES-009 بخش 24، قرارداد V1 برای تفکیک Candidate Discovery، Template Resolution و Semantic Interpretation ثبت شد.
+
+- T01 در محدودهٔ A10:D42 نمونهٔ ساختاری direct mapping است: RowAxis hierarchy از marker/labelها، HeaderPath چندسطحی برای B و D، ستون C صریحاً excluded و E خارج از محدودهٔ فعلی. این نمونه هنوز معادل Template تولیدی مصوب یا persistence نیست.
+- T03 فقط بخشی قابل‌مدل‌سازی دارد؛ A96 و A108 گروه‌های روشن‌اند، ولی span گروه A81 به‌دلیل A95 آبی ambiguous و mapping وابسته به آن BLOCK است.
+- Gray blank فقط داخل value slot مصوب، طبق Rule 7 مالک، صفر است؛ blankهای دیگر یا سلول غایب به صفر تعمیم داده نمی‌شوند.
+- T04/T06/T08/T13/T17/T02 و U01/Sheet1 طبق جزئیات بخش 24 دارای استثنا یا ابهام‌اند. ستون‌های Blue خارج border در scope فعلی وارد استخراج نمی‌شوند؛ این به معنی تعیین نیت نهایی مالک نیست.
+- چند ستون با HeaderPath/period/status متفاوت Factهای مستقل هستند؛ Parsian هنوز Multi-input Fact را اثبات نمی‌کند.
+- Resolver باید exact/versioned و fail-closed باشد؛ fuzzy mapping، سلول خارج از scope و ساختار ناشناخته حق ingest ندارند.
+
+**نتیجه:** قرارداد طراحی PROPOSED است؛ Gate 7 همچنان PARTIAL/OPEN و physical design همچنان PROPOSED. برای عبور، تصمیم صریح مالک دربارهٔ ambiguityهای مؤثر، آزمون workbook مستقل، fixture direct end-to-end، تعیین تکلیف multi-input و reconciliation با متن کامل DB-DES-008/014 لازم است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
