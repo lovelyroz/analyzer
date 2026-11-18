@@ -6,7 +6,7 @@
 
 ## Migration ledger
 
-- version=9; name=codal_excel_source_metadata; applied_at=2026-11-07 11:15:36.865524
+No version 9 row exists.
 
 ## raw_financial_facts schema
 
@@ -24,8 +24,6 @@ CREATE TABLE raw_financial_facts (
 	source_section VARCHAR(150), 
 	source_row INTEGER, 
 	source_column VARCHAR(100), 
-	source_sheet VARCHAR(150), 
-	source_column_header VARCHAR(300), 
 	PRIMARY KEY (raw_fact_id), 
 	FOREIGN KEY(company_id) REFERENCES companies (company_id), 
 	FOREIGN KEY(report_version_id) REFERENCES report_versions (report_version_id), 
@@ -47,18 +45,16 @@ CREATE TABLE raw_financial_facts (
 | 9 | source_section | VARCHAR(150) | 0 | None | 0 |
 | 10 | source_row | INTEGER | 0 | None | 0 |
 | 11 | source_column | VARCHAR(100) | 0 | None | 0 |
-| 12 | source_sheet | VARCHAR(150) | 0 | None | 0 |
-| 13 | source_column_header | VARCHAR(300) | 0 | None | 0 |
 
 ### ORM comparison
 
-- Columns in database but not in current RawFinancialFact ORM model: source_column_header, source_sheet
+- Columns in database but not in current RawFinancialFact ORM model: (none)
 - Columns in current ORM model but absent from database: (none)
 
 ### Target-column population (counts only; no values exposed)
 
-- source_sheet: total_rows=505; non_null=505; distinct_non_null=1
-- source_column_header: total_rows=505; non_null=505; distinct_non_null=23
+- source_sheet: column absent
+- source_column_header: column absent
 
 ### Indexes
 
