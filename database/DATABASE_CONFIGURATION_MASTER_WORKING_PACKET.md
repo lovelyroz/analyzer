@@ -1770,3 +1770,21 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 اگر workbook واقعاً چند report family مستقل را در یک واحد انتشار ترکیب کند، در V1 نباید چند binding را روی یک ReportVersion مخلوط کنیم؛ تا تعریف قرارداد و شواهد واقعی، ورودی باید reject/quarantine یا به واحدهای گزارش مستقل تفکیک شود. بازپردازش با template/standard متفاوت نیز نباید نسخهٔ پذیرفته‌شده را overwrite کند و به مسیر reclassification کنترل‌شده نیاز دارد.
 
 **وضعیت Gate 8:** در سطح logical design بسته شد. Physical binding، ReportType catalog و محتوای دقیق Interpretation Bundle هنوز جزو طراحی physical schema و gateهای بعدی هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 16 گزارش DB-DES-009 ثبت شده است.
+
+
+### 8.77 تعریف Interpretation Standard Bundle و بستن منطقی Gate 1 از DB-DES-009 — 2026-11-18
+
+بررسی Architecture V1.1، DB-DES-008، DB-DES-014، DB-DES-003 و DB-DES-009 نشان داد باید این نسخه‌ها از هم جدا بمانند:
+- TemplateVersion = ساختار فیزیکی workbook؛
+- InterpretationStandardVersion = معنای مالی و قواعد تفسیر row/column؛
+- Reader/adapter/profile/DTO version = نسخهٔ اجرای ingestion و operational provenance؛
+- source fingerprint/revision/publication = هویت منبع و ReportVersion؛
+- FinancialMetric = هویت پایدار Metric که استاندارد به آن ارجاع می‌دهد.
+
+**تعریف Bundle:** شامل scope صنعت و report family، semantic mappingهای کامل row-axis + Header path، temporal interpretation جلالی و PRIMARY/COMPARATIVE و YTD/STANDALONE، reference نسخه‌دار Dimension catalog، unit/measurement-basis rules، value-state/blank/zero rules، alias و normalizationهای مصوب و metadata تأیید/immutability است. Bundle چند mapping/catalog rule version را بسته‌بندی می‌کند؛ ReportVersion فقط یک Bundle را reference می‌کند.
+
+**Scope فیزیکی پیشنهادی:** هر InterpretationStandardVersion به یک TemplateVersion دقیق متصل باشد؛ کلید نسخه در scope همان template با unique `(template_version_id, version_number)`. ReportVersion هر دو binding را نگه می‌دارد و DB باید ثابت کند TemplateVersion داخل Bundle با TemplateVersion مستقیم ReportVersion یکسان است. Template جدید یا تغییر semantic/temporal/unit/value/alias نیازمند نسخهٔ جدید استاندارد است؛ تغییر کد Reader یا source revision به‌تنهایی استاندارد معنایی جدید محسوب نمی‌شود.
+
+**محدودیت دامنه:** Header dictionary تأییدشدهٔ فعلی برای periodic reports بانکی است و به سایر صنایع تعمیم داده نمی‌شود. Header dictionary جایگزین Metric-level semantic mapping نیست.
+
+**وضعیت Gate 1:** تعریف منطقی Bundle و scope آن بسته شد؛ relational component schema، approval workflow و قیدهای physical سازگاری هنوز باز هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 17 گزارش DB-DES-009 ثبت شده است.
