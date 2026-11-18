@@ -600,3 +600,63 @@ Filename، local path، download URL، ingestion timestamp یا SHA-256 به‌�
 **نتیجه Gate 10:** local visible-state reconciliation COMPLETE؛ historical source/side-effect reconciliation و target-environment/backup verification همچنان PARTIAL / OPEN هستند. Migration 9 جایگزین ساخته نمی‌شود و برای ادامهٔ کار، دوباره‌سازی migration یا تکرار cleanup محلی لازم نیست.
 
 **اثر بر DB-DES-009:** additive design و توسعهٔ جدول جدید `financial_facts` می‌تواند در سطح طراحی ادامه یابد؛ هیچ حذف/بازنویسی legacy، backfill خودکار یا migration مخرب تا زمان مجوز مستقل و audit محیط مقصد مجاز نیست. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 22. تکمیل پیشنهاد فیزیکی Row-Axis برای بستن Gate 7 — 2026-11-18
+
+### 22.1 شکاف ساختاری
+- DB-DES-008 ساختار Template را برای layout node، Header binding، ColumnSlot و extraction span تعریف می‌کند؛ اما entity فیزیکی متناظری برای سلسله‌مراتب row-axis ندارد.
+- DB-DES-014 برای هر semantic mapping، row-axis path کامل و ordered Header path را لازم می‌داند؛ mapping در تقاطع این دو محور resolve می‌شود.
+- DTO فعلی Excel، `RowObservation` را با `row_index`، `label_fragments`، `parent_row_index` و `outline_level` ثبت می‌کند. این داده برای ساخت observation موقت کافی است، ولی row-axis identity پایدار تولید نمی‌کند؛ Reader نباید مسئول mapping معنایی باشد.
+
+### 22.2 پیشنهاد حداقلی مدل فیزیکی
+**الف) `template_row_axis_node`**
+- `row_axis_node_id` PK
+- `template_version_id` و `layout_node_id` برای scope دقیق
+- `parent_row_axis_node_id` self-FK برای حفظ سلسله‌مراتب
+- `node_code` پایدار در همان layout node
+- `node_kind`: SECTION / SUBSECTION / LEAF (controlled)
+- `order_index`
+- locatorهای اختیاری نمونه، مانند worksheet و source row range؛ فقط برای تطبیق Template، نه هویت Fact
+
+قیدها:
+- node باید به یک TemplateVersion و layout node تعلق داشته باشد.
+- parent باید در همان TemplateVersion و همان layout node باشد؛ parent cycle ممنوع است.
+- node_code در scope layout node یکتا باشد.
+- leaf node هویت کامل row-axis path را از طریق زنجیرهٔ parentها نشان می‌دهد؛ تکرار leaf label زیر دو parent متفاوت، دو identity متفاوت خواهد داشت.
+- متن خام تمام سلول‌های ردیف ذخیره نمی‌شود. تشخیص label و alias در لایهٔ versioned interpretation/row-label identity انجام می‌شود.
+
+**ب) `semantic_mapping_rule`**
+هر rule نسخه‌دار باید حداقل این references را داشته باشد:
+- `interpretation_standard_version_id`
+- `template_version_id`
+- `layout_node_id`
+- `row_axis_node_id` (leaf/path identity)
+- `column_slot_id` یا slot group مصوب
+- `metric_id`
+- referenceهای دقیق temporal, dimension, unit/value-semantics rules
+
+قید یکتایی منطقی: یک تقاطع مشخص از InterpretationStandardVersion + row-axis path + ColumnSlot در یک layout node باید حداکثر یک mapping مصوب داشته باشد. صفر mapping یا بیش از یک mapping، شرط reject است. composite FK/trigger باید ثابت کند row node و column slot هر دو متعلق به همان node و TemplateVersion هستند که استاندارد به آن مقید است.
+
+**ج) `financial_fact_provenance`**
+پس از تعریف SemanticMappingRule دقیق، `semantic_mapping_rule_id` باید به یک rule مشخص اشاره کند، نه صرفاً به یک نسخهٔ کلی از mapping catalog. در این صورت node/row path/column slot از همان rule قابل بازیابی‌اند و ذخیرهٔ تکراری آن‌ها روی هر provenance row ضروری نیست. ساختار حداقلی پیشنهادی:
+- `provenance_id`
+- `fact_id`
+- `input_role`
+- `semantic_mapping_rule_id`
+- `source_locator` اختیاری و diagnostic-only
+
+هر ورودی مستقل یک provenance row دارد؛ direct معمولاً یک row و multi-input چند row با roleهای مصوب. اگر در شواهد واقعی چند ورودی متمایز بتوانند به یک mapping rule و یک role یکسان برسند، قبل از implementation باید identity تکمیلی آن ورودی‌ها مشخص شود؛ مختصات سلول به‌صورت پیش‌فرض کلید دائمی نمی‌شود.
+
+### 22.3 قواعد تغییر نسخه و تطبیق
+- row-axis nodes بخشی از TemplateVersion immutable هستند. تغییر ساختار، ترتیب یا ancestry ردیف‌ها TemplateVersion جدید می‌خواهد.
+- تغییر alias/معنای row label بدون تغییر layout، InterpretationStandardVersion جدید می‌خواهد.
+- هر semantic mapping به دقیقاً یک row path و یک column slot/path کامل محدود می‌شود؛ matching صرفاً با متن leaf label کافی نیست.
+- row_index/CellRef در WorkbookObservation locator موقت است. در Fact یا Provenance اجباری ذخیره نمی‌شود.
+- Header inheritance و extraction-span ownership طبق DB-DES-008 بدون تغییر باقی می‌ماند؛ row-axis hierarchy نیز نباید extraction permission ایجاد کند.
+- برای header/row path ناشناخته، duplicate مبهم یا mapping چندگانه، کل واحد ingestion رد می‌شود.
+
+### 22.4 محدودیت شواهد و وضعیت
+این مدل physical proposal است، نه ORM authorization. Parsian annotation map فعلی هنوز candidate/provisional است؛ تمام table bounds و row-axis paths production-approved نیستند و workbook مستقل دورهٔ بعد برای drift validation در دسترس این بررسی نبود. پیش از تصویب physical schema باید حداقل یک table با row-axis کامل از دو workbook مستقل، یک direct fact و یک multi-input fact، بدون تکیه بر cell coordinate دائمی، end-to-end مدل‌سازی شود.
+
+**نتیجه Gate 7:** پیشنهاد physical row-axis و semantic intersection اکنون مشخص‌تر شده است؛ اما تا زمان evidence validation و تکمیل مثال‌های direct/multi-input، Gate 7 همچنان **PARTIAL / OPEN** است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
