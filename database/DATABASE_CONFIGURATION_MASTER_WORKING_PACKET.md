@@ -1329,3 +1329,27 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **گیت‌ها:** تأیید DB-DES-009؛ تعیین مالکیت YTD/temporal basis و dimension selector؛ حل Migration 9؛ سپس ORM/Migration، Excel writer و Stage 5 reader به‌صورت additive و با تست‌های adversarial. هیچ dual-write یا حذف جدول legacy در این مرحله مجاز نیست.
 
 **وضعیت:** قرارداد طراحی COMPLETE؛ پیشنهادها نیازمند تأیید مالک؛ هیچ ORM، Migration، کد runtime، داده یا تستی تغییر نکرد و تستی اجرا نشد.
+
+
+### 8.54 قرارداد دوره‌های مالی جلالی و مبنای زمانی مقدار — DB-DES-011 — 2026-11-18
+
+گزارش پیشنهاد: `database/reports/DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md`
+
+این سند ابهام مالکیت YTD را در DB-DES-009/010 حل می‌کند و سه مفهوم را از هم جدا می‌سازد:
+
+1. **FinancialPeriod:** بازه واقعی با تاریخ‌های دقیق جلالی و ماهیت INSTANT یا DURATION؛ هویت منطقی آن شرکت + ماهیت + تاریخ شروع و پایان است.
+2. **Fiscal classification:** سال مالی، فصل مالی و نوع بازه مانند MONTH/QUARTER/SEMI_ANNUAL/NINE_MONTH/ANNUAL؛ این برچسب‌ها جای تاریخ واقعی را نمی‌گیرند و مبنای تجمعی بودن مقدار را تعیین نمی‌کنند.
+3. **Value temporal basis:** برای Factهای DURATION، یکی از STANDALONE یا YTD؛ برای INSTANT نامربوط/NULL. پیشنهاد می‌شود این ویژگی در خود FinancialFact ذخیره شود، نه به‌صورت is_ytd مشترک در FinancialPeriod.
+
+**قواعد پیشنهادی:**
+- آغاز سال مالی از منبع معتبر همان شرکت یا Fiscal Calendar تأییدشده به دست می‌آید؛ هرگز فروردین ۱ یا ژانویه ۱ فرض نمی‌شود.
+- YTD باید از تاریخ واقعی شروع سال مالی تا تاریخ پایان گزارش باشد؛ مقدار مستقل فقط با بازه واقعی خودش ثبت می‌شود.
+- مقدار مستقل محاسبه‌شده از تفاضل دو YTD، داده منبع نیست و فقط runtime باقی می‌ماند؛ تفاضل فقط با زنجیره سازگار مجاز است.
+- INSTANT دارای start=end، months_length=0 و بدون YTD است.
+- DURATION دارای تاریخ‌های دقیق است؛ months_length فقط در بازه کامل ماهانه و با محاسبه تقویمی معتبر تعیین می‌شود، نه تقسیم تعداد روز بر ۳۰. برای بازه نامنظم، NULL پیشنهاد شده و نیازمند تطبیق نهایی با DB-DES-003 است.
+- TTM دوره منبع نیست و فقط در runtime از بازه‌های مستقل، کامل و غیرهم‌پوشان ساخته می‌شود.
+- تاریخ انتشار گزارش، عنوان گزارش یا شماره فصل به‌تنهایی برای استنتاج دوره و YTD کافی نیست؛ ابهام باعث رد کل ingestion unit می‌شود.
+
+**اثر بر اسناد قبلی:** DB-DES-009 باید `is_ytd` را از FinancialPeriod به سطح Fact/temporal interpretation منتقل کند؛ DB-DES-010 باید temporal basis را در metric binding و query لحاظ کند. DB-DES-003 و قرارداد معماری مبنا هنوز باید در مرحله reconciliation بررسی شوند و این پیشنهاد به‌تنهایی آن اسناد را تغییر نمی‌دهد.
+
+**وضعیت:** DB-DES-011 PROPOSED؛ هیچ ORM، Migration، کد runtime، داده یا تست تغییر نکرده است. Migration 9 و منبع معتبر fiscal calendar همچنان gateهای باز پیش از پیاده‌سازی‌اند.
