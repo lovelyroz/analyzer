@@ -1122,3 +1122,38 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 **وضعیت:** ممیزی linkage دیتابیس محلی COMPLETE؛ مسیر write قدیمی PDF در source PRESENT؛ مسیر production Excel-to-canonical persistence NOT ESTABLISHED؛ بازنشستگی RawFinancialFact NOT AUTHORIZED؛ Migration 9 reconciliation همچنان OPEN. هیچ ORM، Migration، داده یا تستی تغییر نکرد و تستی اجرا نشد.
 
 **گام بعدی پیشنهادی:** ممیزی دقیق وابستگی‌های کد و نقطه‌های ورود مسیر PDF، به‌همراه تفکیک اجزای مشترک ingestion از اجزای PDF-only؛ هدف تعیین دامنه‌ی امن بازنشستگی PDF بدون حذف/تغییر منطق مشترک مالی و بدون فرض درباره‌ی کدهای مصرف‌کننده است.
+
+
+### 8.45 ممیزی وابستگی مسیر PDF در CODAL — DB-AUD-012 — 2026-11-18
+
+گزارش: `database/reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md`
+
+بررسی source در branch فعلی زنجیره PDF را مشخص کرد: pipeline محلی/URL → acquisition → adapter و PDF extract → RawLineInput → persistence قدیمی در `service.py::ingest_codal_report` → RawFinancialFact.
+
+**اجزای PDF-only یا legacy:**
+- `src/ingestion/codal/pipeline.py`: entry pointهای PDF محلی و URL.
+- `acquisition.py`: دریافت/دانلود PDF.
+- `adapter.py`، `pdf_extract.py`، `parser.py`: استخراج/تجزیه PDF.
+- `validator.py`: اعتبارسنجی قرارداد قدیمی RawLine.
+- `codal/ingestion.py`: facadeهای PDF و persistence قدیمی.
+- `codal/numbers.py`: normalization و parse مخصوص مسیر قدیمی CODAL.
+
+**اجزای مشترک یا حساس که نباید یک‌جا حذف شوند:**
+1. `src/ingestion/service.py` شامل CODAL raw persistence در کنار FX/OHLC persistence است؛ توابع FX و Market باید حفظ شوند.
+2. `src/ingestion/__init__.py` exportهای مختلط دارد؛ فقط API قدیمی CODAL باید جداگانه تعیین تکلیف شود.
+3. `src/models/normalized.py` مدل RawFinancialFact را کنار مدل‌های مالی دیگر دارد؛ حذف فایل یا مدل‌های دیگر مجاز نیست.
+4. `src/migrations/runner.py` مدل RawFinancialFact را برای metadata baseline import می‌کند؛ حذف ساده import، schema دیتابیس تازه را تغییر می‌دهد.
+5. FKهای raw_fact_id در MappingDecision، NormalizedFinancialFactInput و NormalizedFinancialFact باقی‌اند؛ صفر بودن ارجاعات فعلی، خود FKها را حذف نمی‌کند.
+6. تست‌های test_codal_* عمدتاً مسیر PDF هستند، اما test_stage1_database_architecture.py و test_stage1_database_integrity.py علاوه بر آن schema، FK و حفظ داده legacy را هم پوشش می‌دهند و نباید یک‌جا حذف شوند.
+
+در `src/ingestion/excel` فعلاً DTO و Reader دیده شد؛ مسیر production مستقل Excel-to-canonical persistence در source بررسی‌شده احراز نشد. فایل‌های PDF نمونه و corpus تست نیز در این ممیزی حذف یا تغییر داده نمی‌شوند.
+
+برای تکمیل inventory تمام working tree محلی، اسکریپت read-only `src/scripts/audit_codal_pdf_dependencies.py` اضافه شد. دستور اجرای مالک:
+
+```powershell
+python src/scripts/audit_codal_pdf_dependencies.py
+```
+
+**وضعیت:** ممیزی source در GitHub انجام شد؛ inventory کامل local PENDING؛ مسیر PDF PRESENT؛ بازنشستگی مسیر PDF و جدول RawFinancialFact هنوز انجام نشده؛ هیچ ORM، Migration، داده یا تستی تغییر نکرده و تستی اجرا نشده است. مغایرت Migration 9 نیز OPEN باقی می‌ماند.
+
+**گام بعدی:** مالک اسکریپت inventory را اجرا و `reply.md` را به‌روزرسانی کند؛ سپس تمام callerها و importهای کشف‌شده طبقه‌بندی و طرح بازنشستگی مرحله‌ای تهیه شود. هیچ حذف کدی تا آن زمان انجام نشود.
