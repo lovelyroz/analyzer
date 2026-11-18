@@ -1642,7 +1642,8 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 - Candidate row examples include operating income (A22), continuing-operations net profit (A31), discontinued-operations net profit (A33), total net profit/loss (A34), and per-share profit (A41). The row semantics were cross-checked against report 3 and corrected in DB-DES-016.
 
 **Important semantic outcomes:**
-- A22/A31/A34 are duration/flow candidates, but the recorded Header dates do not establish exact start dates or YTD versus STANDALONE. Duration basis and exact Jalali intervals remain unresolved under DB-DES-011.
+- A22/A31/A33/A34 are duration/flow candidates, but the recorded Header dates do not establish exact start dates or YTD versus STANDALONE. Duration basis and exact Jalali intervals remain unresolved under DB-DES-011.
+- Report-3 historical values show B31 + B33 = B34 (`-25,195,703 + 0 = -25,195,703`) and D31 + D33 = D34 (`-9,124,895 + 0 = -9,124,895`). This is a useful arithmetic consistency observation, not an independent validation of the corrected workbook or an approved canonical accounting rule.
 - A9 states amounts are in millions; currency is not explicitly established by that text. A41 separately states Rial in its row label and must not blindly inherit the general million scale.
 - Audit/restatement qualifiers remain source/ReportVersion provenance, not automatic financial dimensions.
 - A31 (continuing operations), A33 (discontinued operations), and A34 (total net profit/loss) require an explicit accounting-semantic reconciliation to prevent duplicate or inconsistent mappings.
