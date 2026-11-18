@@ -1841,3 +1841,18 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 **اثر بر DB-DES-009:** طراحی additive می‌تواند ادامه یابد؛ حذف legacy، backfill خودکار یا migration مخرب نیازمند مجوز مستقل و audit دقیق محیط مقصد است.
 
 **وضعیت:** Gate 9 برای source و local snapshot بسته است؛ coverage محیط‌های بیرونی محدودیت دارد. Gate 10 فقط برای local visible state بسته و از نظر historical lineage/other targets PARTIAL / OPEN است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+### 8.82 پیشنهاد فیزیکی Row-Axis و SemanticMapping برای تکمیل Gate 7 — 2026-11-18
+
+بررسی DB-DES-008، DB-DES-014 و DTO فعلی Excel نشان داد Template layout فعلی node، Header، ColumnSlot و extraction span دارد، اما physical row-axis hierarchy ندارد؛ درحالی‌که DB-DES-014 معنای Fact را وابسته به تقاطع row-axis path و Header/ColumnSlot می‌داند. `RowObservation` فعلی row index، label fragments و parent row را موقت observe می‌کند، نه اینکه stable semantic identity بسازد.
+
+**پیشنهاد physical:**
+- افزودن `template_row_axis_node` با شناسهٔ پایدار، layout node/template scope، parent self-FK، node code/kind/order و locator نمونهٔ اختیاری. leaf node با زنجیرهٔ parentها هویت کامل row path را مشخص می‌کند؛ leaf label تکراری زیر parent متفاوت، identity متفاوت دارد.
+- SemanticMappingRule باید به InterpretationStandardVersion، TemplateVersion، layout node، row-axis leaf/path، ColumnSlot و ruleهای Metric/Dimension/temporal/unit/value semantics متصل شود. هر تقاطع row/column حداکثر یک mapping مصوب دارد؛ صفر یا چند mapping رد می‌شود.
+- Provenance بهتر است به `semantic_mapping_rule_id` دقیق اشاره کند، نه صرفاً mapping catalog version. در این صورت row path/node/slot از rule بازیابی می‌شوند و لازم نیست در هر provenance row تکرار شوند. هر منبع مستقل یک provenance row با input_role دارد؛ source_locator اختیاری و صرفاً diagnostic است.
+- Row index و CellRef فقط locator هستند؛ کلید دائمی Fact/Provenance نمی‌شوند. تغییر layout/ancestry، TemplateVersion جدید می‌خواهد؛ تغییر alias/meaning، InterpretationStandardVersion جدید.
+
+**محدودیت:** Parsian coordinates و row-axis فعلی هنوز candidate/provisional هستند و workbook مستقل دورهٔ بعد برای drift validation در این بررسی وجود نداشت. پیش از تصویب physical schema باید یک جدول در دو workbook مستقل، همراه یک direct و یک multi-input fact، بدون cell-coordinate identity دائمی اثبات شود.
+
+**وضعیت Gate 7:** physical proposal مشخص‌تر شد، اما evidence validation و نمونه‌های پذیرش هنوز باز هستند؛ Gate 7 همچنان PARTIAL / OPEN است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 22 گزارش DB-DES-009 ثبت شده است.
