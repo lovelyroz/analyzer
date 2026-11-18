@@ -791,3 +791,23 @@ python src/scripts/excel_template_annotation_audit.py --max-color-cells 1 excel/
 ```
 
 در صورت نیاز، جزئیات کامل annotationهای رنگی را می‌توان جداگانه با سقف بزرگ‌تر گرفت؛ برای تشخیص جهت و Border نیازی به چاپ هزاران سلول رنگی نیست. Task 033 همچنان PARTIAL است؛ دستیار تست اجرا نکرده و XLSX را مستقیماً بازبینی نکرده است.
+
+
+## 8.31 — ممیزی کامل metadata فایل نهایی Parsian پس از حذف شیت آزمایشی — 2026-11-19
+
+مالک ابزار `excel_template_annotation_audit.py` را با سقف 2000 سلول رنگی روی `excel/parsian_periodic.xlsx` اجرا کرد و خروجی کامل را به فایل `template_annotation_audit_full.txt` هدایت کرد. transcript فرمان و خروجی فیلترشده در `reply.md` ثبت شده است.
+
+**شواهد قطعی این اجرا:**
+- Reader: `ACCEPTED`.
+- SHA-256 فایل فعلی: `55266751a5ae60666ebce05f1ed4ee1c4df94a4f78fa0c764aa4a0dc4325db85`.
+- فقط یک worksheet گزارش شده: `Recovered_Sheet1`.
+- Used range: `A1:L411`؛ تعداد merged ranges: `101`.
+- `right_to_left=True`؛ ستون A در سمت راست نمایش داده می‌شود و لبهٔ بصری راستِ جدول‌هایی که از A شروع می‌شوند با `border.right` ستون A متناظر است.
+- `THICK_OUTSIDE_RECTANGLES count=0`.
+- Border counts: top: medium=1606, thin=1؛ bottom: medium=1649, thin=193؛ left: medium=1247, thin=2؛ right: medium=1526.
+
+**تفسیر محدود و اصلاح سابقه:** این اجرا هویت تک‌شیتی و hash نسخهٔ فعلی را روشن می‌کند و نشان می‌دهد فرض «thick border دقیق» برای این فایل برقرار نیست. با این حال، شمارش medium/thin به‌تنهایی bounds جدول را ثابت نمی‌کند؛ ضمن اینکه zero thick rectangles به معنی نبود قاب‌های بصری با سبک medium نیست. ابزار فعلی فقط مستطیل‌های چهارضلعی با سبک دقیق thick را در بخش `THICK_OUTSIDE_RECTANGLES` تشخیص می‌دهد. بنابراین نباید از این خروجی نتیجه گرفت که جدول‌ها قاب ندارند یا هر محدودهٔ merged یک جدول مستقل است.
+
+**محدودیت transcript رنگ‌ها:** خروجی فیلترشده در `reply.md` فقط سطر عنوان `COLOR_ANNOTATIONS` را نشان می‌دهد و هیچ سطر سلول رنگی یا `COLOR_CELLS_PRINTED` پس از آن در transcript قابل مشاهده نیست. از این رو، فهرست کامل red/blue/green annotationها در این اجرا قابل استناد نیست؛ آن را از خروجی قبلی یا مختصات گزارش 3 حدس نمی‌زنیم. فایل کامل محلی `template_annotation_audit_full.txt` ایجاد شده، اما محتوای آن به‌صورت کامل در مخزن ارائه نشده است.
+
+**نتیجه:** مانع تک‌شیتی بودن و hash نسخهٔ فعلی رفع شد. مانع استخراج Template هنوز باقی است: فهرست کامل annotationها و نقش آن‌ها (table title/header/sub-table) باید از فایل کامل خروجی قابل مشاهده شود؛ سپس bounds هر جدول باید با بازبینی ساختاری و تصمیم مالک تأیید شوند. هیچ bounds یا partition جدیدی در این بخش تصویب نشده است. Task 033 همچنان PARTIAL است. دستیار XLSX را مستقیماً باز نکرد و هیچ تستی اجرا نکرد.
