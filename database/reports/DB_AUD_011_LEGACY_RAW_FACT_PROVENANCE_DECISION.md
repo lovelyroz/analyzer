@@ -1,0 +1,85 @@
+# DB-AUD-011 — Legacy RawFinancialFact Provenance Assessment
+
+**Date:** 2026-11-18  
+**Status:** AUDIT COMPLETE; MIGRATION / DELETION NOT AUTHORIZED  
+**Scope:** Read-only review of the local SQLite provenance audit output and current GitHub ORM/application references.
+
+## 1. Evidence reviewed
+
+The owner ran `src/scripts/audit_legacy_raw_fact_provenance.py` against the local database `tehran_stock.db`. The report was returned in `reply.md`.
+
+- `raw_financial_facts` contains 505 rows.
+- All five audited provenance columns exist and contain non-NULL values in at least some rows.
+- Three tables have foreign keys referencing `raw_financial_facts.raw_fact_id`.
+- Current application source references were searched under `src`, excluding `src/scripts`.
+
+This report records findings and architectural disposition only. It does not claim that the local database and current GitHub source are from the same revision; Migration 9 reconciliation remains unresolved.
+
+## 2. Field-level findings
+
+| Field | Non-NULL rows | Distinct non-NULL values | Current source-code references outside scripts | Finding |
+|---|---:|---:|---|---|
+| `source_sheet` | 505 | 1 | None found | Legacy worksheet provenance; current value is always `Recovered_Sheet1`. |
+| `source_column_header` | 505 | 23 | None found | Legacy captured header/context text. Values combine temporal, measure, unit, and audit qualifiers in one string. |
+| `source_section` | 245 | 9 | Yes | Still referenced by ingestion service, CODAL adapter, PDF extraction path, and tests. |
+| `source_row` | 505 | 336 | Yes | Still referenced by service, adapter/parser, PDF extraction path, and tests. |
+| `source_column` | 505 | 15 | Yes | Still referenced by service, adapter/parser, PDF extraction path, and tests. |
+
+The ORM model in the current GitHub source defines `source_section`, `source_row`, and `source_column`, but does not define `source_sheet` or `source_column_header`. The latter two therefore remain a schema/model discrepancy requiring Migration 9 lineage reconciliation.
+
+## 3. Referential dependencies
+
+The local database reports these foreign-key references to `raw_financial_facts.raw_fact_id`:
+
+- `mapping_decisions.raw_fact_id`
+- `normalized_financial_fact_inputs.raw_fact_id`
+- `normalized_financial_facts.raw_fact_id`
+
+All are configured with `NO ACTION` on delete. These references make raw-fact deletion a data-integrity operation, not a harmless cleanup. This audit did not count linked/unlinked rows or inspect the semantic validity of the downstream records; no deletion or rewrite is authorized.
+
+## 4. Architectural disposition for the new Excel ingestion design
+
+The future Excel pipeline should not treat the legacy provenance columns as its canonical layout model.
+
+| Legacy field | Target-design treatment | Reason |
+|---|---|---|
+| `source_sheet` | Represent worksheet identity through the versioned Template's worksheet record and matching rule. Retain the legacy column/data for historical compatibility until a separately approved migration. | A single sheet name is not a stable canonical identity; worksheet matching belongs to the Template version. |
+| `source_column_header` | Do not use as a canonical fact key or as a replacement for structured Header definitions. Represent header ranges/levels, column slots, temporal axes, units/basis, and semantic mappings explicitly. Retain historical values unchanged. | The observed strings conflate multiple independent dimensions and are not normalized identifiers. |
+| `source_section` | Treat as legacy source context for the existing ingestion/PDF path. Do not extend it as the Excel table/sub-table identity. New Excel ingestion should use stable Template table/sub-table IDs. | The field is actively referenced in current code, but its free-text section names are not stable structural IDs. |
+| `source_row`, `source_column` | Keep for legacy records and compatibility. For new Excel ingestion, use exact worksheet + cell/range coordinates associated with the approved Template extraction definition and provenance contract; do not assume legacy row/column semantics are interchangeable with Excel A1 coordinates. | Existing values are heterogeneous source locators and the current code normalizes them in legacy adapters. |
+
+### Important boundary
+
+The Template's worksheet, layout node, header/range, column-slot, and extraction-span records describe the approved source layout. They do not automatically provide complete per-fact lineage for every persisted financial input. Before implementation, the design must specify how a selected canonical fact points back to its exact source cell(s), including cases where one fact is composed from multiple cells. Do not solve this by storing an opaque concatenated header string or by overloading `source_section`.
+
+The existing `raw_financial_facts` table is a legacy persistence structure and has downstream references. The new architecture's policy against retaining raw financial-row archives must be implemented as a deliberate pipeline/schema transition, not by deleting this table or its columns during Template creation.
+
+## 5. Decisions and prohibitions
+
+1. Preserve all 505 existing raw facts and all five provenance columns unchanged for now.
+2. Do not drop `source_sheet`, `source_column_header`, `source_section`, `source_row`, or `source_column` in the next migration.
+3. Do not add the two missing ORM attributes merely to mirror the local database until Migration 9's exact DDL, code revision, and source lineage are reconciled.
+4. Do not use free-text `source_column_header` as a metric, period, unit, or canonical column identifier.
+5. Do not use `source_section` as the future Template table/sub-table ID.
+6. Keep the legacy ingestion/PDF references isolated from the new Excel-only path; any removal of PDF-specific code must be a separate scoped change with its own dependency/test review.
+7. Before any legacy-table retirement, inspect row-level linkage and determine whether mapping/normalized records can be retained with sufficient provenance after transition.
+
+## 6. Next required audit
+
+The next step is a focused **row-linkage and lineage-impact audit** of the 505 legacy raw facts:
+
+- count how many raw facts are referenced by each of the three downstream tables;
+- count raw facts with zero, one, or multiple downstream references;
+- identify duplicate or orphaned reference patterns without changing data;
+- determine whether normalized records can survive independently of raw facts and what provenance they would lose;
+- inspect the current Excel ingestion/persistence call path to establish whether it still writes `RawFinancialFact` or has a separate canonical persistence path.
+
+This is required before deciding whether the legacy raw-fact table is retained indefinitely, frozen as historical compatibility data, or retired through a controlled migration.
+
+## 7. Completion status
+
+- Provenance population and code-reference audit: **COMPLETE**.
+- Field-level target-design disposition: **RECORDED, subject to implementation design**.
+- Migration 9 source/revision reconciliation: **OPEN**.
+- Downstream row-linkage audit: **NEXT**.
+- ORM changes, migrations, data updates, and tests: **NONE**.
