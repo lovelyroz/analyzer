@@ -79,10 +79,11 @@ Candidate row paths include:
 |---|---|---|---|
 | A22 | `جمع درآمدهاي عملياتي` | [عملیات در حال تداوم, جمع درآمدهای عملیاتی] | Total operating income (flow) |
 | A31 | `سود (زيان) خالص عملیات در حال تداوم` | [عملیات در حال تداوم, سود خالص عملیات در حال تداوم] | Net profit from continuing operations (flow) |
-| A34 | `سود(زیان) خالص` | [عملیات متوقف شده, سود(زیان) خالص] | Net profit/loss from discontinued operations (flow) |
+| A33 | `سود(زیان) خالص عملیات متوقف شده` | [عملیات متوقف شده, سود(زیان) خالص عملیات متوقف شده] | Net profit/loss from discontinued operations (flow) |
+| A34 | `سود(زیان) خالص` | [total net profit/loss] | Total net profit/loss (flow); reconciliation row, not a second discontinued-operations metric |
 | A41 | `سود (زیان) خالص هر سهم– ریال` | [سود (زیان) پایه هر سهم, سود (زیان) خالص هر سهم] | Per-share measure; exact metric definition requires metric-dictionary confirmation |
 
-These are source-label paths and candidate concepts, not approved FinancialMetric codes. In particular, A34 is a distinct discontinued-operations row and must not be merged with A31 or treated as a duplicate of continuing-operations profit. The total net-profit row A34 and the continuing-operations row A31 need a formal accounting-semantic reconciliation before both are mapped into canonical metrics.
+These are source-label paths and candidate concepts, not approved FinancialMetric codes. A33 is the discontinued-operations result; A34 is the total net-profit/loss row. A34 must not be mislabeled as discontinued operations or mapped as a second copy of A33. The relationship between A31 (continuing operations), A33 (discontinued operations), and A34 (total) requires an explicit accounting-semantic reconciliation before canonical mapping.
 
 ### 5.1 Example intersections
 
@@ -92,6 +93,10 @@ The historical detailed report records:
 |---|---:|---|---|
 | B31 | -25,195,703 | Continuing-operations net profit | Current period, unaudited |
 | D31 | -9,124,895 | Continuing-operations net profit | Restated comparative period, audited |
+| B33 | 0 | Discontinued-operations net profit | Current period, unaudited |
+| D33 | 0 | Discontinued-operations net profit | Restated comparative period, audited |
+| B34 | -25,195,703 | Total net profit/loss | Current period, unaudited |
+| D34 | -9,124,895 | Total net profit/loss | Restated comparative period, audited |
 | B41 | -161 | Basic EPS / net profit per share | Current period, unaudited |
 | D41 | -58 | Basic EPS / net profit per share | Restated comparative period, audited |
 
