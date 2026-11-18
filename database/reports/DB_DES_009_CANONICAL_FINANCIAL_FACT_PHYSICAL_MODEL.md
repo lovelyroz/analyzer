@@ -1070,3 +1070,86 @@ Partitionها فقط ساختار RowAxis را تعیین می‌کنند؛ عن
 **قدم بعدی:** به‌جای بررسی دوبارهٔ workbook، یک «Mapping Decision Register» برای T01 و T03 ساخته شود و فقط فیلدهای semantic واقعاً لازم برای این دو fixture تعیین شوند. پس از اثبات یک direct mapping، الگو به candidateهای دیگر تعمیم داده شود. Provenance CODAL همچنان یک workstream مستقل و مسدودکنندهٔ ingestion نهایی است.
 
 **وضعیت:** ساختار 40 ColumnSlot ثبت شد؛ Semantic Mapping هنوز BLOCKED/INCOMPLETE و Gate 7 PARTIAL / OPEN است. طرح فیزیکی همچنان PROPOSED. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 27. T01 — Row-level Semantic Mapping Readiness Register — 2026-11-19
+
+### 27.1 شواهد Header ودو ColumnSlot
+
+T01 محدودهٔ `Recovered_Sheet1!A10:D42` دارد. Headerها:
+
+| Slot | Header level 1 | Header level 2 | Interpretation ثبت‌شده از متن |
+|---|---|---|---|
+| B | دوره منتهي به ۱۴۰۳/۰۶/۳۱ | حسابرسی نشده | گزارش‌شده برای تاریخ پایان ۱۴۰۳/۰۶/۳۱؛ وضعیت حسابرسی نشده |
+| D | تجدید ارائه شده ۱۴۰۲/۱۲/۲۹ | حسابرسی شده | نسخه/مقایسهٔ تجدیدارائه‌شده با تاریخ ۱۴۰۲/۱۲/۲۹؛ وضعیت حسابرسی شده |
+
+این دو ستون دو observation مستقل‌اند و نباید به‌عنوان دو input یک Fact ادغام شوند. تفاوت تاریخ و وضعیت audit در Header صریح است. از Header به‌تنهایی نمی‌توان نتیجه گرفت B مقدار سه‌ماهه، شش‌ماهه، YTD یا standalone است؛ همچنین D را نباید بدون rule مالی به‌عنوان دورهٔ هم‌طول B تفسیر کرد. هر دو slot از نظر period semantics برای ingestion نهایی BLOCKED هستند تا نوع گزارش و duration basis از metadata/قاعدهٔ معتبر گزارش اثبات شود.
+
+سلول A9 متن `کلیه مبالغ درج شده به میلیون` دارد؛ بنابراین scale «میلیون» به‌عنوان note مشاهده شده است، اما متن ثبت‌شده currency را مشخص نمی‌کند. برای ردیف‌های EPS، خود label واحد ریال را صریح می‌گوید و این واحد بر note عمومی scale اعمال نمی‌شود. واحد ردیف سرمایه نیز از این شواهد به‌تنهایی قطعی نیست.
+
+### 27.2 RowAxis و row labelها
+
+| Parent RowAxis node | Leaf rows | Leaf label / family | Semantic mapping status |
+|---|---|---|---|
+| A12 — عملیات در حال تداوم | 13 | درآمد تسهیلات اعطایی و سپرده‌گذاری و اوراق بدهی | label مشخص؛ canonical Metric و unit/currency هنوز تصویب نشده |
+| A12 | 14 | هزینه سود سپرده‌ها | label مشخص؛ canonical Metric و sign convention باید تثبیت شود |
+| A12 | 15 | خالص درآمد تسهیلات و سپرده‌گذاری | subtotal/derived-like line؛ Metric مستقل فقط با تصمیم catalog و double-count policy |
+| A12 | 16 | درآمد کارمزد | label مشخص؛ canonical Metric باز |
+| A12 | 17 | هزینه کارمزد | label مشخص؛ sign convention باز |
+| A12 | 18 | خالص درآمد کارمزد | subtotal line؛ مستقل بودن Metric و double-count policy لازم |
+| A12 | 19 | خالص سود (زیان) سرمایه‌گذاری‌ها | label مشخص؛ canonical Metric باز |
+| A12 | 20 | خالص سود (زیان) مبادلات و معاملات ارزی | label مشخص؛ canonical Metric باز |
+| A12 | 21 | سایر درآمدها و هزینه‌های عملیاتی | label مشخص؛ canonical Metric باز |
+| A12 | 22 | جمع درآمدهای عملیاتی | total line؛ mapping مستقل و کنترل دوباره‌شماری لازم |
+| A12 | 23 | خالص سایر درآمدها و هزینه‌ها | subtotal line؛ mapping مستقل و کنترل دوباره‌شماری لازم |
+| A12 | 24 | هزینه‌های اداری و عمومی | label مشخص؛ canonical Metric باز |
+| A12 | 25 | هزینه مطالبات مشکوک‌الوصول | label مشخص؛ canonical Metric باز |
+| A12 | 26 | هزینه‌های مالی | label مشخص؛ canonical Metric باز |
+| A12 | 27 | هزینه استهلاک | label مشخص؛ canonical Metric باز |
+| A12 | 28 | سود (زیان) عملیات در حال تداوم قبل از مالیات | subtotal/result line؛ metric و double-count policy لازم |
+| A12 | 29 | مالیات بر درآمد سال جاری | label مشخص؛ canonical Metric باز |
+| A12 | 30 | مالیات بر درآمد سال‌های قبل | label مشخص؛ canonical Metric باز |
+| A12 | 31 | سود (زیان) خالص عملیات در حال تداوم | result line؛ metric و double-count policy لازم |
+| A32 — عملیات متوقف شده | 33 | سود (زیان) خالص عملیات متوقف شده | result line؛ canonical Metric باز |
+| A32 | 34 | سود (زیان) خالص | result line؛ رابطه‌اش با ردیف 31 و 33 باید در catalog تعریف شود، نه از عدد حدس زده شود |
+| A35 — سود (زیان) پایه هر سهم (ریال) | 36 | عملیاتی (ریال) | label صریحاً Rial را تعیین می‌کند؛ Metric/EPS basis و temporal semantics باز |
+| A35 | 37 | غیرعملیاتی (ریال) | Rial صریح؛ Metric/EPS basis و temporal semantics باز |
+| A35 | 38 | ناشی از عملیات در حال تداوم (ریال) | Rial صریح؛ Metric/EPS basis و temporal semantics باز |
+| A35 | 39 | ناشی از عملیات متوقف شده (ریال) | Rial صریح؛ Metric/EPS basis و temporal semantics باز |
+| A35 | 40 | سود (زیان) پایه هر سهم (ریال) | Rial صریح؛ تعریف canonical EPS و basis باز |
+| A35 | 41 | سود (زیان) خالص هر سهم — ریال | Rial صریح؛ تعریف canonical EPS و basis باز |
+| A35 | 42 | سرمایه | unit/scale و اینکه سرمایه به‌صورت چه مبنای مقداری گزارش شده، اثبات نشده |
+
+### 27.3 وضعیت value و provenance
+
+- 28 leaf row label زرد و دو slot مقداری B/D از نظر ساختاری روشن‌اند؛ هر دو slot برای هر leaf row یک candidate مستقل می‌سازند.
+- 56 سلول Gray مقداری در B/D وجود دارد؛ هیچ Gray blank در T01 وجود ندارد. بنابراین Rule 7 در T01 trigger نمی‌شود.
+- ستون C کاملاً Black و excluded است؛ با وجود اعداد ذخیره‌شده در آن، هیچ‌کدام مجاز به استخراج نیستند.
+- ستون E بیرون محدودهٔ T01 است؛ Header درصد تغییر و مقادیر uncolored آن به extraction اضافه نمی‌شوند.
+- در workbook formula cell وجود ندارد؛ با این حال وجود اعداد در Gray cells اثبات‌کنندهٔ منبع/روش محاسبه نیست.
+- Headerهای audit status، وضعیت همان slot را نشان می‌دهند؛ اما provenance کامل شامل filing identity، revision identity و ranking نهایی audited/restated را جایگزین نمی‌کنند.
+
+### 27.4 تصمیم‌های لازم پیش از تصویب T01
+
+1. **Report period:** آیا گزارش مربوط به ۶ ماه منتهی به ۱۴۰۳/۰۶/۳۱ است؟ مدرک باید از خود metadata/عنوان رسمی گزارش یا قرارداد report type بیاید؛ صرف تاریخ پایان کافی نیست.
+2. **duration_basis:** آیا B برای ردیف‌های جریان سود و زیان YTD است؟ آیا ردیف‌های EPS نیز همان basis را دارند؟ D برای هر ردیف چه دوره‌ای را پوشش می‌دهد؟ این‌ها باید با نوع صورت مالی و قواعد زمانی مصوب پاسخ داده شوند.
+3. **Currency/scale:** آیا note «به میلیون» به معنی میلیون ریال است؟ این گزارش فقط عبارت «به میلیون» را در A9 ثبت کرده؛ currency را حدس نمی‌زنیم. EPS ردیف‌های 36–41 به‌طور صریح Rial است.
+4. **Capital row:** واحد و measurement basis ردیف 42 باید از مستند معتبر گزارش روشن شود.
+5. **Metric catalog:** برای leafها canonical Metric ID و برای موارد لازم DimensionSet تعریف شود. نام row label فقط source label است، نه canonical ID.
+6. **Sign/aggregation policy:** درآمد/هزینه، EPS و total/subtotalها باید sign convention و double-count policy مستقل داشته باشند.
+7. **Provenance:** شناسهٔ filing، revision/correction identity، audit status و ranking باید از CODAL metadata به هر observation متصل شود.
+
+### 27.5 خروجی فعلی T01
+
+- **ساختار:** ACCEPTED AS STRUCTURAL FIXTURE.
+- **RowAxis:** سه parent node و 28 leaf row مشخص.
+- **ColumnSlot:** B و D مستقل و دقیقاً resolve شده‌اند.
+- **Semantic mapping:** PARTIAL؛ source labelها ثبت شده‌اند ولی canonical Metric/Dimension کامل نیست.
+- **Period/duration_basis:** BLOCKED.
+- **Currency/scale:** PARTIAL؛ scale عمومی «میلیون» مشاهده شده؛ currency نامعلوم؛ EPS واحد صریح ریال دارد؛ ردیف 42 نامعلوم.
+- **Provenance/revision:** BLOCKED برای ingestion نهایی.
+- **Ingestion:** ممنوع تا رفع موانع فوق. هیچ مقدار نمونه‌ای به FinancialFact تبدیل نشده است.
+
+**قدم بعدی:** بررسی T03 با همین روش، اما با تمرکز بر دو ستون B/C، سه RowAxis group و اثر header داخلی A95:C95. پس از آن دو fixture از نظر پوشش مشترک و تفاوت‌های واقعی مقایسه شوند.
+
+هیچ کد، ORM، schema، migration، دیتابیس یا تستی در این مرحله تغییر نکرد/اجرا نشد.
