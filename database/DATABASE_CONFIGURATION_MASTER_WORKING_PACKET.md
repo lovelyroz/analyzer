@@ -1353,3 +1353,24 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **اثر بر اسناد قبلی:** DB-DES-009 باید `is_ytd` را از FinancialPeriod به سطح Fact/temporal interpretation منتقل کند؛ DB-DES-010 باید temporal basis را در metric binding و query لحاظ کند. DB-DES-003 و قرارداد معماری مبنا هنوز باید در مرحله reconciliation بررسی شوند و این پیشنهاد به‌تنهایی آن اسناد را تغییر نمی‌دهد.
 
 **وضعیت:** DB-DES-011 PROPOSED؛ هیچ ORM، Migration، کد runtime، داده یا تست تغییر نکرده است. Migration 9 و منبع معتبر fiscal calendar همچنان gateهای باز پیش از پیاده‌سازی‌اند.
+
+
+### 8.55 ممیزی تطبیق قراردادهای زمانی Architecture و DB-DES-003/009/010/011 — DB-AUD-016 — 2026-11-18
+
+گزارش: `database/reports/DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md`
+
+متون جاری Architecture V1.3، DB-DES-003، DB-DES-009، DB-DES-010 و DB-DES-011 مقایسه شدند. نتیجه: قواعد اصلی در Jalali، INSTANT/DURATION، دوره اختصاصی هر Fact، comparative، PIT، YTD-differencing و TTM عمدتاً همسو هستند؛ اما قراردادها هنوز کاملاً reconciled نیستند.
+
+**تعارض اصلی:** Architecture V1.3 و DB-DES-003، `is_ytd` را در سطح FinancialPeriod تعریف می‌کنند؛ DB-DES-009 مالکیت آن را باز می‌گذارد؛ DB-DES-010 به duration_basis در هر مشاهده نیاز دارد؛ DB-DES-011 پیشنهاد می‌کند YTD/standalone در سطح FinancialFact باشد. پیشنهاد ممیزی: FinancialPeriod فقط هویت بازه واقعی، تاریخ‌های جلالی و INSTANT/DURATION را نگه دارد و `duration_basis=YTD|STANDALONE` در سطح FinancialFact باشد؛ برای INSTANT نامربوط/NULL. چون Architecture سند normative است، این تغییر بدون تأیید مالک نباید به‌صورت جزئی در اسناد اعمال شود.
+
+**سایر موارد باز:**
+- قاعده `months_length` برای بازه‌های DURATION غیرهم‌ماهانه: DB-DES-009 مقدار مثبت را پیشنهاد می‌کند؛ DB-DES-011 برای بازه نامنظم NULL را پیشنهاد می‌کند؛ Architecture هنوز حالت نامنظم را صریح نکرده است. تصمیم نیازمند شواهد workbook است.
+- مدل و چرخه عمر منبع Fiscal Calendar شرکت‌ها هنوز کامل طراحی نشده است.
+- محل ذخیره نقش PRIMARY/COMPARATIVE/UNKNOWN در مدل فیزیکی DB-DES-009 روشن نیست؛ این نقش نباید بخشی از هویت FinancialPeriod شود.
+- temporal kind و basis مجاز هر Metric، به‌ویژه Rate/Ratio، باید صریح و نسخه‌دار باشد.
+
+**قواعد همسو که نباید دوباره باز شوند:** تقویم جلالی، دوره واقعی هر Fact، عدم تحمیل Report primary period به همه Factها، YTD از شروع واقعی سال مالی، ذخیره standalone فقط در صورت گزارش صریح، runtime-only بودن standalone مشتق‌شده و TTM، اتصال comparative به ReportVersion منتشرکننده، اعمال PIT قبل از ranking، ترتیب چهارسطحی مصوب نسخه‌ها و fail-closed در ابهام.
+
+**گام بعدی:** تأیید مالک برای تغییر مالکیت YTD از FinancialPeriod به FinancialFact؛ سپس یک amendment هماهنگ در Architecture و DB-DES-003/009/010/011. پس از آن، شواهد دوره‌های نامنظم و مدل Fiscal Calendar بررسی شوند. Migration 9 همچنان gate مستقل و باز است.
+
+**وضعیت:** reconciliation audit COMPLETE؛ قرارداد normative و اسناد پشتیبان هنوز نیازمند amendment هماهنگ و تأیید مالک؛ هیچ کد، ORM، Migration، داده یا تست تغییر نکرده و تستی اجرا نشده است.
