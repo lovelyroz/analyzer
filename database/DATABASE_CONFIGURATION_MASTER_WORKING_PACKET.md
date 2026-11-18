@@ -1799,3 +1799,18 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 **Versioning:** Dimension code و member identity پس از approval immutable هستند. تغییر معنای مفهوم/member شناسهٔ جدید می‌خواهد. تغییر alias/display/applicability در InterpretationStandardVersion جدید pin می‌شود. member بازنشسته حذف یا reuse نمی‌شود و برای facts تاریخی باقی می‌ماند؛ Bundle جدید فقط در صورت مجاز بودن می‌تواند آن را به‌کار ببرد. DimensionSet از member identityهای مرتب‌شده و canonical ساخته می‌شود؛ هر Dimension در یک set حداکثر یک member دارد و Fact بدون Dimension از empty set یکتا استفاده می‌کند.
 
 **وضعیت Gate 2:** logical scope/versioning بسته شد؛ physical allowed-value relations، canonical set serialization و approval workflow باز هستند. کاتالوگ واقعی همهٔ صنایع از پیش ساخته نمی‌شود و فقط با شواهد/نیاز استاندارد به‌صورت incremental توسعه می‌یابد. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 18 گزارش DB-DES-009 ثبت شده است.
+
+
+### 8.79 تطبیق Gate 3 با DB-DES-011 — Temporal Basis در سطح FinancialFact — 2026-11-18
+
+این تصمیم قبلاً در DB-DES-011 و reconciliation سند DB-AUD-016 هماهنگ و پذیرفته شده است؛ بنابراین تصمیم مالکیت YTD/Standalone تکرار یا بازگشایی نمی‌شود:
+
+- FinancialPeriod فقط بازه/لحظهٔ واقعی را با تاریخ‌های دقیق جلالی و temporal_kind=INSTANT/DURATION تعریف می‌کند.
+- `duration_basis` روی هر FinancialFact از نوع DURATION قرار می‌گیرد؛ YTD یا STANDALONE. برای INSTANT مقدار NULL/NOT_APPLICABLE است.
+- YTD از شروع واقعی سال مالی شرکت تا پایان دوره است. سال مالی ۱۲ ماه متوالی دارد، اما شروع آن برای هر شرکت باید از منبع معتبر/تقویم مصوب تعیین شود و Farvardin 1 پیش‌فرض نیست.
+- Standalone محاسبه‌شده از تفاضل YTD فقط runtime است؛ TTM نیز runtime-only است.
+- Metric binding باید temporal kind و basisهای مجاز را مشخص کند؛ Rate/Ratio default عمومی ندارد. ابهام زمانی باعث رد کل واحد ingestion می‌شود.
+
+**باقی‌مانده:** physical CHECK/validation برای duration_basis، applicability نسبت به Metric، months_length برای بازه‌های نامنظم، منبع معتبر fiscal calendar و adversarial tests. این‌ها گیت‌های implementation هستند، نه ابهام در مالکیت temporal basis.
+
+**وضعیت Gate 3:** logical ownership بسته و قبلاً ACCEPTED است؛ implementation gates باز هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 19 گزارش DB-DES-009 ثبت شده است.
