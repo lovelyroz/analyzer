@@ -1065,3 +1065,17 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 `python src/scripts/audit_legacy_raw_fact_provenance.py`
 
 سپس اعلام شود `reply.md is updated` تا نتیجه بررسی و تصمیم معماری ثبت شود. این گام report-only است؛ هیچ ORM، Migration یا داده‌ای تغییر نکرده و تستی اجرا نشده است. Migration 9 source/revision reconciliation همچنان باز است.
+
+### 8.42 ارزیابی معماری provenance قدیمی RawFinancialFact — 2026-11-18
+
+نتیجه اسکریپت `audit_legacy_raw_fact_provenance.py` در گزارش `database/reports/DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md` تحلیل شد:
+
+- هر پنج فیلد `source_sheet`، `source_column_header`، `source_section`، `source_row` و `source_column` در دیتابیس محلی دارای داده‌اند؛ به‌ترتیب 505، 505، 245، 505 و 505 ردیف غیرNULL.
+- `source_section/source_row/source_column` در کد برنامه خارج از scripts استفاده می‌شوند؛ `source_sheet/source_column_header` ارجاع برنامه‌ای فعالی در جست‌وجوی انجام‌شده نداشتند.
+- سه جدول `mapping_decisions`، `normalized_financial_fact_inputs` و `normalized_financial_facts` به `raw_financial_facts` FK دارند و حذف raw fact می‌تواند با محدودیت NO ACTION مواجه شود.
+- در معماری Excel جدید، worksheet identity باید از Template worksheet، Header از ساختار Header/ColumnSlot و table/sub-table identity از شناسه‌های پایدار LayoutNode تأمین شود؛ متن آزاد `source_column_header` یا `source_section` جایگزین این شناسه‌ها نیست.
+- provenance دقیق سلول برای factهای canonical هنوز باید طراحی شود؛ Template layout به‌تنهایی الزاماً lineage تک‌تک factها، به‌ویژه ورودی‌های چندسلولی، را کامل نمی‌کند.
+
+**تصمیم ایمنی:** تمام 505 رکورد و پنج ستون فعلی بدون تغییر حفظ شوند. هیچ‌یک در Migration بعدی حذف نشود. تا تعیین تکلیف Migration 9 نیز ORM را صرفاً برای mirror کردن دو ستون غایب در GitHub تغییر ندهیم. مسیر PDF/legacy از مسیر Excel جدید جدا بررسی شود.
+
+**گام بعدی:** ممیزی read-only ارتباط سطری 505 raw fact با سه جدول downstream، شمارش orphan/linked/multiple-linked و بررسی اینکه مسیر persistence اکسل فعلی هنوز RawFinancialFact می‌نویسد یا نه. تا پایان این ممیزی، بازنشستگی جدول legacy تصمیم‌گیری نمی‌شود. هیچ ORM، Migration، داده یا تستی در این گام تغییر نکرد.
