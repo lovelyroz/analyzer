@@ -330,3 +330,26 @@ DB-AUD-006 در این نوبت **PARTIAL** باقی می‌ماند. این م�
 5. هنوز دربارهٔ nullable شدن نهایی ستون، migration، backfill یا تغییر ORM تصمیم اجرایی گرفته نشده است. تصمیم به این موارد موکول به تکمیل gateهای DB-DES-009 و طراحی coexistence/retirement مسیر legacy است.
 
 **وضعیت این گام:** شواهد لازم برای تفکیک مسیر legacy CODAL از نیاز جدید Excel به‌دست آمده، اما gate کامل inventory مصرف‌کنندگان repository-wide هنوز به‌دلیل محدودیت‌های بالا «محدود/مشروط» است. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+## 14. تکمیل بررسی Report.financial_period_id و مرز writer قدیمی — 2026-11-18
+
+در ادامهٔ Gate 5 از DB-DES-009، فایل‌های `src/ingestion/service.py`، `src/ingestion/codal/ingestion.py`، `src/ingestion/codal/pipeline.py` و `src/models/report.py` مستقیماً بازبینی شدند.
+
+یافته‌های قطعی:
+- تنها writer مرکزی CODAL که در این مسیر مشاهده شد `src/ingestion/service.py::ingest_codal_report` است؛ facade در `codal/ingestion.py` به همین تابع delegate می‌کند و pipeline نیز همین writer را صدا می‌زند.
+- ورودی writer یک `period_id` اجباری دارد. تابع FinancialPeriod را load می‌کند و company_id را تطبیق می‌دهد.
+- برای Report موجود، company_id و `Report.financial_period_id` با ورودی مقایسه می‌شوند؛ اختلاف باعث رد عملیات می‌شود.
+- برای Report جدید، `financial_period_id=period_id` ثبت می‌شود.
+- همان `period_id` به تمام RawFinancialFactهای ساخته‌شده برای ReportVersion داده می‌شود.
+- مدل Report نیز این ستون را `nullable=False` تعریف می‌کند.
+- facade و pipeline هر دو پارامتر period_id را عبور می‌دهند؛ pipeline فعلی PDF-oriented است.
+- GitHub code search در این نوبت callerهای بیرونی/سایر فایل‌ها را برنگرداند؛ بنابراین inventory کامل callerها هنوز از این بررسی حاصل نشده است.
+
+نتیجهٔ معماری:
+1. period در سطح هر Fact باید مرجع temporal identity باشد؛ یک period واحد نباید به تمام مقادیر یک workbook چنددوره‌ای تحمیل شود.
+2. حذف یا nullable کردن ستون Report اکنون مجاز نیست؛ legacy writer به آن وابستگی اجرایی و هویتی دارد.
+3. تغییر قرارداد باید با تفکیک writer legacy و writer جدید Excel انجام شود؛ نه با تغییر ناگهانی امضای تابع مشترک.
+4. نقش نهایی Report.financial_period_id (حذف تدریجی، nullable و descriptive، یا جایگزینی با primary-period metadata) پس از inventory کامل call-siteها و physical design تعیین می‌شود.
+
+محدودیت: این بررسی static و read-only بود؛ تست اجرا نشد و هیچ کد، ORM، schema، migration یا دیتابیسی تغییر نکرد.
