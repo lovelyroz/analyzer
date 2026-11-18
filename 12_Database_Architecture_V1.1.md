@@ -227,25 +227,30 @@ Retain and define these period attributes:
 - `fiscal_quarter`: nullable where not applicable; otherwise an integer from 1 through 4.
 - `period_type`: describes the duration/span of the source data, not how often the report is published.
 - `months_length`: number of months represented by the source period.
-- `is_ytd`: for a duration-based flow, whether the source amount is cumulative from the start of that company's fiscal year; it is not applicable (`NULL`/not applicable) to an instant/stock observation.
+- `temporal_kind`: `INSTANT` or `DURATION`.
+- `months_length`: exact calendar-month span where determinable under the approved interval rules.
+
+The value's accumulation basis is not a FinancialPeriod attribute. Each applicable DURATION FinancialFact carries `duration_basis` = `YTD` or `STANDALONE`; INSTANT facts have no duration basis (`NULL` / NOT_APPLICABLE).
 
 The actual start of a fiscal year/period must be resolved from the source or a validated company fiscal calendar. Never infer Farvardin 1 or another start date from a market-wide convention.
 
 For the usual cumulative quarterly filing pattern:
 
-| Fiscal quarter | Source period type | months_length | is_ytd |
+| Fiscal quarter | Source period type | months_length | typical source-fact duration_basis |
 |---|---|---:|---|
-| Q1 | `QUARTER` | 3 | true |
-| Q2 | `SEMI_ANNUAL` | 6 | true |
-| Q3 | `NINE_MONTH` | 9 | true |
-| Q4 | `ANNUAL` | 12 | true |
+| Q1 | `QUARTER` | 3 | `YTD` when reported cumulatively from fiscal-year start |
+| Q2 | `SEMI_ANNUAL` | 6 | `YTD` when reported cumulatively from fiscal-year start |
+| Q3 | `NINE_MONTH` | 9 | `YTD` when reported cumulatively from fiscal-year start |
+| Q4 | `ANNUAL` | 12 | `YTD` when reported cumulatively for the full fiscal year |
 
-Monthly source periods use `MONTH`, `months_length=1`, and `is_ytd=false`.
+These are common patterns, not automatic assignments. The fact-level basis must be supported by the source and approved temporal mapping.
+
+Monthly source periods use `MONTH` and `months_length=1`; their FinancialFacts use `duration_basis=STANDALONE` only when the source reports the month independently. A source-reported cumulative monthly value uses `YTD`.
 
 Standalone-quarter figures calculated from cumulative source periods are derived analytical results, not database inputs. This database architecture defines no standalone-quarter field, column, table, or stored record. The database retains the source-reported cumulative values and their source-period metadata exactly as admitted under the input/provenance rules. Any quarter-differencing logic belongs to the runtime analytical layer and is outside this database storage contract.
 `TTM` is not a source `FinancialPeriod` type. TTM is a derived analytical window and is computed at runtime.
 
-The logical period identity is the company plus period shape/type (`INSTANT` or `DURATION`) and the exact Jalali start date and end date. An `INSTANT` period has identical start and end dates and `months_length=0`; `is_ytd` is not applicable. A `DURATION` period has a source-supported date range and applicable duration/YTD semantics. Enforce valid Jalali components, valid shape/date relationships, quarter range 1–4 where applicable, and consistency between dates, duration, period type, and YTD semantics. Reject unresolved or contradictory period metadata rather than guessing.
+The logical period identity is the company plus temporal kind (`INSTANT` or `DURATION`) and exact Jalali start and end dates. An `INSTANT` period has identical start and end dates and `months_length=0`. A `DURATION` period has a source-supported date range. FinancialPeriod does not contain YTD/standalone. Each applicable DURATION FinancialFact carries its own `duration_basis` (`YTD` or `STANDALONE`); INSTANT facts have no duration basis. Enforce valid Jalali components, valid shape/date relationships, quarter range 1–4 where applicable, and consistency between dates, duration, period type, and the fact's temporal basis. Reject unresolved or contradictory temporal metadata rather than guessing.
 
 **Migration caution:** existing SQL `Date` values must be inspected before migration. Do not assume they represent Gregorian dates or Jalali dates and do not blindly convert them. Ambiguous/unresolvable records require an explicit migration report and safe resolution path.
 
@@ -253,12 +258,12 @@ The logical period identity is the company plus period shape/type (`INSTANT` or 
 
 The detailed logical contract is maintained in `database/reports/DB_DES_003_REPORT_PERIOD_CONTRACT.md`. The following rules are normative and clarify this section:
 
-- **Period shape:** distinguish `INSTANT` observations (stock/balance at a date) from `DURATION` observations (flow over a date range). A point-in-time balance uses the same Jalali date as start and end, `period_type=INSTANT`, `months_length=0`, and no YTD flag. Duration periods retain exact start/end dates and their source-supported duration.
-- **YTD applicability:** `is_ytd` applies to duration-based flow values only. It is not a property to apply to stock/instant values. Rates/ratios follow the source-defined instant or duration basis.
+- **Period shape:** distinguish `INSTANT` observations (stock/balance at a date) from `DURATION` observations (flow over a date range). A point-in-time balance uses the same Jalali date as start and end, `period_type=INSTANT`, and `months_length=0`. Duration periods retain exact start/end dates and their source-supported duration.
+- **Value temporal basis:** `duration_basis` belongs to each applicable DURATION FinancialFact and is `YTD` or `STANDALONE`; it is not a shared FinancialPeriod attribute. INSTANT facts have no duration basis. Rates/ratios follow their source-defined instant or duration semantics.
 - **Per-value period assignment:** one Report/ReportVersion may contain multiple tables, periods, and temporal shapes. Every FinancialFact links to its own actual FinancialPeriod. The Report's declared primary period is filing metadata and never forces every fact into that period.
 - **Local table context:** interpret multi-row/merged headers, group labels, measure subheaders, adjustment blocks, comparative dates, and forecast columns within each table. A worksheet-wide or workbook-wide period assumption is invalid. `دوره منتهی به` identifies an end date but does not by itself establish start date, duration, or YTD/standalone.
 - **Opening/change/closing:** opening and closing balances are instant observations; changes over an interval are duration flows. A bare `ابتدای دوره`/`انتهای دوره` without a resolvable date must not be assigned a guessed FinancialPeriod.
-- **Standalone source versus derived:** an explicitly source-reported standalone-quarter value is a report input and may be stored with its actual quarter duration and `is_ytd=false`. A standalone quarter calculated by differencing cumulative source periods is derived and runtime-only. TTM is always runtime-only.
+- **Standalone source versus derived:** an explicitly source-reported standalone-quarter value is a report input and may be stored with its actual quarter duration and `duration_basis=STANDALONE`. A standalone quarter calculated by differencing cumulative source periods is derived and runtime-only. TTM is always runtime-only.
 - **Comparatives:** comparative values belong to the ReportVersion that publishes them and to the FinancialPeriod they describe. Their PIT availability begins at the containing version's publication datetime.
 - **Unresolved temporal meaning:** do not infer dates or temporal semantics from filename, publication date, column order, arithmetic coincidence, or a general report title. If a required fact period cannot be resolved, reject the report under the all-or-nothing admission rule.
 
@@ -851,7 +856,7 @@ The detailed logical contract is maintained in `database/reports/DB_DES_005_INGE
 - Adapter فقط parse می‌کند؛ raw source observations فقط تا پایان interpretation در حافظه می‌مانند. RawFinancialFact نباید archive دائمی ردیف‌های Excel باشد.
 - Source Header، Standard Database Header، FinancialMetric، approved dimensions، temporal meaning و value semantics هویت‌های جدا هستند. هیچ mapping حدسی/fuzzy یا fallback عمومی مجاز نیست.
 - هر FinancialFact باید به ReportVersion منتشرکننده، FinancialPeriod واقعی، Metric، dimensions مصوب (در صورت وجود) و exact extraction/mapping standard version متصل باشد. ReportVersion ممکن است چند دوره داشته باشد.
-- Actual/Forecast/Plan، INSTANT/DURATION، YTD، unit/basis، NULL/zero/ZERO_FALLBACK و Decimal→INTEGER/ROUND_HALF_UP طبق قراردادهای DB-DES-001/002/003 تفسیر می‌شوند؛ derived standalone و TTM در runtime باقی می‌مانند.
+- Actual/Forecast/Plan، INSTANT/DURATION، fact-level duration_basis (YTD/STANDALONE)، unit/basis، NULL/zero/ZERO_FALLBACK و Decimal→INTEGER/ROUND_HALF_UP طبق قراردادهای DB-DES-001/002/003 تفسیر می‌شوند؛ derived standalone و TTM در runtime باقی می‌مانند.
 - کل فایل پیش از persistence اعتبارسنجی می‌شود. unknown/ambiguous in-scope candidate، temporal ambiguity، value/mapping conflict یا duplicate identity با payload متفاوت، کل واحد را رد می‌کند؛ فقط out-of-scope صریح و نسخه‌دار قابل صرف‌نظر است.
 - ReportVersion، تمام FinancialFacts، provenance لازم و COMPLETED status همان Run در یک transaction ثبت می‌شوند؛ rollback باید همان Run را در transaction مستقل FAILED کند.
 - این قرارداد مسیر هدف را تعریف می‌کند و به معنی انطباق implementation فعلی نیست. ممیزی DB-AUD-001 نشان داده مسیر CODAL بررسی‌شده RawFinancialFact می‌نویسد و اتصال production بین mapping و NormalizedFinancialFact در مسیر بررسی‌شده اثبات نشده است.
