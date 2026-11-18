@@ -1639,13 +1639,13 @@ A second evidence-limited mapping proof was prepared for T01 (`صورت سود �
 - Header paths: B = `[دوره منتهي به ۱۴۰۳/۰۶/۳۱, حسابرسی نشده]`; D = `[تجدید ارائه شده ۱۴۰۲/۱۲/۲۹, حسابرسی شده]`.
 - C is black-filled and excluded. E percentage-change data lies outside the candidate bounds and its values are uncolored; it is not silently included.
 - Green row-axis markers: A12 (continuing operations), A32 (discontinued operations), A35 (basic EPS section).
-- Candidate row examples include operating income (A22), continuing-operations net profit (A31), discontinued-operations net profit (A34), and per-share profit (A41).
+- Candidate row examples include operating income (A22), continuing-operations net profit (A31), discontinued-operations net profit (A33), total net profit/loss (A34), and per-share profit (A41). The row semantics were cross-checked against report 3 and corrected in DB-DES-016.
 
 **Important semantic outcomes:**
 - A22/A31/A34 are duration/flow candidates, but the recorded Header dates do not establish exact start dates or YTD versus STANDALONE. Duration basis and exact Jalali intervals remain unresolved under DB-DES-011.
 - A9 states amounts are in millions; currency is not explicitly established by that text. A41 separately states Rial in its row label and must not blindly inherit the general million scale.
 - Audit/restatement qualifiers remain source/ReportVersion provenance, not automatic financial dimensions.
-- Continuing/discontinued/total net-profit rows require an explicit accounting-semantic reconciliation to prevent duplicate or inconsistent mappings.
+- A31 (continuing operations), A33 (discontinued operations), and A34 (total net profit/loss) require an explicit accounting-semantic reconciliation to prevent duplicate or inconsistent mappings.
 
 **Evidence limitation:** report 3's detailed cell inventory is for the earlier workbook SHA `69186f1ad2b0e481a3588f2731b7027b0a9d9a543d1ca17fd24fc71d8c5aca06`; the corrected workbook SHA is `95f94e739632e48ae6552c562ecbf6c3e8182848718d17977f69bc984a6638b0`. The structural review confirms that the old detailed report cannot prove retained-sheet byte identity. Literal values and header text require direct confirmation against the corrected workbook.
 
