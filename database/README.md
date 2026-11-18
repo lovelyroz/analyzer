@@ -64,8 +64,6 @@
 
 ## ممیزی مسیر PDF در CODAL
 
-- [DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md](reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md) — تفکیک اولیه اجزای PDF-only از persistence مشترک، FKهای legacy، تست‌ها و inventory محلی در انتظار اجرا.
+- [DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md](reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md) — ممیزی تکمیل‌شده مسیر PDF و inventory محلی؛ تفکیک اجزای PDF-only از قراردادهای legacy و schema.
 - اسکریپت read-only: `src/scripts/audit_codal_pdf_dependencies.py`.
-
-
-- [DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md](reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md) — ممیزی مسیر PDF تکمیل‌شده با inventory محلی؛ تفکیک PDF-only از قراردادهای legacy و schema.
+- [DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md](reports/DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md) — طرح مرحله‌ای بازنشستگی PDF با حفظ RawFinancialFact و persistence مشترک تا تصمیم مستقل.
