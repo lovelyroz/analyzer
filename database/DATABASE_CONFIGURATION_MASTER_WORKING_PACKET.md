@@ -1871,3 +1871,21 @@ Dimension فقط برای محور اقتصادی value-defining استفاده 
 **ریسک مدل فعلی:** `Report.codal_tracking_id` در مدل فعلی unique است و writer از آن برای grouping چند ReportVersion استفاده می‌کند. اگر مقدار آن همان TracingNo باشد، چون TracingNo شناسهٔ هر filing است، برای هویت پایدار Report stream مناسب نیست. باید قبل از تغییر schema مشخص شود این فیلد دقیقاً از کدام فیلد CODAL پر می‌شود و CODAL چگونه اصلاحیه را به گزارش قبلی مرتبط می‌کند. هیچ Report identity composite یا حدسی در این مرحله تعریف نمی‌شود.
 
 **وضعیت Gate 4:** PARTIAL — candidate source fields شناسایی شدند، اما original/correction relationship و معنای `codal_tracking_id` هنوز نیازمند payload واقعی‌اند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد. جزئیات در بخش 23 گزارش DB-DES-009 ثبت شده است.
+
+
+### 8.84 بررسی اولیهٔ Gate 5 از DB-DES-009 — وابستگی writer قدیمی به Report.financial_period_id — 2026-11-18
+
+فایل‌های `src/ingestion/service.py`، `src/ingestion/codal/ingestion.py`، `src/ingestion/codal/pipeline.py` و `src/models/report.py` مستقیماً بازبینی شدند.
+
+- `service.py::ingest_codal_report` writer مرکزی CODAL مشاهده‌شده است.
+- facade در `codal/ingestion.py` به آن delegate می‌کند؛ pipeline نیز همان writer را صدا می‌زند.
+- writer یک `period_id` اجباری می‌گیرد، FinancialPeriod را load و مالکیت آن را با company_id کنترل می‌کند.
+- برای Report موجود، company_id و `Report.financial_period_id` باید با ورودی یکسان باشند؛ در غیر این صورت عملیات رد می‌شود.
+- برای Report جدید، همان period روی Report ثبت می‌شود و سپس به تمام RawFinancialFactهای همان ReportVersion اختصاص می‌یابد.
+- مدل Report ستون را `nullable=False` تعریف کرده است.
+
+**نتیجه:** ستون فعلاً قابل nullable/remove نیست. این وابستگی باید هنگام بازطراحی Excel به‌صورت سازگاری legacy نگه داشته شود؛ writer جدید باید period را از تفسیر هر observation/fact دریافت کند و یک period واحد را به کل ReportVersion تحمیل نکند. تغییر امضای writer مشترک تا تعیین مرز compatibility ممنوع/زودهنگام است.
+
+**محدودیت:** GitHub code search در این نوبت callerهای کامل را برنگرداند؛ بنابراین فهرست call-siteها هنوز بسته نشده است. بررسی static/read-only بود؛ تست یا تغییر کد/مدل/schema/migration/DB انجام نشد.
+
+**وضعیت Gate 5:** OPEN — وابستگی مستقیم writer و مدل ثبت شد؛ inventory تمام call-siteها و تصمیم نهایی دربارهٔ نقش ستون هنوز باقی است.
