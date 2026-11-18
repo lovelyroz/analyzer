@@ -1300,3 +1300,32 @@ python src/scripts/audit_codal_pdf_dependencies.py
 **قدم بعدی:** DB-DES-010، تعریف قرارداد انتقال queryهای Stage 5 به `financial_facts`، شامل PIT، انتخاب ReportVersion، ابعاد، NULL/zero، provenance و قواعد عددی.
 
 **وضعیت:** local DB linkage audit COMPLETE؛ همه جداول Normalized/Derived در snapshot محلی خالی؛ هیچ ORM، Migration، داده یا تستی تغییر نکرد و تستی اجرا نشد.
+
+
+### 8.53 قرارداد انتقال Queryهای Stage 5 به FinancialFact canonical — DB-DES-010 — 2026-11-18
+
+گزارش: `database/reports/DB_DES_010_STAGE5_FINANCIAL_FACT_QUERY_MIGRATION_CONTRACT.md`
+
+بر مبنای بررسی مستقیم `src/forecast/queries.py`، `src/forecast/service.py`، `ForecastInputRef` و تست‌های production path، قرارداد پیشنهادی انتقال Stage 5 تدوین شد.
+
+**رفتارهای فعلی که باید حفظ شوند:**
+- PIT با شرط publication datetime <= cutoff؛ نسخه منتشرشده بعد از cutoff حتی اگر امروز current/restated باشد، نباید در گذشته دیده شود.
+- provenance برای هر ورودی و حفظ تاریخچه دوره‌ها.
+- NULL به صفر تبدیل نمی‌شود؛ zero واقعی معتبر است.
+- محاسبات مشتق‌شده Stage 5 در حافظه می‌مانند و هیچ خروجی در DB ذخیره نمی‌شود.
+- forecast generation فقط خواندنی باقی می‌ماند.
+
+**اصلاحات لازم؛ کپی مکانیکی Query فعلی مجاز نیست:**
+- Query فعلی periodها را با عدد `period_id` مرتب می‌کند؛ قرارداد جدید ترتیب را فقط از مرزهای Jalali می‌گیرد.
+- اولویت audit/restatement باید قبل از newest-publication tie-break اعمال شود؛ نسخه‌های هم‌رتبه با جدیدترین publication انتخاب می‌شوند.
+- انتخاب فقط با metric_code کافی نیست؛ هر metric باید dimension selector نسخه‌دار داشته باشد. پیش‌فرض company-level، empty dimension set است؛ aggregation یا انتخاب دلخواه بین segmentها ممنوع.
+- جریان‌ها (DURATION) و موجودی‌ها (INSTANT) تفکیک می‌شوند؛ YTD/standalone و طول دوره نباید بی‌قاعده با هم مخلوط شوند.
+- margin فقط از numerator/denominator هم‌دوره و هم‌مبنای زمانی ساخته می‌شود؛ prior revenue باید بازه standalone قابل‌مقایسه داشته باشد.
+- provenance محاسبات مشتق‌شده باید همه Factهای ورودی را نگه دارد، نه فقط بیشترین publication timestamp.
+- INTEGER/Decimal تا مرز صریح adapter حفظ می‌شود؛ تبدیل float نباید ضمنی باشد.
+
+**Metric bindings اولیه:** REVENUE، OPERATING_PROFIT و NET_PROFIT از نوع DURATION؛ TOTAL_EQUITY از نوع INSTANT؛ EPS فقط با basis صریح per-share و همچنان بدون فرض برابری NET_PROFIT با سود قابل انتساب. پیش‌فرض dimension برای همه EMPTY_DIMENSION_SET_ONLY است، مگر mapping مصوب خلاف آن را تعیین کند.
+
+**گیت‌ها:** تأیید DB-DES-009؛ تعیین مالکیت YTD/temporal basis و dimension selector؛ حل Migration 9؛ سپس ORM/Migration، Excel writer و Stage 5 reader به‌صورت additive و با تست‌های adversarial. هیچ dual-write یا حذف جدول legacy در این مرحله مجاز نیست.
+
+**وضعیت:** قرارداد طراحی COMPLETE؛ پیشنهادها نیازمند تأیید مالک؛ هیچ ORM، Migration، کد runtime، داده یا تستی تغییر نکرد و تستی اجرا نشد.
