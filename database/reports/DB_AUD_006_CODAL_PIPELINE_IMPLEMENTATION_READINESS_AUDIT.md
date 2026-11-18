@@ -257,3 +257,48 @@ DB-AUD-006 در این نوبت **PARTIAL** باقی می‌ماند. این م�
 **نتیجه:** در سه writer بازبینی‌شده (CODAL، OHLC و FX)، چند تعارض مستقیم با DB-DES-005 مشاهده شد؛ به‌ویژه دوام STARTED Run، ثبت FAILED روی همان Run و رد کامل batch در برابر خطای سخت. این یافته‌ها برای اثبات عدم انطباق همین مسیرهای بازبینی‌شده کافی‌اند، اما به معنی inventory کامل تمام ingestion call-siteها نیستند.
 
 **وضعیت:** DB-DES-005 / Task 010 و DB-AUD-006 / Task 027 همچنان PARTIAL. این تکمیل صرفاً مستنداتی است؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد. گام بعدی برای بستن ممیزی، تکمیل inventory تمام callerها و transaction/session boundaries از روی repository tree و سپس دریافت schema/data inventory مجاز از محیط‌های واقعی است.
+
+## 12. تکمیل Repository Inventory و اصلاح دامنهٔ نتیجه‌گیری بخش 11 — 2026-11-18
+
+### 12.1 دامنه و روش
+کاربر inventory محلی تمام فایل‌های Python زیر `src/` و خروجی جست‌وجوی عبارت‌های ingestion و transaction را ارائه کرد. inventory شامل مسیرهای core، CODAL، FX، Market، common، scripts و tests است. سپس wrapperها، pipelineها، writer مرکزی، run tracker و تست‌های مرتبط مستقیماً از مخزن بازبینی شدند. این بررسی static بود؛ هیچ تستی اجرا نشد.
+
+### 12.2 نقشهٔ callerها و wrapperها
+- `src/ingestion/codal/ingestion.py::ingest_codal_report` صرفاً facade سازگاری است و به `src/ingestion/service.py::ingest_codal_report` delegate می‌کند؛ transaction مستقل ندارد.
+- `src/ingestion/codal/ingestion.py::ingest_codal_pdf` extraction را اجرا می‌کند و سپس به facade بالا می‌رسد. در extraction failure، Session را rollback و یک Run جدید FAILED commit می‌کند؛ پیش از extraction یک Run پایدار STARTED ایجاد نمی‌کند.
+- `src/ingestion/codal/pipeline.py::load_codal_pdf` و `load_codal_pdf_from_url` acquisition، extraction و validation را پیش از فراخوانی writer مرکزی اجرا می‌کنند. `_audit_failed_run` در failure یک Run جدید FAILED می‌سازد؛ pipeline پیش از acquisition/extraction یک Run پایدار STARTED ایجاد نمی‌کند.
+- `src/ingestion/service.py::ingest_codal_report` writer اصلی Report/ReportVersion/RawFinancialFact است. این تابع Run را STARTED و flush می‌کند؛ در success همان Run و writes را commit می‌کند. در exception، transaction را rollback و Run اولیه را از بین می‌برد، سپس Run جدید FAILED می‌سازد و commit می‌کند.
+- `src/ingestion/service.py::ingest_ohlc_csv` فقط facade به `src/ingestion/market/ingestion.py::ingest_ohlc_csv` است.
+- `src/ingestion/fx/ingestion.py::ingest_fx_xlsx` و `src/ingestion/service.py::ingest_fx_xlsx` هر دو adapter را به `ingest_fx_rates` وصل می‌کنند؛ writer persistence در `src/ingestion/service.py` است.
+- در inventory ارسالی، `start_run`، `complete_run` و `fail_run` فقط در تعریف‌های `src/ingestion/common/run_tracker.py` ظاهر شده‌اند؛ call-site/import مصرف‌کننده‌ای در `src/` مشاهده نشد. بنابراین این helperها فعلاً مسیر اجرایی اثبات‌شده نیستند و نباید در نقشهٔ runtime به‌عنوان caller فعال شمرده شوند.
+
+### 12.3 دامنهٔ دقیق یافته‌های transaction و اصلاح بخش 11
+1. عدم حفظ همان Run پس از rollback در writer مرکزی CODAL مشاهده شد: Run اولیه STARTED rollback می‌شود و Run تازه FAILED ساخته می‌شود.
+2. در CODAL acquisition/extraction/validation wrappers، Run پایدار STARTED قبل از این مراحل ایجاد نمی‌شود؛ در failure صرفاً Run جدید FAILED ثبت می‌شود. این نیز با lifecycle هدف DB-DES-005 فاصله دارد، اما از نظر توالی با rollback یک Run اولیه یکسان نیست.
+3. writerهای FX و OHLC نیز در کد خود Run ایجاد می‌کنند، در success commit می‌کنند و در exception پس از rollback Run جدید FAILED می‌سازند. FX و OHLC ورودی‌های نامعتبر را ردیفی جمع می‌کنند و ممکن است ورودی‌های معتبر دیگر را همراه COMPLETED و `records_failed > 0` commit کنند.
+4. **اصلاح دامنه:** DB-DES-005 قرارداد ingestion مالی CODAL است. رفتار ردیفی FX/OHLC و upsertهای آن‌ها در این گزارش به‌عنوان رفتار مشاهده‌شده ثبت می‌شود، نه نقض اثبات‌شدهٔ DB-DES-005. برای قضاوت دربارهٔ مطلوب/نامطلوب بودن آن‌ها، قرارداد atomicity و revision مستقل FX و Market لازم است.
+5. CODAL replay با کلید `(codal_tracking_id, publication_datetime)` نسخهٔ موجود و facts آن را دوباره استفاده می‌کند و payload ورودی جدید را با payload ذخیره‌شده مقایسه نمی‌کند. تست corpus موجود سه چرخهٔ تکراری با همان استخراج/ورودی را برای عدم duplication و عدم drift بررسی می‌کند؛ این تست، سناریوی همان کلید با payload متفاوت را پوشش نمی‌دهد. بنابراین replay یکسان از نظر دادهٔ تکراری تست شده، اما replay متعارض از نظر payload همچنان بدون guard اثبات‌شده است.
+6. در مسیر CODAL، خطاهای acquisition/extraction/validation پیش از writer و خطاهای persistence داخل writer به Runهای FAILED منجر می‌شوند؛ اما Run lifecycle هدف که یک STARTED پایدار را پیش از کل پردازش ایجاد و همان Run را نهایی کند، در مسیرهای مشاهده‌شده پیاده نشده است.
+
+### 12.4 وضعیت inventory و محدودیت باقی‌مانده
+خروجی محلی، فهرست تمام فایل‌های `*.py` زیر `src/` و تمام matchهای الگوی انتخاب‌شده در همان فایل‌ها را نشان می‌دهد؛ این برای inventory جست‌وجوشده در `src/` شواهد قوی‌تری از جست‌وجوی قبلی GitHub است. با این حال، این روش callهای پویا، reflection، entrypointهای خارج از `src/`، ابزارهای اجرایی بیرونی یا استفاده از SQL مستقیم بدون واژه‌های جست‌وجوشده را اثبات/رد نمی‌کند. بنابراین ادعای «تمام callerهای repository» فراتر از شواهد خواهد بود.
+
+**نتیجهٔ اصلاح‌شده:** Task 010 / DB-DES-005 برای مسیر CODAL همچنان PARTIAL است؛ مهم‌ترین شکاف‌های مشاهده‌شده، پایدار نبودن Run در تمام مراحل acquisition-to-persistence، ایجاد Run جدید به‌جای حفظ همان Run در failure، و نبود payload-conflict check برای replay با همان identity هستند. رفتار FX/OHLC خارج از حکم انطباق DB-DES-005 نگه داشته می‌شود. Task 027 / DB-AUD-006 نیز به علت نبود schema/data inventory از محیط واقعی و محدودیت‌های فوق PARTIAL می‌ماند.
+
+**تغییرات:** فقط همین سند ممیزی و Master Working Packet مستنداتی به‌روزرسانی می‌شوند. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+## 13. Crosswalk با ممیزی‌های قبلی دیتابیس و جلوگیری از تکرار کار — 2026-11-18
+
+بازخوانی Master Working Packet پس از دریافت inventory محلی نشان می‌دهد بخش مهمی از schema/data و dependency auditها پیش‌تر انجام شده‌اند و نباید دوباره درخواست/اجرا شوند:
+
+- **DB-AUD-011 / Master §8.44:** row-linkage دیتابیس محلی برای 505 `raw_financial_facts` انجام شد؛ سه جدول `mapping_decisions`، `normalized_financial_fact_inputs` و `normalized_financial_facts` در همان snapshot فاقد ردیف و فاقد ارجاع بودند.
+- **DB-AUD-015 / Master §8.52:** هر چهار جدول Normalized/Derived در همان دیتابیس محلی صفر ردیف داشتند؛ referenceهای بررسی‌شده صفر، duplicate input-link groups صفر و `PRAGMA foreign_key_check` بدون violation بود.
+- **Migration 9 / Master §8.64:** آثار قابل‌مشاهدهٔ migration 9 در دیتابیس محلی audit و cleanup شد؛ دو ستون اضافی و ledger row حذف شدند، 505 raw facts حفظ شدند و audit پس از cleanup موفق بود. implementation اصلی migration 9 و side effectهای ناشناخته تاریخی همچنان قابل اثبات نیستند.
+- **DB-AUD-012 / Master §§8.45–8.46:** inventory وابستگی PDF در working tree کامل شد؛ 5,611 فایل اسکن، 26 فایل دارای match و مرز PDF-only/shared/schema/test مشخص شد.
+- **DB-AUD-013 / Master §8.48:** gap audit آمادگی persistence اکسل انجام شد و نتیجه داد مسیر production Excel-to-canonical هنوز وجود ندارد؛ `NormalizedFinancialFact` مقصد آماده محسوب نمی‌شود.
+- **DB-PLAN-013 / Master §8.47:** طرح مرحله‌ای بازنشستگی PDF تدوین شد؛ شرط اصلی آن ساخت و اثبات مسیر Excel persistence پیش از قطع مسیر PDF است.
+
+بنابراین عبارت بخش 12 مبنی بر اینکه schema/data inventory محلی هنوز انجام نشده، بیش از حد کلی بود. **ممیزی‌های هدفمند فوق برای snapshot محلی انجام شده‌اند**؛ آنچه هنوز اثبات نشده، وضعیت سایر محیط‌ها/backupها و مصرف‌کنندگان بیرون از working tree بررسی‌شده است. این گزارش درخواست تکرار آن ممیزی‌های محلی را نمی‌دهد.
+
+**مسیر بعدی پروژه:** ادامهٔ Phase 0 از DB-PLAN-013 و بستن gateهای طراحی DB-DES-009 است؛ نه تکرار PDF dependency audit، RawFact linkage یا Normalized/Derived local linkage. اولین gate اجرایی-مستندی که باید بسته شود، inventory تمام مصرف‌کنندگان `reports.financial_period_id` پیش از nullable کردن/جابه‌جایی آن است. سپس gateهای ReportVersion source revision/standard binding، dimension scope، company-consistency و provenance granularity به‌ترتیب بررسی می‌شوند.
+
+هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای در این crosswalk تغییر نکرد و تستی اجرا نشد.
