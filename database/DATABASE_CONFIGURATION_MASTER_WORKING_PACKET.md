@@ -1272,3 +1272,31 @@ python src/scripts/audit_codal_pdf_dependencies.py
 سپس اعلام شود `reply.md is updated` تا خروجی بررسی شود. دیتابیس فقط read-only باز می‌شود؛ هیچ schema یا rowای تغییر نمی‌کند.
 
 **وضعیت:** source consumer inventory COMPLETE؛ اسکریپت ممیزی محلی CREATED؛ اجرای مالک و شواهد دیتابیس PENDING؛ هیچ ORM، Migration، داده یا تستی تغییر نکرده و تستی اجرا نشده است.
+
+
+### 8.52 نتایج ممیزی linkage جداول Normalized و Derived در دیتابیس محلی — DB-AUD-015 — 2026-11-18
+
+گزارش: `database/reports/DB_AUD_015_LOCAL_NORMALIZED_DERIVED_FACT_LINKAGE_RESULTS.md`
+
+مالک اسکریپت `src/scripts/audit_normalized_derived_fact_links.py` را روی `D:\\Winprojects\\analyzer\\tehran_stock.db` در حالت SQLite read-only اجرا کرد.
+
+**نتایج دقیق این snapshot:**
+- `normalized_financial_facts`: صفر ردیف؛ 10 ستون.
+- `normalized_financial_fact_inputs`: صفر ردیف؛ 5 ستون.
+- `derived_financial_facts`: صفر ردیف؛ 11 ستون.
+- `derived_financial_fact_inputs`: صفر ردیف؛ 5 ستون.
+- `raw_financial_facts`: 505 ردیف؛ هیچ‌کدام از 505 ردیف در دو جدول Normalized/NormalizedInput به هم مرتبط نیستند.
+- `derived_financial_facts.source_report_version_id`: صفر reference برای هر دو ReportVersion موجود.
+- تمام referenceهای بررسی‌شده صفر؛ duplicate input-link groups در هر دو جدول صفر.
+- `PRAGMA foreign_key_check`: صفر violation.
+
+**تصمیم و محدودیت:**
+- برای همین فایل دیتابیس، backfill داده از Normalized/Derived به مدل جدید لازم نیست، چون این چهار جدول خالی‌اند.
+- این نتیجه فقط snapshot محلی را پوشش می‌دهد؛ محیط‌های دیگر، backupها و مصرف‌کنندگان خارجی بررسی نشده‌اند. بنابراین مجوز حذف مدل، جدول، FK یا migration نیست.
+- 505 ردیف RawFinancialFact و پنج ستون provenance طبق DB-AUD-011 دست‌نخورده می‌مانند.
+- Stage 5 query در source همچنان مصرف‌کننده واقعی است و نباید صرفاً به علت خالی بودن جدول محلی حذف شود.
+- Migration 9 discrepancy همچنان مانع بازنشستگی destructive schema است.
+
+**قدم بعدی:** DB-DES-010، تعریف قرارداد انتقال queryهای Stage 5 به `financial_facts`، شامل PIT، انتخاب ReportVersion، ابعاد، NULL/zero، provenance و قواعد عددی.
+
+**وضعیت:** local DB linkage audit COMPLETE؛ همه جداول Normalized/Derived در snapshot محلی خالی؛ هیچ ORM، Migration، داده یا تستی تغییر نکرد و تستی اجرا نشد.
