@@ -151,3 +151,24 @@ A company formally changes its year-end and the transition period runs for fewer
 This design is sufficient to guide the later physical schema proposal, but not to start ORM/migration work. The source-evidence and Migration 9 gates above remain open.
 
 No ORM, migration, runtime code, database row, workbook, or test was changed.
+
+
+## 11. Owner clarification amendment — strict twelve-month fiscal year (2026-11-18)
+
+The owner clarified the domain invariant: **every fiscal year is exactly twelve Jalali calendar months**. This amendment supersedes conflicting wording in Sections 1, 2, 4, 5, 6, 8, and 9 that allowed short/long transition years.
+
+### Binding V1 rules
+
+1. Every CompanyFiscalYear must span exactly twelve consecutive Jalali calendar months. This is not a fixed 365-day rule; actual day count can differ because of the Jalali leap-year cycle and month lengths.
+2. The start month/day may be company-specific; Farvardin 1 is not a universal default.
+3. No short or long transition fiscal-year record is permitted in V1.
+4. A normal next year must follow the approved annual sequence without a gap or overlap. Its exact dates must be evidenced or deterministically established by an already approved company-specific rule.
+5. If an official fiscal-year change appears to require a short/long interval, a gap, or an overlap, do not manufacture a transition record or silently rebase prior years. Mark the calendar/report unresolved and fail closed until an explicit owner-approved policy resolves the case.
+6. Corrections to a previously approved boundary remain auditable and must not silently rewrite historical facts.
+7. YTD assignment remains fact-level: the DURATION fact's actual start date must equal the approved Company's fiscal-year start, and source semantics must establish cumulative measurement.
+
+### Fiscal-year change implication
+
+A change in closing month cannot automatically be bridged while preserving both (a) twelve months in every fiscal year and (b) a continuous, non-overlapping annual sequence. Therefore, V1 does not implement automatic fiscal-year-boundary changes. It records only fully evidenced twelve-month fiscal-year intervals and rejects unresolved changes. If a real target-company case requires a different treatment, that is a separate policy decision; the system must not infer it.
+
+**Status:** The twelve-month invariant is accepted owner input and binding for the V1 logical design. This amendment changes documentation only; no ORM, migration, code, database, or tests changed.
