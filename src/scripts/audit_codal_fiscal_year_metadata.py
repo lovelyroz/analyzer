@@ -64,6 +64,30 @@ def get_annual_filings(symbol: str):
         payload = json.loads(response.read().decode("utf-8-sig"))
         return url, response.status, payload
 
+
+def get_filings_for_year_end(symbol: str, year_end: str):
+    """Fetch main-issuer financial-statement filings for one exact Jalali year-end."""
+    params = {
+        "Symbol": symbol, "Category": "1", "LetterType": "6",
+        "YearEndToDate": year_end, "PageNumber": "1",
+        "Audited": "true", "NotAudited": "true",
+        "Consolidatable": "true", "NotConsolidatable": "true",
+        "Childs": "false", "Mains": "true", "Publisher": "false", "search": "true",
+    }
+    query = urllib.parse.urlencode(params)
+    url = f"https://search.codal.ir/api/search/v2/q?{query}"
+    request = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "fa-IR,fa;q=0.9,en;q=0.8",
+        "Referer": "https://www.codal.ir/",
+        "Origin": "https://www.codal.ir",
+    })
+    with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+        payload = json.loads(response.read().decode("utf-8-sig"))
+        return url, response.status, payload
+
+
 def main() -> int:
     lines = [
         "# CODAL fiscal-year metadata live audit",
@@ -152,6 +176,42 @@ def main() -> int:
                             "letter_code": letter.get("LetterCode"),
                             "url": letter.get("Url"),
                         }, ensure_ascii=False))
+
+        # Focused ZFars checks: query each selected year-end explicitly.
+        # Length is intentionally omitted here; CODAL uses it as a period-month
+        # filter, not as a page-size setting.
+        focused_year_ends = (
+            "1404/09/30", "1403/10/30", "1403/09/30",
+            "1402/12/29", "1402/10/30",
+        )
+        for year_end in focused_year_ends:
+            time.sleep(PAUSE_SECONDS)
+            url, status, payload = get_filings_for_year_end("زفارس", year_end)
+            letters = payload.get("Letters", []) if isinstance(payload, dict) else []
+            lines += [
+                "",
+                f"## ZFars filings for exact year-end {year_end} (Length filter omitted)",
+                f"- URL: {url}",
+                f"- HTTP status: {status}",
+                f"- Total matches reported by CODAL: {payload.get('Total') if isinstance(payload, dict) else 'invalid'}",
+                f"- Records on first page: {len(letters) if isinstance(letters, list) else 'invalid'}",
+            ]
+            if isinstance(letters, list):
+                for letter in letters:
+                    if isinstance(letter, dict):
+                        lines.append("  - " + json.dumps({
+                            "tracing_no": letter.get("TracingNo"),
+                            "symbol": letter.get("Symbol"),
+                            "company_name": letter.get("CompanyName"),
+                            "title": letter.get("Title"),
+                            "sent": letter.get("SentDateTime"),
+                            "published": letter.get("PublishDateTime"),
+                            "period_length": letter.get("Length"),
+                            "year_end_to_date": letter.get("YearEndToDate"),
+                            "letter_code": letter.get("LetterCode"),
+                            "url": letter.get("Url"),
+                        }, ensure_ascii=False))
+
 
     except urllib.error.HTTPError as exc:
         lines += [
