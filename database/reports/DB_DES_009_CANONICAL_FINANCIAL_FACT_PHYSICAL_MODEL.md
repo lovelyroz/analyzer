@@ -660,3 +660,38 @@ Filename، local path، download URL، ingestion timestamp یا SHA-256 به‌�
 این مدل physical proposal است، نه ORM authorization. Parsian annotation map فعلی هنوز candidate/provisional است؛ تمام table bounds و row-axis paths production-approved نیستند و workbook مستقل دورهٔ بعد برای drift validation در دسترس این بررسی نبود. پیش از تصویب physical schema باید حداقل یک table با row-axis کامل از دو workbook مستقل، یک direct fact و یک multi-input fact، بدون تکیه بر cell coordinate دائمی، end-to-end مدل‌سازی شود.
 
 **نتیجه Gate 7:** پیشنهاد physical row-axis و semantic intersection اکنون مشخص‌تر شده است؛ اما تا زمان evidence validation و تکمیل مثال‌های direct/multi-input، Gate 7 همچنان **PARTIAL / OPEN** است. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 23. تکمیل شواهد عمومی CODAL برای Gate 4 و ریسک هویت Report — 2026-11-18
+
+### 23.1 شواهد فنی بیرونی (غیررسمی)
+دو مرجع فنی عمومی که ساختار Search API کدال را reverse-engineer کرده‌اند، این فیلدها را در نتیجهٔ جست‌وجوی هر filing نشان می‌دهند:
+- `TracingNo`: شناسهٔ عددی یکتای filing.
+- `Url`: شامل `LetterSerial`.
+- `LetterSerial`: شناسهٔ opaque یکتای هر letter و کلید دسترسی به صفحه و فایل Excel/PDF.
+- `PublishDateTime` و `SentDateTime`: metadata زمانی منبع.
+- `Title`، `LetterCode`، `HasExcel` و `ExcelUrl`: metadata و دسترسی به artifact.
+
+منابع فنی (غیررسمی و نه قرارداد رسمی منتشرشده از CODAL):
+- `https://github.com/amirziveh/codal-skill/blob/master/SKILL.md` — بخش‌های LetterSerial، TracingNo و Letter Response Schema.
+- `https://mohsenebrahimyir.github.io/codal-tsetmc/codal.html` — نمونهٔ خروجی Search API و فیلدهای TracingNo/PublishDateTime/Url/ExcelUrl.
+
+این شواهد برای شناسایی candidate fieldها کافی است، اما جایگزین دریافت payload واقعی از endpoint و بررسی یک زوج گزارش اصلی/اصلاحی نیست.
+
+### 23.2 اصلاح و دقیق‌سازی تصمیم source identity
+- `LetterSerial` candidate قوی برای `source_revision_key` است، چون هر filing/letter را مشخص می‌کند و مستقیماً برای دریافت Excel استفاده می‌شود.
+- `TracingNo` باید به‌عنوان source filing identifier عددی و cross-reference حفظ شود؛ در صورت اثبات one-to-one بودن با LetterSerial، هر دو در ReportVersion نگهداری و متقابلاً validate شوند.
+- `PublishDateTime` زمان انتشار منبع است؛ `SentDateTime` نیز در صورت نیاز به‌عنوان metadata جدا حفظ شود. این دو نباید با ingestion timestamp جایگزین شوند.
+- SHA-256 همچنان فقط artifact fingerprint است؛ LetterSerial/TracingNo را جایگزین نمی‌کند.
+- اصلاحیه/بازانتشار باید با filing identity جدید و رابطهٔ نسخه‌ای/اصلاحی مناسب ثبت شود، اما اینکه CODAL برای correction دقیقاً چه فیلد یا رابطه‌ای منتشر می‌کند هنوز با نمونهٔ واقعی اثبات نشده است.
+
+### 23.3 ریسک مهم در مدل فعلی Report
+در ORM فعلی، `Report.codal_tracking_id` unique است و در writer legacy به‌عنوان شناسهٔ پایدار Report برای grouping چند ReportVersion استفاده می‌شود. اما اگر این فیلد در ورودی واقعی همان `TracingNo` باشد، چون TracingNo طبق شواهد فنی برای هر filing یکتا است، دیگر نمی‌تواند شناسهٔ پایدار یک Report stream باشد؛ هر filing جدید ممکن است Report جدا بسازد و version grouping از دست برود.
+
+بنابراین پیش از هر تغییر schema باید semantics دقیق `codal_tracking_id` فعلی روشن شود:
+- آیا واقعاً TracingNo یک filing است؟
+- آیا یک شناسهٔ دیگری برای Report stream وجود دارد؟
+- CODAL چگونه filing اصلاحی را به filing قبلی مرتبط می‌کند؟
+- اگر شناسهٔ stream رسمی وجود ندارد، تعریف Report identity باید جداگانه و بر اساس شواهد شرکت/ReportType/period/نوع صورت/تلفیقی-غیرتلفیقی و رابطهٔ اصلاحیه طراحی شود؛ هیچ composite key حدسی در این مرحله پذیرفته نیست.
+
+**نتیجه به‌روزشده Gate 4:** فیلدهای source filing candidate شناسایی شدند و `LetterSerial` به‌عنوان candidate اصلی source revision key توصیه می‌شود؛ اما زوج واقعی original/correction و semantics فعلی `codal_tracking_id` هنوز بررسی نشده‌اند. Gate 4 از EVIDENCE BLOCKED به **PARTIAL / SOURCE-FIELD CANDIDATES IDENTIFIED; REPORT-GROUPING UNVERIFIED** تغییر می‌کند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
