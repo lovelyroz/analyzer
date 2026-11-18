@@ -438,3 +438,45 @@ DB-DES-014 قرارداد منطقی row-axis path و SemanticMappingRule را �
 یک workbook چندجدولی/چنددوره‌ای دلیل کافی برای چند binding نیست. چند binding فقط در صورتی قابل طرح است که بعداً شواهد واقعی از یک واحد انتشار با چند report family مستقل ارائه شود؛ چنین موردی در scope فعلی تثبیت نشده است.
 
 **نتیجه Gate 8:** فرض یک TemplateVersion + یک Interpretation Bundle برای هر ReportVersion در scope فعلی پذیرفته می‌شود و gate در سطح logical design بسته است. Physical schema باید bindingهای NOT NULL/immutable و ارجاع bundle به mapping versionهای مربوط را enforce کند. ReportType catalog و جزئیات physical bundle هنوز باید در gateهای catalog/implementation طراحی شوند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 17. بررسی Gate 1 — تعریف دقیق Interpretation Standard Bundle — 2026-11-18
+
+### 17.1 مرزبندی نسخه‌ها
+- `TemplateVersion` فقط ساختار فیزیکی workbook را مشخص می‌کند: worksheet، table/sub-table، Header ranges/bindings، ColumnSlot و extraction spans.
+- `InterpretationStandardVersion` معنای مالی ساختار را مشخص می‌کند؛ یعنی قواعدی که مشاهدهٔ row/column را به Metric، Dimension، FinancialPeriod، temporal basis، unit/measurement basis و value state تبدیل می‌کنند.
+- نسخهٔ Reader/adapter، profile اجرا، DTO schema و پردازش عملیاتی متعلق به `IngestionRun`/operational provenance هستند؛ نباید با نسخهٔ معنایی استاندارد یکی شوند.
+- source fingerprint، CODAL source revision و publication metadata در ReportVersion/source identity قرار می‌گیرند؛ بخشی از Interpretation Standard نیستند.
+- FinancialMetric identity کاتالوگ پایدار است؛ استاندارد به Metricهای مصوب ارجاع می‌دهد و نباید تعریف Metric را در خود کپی یا بی‌صدا بازنویسی کند.
+
+### 17.2 اجزای الزامی Interpretation Standard Bundle
+یک Bundle نسخه‌دار باید اجزای زیر را به‌صورت immutable یا با reference نسخه‌دار در بر بگیرد:
+1. **Scope:** دامنهٔ report family/type و Industry شرکت، با اتصال به TemplateVersion دقیق؛ شرکت در V1 یک Industry دارد.
+2. **Semantic mapping rules:** نگاشت کامل row-axis path + Header path + layout node/ColumnSlot به Metric و Dimensionهای مصوب؛ یک mapping باید دقیقاً یک معنا داشته باشد.
+3. **Temporal interpretation:** قواعد تبدیل Header/context به FinancialPeriod واقعی جلالی، temporal kind، نقش PRIMARY/COMPARATIVE/UNKNOWN و duration_basis برای Factهای DURATION؛ قواعد باید با DB-DES-003/011 همسو باشند و از عنوان گزارش/ترتیب ستون/شماره فصل به‌تنهایی دوره یا YTD حدس نزنند.
+4. **Dimension interpretation:** شناسه و نسخهٔ scope/allowed values و قواعد استخراج Dimensionهایی که واقعاً هویت اقتصادی مقدار را تغییر می‌دهند؛ dimension catalog می‌تواند مستقل version شود اما Bundle باید نسخهٔ دقیق مورد استفاده را pin کند.
+5. **Unit and measurement semantics:** قواعد تشخیص/اعتبارسنجی source unit، currency، scale و measurement basis و هر تبدیل صریحاً مجاز؛ تبدیل ضمنی یا rescaling مجاز نیست.
+6. **Value-state rules:** قواعد تشخیص REPORTED_VALUE، REPORTED_NULL و ZERO_FALLBACK و سیاست blank/zero مختص template/report family؛ ZERO_FALLBACK فقط در دامنهٔ استثنای مصوب قابل استفاده است.
+7. **Controlled source-label/header aliases:** aliasها و نرمال‌سازی‌های معنایی مصوب، با scope و نسخه؛ تطبیق fuzzy یا انتقال خودکار دیکشنری یک صنعت به صنعت دیگر ممنوع است.
+8. **Approval/immutability metadata:** شناسه، شماره نسخه، وضعیت DRAFT/APPROVED/RETIRED، زمان/مرجع تأیید و تاریخچهٔ نسخه‌ها؛ Bundle مورد استفادهٔ Factهای پذیرفته‌شده نباید ویرایش درجا شود.
+
+Bundle باید مجموعه‌ای از rule/version referenceها باشد، نه یک سند متنی یا یک نسخهٔ واحد برای تمام mappingهای مستقل. چندین SemanticMappingRule و چند catalog version می‌توانند درون یک InterpretationStandardVersion بسته‌بندی شوند؛ ReportVersion همچنان فقط یک Bundle را reference می‌کند.
+
+### 17.3 Scope و هویت فیزیکی پیشنهادی
+با توجه به اینکه Template در DB-DES-008 در scope یک Company + ReportType تعریف می‌شود و هر TemplateVersion تمام layout همان workbook را پوشش می‌دهد، پیشنهاد می‌شود InterpretationStandardVersion به **یک TemplateVersion دقیق** مقید باشد:
+- هویت نسخه: `interpretation_standard_version_id` به‌عنوان PK و `version_number` در scope همان `template_version_id`.
+- قید یکتا: `(template_version_id, version_number)`.
+- Bundle شامل mapping/rule versionهای سازگار با همان TemplateVersion است.
+- ReportVersion هم `template_version_id` و هم `interpretation_standard_version_id` را نگه می‌دارد؛ composite FK یا trigger باید ثابت کند TemplateVersion ارجاع‌شده توسط Bundle دقیقاً همان TemplateVersion متصل به ReportVersion است.
+- Company، Industry و ReportType از زنجیرهٔ TemplateVersion → Template → Company/ReportType قابل اعتبارسنجی‌اند؛ از تکرار بی‌دلیل این scope fields در هر Fact پرهیز شود.
+- تغییر layout، TemplateVersion جدید می‌سازد و Bundle سازگار جدید لازم دارد. تغییر معنای mapping/temporal/unit/value/alias بدون تغییر layout نیز InterpretationStandardVersion جدید می‌سازد.
+
+### 17.4 Scope خاص دیکشنری‌ها
+سند معماری، Header dictionary فعلی را فقط برای periodic reports صنعت بانک تأیید کرده است. این دیکشنری به‌تنهایی جایگزین Metric-level semantic mapping نیست و نباید به شرکت‌ها/صنایع دیگر تعمیم یابد. Bundle هر Template فقط ruleها و aliasهایی را می‌تواند فعال کند که برای همان Industry + ReportType و شواهد همان Template تأیید شده‌اند.
+
+### 17.5 نتیجه Gate 1
+**تصمیم طراحی:** InterpretationStandardVersion یک immutable bundle متصل به یک TemplateVersion است که semantic mapping، temporal interpretation، dimension references، unit/value-state rules و alias/normalization references را با نسخهٔ دقیق pin می‌کند. Reader/adapter version و source revision از آن جدا می‌مانند.
+
+این تعریف، محتوای منطقی Bundle و scope آن را مشخص می‌کند؛ طراحی relational جزئی جدول‌های component/reference، workflow تأیید و قیدهای سازگاری ReportVersion هنوز باید در physical schema نهایی شود.
+
+**وضعیت Gate 1:** در سطح logical definition بسته شد؛ physical catalog/bundle schema و approval workflow باز هستند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
