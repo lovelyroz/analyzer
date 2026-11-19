@@ -269,3 +269,13 @@ Counts نهایی باید با نتیجهٔ commit سازگار باشند. د�
 تست‌های موجود صرفاً وجود audit و upsert را در چند حالت تأیید می‌کنند؛ failure injection برای اثبات rollback کل batch، race/unique conflict، durable STARTED، یا replay fingerprint یافت/اثبات نشد. در نتیجه، قرارداد مستند به‌تنهایی evidence پیاده‌سازی نیست.
 
 **تصمیم اجرایی/محدودیت:** این یافته‌ها مجوز تغییر سرویس یا تست نیستند. پیش از implementation باید revision identity و fingerprint scope برای هر Feed و رفتار correction تأیید شود. هیچ کد، مدل، schema، migration یا DB تغییر نکرده و تستی اجرا نشده است.
+
+
+### 8.99 — قیود یکتایی Jalali و اتلاف diagnostics در adapterها (2026-11-19)
+
+**نتیجه: PARTIAL؛ دو نقص مستقل در هویت فیزیکی و مرز parse کشف شد.**
+
+1. `MarketDaily` unique فعلی `(company_id, trade_date)` است، در حالی که مسیر Jalali مقدار `trade_date=NULL` می‌نویسد. `FXRate` unique فعلی `(rate_date,currency_from,currency_to,rate_type)` است، در حالی که مسیر Jalali `rate_date=NULL` می‌نویسد. SQLite چند NULL را در UNIQUE می‌پذیرد؛ بنابراین این قیود duplicateهای Jalali را متوقف نمی‌کنند. lookupهای `.one_or_none()` ممکن است با duplicateهای موجود شکست بخورند و قید DB مانع race نیست.
+2. Market adapter diagnostics را برمی‌گرداند ولی service بخشی از ردیف‌های سالم را با وجود خطا commit می‌کند. FX adapter تعدادی ردیف malformed/blank را پیش از ساخت DTO بی‌صدا حذف می‌کند و service نیز DTOهای نامعتبر را skip می‌کند؛ این هم count خطا را ناقص می‌کند و هم با fail-whole-unit تعارض دارد.
+
+اقدام امن بعدی فقط audit خواندنی duplicateهای فعلی روی کلیدهای Jalali و inventory نسخهٔ SQLite/migration chain است. هرگونه unique migration باید پس از duplicate preflight و تصمیم دربارهٔ داده‌های موجود طراحی شود؛ merge/delete خودکار ممنوع. هیچ کد، ORM، schema، migration یا DB تغییر نکرده و تستی اجرا نشده است.
