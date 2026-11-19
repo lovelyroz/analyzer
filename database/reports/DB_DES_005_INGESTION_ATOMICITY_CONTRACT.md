@@ -248,3 +248,24 @@ Counts نهایی باید با نتیجهٔ commit سازگار باشند. د�
 - `test_stage1_database_integrity.py` migration runner را تا نسخهٔ ۸ تثبیت می‌کند؛ هیچ migration فعال برای unique constraint هویت جلالی Market/FX در این تست وجود ندارد.
 
 بنابراین صرف اصلاح سرویس کافی نیست: تست‌های موجودی که semantics قدیمیِ partial acceptance و overwrite را تثبیت می‌کنند نیز باید با قرارداد مالک بازنگری شوند. تست‌های لازمِ مفقود/ناکافی شامل failure injection در میانهٔ batch و commit، اثبات صفر ماندن canonical rows پس از هر hard error، duplicate/conflict درون batch، replay fingerprint یکسان/متفاوت، رقابت هم‌زمان روی هویت جلالی، failure در ثبت audit، و late-arriving CODAL publication هستند. هیچ تستی در این ممیزی اجرا نشده است؛ نتیجه صرفاً از خواندن assertionهای موجود به‌دست آمده است.
+
+
+## 13. تطبیق کد جاری با قرارداد — ممیزی 2026-11-19
+
+**وضعیت: PARTIAL؛ اختلاف اجرایی عمده با قرارداد §§4–10.** بررسی مستقیم مدل و سرویس‌ها:
+
+| موضوع | رفتار فعلی مشاهده‌شده | نتیجه نسبت به قرارداد |
+|---|---|---|
+| Audit Run | فقط source/status/timestamps و counts پایه/error_log؛ بدون artifact fingerprint، profile/adapter version، duplicate count یا retry reference | ناقص |
+| STARTED durability | Run و canonical writes در همان Session آغاز می‌شوند؛ ثبت مستقل و پایدار STARTED پیش از parse/validation اثبات نشده | مغایر §4 |
+| CODAL identity | tracking ID اختیاری؛ replay فقط tracking ID + publication_datetime، بدون content fingerprint | مغایر §§6.1–6.4 |
+| CODAL chronology | هر نسخهٔ جدید current می‌شود و قبلی demote؛ مقایسهٔ chronology برای late arrival دیده نشد | مغایر قرارداد PIT |
+| Market batch | ردیف‌های invalid/parser errors شمرده می‌شوند، اما معتبرهای همان فایل commit می‌شوند؛ تست‌ها این رفتار را assert می‌کنند | مغایر fail-whole-unit §5 |
+| Market correction | کلید شرکت + تاریخ جلالی؛ مقدار و source در برخورد با رکورد موجود بی‌قیدوشرط overwrite می‌شوند | مغایر §6.3 |
+| FX batch | ردیف‌های نامعتبر skip و معتبرها commit می‌شوند؛ تست invalid-rate انتظار COMPLETED با partial insertion دارد | مغایر §5 |
+| FX correction | همان کلید تاریخ/ارز/نوع نرخ با rate/source جدید overwrite می‌شود؛ تست آن را update idempotent می‌نامد | مغایر §6.3 |
+| Exception API | CODAL پس از audit FAILED exception را raise می‌کند؛ Market/FX نتیجه FAILED برمی‌گردانند | ناهمگون |
+
+تست‌های موجود صرفاً وجود audit و upsert را در چند حالت تأیید می‌کنند؛ failure injection برای اثبات rollback کل batch، race/unique conflict، durable STARTED، یا replay fingerprint یافت/اثبات نشد. در نتیجه، قرارداد مستند به‌تنهایی evidence پیاده‌سازی نیست.
+
+**تصمیم اجرایی/محدودیت:** این یافته‌ها مجوز تغییر سرویس یا تست نیستند. پیش از implementation باید revision identity و fingerprint scope برای هر Feed و رفتار correction تأیید شود. هیچ کد، مدل، schema، migration یا DB تغییر نکرده و تستی اجرا نشده است.
