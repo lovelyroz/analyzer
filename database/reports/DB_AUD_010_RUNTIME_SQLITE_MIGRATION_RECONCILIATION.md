@@ -144,3 +144,41 @@ The current repository migration chain is version 8, while the previously record
 5. تا بسته‌شدن موارد بالا، cleanup با --apply ممنوع باقی می‌ماند؛ افزودن Migration 10 برای «همسان‌سازی» ledger نیز مجاز نیست.
 
 **وضعیت:** این بررسی source-only است؛ هیچ scriptی اجرا نشد، هیچ DB باز نشد، و هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد. Migration 9 همچنان UNRECONCILED و DB-AUD-010 همچنان PARTIAL است.
+
+
+## 11. پروتکل دقیق تطبیق فایل runtime بدون اتصال write-capable — 2026-11-19
+
+بازبینی تکمیلی `src/scripts/init_db.py` و `src/scripts/migrate_db.py` نشان می‌دهد هر دو `engine` را از `src.core.database` import می‌کنند؛ اما این فایل‌ها `PRAGMA database_list` را چاپ نمی‌کنند. در فهرست sourceهای فعلی نیز entrypoint قطعی اجرای برنامهٔ اصلی شناسایی نشد. بنابراین working directory واقعی اپلیکیشن از repository source به‌تنهایی قابل استنتاج نیست.
+
+برای جلوگیری از بازکردن تصادفی DB جدید یا اتصال به فایل اشتباه، مرحلهٔ بعد باید با working directory واقعی همان فرایندی انجام شود که اپلیکیشن را اجرا می‌کند. URL فعلی `sqlite:///./tehran_stock.db` مسیر نسبی دارد؛ مسیر مورد انتظار آن در آن launch context برابر `Path.cwd() / "tehran_stock.db"` است. پیش از اتصال، وجود فایل باید بررسی شود؛ اگر فایل وجود ندارد، audit باید متوقف شود و نباید SQLite آن را ایجاد کند.
+
+نمونهٔ read-only برای اجرا در همان working directory (این snippet در این ممیزی اجرا نشده است):
+
+```python
+from pathlib import Path
+import sqlite3
+
+candidate = (Path.cwd() / "tehran_stock.db").resolve()
+if not candidate.is_file():
+    raise SystemExit(f"STOP: runtime candidate does not exist: {candidate}")
+
+uri = candidate.as_uri() + "?mode=ro"
+con = sqlite3.connect(uri, uri=True)
+try:
+    print("candidate_path:", candidate)
+    print("database_list:", con.execute("PRAGMA database_list").fetchall())
+    print("sqlite_version:", con.execute("SELECT sqlite_version()").fetchone())
+    print("migration_ledger:", con.execute(
+        "SELECT version, name, applied_at FROM schema_migrations ORDER BY version"
+    ).fetchall())
+finally:
+    con.close()
+```
+
+این روش فقط زمانی نمایندهٔ فایل runtime است که `Path.cwd()` دقیقاً با working directory فرایند اپلیکیشن در زمان بازکردن SQLite یکسان باشد. اگر اپلیکیشن در محیط service/container یا با launcher متفاوت اجرا می‌شود، باید cwd همان محیط از تنظیمات launcher/process ثبت شود؛ cwd ترمینال توسعه‌دهنده کافی نیست. خروجی `PRAGMA database_list` باید مسیر canonical را نشان دهد و با `candidate_path` تطبیق داده شود. پس از آن، duplicate preflightهای DB-DES-004 §15 فقط روی همین فایل و با اتصال read-only اجرا شوند.
+
+### نکتهٔ تکمیلی دربارهٔ cleanup guard
+
+در `cleanup_incomplete_migration_9.py` شرط نسخه با مقایسهٔ رشته‌ای `version < "3.35.0"` پیاده شده است. برای نسخهٔ گزارش‌شدهٔ `3.45.3` فعلاً نتیجهٔ مورد انتظار برقرار است، اما مقایسهٔ lexicographic برای قالب‌های نسخهٔ دیگر قابل اتکا نیست. این نقص source-level ثبت می‌شود؛ اصلاح کد در این Task انجام نمی‌شود و به‌تنهایی نیز مجوز اجرای cleanup ایجاد نمی‌کند.
+
+**وضعیت:** entrypoint اصلی و cwd واقعی هنوز UNKNOWN؛ پروتکل read-only آمادهٔ اجرای مالک است. هیچ script یا query اجرا نشد، هیچ DB باز/ایجاد نشد و هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد. Migration 9 همچنان UNRECONCILED و DB-AUD-010 همچنان PARTIAL است.
