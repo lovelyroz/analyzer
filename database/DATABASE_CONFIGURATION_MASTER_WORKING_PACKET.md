@@ -2192,3 +2192,18 @@ Task 024 بسته شد و قرارداد انتخاب نوع ورودی و admis
 ## 9.12 هم‌راستاسازی DB-DES-004 با تصمیم‌های نهایی MarketDaily — 2026-11-19
 
 خلاصهٔ اجرایی Task 009 به‌روزرسانی شد تا تصمیم‌های مالک دربارهٔ MarketDaily نمونهٔ سامان به‌صورت یکجا منعکس شوند: چهار ستون عددی و واحدهایشان، منبع CODAL، روش دریافت با اسکریپت اختصاصی مالک، و تاریخ جلالی `J-Date` با قالب `YYYY-MM-DD`. این blockerها دیگر در Task 009 باز شمرده نمی‌شوند. publication/availability و revision/correction، هویت شرکت/نماد و کد بازار، و روش ورود ShareCountHistory/CorporateAction همچنان بازند؛ همچنین تطبیق قرارداد با پیاده‌سازی و atomicity در دامنهٔ مستقل خود باقی است. Task 009 PARTIAL می‌ماند. فقط Master Packet به‌روزرسانی شد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 9.13 تصمیم‌های مالک برای Entity و Report/PIT — 2026-11-19
+
+مالک تصمیم‌های تجمیعی DB-AUD-003 و DB-AUD-004 را اعلام کرد و موارد سیاستی زیر بسته شدند:
+
+- Company V1: چهار فیلد هویتی ثابت (company_id, company_name, ticker, industry_id) به‌علاوهٔ فقط دو فیلد اضافهٔ codal_symbol و fiscal_year_end. فیلدهای national_id, status, is_active, created_at جزو قرارداد هدف V1 نیستند. حذف فیزیکی آن‌ها بدون inventory مصرف‌کنندگان، بررسی داده و migration plan مجاز نیست.
+- Industry: seed نسخه‌دار و idempotent برای هفت کد اولیه تأیید شد؛ active/status جداگانه نیاز نیست.
+- Ticker: قید UNIQUE سراسری ندارد؛ company_id هویت پایدار است و ticker کلید هویت نیست.
+- Report: financial_period_id فقط اشاره‌گر اختیاری/توصیفی دورهٔ اصلی است؛ هر Fact باید به دورهٔ واقعی خودش متصل باشد.
+- Report identity: شناسهٔ پایدار و یکتای منبع برای پذیرش و replay خودکار لازم است. در نبود آن، fail-closed و ارجاع برای رفع metadata؛ ساخت کلید ترکیبی حدسی از عنوان/تاریخ/شرکت ممنوع. Replay باید fingerprint محتوا را نیز مقایسه کند.
+- نسخهٔ انتشار دیررس: حفظ به‌عنوان نسخهٔ تاریخی، بدون current شدن صرفاً به‌دلیل دیرتر ingestion شدن.
+- وضعیت audit/restatement نامعلوم: اگر بر رتبه/برنده اثر بگذارد، انتخاب خودکار unresolved باقی می‌ماند.
+
+این تصمیم‌ها blockerهای مالکیتی DB-AUD-003/004 را می‌بندند؛ وضعیت هر دو Task به‌دلیل کار ممیزی فنی باقی‌مانده همچنان PARTIAL است. فایل گزارش reports/DB_AUD_003_004_ENTITY_REPORT_PIT_AUDIT_2026-11-19.md نیز با این تصمیم‌ها هم‌راستا شد. فقط اسناد تغییر کردند؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
