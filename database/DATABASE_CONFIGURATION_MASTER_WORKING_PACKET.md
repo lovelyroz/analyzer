@@ -2212,3 +2212,14 @@ Task 024 بسته شد و قرارداد انتخاب نوع ورودی و admis
 ## 9.14 اصلاح تصمیم یکتایی نماد بورسی — 2026-11-19
 
 مالک تصریح کرد نمادهای بورسی کاملاً یکتا هستند. این تصمیم بند عدم یکتایی ticker در §9.13 را supersede می‌کند. قرارداد هدف Company باید `ticker` را در سطح کل سامانه UNIQUE کند؛ `company_id` همچنان کلید اصلی داخلی باقی می‌ماند. قبل از اعمال قید روی DB موجود، داده‌ها از نظر ticker تکراری، NULL و blank بررسی شوند؛ هر تعارض باید migration را متوقف کند و ادغام/حذف خودکار مجاز نیست. این مرحله فقط مستندات را اصلاح کرد و هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد.
+
+
+## 9.15 تکمیل مرحله‌ای ممیزی PIT و تطبیق Entity با تصمیم نماد یکتا — 2026-11-19
+
+در پی ادامهٔ ممیزی کد، وجود PIT reader واقعی تأیید شد و عبارت قبلی «هیچ PIT query اثبات نشده» دقیق‌تر شد. `src/forecast/queries.py::_period_rows` داده‌های مالی را با شرط `publication_datetime <= cutoff` محدود می‌کند و `_latest_per_metric` جدیدترین publication را برای هر Metric در هر دوره برمی‌گزیند. بااین‌حال این انتخاب رتبهٔ audit/restatement مصوب را اعمال نمی‌کند؛ timestampهای مساوی نیز tie-break صریح و deterministic ندارند، چون query فاقد order و انتخاب فقط بر مبنای `>` است. helper مستقل `src/core/point_in_time.py::select_report_version` نیز cutoff-first است، ولی رتبهٔ نسخه را لحاظ نمی‌کند و call-site تولیدی آن هنوز اثبات نشده است. تست‌های Stage 6 selection/evaluation جای تست مستقیم DB PIT reader را نمی‌گیرند.
+
+همچنین `ReportVersion.is_restated` در ORM فعلی Boolean غیرnullable با default=false است و وضعیت UNKNOWN را مدل نمی‌کند؛ این با تصمیم مالک مبنی بر fail-closed بودن metadata نامعلوم سازگار نیست. مسیر `ingest_codal_report` همچنان نبود tracking ID را می‌پذیرد و Report تازه می‌سازد، replay را بدون content fingerprint تشخیص می‌دهد، و نسخهٔ تازه‌وارد را بدون مقایسهٔ publication chronology current می‌کند. هر RawFact نیز period_id واحد ورودی را می‌گیرد.
+
+در Entity، با وجود تصمیم نهایی مالک برای یکتایی سراسری ticker، مدل فعلی `Company.ticker` هنوز unique نیست و migration متناظری در runner بررسی‌شده وجود ندارد. پیش از اعمال constraint باید duplicate/blankهای DB موجود بررسی شوند و migration در صورت تعارض fail-closed شود.
+
+نتیجه: DB-AUD-003/004 همچنان PARTIAL هستند. cutoff filtering وجود دارد، اما rank-aware deterministic PIT selection و وضعیت UNKNOWN قابل‌نمایش/ایمن هنوز پیاده‌سازی نشده‌اند. این مرحله فقط مستندات را تکمیل کرد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
