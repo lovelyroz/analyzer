@@ -38,7 +38,7 @@ YTD، standalone-quarter، audited، unaudited، original و restated نوع و�
 - `SHARE_COUNT_HISTORY` — تاریخچهٔ تعداد سهام، در صورت فعال‌شدن Feed/استاندارد معتبر؛
 - `CORPORATE_ACTION` — رویداد شرکتی، در صورت فعال‌شدن Feed/استاندارد معتبر.
 
-وجود دامنهٔ منطقی به معنی آماده‌بودن parser یا مجازبودن ingestion نیست. گزینهٔ UI فقط زمانی فعال می‌شود که source/feed profile و استاندارد نسخه‌دار آن دامنه تکمیل و فعال شده باشد. بر اساس شواهد فعلی، جزئیات فایل واقعی Market/FX و Feedهای Share/CorporateAction هنوز برای تصویب پروفایل کافی نیست؛ بنابراین نباید گزینهٔ عملیاتیِ بدون استاندارد نمایش داده شود.
+وجود دامنهٔ منطقی به معنی آماده‌بودن parser یا مجازبودن ingestion نیست. گزینهٔ UI فقط زمانی فعال می‌شود که source/feed profile و استاندارد نسخه‌دار آن دامنه تکمیل و فعال شده باشد. بر اساس شواهد فعلی، Feed profile بازار و Share/CorporateAction هنوز برای تصویب کافی نیست. قرارداد معنایی FX با تصمیم مالک 2026-11-19 روشن شده است، اما تقویم و provenance منبع و نمونهٔ FREE_MARKET برای فعال‌سازی Feedها همچنان باید تأیید شوند؛ بنابراین نباید گزینهٔ عملیاتیِ بدون استاندارد نمایش داده شود.
 
 ## 3. اطلاعات زمینه‌ای که کاربر باید مشخص کند
 
@@ -47,7 +47,7 @@ YTD، standalone-quarter، audited، unaudited، original و restated نوع و�
 | CODAL Monthly Activity | شرکت، نوع گزارش، فایل Excel | company_id و صنعت یکتای شرکت؛ وجود استاندارد فعال همان شرکت/صنعت؛ تطبیق ساختار و Headerها؛ هویت گزارش و نسخه |
 | CODAL Periodic Financial | شرکت، نوع گزارش، فایل Excel | company_id و صنعت یکتا؛ استاندارد فعال؛ ساختار جدول‌ها، HeaderPath، دوره و نسخه؛ عدم ابهام معنایی |
 | Market Daily | شرکت، Feed/source profile فعال، فایل در قالب پشتیبانی‌شده | هویت شرکت، منبع، تقویم، schema ستون‌ها، واحد/scale و زمان انتشار طبق Feed profile |
-| FX Rate | نوع نرخ (FREE_MARKET یا EXCHANGE_CENTER)، Feed/source profile فعال، فایل | هویت منبع، تاریخ جلالی، قالب عددی و واحد Toman/USD؛ تبدیل مصوب به Rial فقط طبق قرارداد FX |
+| FX Rate | نوع نرخ (FREE_MARKET یا EXCHANGE_CENTER)، Feed/source profile فعال، فایل | هویت منبع، تاریخ جلالی، قالب عددی و واحد متناسب با نوع: EXCHANGE_CENTER=Rial/USD بدون تبدیل؛ FREE_MARKET=Toman/USD با تبدیل ×۱۰ به Rial/USD |
 | Share Count History | شرکت، Feed/source profile فعال، فایل | تاریخ اثر/as-of، basis، واحد شمارش، publication/availability و revision |
 | Corporate Action | شرکت، Feed/source profile فعال، فایل | نوع رویداد و معنای آن، شناسه/هویت رویداد، تاریخ‌های اعلام/تصویب/اثر، terms و revision |
 
@@ -123,3 +123,8 @@ UI مرجع نهایی اعتبارسنجی نیست و پنهان‌کردن گ
 - تکمیل استانداردهای محتوایی گزارش فعالیت ماهانه و گزارش‌های مالی دوره‌ای در DB-STD-002/003 باقی می‌ماند.
 - پیاده‌سازی UI، API validation و سرویس‌ها در Taskهای implementation مربوط انجام می‌شود.
 - این سند به‌تنهایی تأییدکنندهٔ آماده‌بودن هیچ Feed فاقد نمونهٔ واقعی نیست.
+
+
+## 9. اصلاحیهٔ FX — 2026-11-19
+
+طبق تصمیم صریح مالک، واحد منبع برای دو نوع FX یکسان نیست: `EXCHANGE_CENTER` ورودی ریالی و بدون تبدیل دارد؛ `FREE_MARKET` ورودی تومانی دارد و برای canonical Rial/USD در ۱۰ ضرب می‌شود. برای فایل نمونهٔ مرکز مبادله، ستون «فروش (ریال)» تنها نرخ canonical است و ستون خرید ذخیره نمی‌شود. این تصمیم، نیاز به Feed profile واقعی، تقویم و provenance را حذف نمی‌کند. این اصلاحیه فقط مستندات را تغییر داد و هیچ کد یا داده‌ای را تغییر نداد.
