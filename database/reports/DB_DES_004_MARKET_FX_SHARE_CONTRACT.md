@@ -367,3 +367,70 @@ WHERE (jalali_year IS NOT NULL OR jalali_month IS NOT NULL OR jalali_day IS NOT 
 خروجی preflight باید فقط شامل شمارش و شناسهٔ رکوردهای مسئله‌دار باشد؛ هیچ مقدار مالی لازم نیست افشا شود. اگر duplicate وجود داشت، migration متوقف می‌ماند تا مالک سیاست رفع تعارض را تعیین کند. هیچ merge، حذف، انتخاب خودکار «رکورد برنده»، تغییر ORM/schema یا migration از این پروتکل مجاز نمی‌شود. طراحی قید نهایی باید هم‌زمان Jalali و legacy Gregorian را پوشش دهد و با نسخهٔ SQLite گزارش‌شدهٔ `3.45.3` پس از تأیید تطابق فایل، و زنجیرهٔ migration تأییدشده سازگار باشد.
 
 این بخش فقط پروتکل audit را تعریف می‌کند؛ queryها اجرا نشده‌اند، هیچ داده/کد/مدل/schema/migration تغییر نکرده و تستی اجرا نشده است.
+
+
+### 15.1 Queryهای تکمیلی برای طبقه‌بندی تاریخ‌ها
+
+برای تفکیک وضعیت تاریخ در هر جدول، queryهای زیر شمارش‌های mutually exclusive ارائه می‌کنند. این queryها جایگزین validator تقویم جلالی نیستند و فقط completeness/range ساده را می‌سنجند.
+
+```sql
+-- MarketDaily: Gregorian/Jalali representation inventory
+SELECT
+  CASE
+    WHEN trade_date IS NOT NULL
+     AND jalali_year IS NULL AND jalali_month IS NULL AND jalali_day IS NULL
+      THEN 'GREGORIAN_ONLY'
+    WHEN trade_date IS NOT NULL
+     AND jalali_year IS NOT NULL AND jalali_month IS NOT NULL AND jalali_day IS NOT NULL
+      THEN 'BOTH_COMPLETE'
+    WHEN trade_date IS NULL
+     AND jalali_year IS NOT NULL AND jalali_month IS NOT NULL AND jalali_day IS NOT NULL
+      THEN 'JALALI_ONLY'
+    WHEN trade_date IS NULL
+     AND jalali_year IS NULL AND jalali_month IS NULL AND jalali_day IS NULL
+      THEN 'NO_DATE'
+    ELSE 'PARTIAL_OR_MIXED'
+  END AS date_state,
+  COUNT(*) AS row_count
+FROM market_daily
+GROUP BY date_state
+ORDER BY date_state;
+
+-- MarketDaily: simple Jalali component range anomalies
+SELECT market_data_id, company_id, jalali_year, jalali_month, jalali_day
+FROM market_daily
+WHERE (jalali_year IS NOT NULL AND jalali_year <= 0)
+   OR (jalali_month IS NOT NULL AND (jalali_month < 1 OR jalali_month > 12))
+   OR (jalali_day IS NOT NULL AND (jalali_day < 1 OR jalali_day > 31));
+
+-- FXRate: Gregorian/Jalali representation inventory
+SELECT
+  CASE
+    WHEN rate_date IS NOT NULL
+     AND jalali_year IS NULL AND jalali_month IS NULL AND jalali_day IS NULL
+      THEN 'GREGORIAN_ONLY'
+    WHEN rate_date IS NOT NULL
+     AND jalali_year IS NOT NULL AND jalali_month IS NOT NULL AND jalali_day IS NOT NULL
+      THEN 'BOTH_COMPLETE'
+    WHEN rate_date IS NULL
+     AND jalali_year IS NOT NULL AND jalali_month IS NOT NULL AND jalali_day IS NOT NULL
+      THEN 'JALALI_ONLY'
+    WHEN rate_date IS NULL
+     AND jalali_year IS NULL AND jalali_month IS NULL AND jalali_day IS NULL
+      THEN 'NO_DATE'
+    ELSE 'PARTIAL_OR_MIXED'
+  END AS date_state,
+  COUNT(*) AS row_count
+FROM fx_rates
+GROUP BY date_state
+ORDER BY date_state;
+
+-- FXRate: simple Jalali component range anomalies
+SELECT fx_rate_id, jalali_year, jalali_month, jalali_day
+FROM fx_rates
+WHERE (jalali_year IS NOT NULL AND jalali_year <= 0)
+   OR (jalali_month IS NOT NULL AND (jalali_month < 1 OR jalali_month > 12))
+   OR (jalali_day IS NOT NULL AND (jalali_day < 1 OR jalali_day > 31));
+```
+
+`PARTIAL_OR_MIXED` هر حالت ترکیبی ناقص را شامل می‌شود؛ برای هر ردیف این دسته، queryهای §15 برای نمایش شناسه و اجزای تاریخ استفاده شوند. مقدار سال فقط از نظر مثبت‌بودن بررسی شده است؛ دامنهٔ مجاز سال باید با قرارداد تقویم/دادهٔ پروژه تطبیق داده شود. هیچ‌یک از این queryها روز معتبر ماه یا leap-year جلالی را اثبات نمی‌کنند.
