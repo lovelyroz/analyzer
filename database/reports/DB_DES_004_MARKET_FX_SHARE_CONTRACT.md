@@ -296,3 +296,17 @@ DB-DES-004 از نظر طراحی منطقی زمانی قابل‌بستن اس
 - `Final`، `Open`، `High` و `Low` خارج از V1.
 
 این mapping فقط برای Feed نمونهٔ سامان معتبر است و به قالب‌های دیگر تعمیم خودکار ندارد. همچنین تأیید بعدی مالک دربارهٔ CODAL/اسکریپت اختصاصی و جلالی بودن `J-Date` بر متن‌های قدیمی‌تر که منبع یا تقویم را UNKNOWN می‌دانستند مقدم است. موارد مستقل publication/availability و revision/correction همچنان باز هستند. این اصلاحیه فقط تقدم تصمیم‌های مصوب را روشن می‌کند؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+
+
+## 14. ممیزی قیود فیزیکی هویت جلالی و adapterها — 2026-11-19
+
+**وضعیت: PARTIAL؛ هویت منطقی جلالی در DB enforce نشده است.** شواهد: `src/models/market.py`, `src/models/fx.py`, `src/ingestion/common/identity.py`, `src/ingestion/market/adapter.py`, `src/ingestion/fx/adapter.py`.
+
+- MarketDaily قید یکتا را فقط روی `(company_id, trade_date)` دارد؛ ورودی‌های جلالی `trade_date=NULL` ذخیره می‌شوند. در SQLite، چند NULL در ستون کلید یکتا مجاز است؛ پس هویت مصوب `(company_id, jalali_year, jalali_month, jalali_day)` در DB enforce نمی‌شود.
+- FXRate قید یکتا را فقط روی `(rate_date, currency_from, currency_to, rate_type)` دارد؛ ورودی جلالی `rate_date=NULL` دارد. هویت جلالی `(jy,jm,jd,currency_from,currency_to,rate_type)` در DB enforce نشده است.
+- Lookup helperهای هر دو مسیر با همین اجزای جلالی `.one_or_none()` اجرا می‌کنند؛ اگر دادهٔ تکراری legacy وجود داشته باشد، lookup به‌جای reconcile کنترل‌شده می‌تواند MultipleResultsFound بدهد. در رقابت هم‌زمان نیز unique constraint فعلی از duplicateهای Jalali جلوگیری نمی‌کند.
+- Market adapter خطاهای تاریخ/هویت را در `errors` می‌گذارد، اما service همچنان ردیف‌های parseشدهٔ معتبر را commit می‌کند؛ با قرارداد رد کل واحد مغایر است.
+- FX adapter ردیف‌های دارای تاریخ خالی، مقدار خالی، تاریخ نامعتبر یا نرخ غیرقابل‌parse را بی‌صدا از DTO خروجی حذف می‌کند؛ `ingest_fx_rates` فقط DTOهای باقی‌مانده را می‌بیند، پس حتی failed count نیز این ورودی‌های حذف‌شده را بازتاب نمی‌دهد. سپس خطاهای اعتبارسنجی DTOها نیز به‌صورت partial skip انجام می‌شوند.
+- مدل‌ها برای Jalali year/day قواعد تقویمی کامل (از جمله روز معتبر بر اساس ماه و سال کبیسه) enforce نمی‌کنند؛ کنترل‌های موجود صرفاً بازهٔ ماه 1..12 و روز 1..31 را می‌سنجند.
+
+**نتیجه:** قرارداد منطقی identity، atomicity و diagnostics در سطح adapter/DB کامل نیست. پیش از migration باید duplicateهای فعلی بر اساس کلیدهای جلالی read-only شمارش و طبقه‌بندی شوند؛ هیچ merge/delete خودکار مجاز نیست. سپس طراحی باید قید یکتای Jalali و سازگاری legacy Gregorian را با توجه به SQLite و نسخهٔ migration مشخص کند. این گزارش مجوز اجرای migration یا اصلاح داده نیست.
