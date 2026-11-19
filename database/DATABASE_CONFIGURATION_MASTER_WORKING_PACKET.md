@@ -2223,3 +2223,12 @@ Task 024 بسته شد و قرارداد انتخاب نوع ورودی و admis
 در Entity، با وجود تصمیم نهایی مالک برای یکتایی سراسری ticker، مدل فعلی `Company.ticker` هنوز unique نیست و migration متناظری در runner بررسی‌شده وجود ندارد. پیش از اعمال constraint باید duplicate/blankهای DB موجود بررسی شوند و migration در صورت تعارض fail-closed شود.
 
 نتیجه: DB-AUD-003/004 همچنان PARTIAL هستند. cutoff filtering وجود دارد، اما rank-aware deterministic PIT selection و وضعیت UNKNOWN قابل‌نمایش/ایمن هنوز پیاده‌سازی نشده‌اند. این مرحله فقط مستندات را تکمیل کرد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 9.16 ممیزی Seed صنایع و مصرف ticker در MarketDaily — 2026-11-19
+
+بررسی `src/scripts/seed_data.py` هفت کد مصوب را تأیید کرد: BANK، INVESTMENT، PETROCHEMICAL، METALS، CEMENT، FOOD و PHARMACEUTICAL. Seed فعلی بر اساس `industry_code` از درج تکراری جلوگیری می‌کند، اما version/history ندارد؛ اگر نام کد موجود تغییر کرده باشد، اختلاف را تشخیص یا گزارش نمی‌کند. همچنین exception را rollback و فقط print می‌کند و دوباره raise نمی‌کند؛ بنابراین اجرای خودکار ممکن است خطا را به‌صورت exit failure دریافت نکند. در migration runner نیز seed نسخه‌دار مستقلی دیده نشد. پس وجود فهرست و idempotency پایه تأیید است، اما شرط مالک برای versioned seed هنوز کامل اجرا نشده است.
+
+در MarketDaily، `src/ingestion/market/ingestion.py` شرکت را با `Company.ticker` و `.one_or_none()` resolve می‌کند؛ ticker ناشناخته به خطای ردیف تبدیل می‌شود. تا زمانی که قید UNIQUE در DB اعمال نشده باشد، ticker تکراری می‌تواند به خطای multiple rows منجر شود. در مسیرهای CODAL نیز company_id و period_id ورودی پذیرفته و تطابق Company/FinancialPeriod در لایهٔ persistence کنترل می‌شود، اما admission service مشترکی که وجود Company، عضویت در Industry مصوب و اعتبار هویت را برای تمام Feedها یکسان کنترل کند، اثبات نشد.
+
+DB-AUD-003 PARTIAL باقی می‌ماند: versioned/immutable seed، خطای قابل‌مشاهدهٔ seed، قید یکتایی ticker همراه با preflight دادهٔ قدیمی، و inventory کامل مصرف‌کنندگان و دادهٔ واقعی بازند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
