@@ -74,7 +74,7 @@ No live SQLite file, configured environment, schema snapshot, or row sample was 
 
 1. **Company V1 strictness — DECIDED:** در کنار چهار فیلد هویتی ثابت (`company_id`, `company_name`, `ticker`, `industry_id`)، فقط `codal_symbol` و `fiscal_year_end` از فیلدهای اضافهٔ فعلی برای V1 حفظ شوند. `national_id`, `status`, `is_active`, `created_at` جزو قرارداد هدف V1 نیستند. این تصمیم مجوز حذف فوری داده/ستون نیست؛ پیش از هر migration باید مصرف‌کنندگان و دادهٔ موجود بررسی و برنامهٔ سازگاری/انتقال جداگانه تصویب شود.
 2. **Industry catalog lifecycle — DECIDED:** seed نسخه‌دار و idempotent برای هفت کد اولیه تأیید شد؛ Industry فیلد active/status جداگانه نخواهد داشت. کدهای seed پس از استفاده نباید بی‌سروصدا تغییر معنا دهند.
-3. **Company ticker uniqueness — DECIDED:** چون `company_id` کلید پایدار شرکت است و قرارداد V1 برای ticker تاریخچه/دامنهٔ بازار تعریف نکرده، روی `ticker` قید UNIQUE سراسری اعمال نمی‌شود. ticker شناسهٔ نمایشی/بازاری است، نه کلید هویت؛ هرجا تطبیق بازار لازم باشد باید از زمینهٔ بازار و نگاشت معتبر استفاده شود.
+3. **Company ticker uniqueness — DECIDED:** چون `company_id` کلید پایدار شرکت است و قرارداد V1 برای ticker تاریخچه/دامنهٔ بازار تعریف نکرده، طبق تأیید مالک، نمادهای بورسی کاملاً یکتا هستند؛ بنابراین `Company.ticker` باید در کل سامانه قید UNIQUE سراسری داشته باشد. `company_id` همچنان کلید اصلی/پایدار داخلی باقی می‌ماند، اما تکرار ticker برای دو Company مجاز نیست.
 4. **Report primary period — DECIDED:** `Report.financial_period_id` در مدل هدف فقط به‌صورت اشاره‌گر اختیاری/توصیفی به دورهٔ اصلی گزارش باقی می‌ماند؛ دورهٔ هر مقدار فقط از FinancialFact/RawFact مربوط به همان مقدار تعیین می‌شود. این فیلد مرجع همهٔ Factهای گزارش نیست.
 5. **Missing CODAL tracking ID — DECIDED BY TECHNICAL OWNER:** برای جلوگیری از ادغام اشتباه دو گزارش یا ساخت نسخهٔ تکراری، `codal_tracking_id` یا شناسهٔ یکتای پایدار و مستند منبع شرط پذیرش و replay خودکار است. اگر وجود نداشته باشد، سیستم نباید از عنوان/تاریخ/شرکت یک کلید ترکیبی حدسی بسازد؛ گزارش برای تعیین هویت متوقف و به صف بررسی/رفع نقص metadata هدایت می‌شود. پس از شناسایی شناسهٔ پایدار، replay باید علاوه بر شناسه و publication identity، fingerprint محتوای ورودی را نیز مقایسه کند تا payload متفاوت با replay یکسان اشتباه نشود.
 6. **Late-arriving publication — DECIDED:** بله؛ نسخهٔ قدیمی‌تر که دیرتر دریافت شده حفظ می‌شود، اما صرفاً به‌دلیل زمان ingestion نباید current شود. انتخاب جاری/PIT بر اساس publication معتبر و رتبه‌بندی مصوب انجام می‌شود.
@@ -91,10 +91,15 @@ DB-AUD-003 and DB-AUD-004 remain PARTIAL until repository-wide call-site/read-wr
 
 - Company: فیلدهای ثابت هویتی چهارگانه به‌علاوهٔ فقط codal_symbol و fiscal_year_end در V1؛ سایر فیلدهای اضافهٔ فعلی جزو قرارداد هدف نیستند، اما حذف فیزیکی بدون inventory و migration plan مجاز نیست.
 - Industry: seed نسخه‌دار/idempotent برای هفت کد تأیید؛ active/status جداگانه لازم نیست.
-- Ticker: قید یکتایی سراسری ندارد؛ company_id هویت پایدار است.
+- Ticker: طبق تأیید مالک، نمادهای بورسی کاملاً یکتا هستند و ticker باید در سطح کل سامانه UNIQUE باشد؛ company_id کلید اصلی داخلی باقی می‌ماند.
 - Report: primary period اختیاری و صرفاً توصیفی است؛ هر Fact دورهٔ مستقل خودش را دارد.
 - Report identity: شناسهٔ پایدار منبع لازم است؛ در نبود آن fail-closed، بدون composite key حدسی. Replay باید fingerprint محتوا را نیز مقایسه کند.
 - نسخهٔ دیررس: حفظ تاریخی، بدون ارتقای خودکار به current صرفاً بر مبنای زمان ورود.
 - audit/restatement نامعلوم: در صورت اثرگذاری بر برنده، انتخاب unresolved.
 
 این تصمیم‌ها قرارداد مستنداتی را می‌بندند، نه ممیزی پیاده‌سازی را. DB-AUD-003/004 تا تکمیل inventory تمام call-siteها، بررسی DB واقعی و اثبات PIT selector همچنان PARTIAL می‌مانند. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+
+
+## Owner clarification — ticker uniqueness
+
+مالک تصریح کرد نمادهای بورسی کاملاً یکتا هستند. این تصمیم، بند قبلی دربارهٔ عدم یکتایی سراسری ticker را صریحاً supersede می‌کند: قرارداد هدف Company باید یکتایی سراسری `ticker` را enforce کند. پیش از افزودن قید به دیتابیس موجود، باید رکوردهای فعلی برای NULL/blank و duplicate بررسی شوند؛ در صورت تعارض، migration باید fail-closed شود و هیچ رکوردی خودکار ادغام یا حذف نشود. این ثبت مستنداتی است و قید ORM/schema/migration هنوز تغییر نکرده است.
