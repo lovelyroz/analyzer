@@ -2254,3 +2254,14 @@ DB-AUD-003 PARTIAL باقی می‌ماند: versioned/immutable seed، خطای
 بنابراین عبارت دقیق وضعیت این است: **Excel source observation و structural detection موجود است؛ Excel-to-canonical persistence pipeline و relational template/report-type model هنوز اثبات/تکمیل نشده‌اند.** قدم عمودی بعدی باید template interpretation مصوب → تفسیر قطعی ردیف/ستون/دوره/مقدار → canonical fact DTO → writer تراکنشی با source identity/fingerprint و period مستقل هر Fact → تست‌های persistence/provenance باشد. مسیر PDF/Raw و schema legacy تا اثبات این مسیر و تصویب retirement plan دست‌نخورده بمانند.
 
 این گام فقط مستندات را دقیق‌تر کرد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 9.19 تطبیق گزارش محلی تازهٔ MarketDaily/FX با قراردادهای مصوب — 2026-11-19
+
+گزارش محلی جدید در `reply.md` ساختار فایل‌های `saman_price_history.csv` و `dollar-history.xlsx` را دوباره بررسی کرده است. وضعیت UNKNOWN در این گزارش دربارهٔ مواردی که از محتوای فایل به‌تنهایی قابل استنتاج نیستند، نباید تصمیم‌های قبلی مالک را باز کند:
+
+- برای CSV سامان، منبع CODAL و روش دریافت با اسکریپت اختصاصی مالک، تاریخ جلالی `J-Date` با قالب `YYYY-MM-DD`، و mapping/واحدهای `Close` (ریال/سهم)، `Volume` (سهم)، `No` (تعداد معامله) و `Value` (ریال) قبلاً تأیید شده‌اند. `Value` مستقل منبع است و از `Volume × Close` بازسازی نمی‌شود؛ `Final`، `Open`، `High` و `Low` خارج از V1 هستند. CSV جدید همان SHA-256 قبلی را دارد؛ پس نمونه از نظر محتوای فایل عوض نشده است.
+- برای FX، قرارداد `EXCHANGE_CENTER` برابر Rial/USD، انتخاب ستون فروش و عدم تبدیل است؛ تقویم جلالی نیز در قرارداد مصوب است. گزارش ساختاری تازه به‌تنهایی نمی‌تواند نوع نرخ/منبع را استنتاج کند و این محدودیت استنتاج، تصمیم مالک را نقض نمی‌کند. SHA-256 فایل XLSX مشاهده‌شده در ممیزی جدید `eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf` است؛ تطبیق همین artifact با پروفایل مصوب و provenance/زمان انتشار آن باید در شواهد Feed ثبت شود.
+- علامت‌گذاری آماری رکورد 1402-01-15 به‌عنوان outlier در Volume/Value/No، صرفاً diagnostic است و خطای منبع را اثبات نمی‌کند؛ تغییر یا حذف داده مجاز نیست.
+
+بنابراین blockerهای فعال MarketDaily همچنان publication/availability و revision/correction هستند، نه هویت منبع، تقویم یا معنای فیلدهای مصوب. برای FX، provenance و زمان انتشار/دسترس‌پذیری artifact، و نمونه/پروفایل FREE_MARKET همچنان بازند. این گام فقط اسناد را هم‌راستا می‌کند؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
