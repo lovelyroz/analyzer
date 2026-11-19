@@ -91,3 +91,20 @@ The source-reference scan found the two names only in the temporary audit script
 **Architectural assessment:** these columns must not be dropped or retained solely because they contain data. The new Excel ingestion design uses explicit template structure, canonical identifiers, and source locators/provenance at the appropriate report/template level. Before deciding their final disposition, determine whether the information they contain is represented elsewhere in the approved design and whether any existing service/report requires backward compatibility. Until then, preserve the columns and their values; do not run a destructive migration.
 
 This follow-up resolves the earlier uncertainty about whether the two columns are populated, but does not recover the original Migration 9 implementation or prove its complete schema effects. The exact historical migration source remains unavailable in the checked-out repository.
+
+
+## 8. Current-branch Migration 9 tooling cross-check — 2026-11-19
+
+A read-only inspection of the current GitHub branch found:
+- `src/migrations/runner.py` registers migrations 1 through 8 only.
+- `src/scripts/audit_migration_9_database_state.py` opens the project-root `tehran_stock.db` in SQLite read-only mode and writes its report to root `reply.md`.
+- `src/scripts/audit_migration_9_source.py` scans local `src/` and `tests/` Python files and local Git refs for Migration 9 source/history; it does not open the database.
+- `src/scripts/cleanup_incomplete_migration_9.py` has a read-only default and a destructive `--apply` mode. The apply path requires the exact ledger row `(9, codal_excel_source_metadata)`, version 9 to be the highest migration, both target columns to exist, no indexes/triggers or other schema objects referencing them, and SQLite >= 3.35. It creates a backup, drops `source_column_header` and `source_sheet`, deletes the version-9 ledger row, and checks SQLite integrity and foreign keys.
+
+The existing local evidence recorded in §7 reports that these two columns contain data in all 505 RawFinancialFact rows (source_sheet: 505 non-null, one distinct value; source_column_header: 505 non-null, 23 distinct values). Therefore, `cleanup_incomplete_migration_9.py --apply` is destructive to live schema/data representation even though it preserves a backup. It must not be run merely to make the local ledger match the current branch. First recover the exact local Migration 9 source/revision and determine whether these populated provenance values are represented elsewhere in the approved Excel ingestion design.
+
+A further path discrepancy is confirmed: `src/core/database.py` configures relative `sqlite:///./tehran_stock.db`, whose resolved file depends on process working directory; the two Migration 9 DB scripts instead hard-code `ROOT / "tehran_stock.db"`. Their target may differ when the process is launched from another working directory. The scripts' output does not prove it inspected the same DB file used by the application unless the resolved paths are compared.
+
+### Updated conclusion
+
+The current repository migration chain is version 8, while the previously recorded owner-local database evidence reports version 9 and populated Migration 9 columns. The exact migration source and deployment lineage remain unreconciled. Do not run cleanup, add migration 10, or infer that the two columns are disposable. The next safe action is read-only local source/path reconciliation and explicit design mapping for both populated columns. No code, ORM, schema, migration, database, or tests were changed/run in this follow-up.
