@@ -235,3 +235,16 @@ Counts نهایی باید با نتیجهٔ commit سازگار باشند. د�
 | Share/CorporateAction | NOT IMPLEMENTED/NOT AUDITED در این vertical slice |
 
 **نتیجه:** DB-DES-005 قطعاً PARTIAL باقی می‌ماند و سرویس‌های Market، FX و CODAL با قرارداد اتمیک/idempotency مصوب منطبق نیستند. این یافته‌ها مجوز تغییر کد یا schema نیستند. اصلاحات اجرایی باید به Taskهای پیاده‌سازی/مهاجرت مجزا، preflight داده و تست‌های atomicity/idempotency/concurrency ارجاع شوند. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+
+### 13.6 تطبیق تست‌های موجود و قرارداد تست — 2026-11-19
+
+خواندن تست‌های `src/tests/test_ingestion_ohlc.py`, `src/tests/test_ingestion_fx.py`, `src/tests/test_codal_pdf_extraction.py` و `src/tests/test_stage1_database_integrity.py` نشان می‌دهد بخشی از رفتار ناسازگار فعلی نه‌تنها پوشش داده نشده، بلکه صریحاً به‌عنوان رفتار مورد انتظار تثبیت شده است:
+
+- `test_ingestion_fx.py::test_invalid_rate_type_and_non_positive_rate_fail_explicitly` انتظار دارد با سه ردیف نامعتبر و یک ردیف معتبر، نتیجه `COMPLETED`، سه failed و یک inserted باشد؛ این مستقیماً خلاف hard-fail کل batch در قرارداد است.
+- `test_ingestion_fx.py::test_fx_idempotent_upsert_jalali` تغییر rate و source برای همان هویت جلالی را `records_updated=1` و موفقیت می‌داند؛ این همان overwrite بدون revision/fingerprint است که قرارداد ممنوع می‌کند.
+- `test_ingestion_ohlc.py` سناریوی idempotent upsert را با `records_updated` برای همان هویت انتظار دارد؛ باید پس از تعیین revision contract به replay بی‌تغییر یا conflict/revision صریح بازتعریف شود.
+- تست‌های CODAL در `test_codal_pdf_extraction.py` replay بر اساس tracking ID و publication datetime را idempotent می‌دانند و `records_updated` را برابر تعداد RawFinancialFactهای قبلی assert می‌کنند؛ fingerprint/content comparison در تست‌ها دیده نمی‌شود. همچنین زنجیرهٔ نسخه‌ها، supersession و is_current در این فایل پوشش دارد، اما آزمون late-arriving publication قدیمی‌تر در برابر نسخهٔ جدیدتر به‌عنوان یک adversarial chronology test در قسمت‌های بررسی‌شده یافت نشد.
+- `test_stage1_database_integrity.py` migration runner را تا نسخهٔ ۸ تثبیت می‌کند؛ هیچ migration فعال برای unique constraint هویت جلالی Market/FX در این تست وجود ندارد.
+
+بنابراین صرف اصلاح سرویس کافی نیست: تست‌های موجودی که semantics قدیمیِ partial acceptance و overwrite را تثبیت می‌کنند نیز باید با قرارداد مالک بازنگری شوند. تست‌های لازمِ مفقود/ناکافی شامل failure injection در میانهٔ batch و commit، اثبات صفر ماندن canonical rows پس از هر hard error، duplicate/conflict درون batch، replay fingerprint یکسان/متفاوت، رقابت هم‌زمان روی هویت جلالی، failure در ثبت audit، و late-arriving CODAL publication هستند. هیچ تستی در این ممیزی اجرا نشده است؛ نتیجه صرفاً از خواندن assertionهای موجود به‌دست آمده است.
