@@ -310,3 +310,60 @@ DB-DES-004 از نظر طراحی منطقی زمانی قابل‌بستن اس
 - مدل‌ها برای Jalali year/day قواعد تقویمی کامل (از جمله روز معتبر بر اساس ماه و سال کبیسه) enforce نمی‌کنند؛ کنترل‌های موجود صرفاً بازهٔ ماه 1..12 و روز 1..31 را می‌سنجند.
 
 **نتیجه:** قرارداد منطقی identity، atomicity و diagnostics در سطح adapter/DB کامل نیست. پیش از migration باید duplicateهای فعلی بر اساس کلیدهای جلالی read-only شمارش و طبقه‌بندی شوند؛ هیچ merge/delete خودکار مجاز نیست. سپس طراحی باید قید یکتای Jalali و سازگاری legacy Gregorian را با توجه به SQLite و نسخهٔ migration مشخص کند. این گزارش مجوز اجرای migration یا اصلاح داده نیست.
+
+
+## 15. پروتکل preflight خواندنی پیش از طراحی قید یکتای Jalali — 2026-11-19
+
+**وضعیت: BLOCKED به دادهٔ محلی؛ queryها تعریف شده‌اند اما روی دیتابیس مالک اجرا نشده‌اند.** بررسی GitHub فقط مدل و کد را نشان می‌دهد و دسترسی به فایل SQLite محلی در این مرحله وجود ندارد. بنابراین دربارهٔ تعداد duplicateها، رکوردهای ناقص یا نسخهٔ واقعی SQLite نتیجه‌ای اعلام نمی‌شود.
+
+پیش از هر migration، روی همان فایل SQLite که اپلیکیشن واقعاً باز می‌کند و با اتصال read-only، این موارد باید ثبت شوند:
+
+```sql
+PRAGMA database_list;
+SELECT sqlite_version();
+SELECT version, name, applied_at FROM schema_migrations ORDER BY version;
+
+-- Duplicate Jalali identity candidates: MarketDaily
+SELECT company_id, jalali_year, jalali_month, jalali_day,
+       COUNT(*) AS row_count,
+       GROUP_CONCAT(market_data_id) AS row_ids
+FROM market_daily
+WHERE jalali_year IS NOT NULL
+  AND jalali_month IS NOT NULL
+  AND jalali_day IS NOT NULL
+GROUP BY company_id, jalali_year, jalali_month, jalali_day
+HAVING COUNT(*) > 1;
+
+-- Duplicate Jalali identity candidates: FXRate
+SELECT jalali_year, jalali_month, jalali_day,
+       currency_from, currency_to, rate_type,
+       COUNT(*) AS row_count,
+       GROUP_CONCAT(fx_rate_id) AS row_ids
+FROM fx_rates
+WHERE jalali_year IS NOT NULL
+  AND jalali_month IS NOT NULL
+  AND jalali_day IS NOT NULL
+GROUP BY jalali_year, jalali_month, jalali_day,
+         currency_from, currency_to, rate_type
+HAVING COUNT(*) > 1;
+
+-- Partial Jalali tuples: MarketDaily
+SELECT market_data_id, company_id, trade_date,
+       jalali_year, jalali_month, jalali_day
+FROM market_daily
+WHERE (jalali_year IS NOT NULL OR jalali_month IS NOT NULL OR jalali_day IS NOT NULL)
+  AND (jalali_year IS NULL OR jalali_month IS NULL OR jalali_day IS NULL);
+
+-- Partial Jalali tuples: FXRate
+SELECT fx_rate_id, rate_date, jalali_year, jalali_month, jalali_day,
+       currency_from, currency_to, rate_type
+FROM fx_rates
+WHERE (jalali_year IS NOT NULL OR jalali_month IS NOT NULL OR jalali_day IS NOT NULL)
+  AND (jalali_year IS NULL OR jalali_month IS NULL OR jalali_day IS NULL);
+```
+
+همچنین باید تعداد/شناسهٔ رکوردهای Gregorian-only (تاریخ Gregorian موجود و هر سه جزء Jalali تهی)، رکوردهای دارای هر دو نمایش تاریخ، و رکوردهای فاقد هر دو نمایش جداگانه گزارش شوند. دامنهٔ سال/ماه/روز خارج از بازه نیز با query مستقل شمارش شود؛ اعتبار کامل تقویم جلالی، از جمله روز معتبر ماه و سال کبیسه، باید با validator مشترک پروژه و به‌صورت read-only ارزیابی شود، نه صرفاً با CHECKهای فعلی SQL.
+
+خروجی preflight باید فقط شامل شمارش و شناسهٔ رکوردهای مسئله‌دار باشد؛ هیچ مقدار مالی لازم نیست افشا شود. اگر duplicate وجود داشت، migration متوقف می‌ماند تا مالک سیاست رفع تعارض را تعیین کند. هیچ merge، حذف، انتخاب خودکار «رکورد برنده»، تغییر ORM/schema یا migration از این پروتکل مجاز نمی‌شود. طراحی قید نهایی باید هم‌زمان Jalali و legacy Gregorian را پوشش دهد و با نسخهٔ واقعی SQLite و زنجیرهٔ migration تأییدشده سازگار باشد.
+
+این بخش فقط پروتکل audit را تعریف می‌کند؛ queryها اجرا نشده‌اند، هیچ داده/کد/مدل/schema/migration تغییر نکرده و تستی اجرا نشده است.
