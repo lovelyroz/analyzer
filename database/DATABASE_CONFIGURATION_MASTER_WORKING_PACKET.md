@@ -2314,3 +2314,17 @@ Adapter audit: Market CSV adapter خطاهای parse را گزارش می‌کن
 
 
 تکمیل پروتکل: در DB-DES-004 §15.1 queryهای شمارش وضعیت تاریخ (Gregorian-only، Jalali-only، هر دو کامل، بدون تاریخ، و partial/mixed) و شناسایی مؤلفه‌های خارج از بازه افزوده شد. نسخهٔ SQLite گزارش‌شده در DB-AUD-010 §1 برابر 3.45.3 است؛ ابهام، تطابق فایل این شواهد با فایل runtime است، نه خود شمارهٔ نسخه. هیچ query محلی اجرا نشده است.
+
+
+## 9.22 ثبت دو Semantic Mapping Proof محدود برای Parsian T01/T03 — 2026-11-19
+
+دو گزارش تکمیلی در مخزن بررسی شدند:
+
+- `reports/DB_DES_015_PARSIAN_T03_TOTAL_ASSETS_MAPPING_PROOF.md`: مسیر ردیف نامزد `دارایی‌ها → جمع دارایی‌ها` و مفهوم نامزد Total Assets را برای T03 مشخص می‌کند. ماهیت `INSTANT` از نظر معنایی قوی است، اما هنوز rule نسخه‌دار و mapping مصوب نیست. دو تاریخ اندازه‌گیری B/C مستقل‌اند؛ وضعیت حسابرسی و تجدید ارائه باید در provenance نسخه باقی بماند. واحد و scale مقدارها از شواهد فعلی حل نشده‌اند؛ بنابراین مقدارها canonical-admissible نیستند.
+- `reports/DB_DES_016_PARSIAN_T01_INCOME_STATEMENT_MAPPING_PROOF.md`: برای T01 چند مسیر ردیف و مفهوم نامزد از جمله درآمد عملیاتی، سود خالص عملیات در حال تداوم، عملیات متوقف‌شده، سود خالص کل و EPS را تفکیک می‌کند. T01 از نظر ماهیت جریان، candidate نوع `DURATION` است؛ اما بازهٔ دقیق و `YTD/STANDALONE`، currency و mapping کدهای Metric همچنان حل نشده‌اند. ردیف سود خالص کل نباید به‌عنوان تکرار سود عملیات متوقف‌شده map شود؛ رابطهٔ اجزای ادامه‌دار/متوقف‌شده/کل و سیاست جمع‌پذیری نیازمند تصمیم معنایی صریح است. یادداشت «به میلیون» scale را پیشنهاد می‌کند، نه currency؛ EPS با واحد صریح ریال قاعدهٔ مستقل می‌خواهد.
+
+این دو گزارش، شکل معنایی نامزدها و موانع هر دو fixture را روشن‌تر می‌کنند؛ هیچ‌کدام FinancialMetric code، DimensionSet، واحد/scale نهایی، period/basis، ReportVersion provenance یا SemanticMapping production را تصویب نمی‌کند. مقادیر نقل‌شده نیز هنوز مستقیماً از workbook اصلاح‌شده با hash نهایی تأیید نشده‌اند.
+
+**اثر بر Taskها:** ماتریس آمادگی 126 observation در DB-DES-009 §30 همچنان مرجع readiness است. DB-ING-006 / Task 033 همچنان PARTIAL و همهٔ observationهای T01/T03 برای ingestion نهایی غیرمجاز باقی می‌مانند. این proofها جایگزین تأیید کامل 17 bounds و 15 partition، تطبیق مستقیم مختصات با workbook نهایی، workbook مستقل دورهٔ بعد و اثبات deterministic template matching/end-to-end acceptance نیستند.
+
+این ادغام فقط مستندات بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
