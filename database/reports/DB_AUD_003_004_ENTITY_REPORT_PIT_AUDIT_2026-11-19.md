@@ -70,16 +70,31 @@ No live SQLite file, configured environment, schema snapshot, or row sample was 
 
 ## Owner decisions required — consolidated batch
 
-The following are genuine policy choices not inferable from the inspected implementation. No answer is assumed.
+مالک در 2026-11-19 به موارد زیر پاسخ داده است؛ تصمیم‌ها در ادامه به‌عنوان قرارداد مالک ثبت می‌شوند.
 
-1. **Company V1 strictness:** Should legacy `national_id`, `codal_symbol`, `fiscal_year_end`, `status`, `is_active`, and `created_at` be retained as compatibility/operational fields outside the four-field fixed identity, or should the physical V1 model eventually contain only the four approved fields? Recommendation: preserve existing data and classify non-identity/legacy fields separately; do not delete in the first migration.
-2. **Industry catalog lifecycle:** Should Industry retain an operational active flag/status even though the current ORM lacks one, and should the seven initial codes be inserted by a versioned seed/catalog step? Recommendation: versioned idempotent seed; never silently repurpose codes.
-3. **Company ticker uniqueness:** May multiple Company rows share a ticker over time/market context, or must ticker be unique in V1? Since `company_id` is the stable key and no ticker-history table is planned, recommend allowing non-unique ticker unless an explicit market-scope uniqueness rule is approved.
-4. **Report primary period:** Should the legacy `Report.financial_period_id` be retained only as an optional descriptive primary-period pointer, or removed from the target logical model once Fact-level period links are complete? Recommendation: descriptive/optional only, never authoritative for all facts.
-5. **Missing CODAL tracking ID:** What source-stable attributes define logical Report identity and replay when CODAL tracking ID is absent? Recommendation: require a source-stable identifier or explicitly approved composite key plus payload fingerprint; otherwise fail closed rather than invent identity.
-6. **Late-arriving publication:** If an older publication is ingested after a newer version, should it be stored as historical but not current? Recommendation: yes; current/latest must be determined by valid publication chronology and approved rank, not ingestion order.
-7. **Unknown audit/restatement metadata:** Confirm that a version with unknown audit/restatement status remains unresolved for automatic ranking when it could change the winner, consistent with DB-DES-003 §7.1. Recommendation: keep the existing fail-closed rule.
+1. **Company V1 strictness — DECIDED:** در کنار چهار فیلد هویتی ثابت (`company_id`, `company_name`, `ticker`, `industry_id`)، فقط `codal_symbol` و `fiscal_year_end` از فیلدهای اضافهٔ فعلی برای V1 حفظ شوند. `national_id`, `status`, `is_active`, `created_at` جزو قرارداد هدف V1 نیستند. این تصمیم مجوز حذف فوری داده/ستون نیست؛ پیش از هر migration باید مصرف‌کنندگان و دادهٔ موجود بررسی و برنامهٔ سازگاری/انتقال جداگانه تصویب شود.
+2. **Industry catalog lifecycle — DECIDED:** seed نسخه‌دار و idempotent برای هفت کد اولیه تأیید شد؛ Industry فیلد active/status جداگانه نخواهد داشت. کدهای seed پس از استفاده نباید بی‌سروصدا تغییر معنا دهند.
+3. **Company ticker uniqueness — DECIDED:** چون `company_id` کلید پایدار شرکت است و قرارداد V1 برای ticker تاریخچه/دامنهٔ بازار تعریف نکرده، روی `ticker` قید UNIQUE سراسری اعمال نمی‌شود. ticker شناسهٔ نمایشی/بازاری است، نه کلید هویت؛ هرجا تطبیق بازار لازم باشد باید از زمینهٔ بازار و نگاشت معتبر استفاده شود.
+4. **Report primary period — DECIDED:** `Report.financial_period_id` در مدل هدف فقط به‌صورت اشاره‌گر اختیاری/توصیفی به دورهٔ اصلی گزارش باقی می‌ماند؛ دورهٔ هر مقدار فقط از FinancialFact/RawFact مربوط به همان مقدار تعیین می‌شود. این فیلد مرجع همهٔ Factهای گزارش نیست.
+5. **Missing CODAL tracking ID — DECIDED BY TECHNICAL OWNER:** برای جلوگیری از ادغام اشتباه دو گزارش یا ساخت نسخهٔ تکراری، `codal_tracking_id` یا شناسهٔ یکتای پایدار و مستند منبع شرط پذیرش و replay خودکار است. اگر وجود نداشته باشد، سیستم نباید از عنوان/تاریخ/شرکت یک کلید ترکیبی حدسی بسازد؛ گزارش برای تعیین هویت متوقف و به صف بررسی/رفع نقص metadata هدایت می‌شود. پس از شناسایی شناسهٔ پایدار، replay باید علاوه بر شناسه و publication identity، fingerprint محتوای ورودی را نیز مقایسه کند تا payload متفاوت با replay یکسان اشتباه نشود.
+6. **Late-arriving publication — DECIDED:** بله؛ نسخهٔ قدیمی‌تر که دیرتر دریافت شده حفظ می‌شود، اما صرفاً به‌دلیل زمان ingestion نباید current شود. انتخاب جاری/PIT بر اساس publication معتبر و رتبه‌بندی مصوب انجام می‌شود.
+7. **Unknown audit/restatement metadata — DECIDED:** بله؛ اگر وضعیت نامعلوم بتواند نتیجهٔ رتبه‌بندی را تغییر دهد، انتخاب خودکار unresolved می‌ماند و حدس مجاز نیست.
 
 ## Completion criteria
 
 DB-AUD-003 and DB-AUD-004 remain PARTIAL until repository-wide call-site/read-write inventory, actual DB/schema/data inspection, and PIT selector evidence are complete. No code, ORM, schema, migration, data, or test changes were made; tests were not run.
+
+
+## Owner decision addendum — 2026-11-19
+
+تصمیم‌های بالا از سوی مالک دریافت و نهایی شد. خلاصهٔ اجرایی:
+
+- Company: فیلدهای ثابت هویتی چهارگانه به‌علاوهٔ فقط codal_symbol و fiscal_year_end در V1؛ سایر فیلدهای اضافهٔ فعلی جزو قرارداد هدف نیستند، اما حذف فیزیکی بدون inventory و migration plan مجاز نیست.
+- Industry: seed نسخه‌دار/idempotent برای هفت کد تأیید؛ active/status جداگانه لازم نیست.
+- Ticker: قید یکتایی سراسری ندارد؛ company_id هویت پایدار است.
+- Report: primary period اختیاری و صرفاً توصیفی است؛ هر Fact دورهٔ مستقل خودش را دارد.
+- Report identity: شناسهٔ پایدار منبع لازم است؛ در نبود آن fail-closed، بدون composite key حدسی. Replay باید fingerprint محتوا را نیز مقایسه کند.
+- نسخهٔ دیررس: حفظ تاریخی، بدون ارتقای خودکار به current صرفاً بر مبنای زمان ورود.
+- audit/restatement نامعلوم: در صورت اثرگذاری بر برنده، انتخاب unresolved.
+
+این تصمیم‌ها قرارداد مستنداتی را می‌بندند، نه ممیزی پیاده‌سازی را. DB-AUD-003/004 تا تکمیل inventory تمام call-siteها، بررسی DB واقعی و اثبات PIT selector همچنان PARTIAL می‌مانند. هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد و تستی اجرا نشد.
