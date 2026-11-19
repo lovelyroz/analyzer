@@ -2328,3 +2328,13 @@ Adapter audit: Market CSV adapter خطاهای parse را گزارش می‌کن
 **اثر بر Taskها:** ماتریس آمادگی 126 observation در DB-DES-009 §30 همچنان مرجع readiness است. DB-ING-006 / Task 033 همچنان PARTIAL و همهٔ observationهای T01/T03 برای ingestion نهایی غیرمجاز باقی می‌مانند. این proofها جایگزین تأیید کامل 17 bounds و 15 partition، تطبیق مستقیم مختصات با workbook نهایی، workbook مستقل دورهٔ بعد و اثبات deterministic template matching/end-to-end acceptance نیستند.
 
 این ادغام فقط مستندات بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
+
+## 9.23 دفتر تأیید هندسهٔ Parsian و تفکیک hashهای workbook — 2026-11-19
+
+در DB-ING-006 §8.32 دفتر review برای 17 candidate table bounds و 15 candidate sub-table partition ثبت شد. bounds تاریخی گزارش 3 و row partitionهای annotation map در یک register جمع شده‌اند، اما approved نیستند و ستون‌های دقیق childها همچنان نیازمند تأیید هستند.
+
+نکتهٔ provenance مهم: شواهد هندسی گزارش 3 به hash 69186f1a...c5aca06، annotation map به 95f94e73...a6638b0 و audit metadata فعلی به 55266751...4325db85 مربوط‌اند. audit فعلی تک‌شیتی بودن، Recovered_Sheet1، used range A1:L411 و RTL را ثابت می‌کند، ولی transcript قابل مشاهدهٔ آن annotation inventory کامل را ندارد. تطبیق مستقیم worksheet XML یا مختصات بین این hashها موجود نیست؛ بنابراین candidateهای هندسی فقط برای بازبینی روی artifact فعلی‌اند، نه ورودی قطعی Template.
+
+Gate بعدی: تأیید/اصلاح تمام 17 rectangle و 15 partition (با ستون و Header inheritance برای هر child) روی hash فعلی؛ سپس audit کامل رنگ‌ها با پوشش theme-based black fill؛ بازتولید coordinate map؛ و validator مستقل برای مالکیت یکتای 459 gray candidate cells و عدم overlap/duplicate. عدد 459 و 60 span فقط انتظار تاریخی است و باید از نقشهٔ تأییدشده دوباره محاسبه شود. workbook مستقل دورهٔ بعد همچنان آزمون drift جداگانه است.
+
+DB-ING-006 / Task 033 PARTIAL باقی می‌ماند. این گام صرفاً register و ارجاع مستنداتی اضافه کرد؛ هیچ workbook، کد، ORM، schema، migration یا دیتابیسی تغییر نکرد و تستی اجرا نشد.
