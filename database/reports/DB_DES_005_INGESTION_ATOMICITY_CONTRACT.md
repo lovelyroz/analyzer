@@ -300,3 +300,41 @@ Counts نهایی باید با نتیجهٔ commit سازگار باشند. د�
 6. در CODAL، publication chronology، supersession و رتبهٔ کیفیت مصوب مالک باید مستقل اعمال شوند؛ arrival order هرگز جای chronology نیست.
 
 تا زمان پاسخ به این تصمیم‌ها، هیچ fingerprint scope، revision key، conflict winner یا batch policy در این دفتر تصویب نمی‌شود. نتیجهٔ اجرایی ثابت فعلی فقط این است: identity ناقص یا تعارض غیرقابل توضیح نباید به overwrite، partial commit یا پذیرش خودکار منجر شود؛ کل واحد ورودی متوقف و برای review گزارش شود. این بخش مستنداتی است؛ هیچ کد، تست، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرده و تستی اجرا نشده است.
+
+
+### 13.8 ماتریس پذیرش آزمون برای اصلاح DB-DES-005 — 2026-11-19
+
+این ماتریس، رفتار موردنیاز را به سناریوهای مستقل و قابل‌اثبات تبدیل می‌کند. این‌ها **آزمون‌های پیشنهادی پذیرش** هستند، نه ادعای وجود یا اجرای تست. هر سناریو باید روی دیتابیس تست ایزوله اجرا شود و وضعیت canonical، Run audit و transaction را جداگانه assert کند.
+
+| ID | حوزه | سناریو | انتظار canonical | انتظار audit / نتیجه |
+|---|---|---|---|---|
+| AT-01 | Run lifecycle | ثبت STARTED موفق، سپس پردازش موفق | فقط پس از validation کامل و در transaction نهایی نوشته شود | همان Run از STARTED به COMPLETED؛ یک Run جدید ساخته نشود |
+| AT-02 | Run lifecycle | شکست parse/validation پس از ثبت STARTED | صفر canonical write | همان Run به FAILED؛ خطا خلاصه و sanitized |
+| AT-03 | Run lifecycle | شکست ثبت STARTED | هیچ ingestion/persistence آغاز نشود | خطا به caller؛ Run جعلی یا نتیجهٔ موفق گزارش نشود |
+| AT-04 | Atomicity | خطای hard در آخرین رکورد Market/FX batch | هیچ رکورد canonical از کل batch باقی نماند | Run برابر FAILED؛ rejected count و locatorهای امن ثبت شوند |
+| AT-05 | Atomicity | exception پس از stage شدن چند write و پیش از commit | تمام writeهای همان واحد rollback شوند | همان Run در transaction مستقل FAILED شود |
+| AT-06 | Atomicity | شکست commit یا constraint در میانهٔ flush | صفر canonical write از واحد | audit شکست باقی بماند؛ نتیجه COMPLETED نباشد |
+| AT-07 | Adapter boundary | ردیف malformed یا تاریخ خالی در FX adapter | adapter نباید مورد را بی‌صدا حذف کند؛ کل واحد در صورت hard error رد شود | diagnostic و records_found/rejected با ورودی منبع قابل reconcile باشد |
+| AT-08 | Adapter boundary | خطای parse در Market adapter همراه ردیف سالم | ردیف سالم نیز commit نشود | FAILED کل batch؛ partial acceptance ممنوع |
+| AT-09 | Intra-batch identity | دو ردیف با logical identity و payload یکسان | حداکثر یک canonical record | duplicate/unchanged count دقیق |
+| AT-10 | Intra-batch conflict | دو ردیف با logical identity یکسان و payload متفاوت | صفر canonical write از کل واحد | FAILED با conflict قابل‌تشخیص |
+| AT-11 | Replay | همان artifact/revision و fingerprint یکسان | canonical state بدون تغییر | Run جدید برای تلاش جدید؛ نتیجهٔ unchanged، نه inserted/updated |
+| AT-12 | Replay conflict | stable identity یکسان و fingerprint/payload متفاوت، بدون revision معتبر | canonical state قبلی دست‌نخورده | FAILED یا review-required طبق API مصوب؛ هرگز overwrite خاموش |
+| AT-13 | Correction | revision معتبر و قاعدهٔ supersession مصوب | فقط replacement/versioning مجاز همان دامنه | updated فقط برای replacement واقعی؛ تاریخچهٔ نسخه حفظ شود |
+| AT-14 | Concurrency | دو Run هم‌زمان برای یک logical identity و payload برابر | یک canonical identity یکتا | loser پس از rollback فقط با اثبات revision و payload برابر unchanged تلقی شود |
+| AT-15 | Concurrency | دو Run هم‌زمان برای یک logical identity و payload متفاوت | حداکثر یک وضعیت canonical؛ هیچ last-write-wins | conflict ثبت و تصمیم winner خودکار انجام نشود |
+| AT-16 | CODAL chronology | ورود نسخهٔ جدیدتر، سپس نسخهٔ قدیمی‌تر با arrival دیرتر | نسخهٔ قدیمی‌تر current نشود | chronology/supersession از publication evidence پیروی کند |
+| AT-17 | CODAL completeness | ReportVersion به‌همراه چند fact؛ شکست یک fact در persistence | نه ReportVersion و نه هیچ fact وابسته باقی نماند | همان Run FAILED |
+| AT-18 | Audit safety | exception شامل مسیر محلی، token یا payload نمونه | canonical outcome مطابق rollback | هیچ secret/path/payload خام در error_log نباشد |
+| AT-19 | Counts | واحد FAILED پس از چند write موقت | committed inserted/updated برابر صفر | attempted/rejected از committed جدا باشد؛ counts معنای ثابت داشته باشند |
+| AT-20 | Retry | retry پس از FAILED با همان ورودی اصلاح‌نشده | رفتار deterministic؛ validation/conflict دوباره canonical ننویسد | Run جدید با ارجاع به تلاش قبلی/source identity؛ retry خودکار خطای معنایی ممنوع |
+
+**شرایط اجرای معتبر ماتریس:**
+- هر تست باید با snapshot اولیه و query پس از پایان، تعداد و شناسهٔ canonical rows را مقایسه کند؛ صرفاً بررسی return value کافی نیست.
+- برای failure injection، نقطهٔ شکست باید پس از حداقل یک write موقت stage‌شده باشد تا rollback واقعی اثبات شود.
+- تست concurrency باید از دو Session/transaction مستقل استفاده کند؛ اجرای ترتیبی جایگزین رقابت نیست.
+- تست Jalali uniqueness باید پس از preflight داده و migration طراحی‌شده اجرا شود؛ تا آن زمان AT-14/15 در وضعیت نیازمند constraint فیزیکی باقی می‌مانند.
+- آزمون CODAL chronology به publication identity معتبر و rule ranking/supersession مصوب نیاز دارد؛ با timestamp ورود جایگزین نشود.
+- تست‌های قدیمی که partial acceptance یا overwrite را موفقیت تلقی می‌کنند باید بازنویسی شوند؛ تا وقتی قرارداد revision نهایی نشده، AT-12/13 را فقط می‌توان در سطح fail-closed/conflict آزمود و replacement را نباید حدس زد.
+
+**وضعیت:** هیچ‌یک از سناریوهای این ماتریس در این مرحله اجرا نشده‌اند. ماتریس، مجوز تغییر تست یا implementation نیست؛ ابتدا تصمیم‌های §13.7، preflight هویت جلالی DB-DES-004 §15 و قراردادهای Feed باید بسته شوند. DB-DES-005 همچنان PARTIAL است.
