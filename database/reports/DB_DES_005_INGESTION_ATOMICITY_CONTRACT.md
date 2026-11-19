@@ -184,3 +184,54 @@ Counts نهایی باید با نتیجهٔ commit سازگار باشند. د�
 - Implementation follow-up: اصلاح partial commit در Market/FX، CODAL transaction/replay behavior، sanitized failure audit و تست‌های atomicity/idempotency/concurrency/boundary.
 
 **محدودیت این Task:** این سند قرارداد منطقی است؛ هیچ ORM، schema، migration، داده، کد یا تستی را تغییر نمی‌دهد و به معنی اثبات رفتار فعلی سرویس‌ها نیست. DB-DES-005 تا زمان تطبیق با کد و تست‌ها PARTIAL باقی می‌ماند.
+
+
+## 13. تطبیق خواندنی سرویس‌های فعلی با قرارداد — 2026-11-19
+
+این بخش بر اساس snapshot شاخهٔ `master` و خواندن مستقیم فایل‌های `src/ingestion/service.py`, `src/ingestion/market/ingestion.py`, `src/ingestion/fx/ingestion.py`, `src/ingestion/codal/ingestion.py`, `src/ingestion/common/idempotency.py`, `src/ingestion/common/identity.py`, `src/ingestion/common/run_tracker.py` و مدل‌های audit/Market/FX تهیه شده است. این بررسی صرفاً خواندنی است و اجرای تست یا تغییر کد دربرندارد.
+
+### 13.1 یافته‌های قطعی در Market
+
+- `ingest_ohlc_csv` پس از parse، خطاهای parser و خطاهای validation/شرکت ناشناخته را در شمارندهٔ `failed` جمع می‌کند، اما ردیف‌های معتبر دیگر را همچنان stage می‌کند و در پایان با وجود `failed > 0`، Run را `COMPLETED` کرده و commit می‌کند. این partial acceptance صریحاً با §§4–5 قرارداد مغایر است.
+- در صورت وجود رکورد با همان هویت، فیلدهای آن بدون source revision، publication/availability metadata یا fingerprint مقایسه/جایگزین می‌شوند؛ این رفتار overwrite/last-write-wins است، نه replay بی‌تغییر یا replacement مصوب.
+- مسیر خطای exception کل transaction را rollback می‌کند و یک FAILED run جداگانه می‌سازد؛ اما در مسیر validation errors به‌جای rollback کامل، داده‌های معتبر commit می‌شوند.
+- `MarketDaily` فقط `UniqueConstraint(company_id, trade_date)` دارد. رکوردهای جلالی این Feed با `trade_date=NULL` ثبت می‌شوند؛ در SQLite و بسیاری از DBها unique index چند مقدار NULL را مانع نمی‌شود. بنابراین این قید، uniqueness هویت جلالی `(company_id, jalali_year, jalali_month, jalali_day)` را تضمین نمی‌کند.
+
+### 13.2 یافته‌های قطعی در FX
+
+- `ingest_fx_rates` اعتبارسنجی هر عنصر را در حلقه انجام می‌دهد، اما موارد نامعتبر را فقط به `failed` و `errors` اضافه کرده و بقیهٔ batch را ادامه می‌دهد. در پایان حتی با `failed > 0`، Run را `COMPLETED` کرده و canonical rows معتبر را commit می‌کند؛ این نیز partial acceptance خلاف قرارداد است.
+- اگر هویت موجود پیدا شود، `rate` و `source` بی‌قید revision/fingerprint/publication overwrite می‌شوند.
+- مدل `FXRate` قید unique را بر `(rate_date, currency_from, currency_to, rate_type)` اعمال می‌کند. رکوردهای Jalali با `rate_date=NULL` هستند، بنابراین قید مذکور هویت جلالی `(jalali_year, jalali_month, jalali_day, currency_from, currency_to, rate_type)` را ایمن نمی‌کند.
+- مسیر exception rollback و FAILED run جداگانه ایجاد می‌کند؛ اما خطاهای validation به‌صورت partial commit عبور می‌کنند.
+
+### 13.3 یافته‌های قطعی در CODAL
+
+- `ingest_codal_report` یک STARTED run را flush می‌کند، اما شروع Run در transaction مستقل commit نمی‌شود. در مسیر موفق، canonical writes و COMPLETED در یک commit قرار می‌گیرند؛ در مسیر exception، rollback باعث حذف STARTED می‌شود و سپس FAILED run جدیدی در transaction بعدی ساخته می‌شود. بنابراین audit شروع پایدار و همان Run با transition نهایی مطابق قرارداد وجود ندارد.
+- اگر `codal_tracking_id` موجود نباشد، Report جدید ساخته می‌شود و کلید پایدار replay در دسترس نیست؛ این با الزام مالک به stable source ID برای ingestion خودکار سازگار نیست.
+- اگر tracking ID و publication datetime یکسان پیدا شود، کد فقط تعداد RawFinancialFactهای نسخهٔ قبلی را می‌شمارد، Run را COMPLETED می‌کند و همان نسخه را برمی‌گرداند. نه fingerprint ورودی و نه برابری payload بررسی نمی‌شود؛ حتی محتوای جدید متفاوت نیز ممکن است بی‌صدا به‌عنوان replay یکسان پذیرفته شود. مقدار `records_updated` نیز به‌اشتباه با تعداد facts قبلی پر می‌شود، در حالی‌که هیچ replacement انجام نشده است.
+- در مسیر ساخت نسخهٔ جدید، نسخهٔ جاری قبلی پیش از تعیین chronology demote می‌شود و نسخهٔ جدید همیشه `is_current_version=True` می‌گیرد؛ این با تصمیم مالک دربارهٔ عدم current شدن خودکار late-arriving publication قدیمی ناسازگار است.
+- تمام RawFinancialFactهای ورودی با یک `period_id` مشترک ساخته می‌شوند؛ این مغایرت مستقل DB-AUD-002 است و در اینجا به‌عنوان ورودی/DTO نامتناسب برای واحد اتمیک ثبت می‌شود.
+- `error_log=str(exc)` ممکن است مسیر خصوصی یا جزئیات حساس exception را وارد audit کند؛ sanitization مطابق §3.2 اثبات نشده است.
+
+### 13.4 مدل audit و helperهای مشترک
+
+- `IngestionRun` فقط source، timestamp، status، counts و error_log را دارد؛ source/feed profile version، artifact fingerprint، stable source identity، duplicate/unchanged و out-of-scope counts در مدل موجود نیستند.
+- `start_run` صرفاً add/flush می‌کند و transaction مستقل/commit نمی‌کند. `fail_run` commit مستقل دارد. این helperها خودشان تضمین‌کنندهٔ مرز transaction واحد نیستند.
+- `common/idempotency.py` صرفاً یادداشت قراردادی است؛ اجرای fingerprint یا source-revision idempotency در آن وجود ندارد.
+
+### 13.5 وضعیت قیود و نتیجهٔ تطبیق
+
+| معیار | وضعیت مشاهده‌شده |
+|---|---|
+| Hard error موجب رد کل Market batch | FAIL — ردیف‌های معتبر commit می‌شوند |
+| Hard error موجب رد کل FX batch | FAIL — ردیف‌های معتبر commit می‌شوند |
+| Market/FX replay بدون تغییر | FAIL — رکورد موجود overwrite می‌شود |
+| هویت یکتای Jalali در DB | NOT ENFORCED — قیدهای فعلی بر ستون تاریخ میلادی NULLپذیرند |
+| CODAL stable ID اجباری | FAIL — tracking ID اختیاری است |
+| CODAL replay با fingerprint | FAIL — فقط tracking ID + publication datetime بررسی می‌شود |
+| CODAL late-arriving chronology | FAIL — آخرین ingest current می‌شود |
+| STARTED پایدار و همان Run terminal | FAIL/NOT PROVEN — شروع commit مستقل ندارد و شکست Run جدید می‌سازد |
+| sanitized error audit | NOT PROVEN — متن exception خام ذخیره می‌شود |
+| Share/CorporateAction | NOT IMPLEMENTED/NOT AUDITED در این vertical slice |
+
+**نتیجه:** DB-DES-005 قطعاً PARTIAL باقی می‌ماند و سرویس‌های Market، FX و CODAL با قرارداد اتمیک/idempotency مصوب منطبق نیستند. این یافته‌ها مجوز تغییر کد یا schema نیستند. اصلاحات اجرایی باید به Taskهای پیاده‌سازی/مهاجرت مجزا، preflight داده و تست‌های atomicity/idempotency/concurrency ارجاع شوند. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و هیچ تستی اجرا نشد.
