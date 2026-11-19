@@ -2301,11 +2301,11 @@ Adapter audit: Market CSV adapter خطاهای parse را گزارش می‌کن
 
 ## 9.21 تعریف پروتکل preflight فقط‌خواندنی برای Jalali uniqueness — 2026-11-19
 
-برای ادامهٔ DB-DES-004/005، queryهای لازم پیش از migration در reports/DB_DES_004_MARKET_FX_SHARE_CONTRACT.md §15 ثبت شدند. این مرحله فقط طراحی audit است؛ queryها روی دیتابیس محلی اجرا نشده‌اند و تعداد duplicateها، tupleهای ناقص، رکوردهای Gregorian-only یا نسخهٔ SQLite هنوز UNKNOWN است.
+برای ادامهٔ DB-DES-004/005، queryهای لازم پیش از migration در reports/DB_DES_004_MARKET_FX_SHARE_CONTRACT.md §15 ثبت شدند. این مرحله فقط طراحی audit است؛ queryها روی دیتابیس محلی اجرا نشده‌اند و تعداد duplicateها، tupleهای ناقص و رکوردهای Gregorian-only هنوز UNKNOWN است. نسخهٔ SQLite در شواهد مالک 3.45.3 گزارش شده، اما تطابق فایل DB آن شواهد با فایل واقعی runtime به‌دلیل URL نسبی برنامه هنوز اثبات نشده است.
 
 ترتیب اجرای preflight:
 1. مسیر واقعی DB برنامه با PRAGMA database_list از همان working directory/runtime ثبت شود؛ مسیر hard-code شدهٔ اسکریپت audit به‌تنهایی کافی نیست.
-2. sqlite_version() و کل migration ledger مرتب‌شده ثبت و با migration runner و source دقیق Migration 9 تطبیق داده شوند.
+2. sqlite_version() و کل migration ledger مرتب‌شده از connection واقعی برنامه ثبت و با شواهد گزارش‌شدهٔ SQLite 3.45.3، migration runner و source دقیق Migration 9 تطبیق داده شوند.
 3. duplicateهای MarketDaily بر کلید (company_id, jalali_year, jalali_month, jalali_day) و FXRate بر (jalali_year, jalali_month, jalali_day, currency_from, currency_to, rate_type) فقط شمارش و شناسه‌گذاری شوند.
 4. Jalali tupleهای ناقص، تاریخ‌های خارج از بازه، Gregorian-only، هر دو نمایش تاریخ، و فاقد هر دو نمایش جداگانه inventory شوند. اعتبار تقویمی کامل با validator جلالی پروژه به‌صورت read-only بررسی شود.
 5. فقط پس از ثبت نتیجه و تصمیم مالک دربارهٔ هر تعارض، طراحی قید unique و سازگاری آن با legacy Gregorian و نسخهٔ واقعی SQLite مطرح شود.
