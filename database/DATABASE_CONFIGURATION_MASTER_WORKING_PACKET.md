@@ -2361,3 +2361,12 @@ DB-ING-006 / Task 033 PARTIAL باقی می‌ماند. این گام صرفاً
 همچنین guardهای cleanup_incomplete_migration_9.py --apply ساختاری‌اند و پر بودن ستون‌ها را مانع حذف نمی‌دانند. با شواهد قبلی که هر دو ستون را در تمام ۵۰۵ ردیف populated نشان می‌دهد، backup گرفتن به معنی حفظ provenance در schema فعال نیست. تا بازیابی source/revision دقیق Migration 9، اثبات تطابق فایل runtime، و تعیین مقصد lineage این دو ستون، اجرای --apply ممنوع است؛ Migration 10 نیز برای همسان‌سازی شتاب‌زده مجاز نیست.
 
 این بررسی فقط source-level بود؛ هیچ DB باز یا script اجرا نشد و هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد. DB-AUD-010 همچنان PARTIAL و Migration 9 همچنان UNRECONCILED است.
+
+
+## 9.27 پروتکل read-only برای شناسایی دقیق فایل SQLite runtime — 2026-11-19
+
+در DB-AUD-010 §11، پس از بررسی init_db.py و migrate_db.py، پروتکل اجرایی read-only ثبت شد. هر دو اسکریپت engine را از src.core.database import می‌کنند، ولی entrypoint قطعی اپلیکیشن اصلی و cwd واقعی از source فعلی قابل اثبات نیست. URL نسبی sqlite:///./tehran_stock.db فقط در working directory واقعی همان فرایند قابل resolve است.
+
+پروتکل ثبت‌شده ابتدا وجود فایل candidate را کنترل می‌کند تا SQLite فایل تازه نسازد، سپس با mode=ro مسیر database_list، نسخه و migration ledger را می‌خواند. اجرای آن فقط در cwd واقعی runtime معتبر است؛ برای service/container باید cwd از launcher همان محیط گرفته شود. پس از اثبات مسیر، preflightهای Jalali در DB-DES-004 §15 روی همان فایل اجرا خواهند شد.
+
+همچنین در cleanup script، شرط نسخهٔ SQLite با مقایسهٔ رشته‌ای پیاده شده است؛ این مورد source-level ثبت شد اما هیچ اصلاح کدی انجام نشد. هیچ script/query اجرا، DB باز/ایجاد یا کد/ORM/schema/migration/data تغییر نکرد. Migration 9 UNRECONCILED و DB-AUD-010 PARTIAL باقی می‌مانند.
