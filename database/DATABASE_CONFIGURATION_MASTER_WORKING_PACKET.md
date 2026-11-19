@@ -2265,3 +2265,10 @@ DB-AUD-003 PARTIAL باقی می‌ماند: versioned/immutable seed، خطای
 - علامت‌گذاری آماری رکورد 1402-01-15 به‌عنوان outlier در Volume/Value/No، صرفاً diagnostic است و خطای منبع را اثبات نمی‌کند؛ تغییر یا حذف داده مجاز نیست.
 
 بنابراین blockerهای فعال MarketDaily همچنان publication/availability و revision/correction هستند، نه هویت منبع، تقویم یا معنای فیلدهای مصوب. برای FX، provenance و زمان انتشار/دسترس‌پذیری artifact، و نمونه/پروفایل FREE_MARKET همچنان بازند. این گام فقط اسناد را هم‌راستا می‌کند؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+
+
+## 9.20 تطبیق اجرایی DB-DES-005 با سرویس‌های Market/FX/CODAL — 2026-11-19
+
+ممیزی خواندنی سرویس‌های واقعی در گزارش `reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md` §13 ثبت شد. نتیجهٔ کلیدی: قرارداد اتمیک در سرویس‌های فعلی اجرا نشده است. Market و FX در صورت وجود ردیف نامعتبر، ردیف‌های معتبر دیگر را commit و Run را COMPLETED می‌کنند؛ هر دو برای هویت موجود، مقدارها را بدون revision/fingerprint overwrite می‌کنند. قیدهای unique فعلی MarketDaily و FXRate بر تاریخ میلادی NULLپذیرند و uniqueness هویت‌های جلالی را تضمین نمی‌کنند. CODAL tracking ID را اختیاری می‌پذیرد، replay را بدون fingerprint و مقایسهٔ محتوا موفق اعلام می‌کند، late-arriving version را current می‌کند، و STARTED را در transaction مستقل پایدار نمی‌سازد. مدل IngestionRun نیز artifact fingerprint، source revision، unchanged/duplicate و profile version را ندارد و error_log خام از نظر sanitization اثبات نشده است.
+
+**نتیجه:** DB-DES-005 و بخش‌های اجرایی مرتبط DB-AUD-001/002 همچنان PARTIAL هستند. این یافته‌ها مجوز تغییر کد/ORM/schema/migration/DB نیستند؛ اصلاح باید با preflight داده و قیود unique جلالی و تست‌های failure injection/atomicity/idempotency/concurrency در Task اجرایی مجزا انجام شود. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
