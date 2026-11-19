@@ -123,3 +123,24 @@ The current repository migration chain is version 8, while the previously record
 - هیچ cleanup، migration جدید یا تغییر داده‌ای مجاز نیست.
 
 این اصلاحیه صرفاً دقت مستندات را بالا می‌برد؛ هیچ کد، دیتابیس، schema یا migration تغییر نکرد و query یا تستی اجرا نشد.
+
+
+## 10. بررسی ایمنی guardهای Migration 9 و مرز تطبیق runtime — 2026-11-19
+
+بازخوانی مستقیم source در commit فعلی، ابهام مسیر را دقیق‌تر می‌کند:
+
+- src/core/database.py مقدار DATABASE_URL = "sqlite:///./tehran_stock.db" را به create_engine می‌دهد. در نتیجه فایل نهایی از working directory زمان ایجاد engine اثر می‌پذیرد؛ مسیر ریشهٔ پروژه در این تعریف تثبیت نشده است.
+- src/scripts/audit_migration_9_database_state.py و src/scripts/cleanup_incomplete_migration_9.py هر دو DB_PATH = ROOT / "tehran_stock.db" را می‌سازند. این دو مسیر فقط در صورتی یکی‌اند که working directory برنامه هنگام ساخت engine دقیقاً همان root باشد؛ source فعلی این شرط را تضمین نمی‌کند.
+- audit دیتابیس از connection مستقل SQLite استفاده می‌کند و PRAGMA database_list را از connection واقعی SQLAlchemy برنامه نمی‌خواند. بنابراین گزارش audit، به‌تنهایی، اتصال runtime را شناسایی نمی‌کند.
+- cleanup در حالت پیش‌فرض read-only است؛ اما --apply پس از guardهای ساختاری، backup می‌گیرد و دو ستون را حذف می‌کند. guardها تعداد ردیف‌های غیرNULL یا معنای داده‌های ستون‌ها را شرط توقف قرار نمی‌دهند. وجود backup نیز حذف provenance از schema فعال را به عملیات غیرمخرب تبدیل نمی‌کند.
+- مقایسهٔ نسخهٔ SQLite در cleanup به‌صورت رشته‌ای (version < "3.35.0") انجام می‌شود، نه مقایسهٔ tuple عددی نسخه. در شواهد گزارش‌شدهٔ فعلی، نسخه 3.45.3 است و این مورد مانع فعلی نیست؛ بااین‌حال guard نسخه به‌صورت عمومی قابل اتکا برای همهٔ قالب‌های نسخه نیست.
+
+### اقدام لازم پیش از هر تصمیم دربارهٔ Migration 9
+
+1. از همان engine/connection واقعی برنامه، در همان launch context، PRAGMA database_list، sqlite_version() و ledger را فقط‌خواندنی ثبت کنید.
+2. مسیر resolved خروجی را با Path.resolve() برای ROOT / "tehran_stock.db" مقایسه کنید؛ اگر متفاوت‌اند، audit قبلی را به فایل runtime تعمیم ندهید.
+3. source/revision دقیق Migration 9 را بازیابی و DDL کامل آن را با schema و دادهٔ فعلی تطبیق دهید.
+4. برای دو ستون source_sheet و source_column_header، مقصد معنایی و lineage جایگزین را مستند و تأیید کنید؛ سپس دربارهٔ نگهداری، انتقال یا retirement تصمیم بگیرید.
+5. تا بسته‌شدن موارد بالا، cleanup با --apply ممنوع باقی می‌ماند؛ افزودن Migration 10 برای «همسان‌سازی» ledger نیز مجاز نیست.
+
+**وضعیت:** این بررسی source-only است؛ هیچ scriptی اجرا نشد، هیچ DB باز نشد، و هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد. Migration 9 همچنان UNRECONCILED و DB-AUD-010 همچنان PARTIAL است.
