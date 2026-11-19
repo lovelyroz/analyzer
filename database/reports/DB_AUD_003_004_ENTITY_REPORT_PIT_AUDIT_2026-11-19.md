@@ -132,3 +132,18 @@ The latest owner decision requires global uniqueness for `Company.ticker`. The c
 ### Status
 
 DB-AUD-004 remains PARTIAL. A cutoff filter is confirmed in the forecast reader, but rank-aware, deterministic, unknown-safe version selection is not implemented by the inspected path. DB-AUD-003 remains PARTIAL; the ticker uniqueness requirement is now unambiguous, but the model/migration and full Company/Industry reader-writer/data inventory remain open. No code, ORM, schema, migration, database, or test was changed or run.
+
+
+## Entity catalog and market-identity follow-up — 2026-11-19
+
+Additional focused inspection covered `src/scripts/seed_data.py`, CODAL ingestion facades, and MarketDaily persistence.
+
+- `LOCKED_V1_INDUSTRIES` contains the seven approved codes: BANK, INVESTMENT, PETROCHEMICAL, METALS, CEMENT, FOOD, PHARMACEUTICAL.
+- `seed_initial_data()` is insert-if-missing by `industry_code`, so reruns do not create duplicate code rows. It is not yet a versioned seed: no seed version/history is stored, and an existing code with a changed `industry_name` is silently left as-is rather than checked against an immutable approved definition. The function catches exceptions, rolls back, and prints an error without re-raising, so automation may not receive a failing process status.
+- The inspected migration runner has no dedicated industry catalog seed migration. Thus the seven codes exist in a script, but migration-controlled/versioned catalog state is not established.
+- MarketDaily ingestion resolves each incoming CSV ticker with `Company.ticker` and `.one_or_none()`; unknown ticker produces a row error. This makes the owner's global ticker uniqueness decision operationally important: without a DB UNIQUE constraint, duplicate Company tickers can make resolution fail with a multiple-row exception rather than a controlled identity error.
+- The inspected CODAL facades accept `company_id` and a single `period_id`; the lower-level persistence service validates that the FinancialPeriod belongs to the supplied company. The inspected paths do not establish a shared admission service that verifies Company existence, approved Industry membership, and ticker uniqueness before every ingestion type.
+
+### Remaining DB-AUD-003 gates
+
+The seven-code list and insert-if-missing behavior are evidenced. Versioned/immutable seed semantics, fail-visible seed execution, Company ticker constraint plus legacy-data preflight, and complete API/DTO/reader/writer/data inventory remain open. No code, ORM, schema, migration, database, or tests changed or ran.
