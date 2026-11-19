@@ -2243,3 +2243,14 @@ DB-AUD-003 PARTIAL باقی می‌ماند: versioned/immutable seed، خطای
 یک اختلاف مسیر نیز وجود دارد: URL دیتابیس برنامه `sqlite:///./tehran_stock.db` نسبی و وابسته به working directory است، ولی اسکریپت‌های Migration 9 مسیر `ROOT/tehran_stock.db` را hard-code کرده‌اند. بنابراین تا resolved path مقایسه نشود، نمی‌توان فرض کرد ممیزی همان DB مورد استفادهٔ برنامه را بررسی کرده است.
 
 نتیجه: branch فعلی runner تا نسخهٔ ۸ است؛ شواهد قبلی دیتابیس محلی ledger نسخهٔ ۹ و ستون‌های پرشده را گزارش کرده‌اند. lineage و source دقیق Migration 9 هنوز reconcile نشده‌اند. cleanup، migration 10 و حذف ستون‌ها تا تعیین تکلیف metadata ممنوع/متوقف بمانند. این مرحله فقط مستندات را به‌روزرسانی کرد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 9.18 تفکیک پیشرفت Excel Reader از تکمیل Pipeline کاننیکال — 2026-11-19
+
+ممیزی تکمیلی کد نشان داد توصیف قدیمی «Excel adapter وجود ندارد» دیگر دقیق نیست. در مخزن، `src/ingestion/excel/dto.py` DTOهای immutable و transient برای Workbook/Worksheet/Table/Row/Column/Cell observations، Header fragments/axes، source artifact SHA-256، reader provenance و diagnostics دارد. `src/ingestion/excel/reader.py::read_excel_source` یک reader فقط‌خواندنی XLSX است که literal values را مشاهده می‌کند، formula/unsupported cell kinds را رد می‌کند و طبق قرارداد خود هیچ normalization مالی یا persistence انجام نمی‌دهد. preflight بستهٔ ZIP و محدودیت‌های resource نیز دارد. detector ناحیهٔ جدول بصری نیز فقط CANDIDATE/AMBIGUOUS ساختاری می‌دهد و معنای مالی یا period/metric را حدس نمی‌زند.
+
+بااین‌حال، در مدل‌های ORM بررسی‌شده هنوز relational Template entities وجود ندارد؛ ReportType catalog FK و رابطهٔ ReportVersion به TemplateVersion نیز پیاده‌سازی‌شده احراز نشد. writer تولیدی‌ای هم در این مرز مشاهده نشد که observation را از مسیر template مصوب، تعیین period مستقل هر fact، mapping به Metric/Dimension کاننیکال و ذخیرهٔ transactional/provenance عبور دهد.
+
+بنابراین عبارت دقیق وضعیت این است: **Excel source observation و structural detection موجود است؛ Excel-to-canonical persistence pipeline و relational template/report-type model هنوز اثبات/تکمیل نشده‌اند.** قدم عمودی بعدی باید template interpretation مصوب → تفسیر قطعی ردیف/ستون/دوره/مقدار → canonical fact DTO → writer تراکنشی با source identity/fingerprint و period مستقل هر Fact → تست‌های persistence/provenance باشد. مسیر PDF/Raw و schema legacy تا اثبات این مسیر و تصویب retirement plan دست‌نخورده بمانند.
+
+این گام فقط مستندات را دقیق‌تر کرد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
