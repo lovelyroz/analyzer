@@ -279,3 +279,24 @@ Counts نهایی باید با نتیجهٔ commit سازگار باشند. د�
 2. Market adapter diagnostics را برمی‌گرداند ولی service بخشی از ردیف‌های سالم را با وجود خطا commit می‌کند. FX adapter تعدادی ردیف malformed/blank را پیش از ساخت DTO بی‌صدا حذف می‌کند و service نیز DTOهای نامعتبر را skip می‌کند؛ این هم count خطا را ناقص می‌کند و هم با fail-whole-unit تعارض دارد.
 
 اقدام امن بعدی فقط audit خواندنی duplicateهای فعلی روی کلیدهای Jalali و inventory نسخهٔ SQLite/migration chain است. هرگونه unique migration باید پس از duplicate preflight و تصمیم دربارهٔ داده‌های موجود طراحی شود؛ merge/delete خودکار ممنوع. هیچ کد، ORM، schema، migration یا DB تغییر نکرده و تستی اجرا نشده است.
+
+
+### 13.7 دفتر تصمیم‌های باز برای Revision Identity و Fingerprint — 2026-11-19
+
+این دفتر، ورودی لازم پیش از هر vertical-slice اجرایی را از هم جدا می‌کند. موارد زیر **پیشنهاد مصوب یا سیاست نهایی نیستند**؛ فقط تصمیم‌هایی‌اند که بدون آن‌ها پیاده‌سازی idempotency/correction قابل اتکا نیست.
+
+| Feed | هویت پایدار منبع/رکورد | هویت revision یا correction | دامنهٔ fingerprint که باید تعیین تکلیف شود | رفتار تعارض حل‌نشده |
+|---|---|---|---|---|
+| CODAL Report | Stable source ID متعلق به گزارش منطقی (مانند CODAL tracking ID یا معادل مستند) برای ingestion خودکار الزامی است؛ عنوان/تاریخ/شرکت به‌تنهایی جایگزین مجاز نیست | شناسه/ترتیب نسخهٔ منتشرشده و publication identity؛ ارتباط نسخهٔ اصلاحی با نسخهٔ قبلی باید از metadata معتبر منبع یا review صریح بیاید | fingerprint کل artifact ورودی در برابر fingerprint محتوای canonicalized؛ باید روشن شود تغییرات غیرمالی، metadata انتشار، ترتیب sheet/table و تغییرات صرفاً formatting چه اثری دارند | stable ID یا publication identity مفقود/متناقض، یا payload متفاوت با identity یکسان: توقف و review؛ replay یکسان فقط پس از مقایسهٔ fingerprint قابل اعلام است |
+| MarketDaily CSV | کلید مشاهدهٔ اقتصادی مصوب: Company + تاریخ جلالی؛ Feed/source identity نیز باید مشخص باشد | شناسه یا شواهد معتبر برای اصلاح/بازنشر همان روز؛ publication/availability و chronology هنوز تعیین نشده‌اند | fingerprint کل CSV در برابر fingerprint هر رکورد normalized؛ باید رفتار تغییر ترتیب ردیف‌ها، تغییر ترتیب ستون‌ها، ردیف تکراری و metadata غیرمؤثر مشخص شود | یک کلید روزانه با مقدار متفاوت، بدون revision معتبر، conflict است؛ overwrite یا انتخاب آخرین فایل مجاز نیست |
+| FX daily workbook/feed | کلید اقتصادی مصوب: تاریخ جلالی + ارز مبدأ/مقصد + rate type؛ Feed profile و provenance artifact باید مشخص باشد | شناسه یا شواهد معتبر اصلاح/بازنشر همان تاریخ و نوع نرخ؛ publication/availability و تقویم کامل هنوز باز است | fingerprint artifact در برابر fingerprint نرخ normalized؛ اثر تغییر sheet/row order، formatting و مقدار منبع پس از تبدیل واحد باید تعیین شود | مقدار متفاوت برای کلید موجود، بدون revision معتبر، conflict است؛ overwrite یا انتخاب آخرین فایل مجاز نیست |
+
+**تصمیم‌های مشترک که باید پیش از implementation بسته شوند:**
+1. آیا fingerprint بر bytes خام artifact، محتوای معنایی parseشده، یا هر دو بنا می‌شود؛ و نسخهٔ الگوریتم/serialization چگونه ثبت می‌شود.
+2. کدام metadata در fingerprint وارد می‌شود: source/feed profile، company identity، calendar/unit، publication/availability، parser/mapping version و revision identity.
+3. replay دقیقاً چه زمانی UNCHANGED است؛ تغییر payload با stable identity یکسان چه زمانی correction معتبر و چه زمانی conflict است.
+4. واحد اتمیک پذیرش برای هر Feed چیست (کل workbook/CSV، یک گزارش منطقی، یا batch مشخص) و کدام diagnosticها hard error، out-of-scope یا warning محسوب می‌شوند. تا تعیین این مرز، رفتار فعلی partial acceptance معیار قابل قبول نیست.
+5. duplicate داخل یک artifact، duplicate بین artifactها، و دو ورودی هم‌زمان با identity یکسان چگونه fail-closed و audit می‌شوند.
+6. در CODAL، publication chronology، supersession و رتبهٔ کیفیت مصوب مالک باید مستقل اعمال شوند؛ arrival order هرگز جای chronology نیست.
+
+تا زمان پاسخ به این تصمیم‌ها، هیچ fingerprint scope، revision key، conflict winner یا batch policy در این دفتر تصویب نمی‌شود. نتیجهٔ اجرایی ثابت فعلی فقط این است: identity ناقص یا تعارض غیرقابل توضیح نباید به overwrite، partial commit یا پذیرش خودکار منجر شود؛ کل واحد ورودی متوقف و برای review گزارش شود. این بخش مستنداتی است؛ هیچ کد، تست، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرده و تستی اجرا نشده است.
