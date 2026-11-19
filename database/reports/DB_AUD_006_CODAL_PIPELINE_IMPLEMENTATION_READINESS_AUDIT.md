@@ -392,3 +392,21 @@ DB-AUD-006 در این نوبت **PARTIAL** باقی می‌ماند. این م�
 در شواهد فعلی، مصرف‌کنندهٔ اجرایی مستقل دیگری برای ستون `Report.financial_period_id` از فایل‌های غیر Python احراز نشد؛ شواهد اجرایی مستقیم همچنان به writer قدیمی CODAL و facade/pipelineهای متصل به آن محدود است. این نتیجه، به‌معنای اثبات نبود هرگونه مصرف‌کننده در تمام محیط‌ها نیست.
 
 **تصمیم بدون تغییر:** ستون و قرارداد legacy فعلاً حفظ می‌شوند. writer جدید Excel باید دوره را برای هر observation/fact تعیین کند. nullable/remove یا تغییر نقش ستون Report تا تکمیل بررسی callerهای بیرونی و طرح coexistence/retirement مجاز نیست. این گام read-only بود؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+
+
+## 17. Follow-up: Excel source observation capability versus persistence — 2026-11-19
+
+A focused inspection of the current Excel modules confirms meaningful progress since the earlier PDF-only snapshot:
+
+- `src/ingestion/excel/dto.py` defines immutable transient observation DTOs for workbook metadata, worksheets, table/row/column/cell observations, header fragments/axes, source artifact SHA-256, reader provenance, and diagnostics.
+- `src/ingestion/excel/reader.py::read_excel_source` is a read-only XLSX observation adapter. Its documented boundary is literal-value observation: it rejects formulas/unsupported cell kinds and does not normalize financial semantics or persist observations.
+- The reader includes package/resource preflight (file size, ZIP package structure/member count/uncompressed size, workbook parts), worksheet visibility/date-system metadata, and immutable source locators.
+- The Excel visual table-region detector is a separate structural candidate detector. Visual regions remain CANDIDATE/AMBIGUOUS; the detector does not infer financial meaning, assign periods/metrics, or persist a template.
+- The reviewed `src/models` files still contain no Company Table Layout Template relational ORM entities, and the current Report model has no ReportType catalog FK or ReportVersion-to-TemplateVersion provenance relationship.
+- No production writer was found in the reviewed Excel reader/detector boundary that takes the observation DTO through approved template interpretation, assigns each financial observation's own FinancialPeriod, maps canonical metrics/dimensions, and persists the approved canonical facts.
+
+### Revised readiness statement
+
+The previous phrase "no Excel adapter" is now stale and must not be repeated without qualification. The repository has an Excel *observation* adapter and structural table-candidate detection. It does not yet evidence an end-to-end Excel-to-canonical persistence pipeline or implemented relational template/report-type model. The correct next vertical slice is: approved template interpretation -> deterministic row/column/period/value interpretation -> canonical fact DTO -> transactional writer with source identity/fingerprint and per-fact period -> persistence/provenance tests. Keep the existing PDF/Raw path and legacy schema intact until this Excel slice is proven and a separate retirement plan is approved.
+
+No code, ORM, schema, migration, database, or tests were changed/run in this follow-up.
