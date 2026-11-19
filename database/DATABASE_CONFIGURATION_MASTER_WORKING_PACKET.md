@@ -2352,3 +2352,12 @@ DB-ING-006 / Task 033 PARTIAL باقی می‌ماند. این گام صرفاً
 در reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md §13.8 ماتریس ۲۰ سناریویی برای Run lifecycle، atomic rollback، adapter diagnostics، duplicate/conflict، replay، correction، concurrency، CODAL chronology/completeness، audit sanitization، counts و retry ثبت شد. معیارهای اعتبار آزمون نیز تصریح می‌کنند که باید canonical state قبل/بعد بررسی شود، failure injection پس از stage شدن write انجام شود و concurrency با Sessionهای مستقل آزموده شود.
 
 این ماتریس test plan است، نه گزارش اجرای تست. اصلاح assertionهای قدیمی و اجرای آن منوط به بسته‌شدن تصمیم‌های §13.7، preflight کلیدهای Jalali و قراردادهای Feed است. DB-DES-005 همچنان PARTIAL؛ هیچ تست یا کدی تغییر نکرد و تستی اجرا نشد.
+
+
+## 9.26 تکمیل ممیزی ایمنی Migration 9 و تطبیق مسیر runtime — 2026-11-19
+
+در reports/DB_AUD_010_RUNTIME_SQLITE_MIGRATION_RECONCILIATION.md §10، source فعلی src/core/database.py با دو اسکریپت audit/cleanup تطبیق داده شد. برنامه از URL نسبی sqlite:///./tehran_stock.db استفاده می‌کند، درحالی‌که اسکریپت‌ها فایل ROOT / "tehran_stock.db" را باز می‌کنند؛ پس یکسان بودن فایل فقط با اثبات working directory و مقایسهٔ مسیر resolved ممکن است. audit فعلی نیز connection واقعی engine برنامه را inspect نمی‌کند.
+
+همچنین guardهای cleanup_incomplete_migration_9.py --apply ساختاری‌اند و پر بودن ستون‌ها را مانع حذف نمی‌دانند. با شواهد قبلی که هر دو ستون را در تمام ۵۰۵ ردیف populated نشان می‌دهد، backup گرفتن به معنی حفظ provenance در schema فعال نیست. تا بازیابی source/revision دقیق Migration 9، اثبات تطابق فایل runtime، و تعیین مقصد lineage این دو ستون، اجرای --apply ممنوع است؛ Migration 10 نیز برای همسان‌سازی شتاب‌زده مجاز نیست.
+
+این بررسی فقط source-level بود؛ هیچ DB باز یا script اجرا نشد و هیچ کد، ORM، schema، migration یا داده‌ای تغییر نکرد. DB-AUD-010 همچنان PARTIAL و Migration 9 همچنان UNRECONCILED است.
