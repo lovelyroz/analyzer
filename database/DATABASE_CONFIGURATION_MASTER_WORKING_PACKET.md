@@ -2297,3 +2297,17 @@ DB-AUD-003 PARTIAL باقی می‌ماند: versioned/immutable seed، خطای
 Adapter audit: Market CSV adapter خطاهای parse را گزارش می‌کند ولی persistence بخشی از ردیف‌های معتبر را ادامه می‌دهد. FX XLSX adapter ردیف‌های دارای تاریخ/مقدار نامعتبر یا ناقص را بدون diagnostic حذف می‌کند؛ سرویس FX نیز خطاهای DTO را skip و باقی را commit می‌کند. این رفتار هم با fail-whole-unit مغایر است و هم تعداد خطاهای ورودی را کمتر از واقع نشان می‌دهد.
 
 **وضعیت DB-DES-004 و DB-DES-005 همچنان PARTIAL.** گام امن بعدی duplicate preflight فقط‌خواندنی روی کلیدهای Jalali، سپس تعیین نسخه SQLite و طراحی migration با سیاست صریح برخورد با دادهٔ تکراری است. هیچ merge/delete یا تغییر کد/مدل/schema/migration/DB انجام نشده؛ تست اجرا نشده است.
+
+
+## 9.21 تعریف پروتکل preflight فقط‌خواندنی برای Jalali uniqueness — 2026-11-19
+
+برای ادامهٔ DB-DES-004/005، queryهای لازم پیش از migration در reports/DB_DES_004_MARKET_FX_SHARE_CONTRACT.md §15 ثبت شدند. این مرحله فقط طراحی audit است؛ queryها روی دیتابیس محلی اجرا نشده‌اند و تعداد duplicateها، tupleهای ناقص، رکوردهای Gregorian-only یا نسخهٔ SQLite هنوز UNKNOWN است.
+
+ترتیب اجرای preflight:
+1. مسیر واقعی DB برنامه با PRAGMA database_list از همان working directory/runtime ثبت شود؛ مسیر hard-code شدهٔ اسکریپت audit به‌تنهایی کافی نیست.
+2. sqlite_version() و کل migration ledger مرتب‌شده ثبت و با migration runner و source دقیق Migration 9 تطبیق داده شوند.
+3. duplicateهای MarketDaily بر کلید (company_id, jalali_year, jalali_month, jalali_day) و FXRate بر (jalali_year, jalali_month, jalali_day, currency_from, currency_to, rate_type) فقط شمارش و شناسه‌گذاری شوند.
+4. Jalali tupleهای ناقص، تاریخ‌های خارج از بازه، Gregorian-only، هر دو نمایش تاریخ، و فاقد هر دو نمایش جداگانه inventory شوند. اعتبار تقویمی کامل با validator جلالی پروژه به‌صورت read-only بررسی شود.
+5. فقط پس از ثبت نتیجه و تصمیم مالک دربارهٔ هر تعارض، طراحی قید unique و سازگاری آن با legacy Gregorian و نسخهٔ واقعی SQLite مطرح شود.
+
+تا پیش از این شواهد، migration جدید یا اصلاح قیدها مجاز نیست. در صورت duplicate، عملیات fail-closed است؛ merge/delete، انتخاب خودکار رکورد برنده و بازنویسی تاریخ ممنوع‌اند. DB-DES-004 و DB-DES-005 PARTIAL باقی می‌مانند. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرده و query یا تستی اجرا نشده است.
