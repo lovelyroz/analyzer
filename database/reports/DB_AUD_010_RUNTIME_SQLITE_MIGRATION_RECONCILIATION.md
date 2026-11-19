@@ -108,3 +108,18 @@ A further path discrepancy is confirmed: `src/core/database.py` configures relat
 ### Updated conclusion
 
 The current repository migration chain is version 8, while the previously recorded owner-local database evidence reports version 9 and populated Migration 9 columns. The exact migration source and deployment lineage remain unreconciled. Do not run cleanup, add migration 10, or infer that the two columns are disposable. The next safe action is read-only local source/path reconciliation and explicit design mapping for both populated columns. No code, ORM, schema, migration, database, or tests were changed/run in this follow-up.
+
+
+## 9. تطبیق نسخهٔ SQLite گزارش‌شده با ابهام مسیر runtime — 2026-11-19
+
+نسخهٔ SQLite برابر **3.45.3** در شواهد محلی ارائه‌شده توسط مالک (§1) ثبت شده است؛ بنابراین نوشتن «نسخهٔ SQLite نامعلوم است» دقیق نیست. این نسخه از نظر قابلیت‌های SQLite جدیدتر از حداقل 3.35 مورد استفاده در guard اسکریپت cleanup است.
+
+اما این داده به‌تنهایی ثابت نمی‌کند که اسکریپت‌های محلی و برنامه دقیقاً یک فایل DB را باز کرده‌اند. برنامه در `src/core/database.py` از URL نسبی `sqlite:///./tehran_stock.db` استفاده می‌کند؛ مسیر آن به working directory فرایند وابسته است. اسکریپت DB audit در مقابل `ROOT / "tehran_stock.db"` را باز می‌کند. تا زمانی که `PRAGMA database_list` از connection واقعی برنامه در working directory اجرای آن ثبت و با مسیر resolved اسکریپت مقایسه نشود، تطابق فایل‌ها UNKNOWN می‌ماند.
+
+بنابراین وضعیت دقیق چنین است:
+- SQLite version در شواهد مالک: **3.45.3 (reported)**.
+- migration ledger نسخهٔ 9 در شواهد مالک: گزارش شده؛ اما تعلق آن به همان DB runtime باید با مسیر قطعی شود.
+- duplicateهای MarketDaily و FXRate: هنوز preflight نشده‌اند.
+- هیچ cleanup، migration جدید یا تغییر داده‌ای مجاز نیست.
+
+این اصلاحیه صرفاً دقت مستندات را بالا می‌برد؛ هیچ کد، دیتابیس، schema یا migration تغییر نکرد و query یا تستی اجرا نشد.
