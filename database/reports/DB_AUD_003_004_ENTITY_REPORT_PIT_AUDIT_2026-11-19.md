@@ -103,3 +103,32 @@ DB-AUD-003 and DB-AUD-004 remain PARTIAL until repository-wide call-site/read-wr
 ## Owner clarification — ticker uniqueness
 
 مالک تصریح کرد نمادهای بورسی کاملاً یکتا هستند. این تصمیم، بند قبلی دربارهٔ عدم یکتایی سراسری ticker را صریحاً supersede می‌کند: قرارداد هدف Company باید یکتایی سراسری `ticker` را enforce کند. پیش از افزودن قید به دیتابیس موجود، باید رکوردهای فعلی برای NULL/blank و duplicate بررسی شوند؛ در صورت تعارض، migration باید fail-closed شود و هیچ رکوردی خودکار ادغام یا حذف نشود. این ثبت مستنداتی است و قید ORM/schema/migration هنوز تغییر نکرده است.
+
+
+## PIT selector and production-consumer follow-up — 2026-11-19
+
+A focused follow-up inspected `src/core/point_in_time.py`, `src/forecast/queries.py`, `src/ingestion/service.py`, and the Stage 6 cutoff/selection test files.
+
+### Confirmed PIT paths
+
+1. `src/core/point_in_time.py::select_report_version` exists. It filters `report_id` and `publication_datetime <= cutoff`, then orders by publication descending and `version_number` descending. It does not read `is_restated`, any audit-status/rank field, or a content/source identity. A tracked call-site to this helper has not yet been established.
+2. The production forecast reader in `src/forecast/queries.py::_period_rows` filters normalized facts by company, requested metric codes, and `ReportVersion.publication_datetime <= cutoff`. It returns each candidate fact with its source ReportVersion and publication time.
+3. `_latest_per_metric` then chooses the strictly latest publication per metric within each period. It does not select a report-version winner using audit/restatement rank. Equal publication timestamps are not resolved explicitly: the comparison uses only `>`, and the SQL query has no ordering, so equal-time candidates can be decided by row-return order. This is not a deterministic approved tie-break.
+4. The Stage 6 tests `test_stage6_p25_selection.py` and `test_stage6_p25_adversarial.py` exercise evaluation-actual selection and restatement cases. They are not proof that the database PIT reader applies the owner-approved ReportVersion rank.
+5. `ReportVersion.is_restated` is a non-null Boolean with default false, so the current ORM cannot distinguish an explicitly confirmed non-restated version from unknown restatement metadata. The owner has decided unknown rank-affecting metadata must remain unresolved; this needs a representable state and fail-closed selection before the contract can be considered implemented.
+
+### Confirmed write-path gaps
+
+The current `ingest_codal_report` still:
+- accepts `codal_tracking_id=None` and creates a new Report when no tracking ID is supplied, contrary to the owner-approved stable-source-ID requirement for automated ingestion;
+- treats a matching tracking ID + publication datetime as replay without comparing content fingerprint;
+- demotes the existing current version and marks the newly ingested version current without comparing publication chronology, so a late-arriving older publication can replace the current flag;
+- assigns the supplied single `period_id` to every RawFinancialFact in the call.
+
+### Entity implementation gap
+
+The latest owner decision requires global uniqueness for `Company.ticker`. The current `src/models/entity.py` still declares `ticker = Column(String(50), nullable=False)` without `unique=True` or a table-level unique constraint. No migration enforcing it is present in the inspected migration runner. This is a confirmed contract-to-ORM gap, not an instruction to add the constraint before checking existing duplicate/blank data.
+
+### Status
+
+DB-AUD-004 remains PARTIAL. A cutoff filter is confirmed in the forecast reader, but rank-aware, deterministic, unknown-safe version selection is not implemented by the inspected path. DB-AUD-003 remains PARTIAL; the ticker uniqueness requirement is now unambiguous, but the model/migration and full Company/Industry reader-writer/data inventory remain open. No code, ORM, schema, migration, database, or test was changed or run.
