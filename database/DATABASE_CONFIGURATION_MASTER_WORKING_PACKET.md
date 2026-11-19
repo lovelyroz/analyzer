@@ -2288,3 +2288,12 @@ DB-AUD-003 PARTIAL باقی می‌ماند: versioned/immutable seed، خطای
 **اثر:** معیارهای §4–§10 قرارداد DB-DES-005 برقرار نیستند؛ به‌ویژه fail-whole-unit، no-partial-write، revision-aware idempotency و consistent audit counts. تست‌های فعلی بخشی از رفتار مغایر را تثبیت کرده‌اند؛ صرف افزودن فیلد audit مشکل را حل نمی‌کند.
 
 **اقدام بعدی:** پیش از تغییر کد/تست/schema، باید برای هر Feed منبع revision identity، fingerprint scope، تعارض replay در برابر correction، و معنای batch/file acceptance نهایی شود. سپس یک vertical slice با validation کامل قبل از write، یک transaction برای کل واحد و tests failure injection طراحی شود. تا آن زمان DB-DES-005 و Task وابسته PARTIAL باقی می‌مانند. تست اجرا نشده؛ هیچ کد، ORM، schema، migration یا DB تغییر نکرده است.
+
+
+### 8.100 — DB-DES-004 / DB-DES-005: Jalali uniqueness و adapter diagnostics (2026-11-19)
+
+یافتهٔ تازه از مدل‌های واقعی: UniqueConstraint فعلی MarketDaily روی `company_id, trade_date` و FXRate روی `rate_date, currency_from, currency_to, rate_type` است؛ اما ingestion جلالی ستون Gregorian date را NULL می‌گذارد. در SQLite، UNIQUE چند NULL را می‌پذیرد؛ پس کلیدهای اقتصادی جلالی در سطح DB یکتا نیستند و lookupهای `.one_or_none()` در صورت duplicate قبلی ممکن است fail شوند. هم‌زمانی نیز از این قیدها محافظت نمی‌شود.
+
+Adapter audit: Market CSV adapter خطاهای parse را گزارش می‌کند ولی persistence بخشی از ردیف‌های معتبر را ادامه می‌دهد. FX XLSX adapter ردیف‌های دارای تاریخ/مقدار نامعتبر یا ناقص را بدون diagnostic حذف می‌کند؛ سرویس FX نیز خطاهای DTO را skip و باقی را commit می‌کند. این رفتار هم با fail-whole-unit مغایر است و هم تعداد خطاهای ورودی را کمتر از واقع نشان می‌دهد.
+
+**وضعیت DB-DES-004 و DB-DES-005 همچنان PARTIAL.** گام امن بعدی duplicate preflight فقط‌خواندنی روی کلیدهای Jalali، سپس تعیین نسخه SQLite و طراحی migration با سیاست صریح برخورد با دادهٔ تکراری است. هیچ merge/delete یا تغییر کد/مدل/schema/migration/DB انجام نشده؛ تست اجرا نشده است.
