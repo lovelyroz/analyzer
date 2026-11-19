@@ -2338,3 +2338,10 @@ Adapter audit: Market CSV adapter خطاهای parse را گزارش می‌کن
 Gate بعدی: تأیید/اصلاح تمام 17 rectangle و 15 partition (با ستون و Header inheritance برای هر child) روی hash فعلی؛ سپس audit کامل رنگ‌ها با پوشش theme-based black fill؛ بازتولید coordinate map؛ و validator مستقل برای مالکیت یکتای 459 gray candidate cells و عدم overlap/duplicate. عدد 459 و 60 span فقط انتظار تاریخی است و باید از نقشهٔ تأییدشده دوباره محاسبه شود. workbook مستقل دورهٔ بعد همچنان آزمون drift جداگانه است.
 
 DB-ING-006 / Task 033 PARTIAL باقی می‌ماند. این گام صرفاً register و ارجاع مستنداتی اضافه کرد؛ هیچ workbook، کد، ORM، schema، migration یا دیتابیسی تغییر نکرد و تستی اجرا نشد.
+
+
+## 9.24 دفتر تصمیم‌های باز DB-DES-005 برای revision و fingerprint — 2026-11-19
+
+در reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md §13.7 یک decision register برای CODAL، MarketDaily و FX افزوده شد. برای هر Feed، هویت پایدار منبع/رکورد، revision/correction identity، fingerprint scope و رفتار تعارض جدا شده‌اند؛ همچنین تصمیم‌های مشترک دربارهٔ byte-level در برابر semantic fingerprint، metadata مؤثر، تعریف replay بی‌تغییر، واحد اتمیک batch، duplicate درون/بین artifactها و chronology/supersession فهرست شده‌اند.
+
+این register هیچ fingerprint algorithm، revision key یا conflict winner را تصویب نمی‌کند. فقط مرز ایمن فعلی را تثبیت می‌کند: هویت ناقص یا payload متعارض نباید به overwrite یا partial commit منجر شود؛ ورودی تا review متوقف می‌ماند. DB-DES-005 PARTIAL است و implementation همچنان نیازمند تصمیم‌های مالک و preflight داده/قیود جلالی است. فقط مستندات تغییر کرد؛ هیچ کد، تست، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
