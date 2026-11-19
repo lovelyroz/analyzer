@@ -1,292 +1,331 @@
-# Task: Independent Re-Audit of Parsian Periodic Excel Workbook
+# LOCAL DATA FEED AUDIT — Market Price & FX Rate
 
-**Task ID:** DB-ING-006-AUDIT-02  
-**Mode:** REPORT ONLY — NO CODE CHANGES
+## نوع کار
+**REPORT ONLY — NO CODE CHANGE / NO DATABASE CHANGE**
 
-## 1. Objective
+## پروژه
+- Repository: `lovelyroz/analyzer`
+- Local path: `D:\Winprojects\analyzer`
+- گزارش نهایی: `reply.md`
+- زبان گزارش: فارسی
+- فرمت: Markdown
 
-Perform a completely independent, fresh audit of the original workbook:
+## هدف
 
-`parsian_periodic.xlsx`
+دو فایل زیر را مستقیماً از روی دیسک بررسی کن و یک گزارش فنی کامل تهیه کن:
 
-Save the new report at:
+1. `saman_price_history.csv`
+2. `dollar-history.xlsx`
 
-`parsian_periodic_report_2.md`
+این بررسی برای تکمیل استاندارد ورودی‌های غیرصورت‌مالی پروژه (DB-STD-005) است.
 
+هدف، استخراج ساختار واقعی فایل‌ها و مشخصات Feed است؛ نه طراحی فرضی یا پیشنهاد یک قالب جدید.
 
+**هیچ چیزی را حدس نزن. هر ویژگی که از فایل یا شواهد قابل مشاهده نیست، صریحاً UNKNOWN ثبت کن.**
 
+---
 
-The purpose is to establish reliable, coordinate-level evidence for creating a Company Table Layout Template.
+## بخش اول — شناسایی فایل‌ها
 
-## 2. Strict Restrictions
+1. فایل‌ها را در پروژه پیدا کن.
+2. مسیر کامل هر فایل را در گزارش بنویس.
+3. اگر چند فایل با همین نام وجود دارد، همه را گزارش کن و بدون تصمیم‌گیری خودسرانه مشخص کن کدام نسخه باید بررسی شود.
+4. اندازه فایل، فرمت، تاریخ آخرین تغییر و SHA-256 هر فایل را ثبت کن.
+5. اگر فایلی پیدا نشد، آن را صریحاً اعلام کن و جایگزین انتخاب نکن.
 
-- Do not modify the source XLSX.
-- Do not modify application code.
-- Do not modify existing reports, specifications, or architecture documents.
-- Do not run tests.
-- Do not create or modify any other project file.
-- Do not infer financial meaning from cell contents.
-- Do not guess table boundaries or cell roles.
-- Do not silently resolve contradictory evidence.
-- Do not use the previous report as a substitute for inspecting the workbook.
-- The only permitted output is the new Markdown report at the specified path.
+## بخش دوم — بررسی saman_price_history.csv
 
-## 3. Authoritative Annotation Convention
+فایل را با حفظ داده‌های اصلی بررسی کن.
 
-The workbook has been standardized manually by its owner. The following rules describe the intended annotations.
+### 2.1 مشخصات ساختاری
+- Encoding واقعی
+- Delimiter
+- نوع و تعداد ستون‌ها
+- نام دقیق تمام Headerها
+- تعداد کل رکوردها
+- تعداد ردیف‌های خالی
+- وجود Header تکراری
+- وجود ردیف توضیحات یا اطلاعات اضافی قبل و بعد از جدول
+- وجود BOM یا نشانه‌های غیرمعمول
 
-| Color | Meaning |
-|---|---|
-| Red | Main table name; located outside the table, normally one or two rows before it |
-| Blue | Table header cells |
-| Yellow | Description/label cells for rows |
-| Gray | Numeric/value cells that must be extracted |
-| Black | Columns whose values must NOT be extracted |
-| Green | Sub-table name |
+### 2.2 بررسی ستون‌ها
 
-Additional rules:
+برای تک‌تک ستون‌ها یک جدول بساز و این موارد را ثبت کن:
 
-1. Every table is intended to have a recognizable outside border. It does not have to use Excel's literal `thick` border style. A visibly distinguishable non-default border may be used.
-2. The owner colors cells so that table regions can still be recognized even when a border is incomplete.
-3. Most tables are read right-to-left. In the common layout, yellow description cells are on the right.
-4. Green cells identify sub-table names. In the reading order, the yellow description column immediately following a green marker begins the corresponding sub-table's label region. This continues until the next green marker or the parent table's end.
-5. Cells without an annotation color are NOT extracted.
-6. Black cells/columns are NOT extracted.
-7. A gray cell is an extraction cell even if its Excel value is blank. A blank gray cell must be interpreted as numeric zero (`0`), not NULL or missing. Therefore, blank gray cells must be included in the gray-cell inventory and explicitly identified as blank.
-8. A valid table may have no yellow description column if its gray extraction cells and table structure establish that it is a valid owner-annotated exception.
-9. A blue header alone is not sufficient evidence that a region is an extractable table. Record the evidence without independently inventing a table classification.
+| Field | Source Header | Detected Data Type | Sample Values | Null Count | Zero Count | Min | Max | Interpretation |
+|---|---|---|---|---|---|---|---|---|
 
-These are annotation rules, not permission to infer missing annotations.
+در ستون Interpretation فقط معنایی را بنویس که از نام ستون، داده‌ها یا شواهد معتبر قابل اثبات باشد.
 
-## 4. Workbook and Worksheet Inventory
+### 2.3 بررسی تاریخ
+- Header مربوط به تاریخ را شناسایی کن.
+- چند مقدار واقعی تاریخ را نمایش بده.
+- مشخص کن تاریخ به چه تقویمی است: Jalali، Gregorian یا UNKNOWN.
+- قالب دقیق تاریخ را تعیین کن.
+- ترتیب تاریخ‌ها را بررسی کن.
+- تعداد تاریخ‌های تکراری را گزارش کن.
+- بازه زمانی ابتدا و انتهای داده را مشخص کن.
+- وجود تاریخ نامعتبر یا ناقص را بررسی کن.
+- مشخص کن تاریخ معامله است یا تاریخ دیگری؛ اگر قابل اثبات نیست UNKNOWN بنویس.
 
-Inspect every worksheet independently.
+### 2.4 بررسی داده‌های بازار
 
-For each worksheet, report:
+مشخص کن آیا فایل حاوی هرکدام از موارد زیر است یا خیر:
 
-- Exact worksheet name.
-- Used range.
-- `rightToLeft` property.
-- Merged cell ranges.
-- Dimensions and non-empty cell counts.
-- Formula cell count and exact coordinates, if any.
-- Any unusual worksheet properties that affect interpretation.
+- Open
+- High
+- Low
+- Close
+- Raw Closing Price
+- Adjusted Closing Price
+- Volume
+- Trading Value
+- سایر فیلدها
 
-Do not assume that a worksheet is a duplicate of another worksheet. Treat each worksheet as independent unless the workbook itself provides clear evidence otherwise.
+برای هر مورد:
+- Header اصلی منبع
+- معنای قابل اثبات
+- واحد و مقیاس
+- نوع داده
+- درصد مقادیر خالی
+- نمونه مقادیر واقعی
 
-## 5. Raw Color Inventory
+را ثبت کن.
 
-Inspect all cells in the used range, including blank cells that have formatting.
+**مهم:** صرفاً به‌دلیل نام یک ستون، آن را قیمت تعدیل‌شده، قیمت پایانی، حجم یا ارزش معاملات فرض نکن.
 
-For every annotated cell, report:
+### 2.5 کنترل‌های کیفیت
 
-- Worksheet name.
-- Exact cell coordinate.
-- Observed cell value.
-- Excel data type.
-- Whether the cell is blank.
-- Fill type.
-- Color type (`rgb`, `indexed`, or `theme`).
-- Raw RGB value, if applicable.
-- Theme index, if applicable.
-- Indexed color, if applicable.
-- Tint.
+موارد زیر را بررسی کن:
 
-Classify the cells by the owner's annotation roles:
+- High < Low
+- Open/Close خارج از بازه High/Low
+- قیمت منفی
+- حجم یا ارزش منفی
+- مقادیر غیرعددی
+- صفرهای مشکوک
+- تاریخ‌های تکراری با مقادیر یکسان
+- تاریخ‌های تکراری با مقادیر متناقض
+- ترتیب نامنظم رکوردها
+- مقادیر پرت و غیرعادی
 
-- Red
-- Blue
-- Yellow
-- Gray
-- Black
-- Green
-- Uncolored
+برای هر کنترل، تعداد موارد نقض و چند نمونه دقیق را ارائه کن.
 
-Do not invent a separate semantic category for a slightly different shade of black. Preserve the raw color metadata and report the visual/color difference objectively. The owner has clarified that dark-looking cells in this workbook belong to the black excluded-column role unless the source workbook proves otherwise.
+هیچ رکوردی را اصلاح یا حذف نکن.
 
-Provide per-worksheet and workbook-wide counts for every color role.
+---
 
-### Critical: Gray cells
+## بخش سوم — بررسی dollar-history.xlsx
 
-For gray cells, provide a complete coordinate-level inventory.
+تمام Worksheetهای فایل را بررسی کن، نه فقط اولین Sheet.
 
-Separate them into:
+### 3.1 مشخصات Workbook
 
-- Gray cells with literal numeric values.
-- Gray cells with literal text values.
-- Gray cells with blank values.
-- Gray cells with other data types.
+- مسیر کامل
+- تعداد Worksheetها
+- نام دقیق هر Worksheet
+- وضعیت Hidden/Visible
+- ابعاد استفاده‌شده هر Sheet
+- تعداد ردیف و ستون دارای داده
+- وجود سلول Merge شده
+- وجود Formula
+- وجود جدول‌های Excel
+- جهت Worksheet در صورت قابل تشخیص بودن
 
-Do not omit blank gray cells. Do not treat them as uncolored or as absent data.
+### 3.2 بررسی ساختار هر Worksheet
 
-## 6. Border Audit
+برای هر Sheet جداگانه:
 
-Inspect border properties for all relevant cells, including cells with blank values.
+- Header واقعی را پیدا کن.
+- شماره ردیف Header را ثبت کن.
+- نام دقیق ستون‌ها را بنویس.
+- تعداد رکوردها را مشخص کن.
+- ردیف‌های توضیحی و خالی را مشخص کن.
+- اگر چند جدول در یک Sheet وجود دارد، آن‌ها را جداگانه گزارش کن.
 
-For each candidate table region, report:
+اگر ساختار Sheet پیچیده است، آدرس دقیق محدوده‌ها را با فرمت Excel ثبت کن.
 
-- Exact outer boundary coordinates.
-- Top, bottom, left, and right border styles.
-- Border color metadata where available.
-- Whether each edge is continuous or has gaps.
-- Exact coordinates of missing or different-style edge segments.
-- Whether the boundary is visually distinguishable from ordinary cell borders.
+### 3.3 بررسی ستون‌ها
 
-Do not require the literal `thick` style.
+برای تمام ستون‌ها جدولی مشابه زیر تهیه کن:
 
-Do not automatically reject a candidate because its border is `medium`, `thin`, or mixed. Report the observed evidence and let the owner make the final decision.
+| Field | Source Header | Detected Data Type | Sample Values | Null Count | Zero Count | Min | Max | Interpretation |
+|---|---|---|---|---|---|---|---|---|
 
-Also report formatted/bordered regions that are not associated with a red main table name.
+### 3.4 شناسایی نوع نرخ ارز
 
-## 7. Main Table Inventory
+بررسی کن آیا فایل شامل موارد زیر است:
 
-Identify every red main-table name independently.
+- FREE_MARKET
+- EXCHANGE_CENTER
 
-For each red cell, report:
+یا نرخ‌های دیگری دارد.
 
-- Worksheet and exact coordinate.
-- Exact cell value.
-- Raw fill metadata.
-- Its position relative to nearby bordered/annotated regions.
+مشخص کن نوع نرخ:
+- در یک ستون مشخص شده است؟
+- از Sheet جداگانه قابل تشخیص است؟
+- از نام فایل یا ساختار دیگری برداشت می‌شود؟
+- یا اصلاً قابل تشخیص نیست؟
 
-For every possible associated table region, report:
+هیچ‌کدام از دو نوع نرخ را صرفاً بر اساس حدس به داده‌ها نسبت نده.
 
-- Worksheet.
-- Exact rectangular bounds in A1 notation.
-- Top-left and bottom-right coordinates.
-- Red main-name cell coordinate.
-- Number of rows and columns.
-- Border evidence.
-- Blue header coordinates.
-- Yellow description coordinates.
-- Gray extraction coordinates.
-- Black excluded coordinates.
-- Green sub-table marker coordinates.
-- Uncolored coordinates.
-- Any cells outside the rectangle that appear related, but do not include them without evidence.
+### 3.5 بررسی تاریخ و مقدار نرخ
 
-Do not assume that every red name necessarily identifies a valid extractable table. Report the evidence and any uncertainty.
+- قالب تاریخ
+- تقویم تاریخ
+- بازه زمانی
+- تاریخ‌های تکراری
+- نرخ‌های خالی یا صفر
+- نرخ‌های غیرعددی
+- واحد نرخ
+- مقیاس نرخ
+- جداکننده هزارگان
+- جداکننده اعشار
+- تعداد ارقام اعشار
+- نحوه نمایش اعداد فارسی و انگلیسی
 
-Do not assume that every bordered rectangle is a table.
+را بررسی کن.
 
-## 8. Sub-table Inventory
+**نکته مهم:** در استاندارد دامنه‌ای پروژه، نرخ ارز باید به شکل Rial به‌ازای USD ذخیره شود. همچنین تصمیم قبلی پروژه این است که اگر مقدار منبع Toman به‌ازای USD باشد، تبدیل با Decimal و ضرب در ۱۰ و سپس یک بار ROUND_HALF_UP انجام شود.
 
-For every green cell, report:
+اما ابتدا باید از روی فایل مشخص شود واحد واقعی منبع چیست. این تبدیل را روی فایل اجرا نکن؛ فقط مشخص کن آیا شواهد فایل با این قرارداد سازگار است یا خیر.
 
-- Worksheet and exact coordinate.
-- Exact cell value.
-- Parent table candidate, if objectively identifiable.
-- Yellow description cells that follow it in the table's reading order.
-- Exact coordinates of the first and last associated yellow cells.
-- The next green marker, if any.
-- Whether the sub-table boundary is clear or ambiguous.
+---
 
-Provide provisional sub-table ranges only when the source workbook's annotations and geometry support them.
+## بخش چهارم — بررسی قابلیت استفاده در DB-STD-005
 
-Do not invent missing yellow or gray annotations.
+برای هر فایل یک نتیجه مستقل ارائه کن.
 
-## 9. Direction and Reading Order
+### MarketDaily
 
-For each table candidate:
+بررسی کن آیا داده‌های فایل برای تعیین Feed Profile بازار کافی هستند یا خیر.
 
-- Record the worksheet's `rightToLeft` property.
-- Determine the actual physical position of yellow description cells and gray value cells.
-- Report the observed column order.
-- Record any merged cells that affect the reading order.
-- Do not assume that `rightToLeft=True` alone proves the logical reading order.
-- Do not assume that visual column A is on the left or right without checking the actual workbook layout.
+موارد لازم:
 
-## 10. Independent Worksheet Examination
+- Source identity
+- Company identity
+- Trading date
+- Open / High / Low / Close
+- Raw / Adjusted price distinction
+- Volume
+- Trading value
+- Unit and scale
+- Date calendar and format
+- Nullability
+- Duplicate policy
+- Source revision / publication metadata
 
-Pay particular attention to the secondary worksheet.
+برای هر مورد یکی از این وضعیت‌ها را تعیین کن:
 
-Do not rely on any previous claim about its name, range, title, colors, or contents.
+- CONFIRMED_FROM_FILE
+- PARTIALLY_CONFIRMED
+- NOT_PRESENT
+- UNKNOWN
+- REQUIRES_OWNER_CONFIRMATION
 
-For every possible table-like region on that worksheet, report the same evidence required in sections 5–9.
+### FXRate
 
-In particular, verify independently:
+برای فایل ارز نیز موارد زیر را بررسی کن:
 
-- Whether a red main-table name exists.
-- Whether blue header cells exist.
-- Whether yellow description cells exist.
-- Whether gray extraction cells exist.
-- Whether any gray extraction cells are blank.
-- Whether green sub-table markers exist.
-- Whether black excluded columns exist.
-- Whether a recognizable border exists.
-- Exact coordinates and values of all these cells.
+- Source identity
+- Rate date
+- Rate type
+- Currency
+- Source unit
+- Canonical unit compatibility
+- Decimal precision
+- Duplicate policy
+- Publication / availability time
+- Revision metadata
 
-Do not call the worksheet a duplicate merely because its contents resemble another worksheet.
+از وضعیت‌های بالا استفاده کن.
 
-## 11. Anomaly and Conflict Register
+---
 
-Create a separate section listing all anomalies, including:
+## بخش پنجم — نمونه داده و شواهد
 
-- A red name without an identifiable table.
-- A table-like bordered region without a red name.
-- Blue headers without gray extraction cells.
-- Gray cells without yellow descriptions.
-- Blank gray cells.
-- Yellow cells without corresponding gray cells.
-- Green markers without clear sub-table extents.
-- Black columns mixed with gray extraction columns.
-- Missing or incomplete borders.
-- Uncolored cells inside otherwise annotated regions.
-- Merged cells that complicate bounds or interpretation.
-- Formula cells or unsupported cell types.
-- Any discrepancy between visual appearance and raw formatting metadata.
+برای هر فایل:
 
-For each anomaly, provide exact worksheet and cell coordinates. Do not resolve it by guessing.
+1. حداقل ۱۰ ردیف واقعی از ابتدای داده‌ها را نشان بده.
+2. حداقل ۱۰ ردیف از انتهای داده‌ها را نشان بده.
+3. اگر داده‌ها کمتر از این مقدار هستند، تمام رکوردها را نشان بده.
+4. برای موارد مشکوک یا ناسازگار، نمونه دقیق ارائه کن.
+5. شماره ردیف یا آدرس سلول Excel را برای هر مشاهده مهم ثبت کن.
 
-## 12. Required Report Structure
+داده‌های نمونه باید عیناً از فایل باشند؛ هیچ مقداری را تغییر نده.
 
-Save the report with these sections:
+اگر نمایش کل داده‌ها در گزارش حجیم می‌شود، فقط نمونه‌های نماینده و خلاصه آماری را قرار بده؛ اما تمام بررسی‌ها باید روی کل داده انجام شوند.
 
-1. Audit scope, workbook identity, and source SHA-256.
-2. Worksheet inventory.
-3. Global raw color inventory.
-4. Complete coordinate inventory of annotated cells, grouped by worksheet and color.
-5. Border inventory.
-6. Main table candidates.
-7. Detailed evidence for every candidate table.
-8. Green sub-table marker inventory and provisional partitions.
-9. Reading direction and column order.
-10. Independent secondary worksheet analysis.
-11. Blank gray cell inventory and zero interpretation.
-12. Anomaly and conflict register.
-13. Final factual summary and unresolved questions.
+---
 
-Use Markdown tables where useful. For long coordinate lists, use compact grouped lists, but never omit coordinates.
+## بخش ششم — نتیجه‌گیری و پیشنهاد فنی
 
-## 13. Quality Requirements
+در انتهای گزارش، این موارد را مشخص کن:
 
-- All counts must be reproducible from the coordinate-level inventory.
-- Every reported range must be traceable to actual worksheet coordinates.
-- Distinguish observed facts from interpretations.
-- Preserve raw formatting metadata rather than reporting only semantic color names.
-- Do not silently merge similar colors into one category.
-- Do not infer a table solely from a title, header, or border.
-- Explicitly distinguish blank cells from cells containing numeric zero.
-- Include source workbook SHA-256 so the inspected file can be identified.
-- State which inspection library and method were used.
-- If any part of the workbook could not be inspected reliably, state that limitation explicitly.
+1. آیا `saman_price_history.csv` برای تعریف Feed Profile مربوط به MarketDaily کافی است؟
+2. آیا `dollar-history.xlsx` برای تعریف Feed Profile مربوط به FXRate کافی است؟
+3. چه اطلاعاتی هنوز از مالک پروژه لازم است؟
+4. چه مواردی با همین فایل‌ها قابل تعیین هستند؟
+5. چه مواردی به اطلاعات خارج از فایل نیاز دارند؟
+6. آیا هر دو فایل برای پذیرش در DB-STD-005 آماده‌اند؟
+7. دقیقاً چه موانعی برای بستن Task 025 باقی می‌ماند؟
 
-## 14. Final Output
+یک جدول نهایی تهیه کن:
 
-Create only:
+| Domain | Confirmed | Unresolved | Blockers | Readiness |
+|---|---|---|---|---|
 
-`parsian_periodic_report_2.md`
+در بخش پیشنهادها، هیچ ساختار جدیدی را بدون شواهد به‌عنوان تصمیم قطعی پروژه معرفی نکن.
 
-At the end of your response, report:
+---
 
-- Confirmation that the original XLSX was inspected from scratch.
-- Source workbook SHA-256.
-- Report path.
-- Number of worksheets inspected.
-- Number of red, blue, yellow, gray, black, and green cells per worksheet.
-- Number of blank gray cells.
-- Any unresolved inspection limitations.
+## بخش هفتم — الزامات گزارش
 
-Do not edit or overwrite `parsian_periodic_report_1.md`.
+گزارش باید شامل این بخش‌ها باشد:
 
-**Remember: This is an evidence-gathering task, not a template-design or code-implementation task.**
+1. Executive Summary
+2. File Identity and Integrity
+3. CSV Structural Audit
+4. CSV Field-Level Audit
+5. Excel Workbook Audit
+6. Excel Worksheet and Field-Level Audit
+7. Date and Numeric Format Analysis
+8. Data Quality Findings
+9. DB-STD-005 Compatibility Matrix
+10. Unresolved Questions
+11. Final Readiness Assessment
+12. Evidence Appendix
+
+گزارش را به زبان فارسی و Markdown بنویس.
+
+تمام اعداد، تاریخ‌ها، Headerها، مسیرها و نمونه‌ها باید قابل ردیابی به فایل اصلی باشند.
+
+## محدودیت‌های قطعی
+
+- هیچ کدی را تغییر نده.
+- هیچ فایل اصلی را تغییر نده.
+- هیچ فایل جدیدی به پروژه اضافه نکن، به‌جز گزارش نهایی.
+- هیچ داده‌ای وارد دیتابیس نکن.
+- هیچ Migration اجرا نکن.
+- هیچ تستی اجرا نکن.
+- هیچ داده‌ای را Normalize، اصلاح، حذف یا بازنویسی نکن.
+- هیچ واحد، تقویم، نوع نرخ یا معنای مالی را حدس نزن.
+- هیچ گزارش قبلی را به‌عنوان جایگزین بررسی مستقیم فایل‌ها در نظر نگیر.
+- فقط دو فایل مشخص‌شده را بررسی کن؛ سراغ بررسی گسترده سایر فایل‌های پروژه نرو.
+
+## خروجی
+
+گزارش کامل را در فایل زیر قرار بده:
+
+`reply.md`
+
+در پایان فقط خلاصه‌ای از این موارد را اعلام کن:
+
+- مسیر دقیق دو فایل بررسی‌شده
+- SHA-256 هر دو فایل
+- تعداد Worksheetها و رکوردهای هر فایل
+- تعداد یافته‌های مهم
+- موارد UNKNOWN و نیازمند تصمیم مالک
+- مسیر گزارش `reply.md`
+
+**گزارش باید آن‌قدر کامل باشد که ChatGPT بتواند بدون دسترسی مستقیم به فایل‌های Excel و CSV، استاندارد Feed را بر اساس شواهد آن بررسی و تصمیم‌گیری کند.**
