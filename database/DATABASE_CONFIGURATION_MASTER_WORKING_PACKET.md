@@ -2232,3 +2232,14 @@ Task 024 بسته شد و قرارداد انتخاب نوع ورودی و admis
 در MarketDaily، `src/ingestion/market/ingestion.py` شرکت را با `Company.ticker` و `.one_or_none()` resolve می‌کند؛ ticker ناشناخته به خطای ردیف تبدیل می‌شود. تا زمانی که قید UNIQUE در DB اعمال نشده باشد، ticker تکراری می‌تواند به خطای multiple rows منجر شود. در مسیرهای CODAL نیز company_id و period_id ورودی پذیرفته و تطابق Company/FinancialPeriod در لایهٔ persistence کنترل می‌شود، اما admission service مشترکی که وجود Company، عضویت در Industry مصوب و اعتبار هویت را برای تمام Feedها یکسان کنترل کند، اثبات نشد.
 
 DB-AUD-003 PARTIAL باقی می‌ماند: versioned/immutable seed، خطای قابل‌مشاهدهٔ seed، قید یکتایی ticker همراه با preflight دادهٔ قدیمی، و inventory کامل مصرف‌کنندگان و دادهٔ واقعی بازند. هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
+
+
+## 9.17 تطبیق ابزارهای Migration 9 با وضعیت دیتابیس محلی — 2026-11-19
+
+در branch فعلی، `src/migrations/runner.py` فقط migrationهای ۱ تا ۸ را ثبت می‌کند. اسکریپت‌های ممیزی Migration 9 وجود دارند: ممیزی DB به‌صورت read-only فایل `ROOT/tehran_stock.db` را باز می‌کند و `reply.md` را می‌نویسد؛ ممیزی source، فایل‌های Python زیر `src/` و `tests/` و Git refs محلی را جست‌وجو می‌کند و DB را باز نمی‌کند.
+
+اسکریپت `cleanup_incomplete_migration_9.py` در حالت پیش‌فرض read-only است، اما گزینهٔ `--apply` عملیاتی مخرب انجام می‌دهد: پس از کنترل ledger row دقیق نسخهٔ ۹، بالاترین بودن نسخه، وجود دو ستون، نبود index/trigger/reference دیگر و SQLite >= 3.35، backup می‌گیرد، ستون‌های `source_column_header` و `source_sheet` را DROP می‌کند و ledger row نسخهٔ ۹ را حذف می‌کند. طبق شواهد محلی ثبت‌شده در DB-AUD-010 §7، هر دو ستون در تمام ۵۰۵ ردیف پر هستند (source_sheet دارای یک مقدار متمایز و source_column_header دارای ۲۳ مقدار متمایز). بنابراین اجرای `--apply` داده/ساختار زنده را حذف می‌کند و صرفاً همسان‌سازی بی‌خطر ledger نیست؛ اجرای آن مجاز/پیشنهاد نمی‌شود تا source دقیق Migration 9 و جایگزین معنایی این metadata در قرارداد Excel مشخص شود.
+
+یک اختلاف مسیر نیز وجود دارد: URL دیتابیس برنامه `sqlite:///./tehran_stock.db` نسبی و وابسته به working directory است، ولی اسکریپت‌های Migration 9 مسیر `ROOT/tehran_stock.db` را hard-code کرده‌اند. بنابراین تا resolved path مقایسه نشود، نمی‌توان فرض کرد ممیزی همان DB مورد استفادهٔ برنامه را بررسی کرده است.
+
+نتیجه: branch فعلی runner تا نسخهٔ ۸ است؛ شواهد قبلی دیتابیس محلی ledger نسخهٔ ۹ و ستون‌های پرشده را گزارش کرده‌اند. lineage و source دقیق Migration 9 هنوز reconcile نشده‌اند. cleanup، migration 10 و حذف ستون‌ها تا تعیین تکلیف metadata ممنوع/متوقف بمانند. این مرحله فقط مستندات را به‌روزرسانی کرد؛ هیچ کد، ORM، schema، migration، دیتابیس یا تستی تغییر نکرد/اجرا نشد.
