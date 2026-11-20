@@ -52,36 +52,32 @@ def load_ohlc_csv_rows(path: Union[str, Path]) -> OhlcCsvParseResult:
         if not reader.fieldnames:
             return result
 
-        header_map = {
-            "jdate": "jdate",
-            "date": "jdate",
-            "open": "open",
-            "high": "high",
-            "low": "low",
-            "close": "close",
-            "final": "final",
-            "adjclose": "final",
-            "adjustedclose": "final",
-            "volume": "volume",
-            "value": "value",
-            "no": "trade_count",
-            "tradecount": "trade_count",
-            "ticker": "ticker",
-            "symbol": "ticker",
-        }
+        # Keep the MarketDaily allowlist deliberately narrow.  OHLC/Final
+        # columns may exist in source exports but are never inspected or mapped.
+        header_map = {"jdate": "jdate", "ticker": "ticker", "close": "close",
+                      "volume": "volume", "no": "trade_count", "value": "value"}
         colmap = {}
         for h in reader.fieldnames:
             key = normalize_header(h)
             if key in header_map:
                 colmap[header_map[key]] = h
 
-        if "jdate" not in colmap or "ticker" not in colmap:
-            raise ValueError("CSV missing required columns: jdate/date and ticker/symbol")
+        required = ("jdate", "ticker", "close", "volume", "trade_count", "value")
+        missing = [name for name in required if name not in colmap]
+        if missing:
+            raise ValueError(f"CSV missing approved required columns: {missing}")
 
         raw_rows = list(reader)
         result.records_found = len(raw_rows)
+        seen = {}
 
         for line_no, row in enumerate(raw_rows, start=2):
+            if None in row:
+                result.errors.append(f"line {line_no}: row has more fields than the header")
+                continue
+            if any(row.get(h) is None for h in reader.fieldnames):
+                result.errors.append(f"line {line_no}: row has fewer fields than the header")
+                continue
             jdate_raw = (row.get(colmap["jdate"]) or "").strip()
             ticker = (row.get(colmap["ticker"]) or "").strip()
             if not jdate_raw or not ticker:
@@ -94,12 +90,20 @@ def load_ohlc_csv_rows(path: Union[str, Path]) -> OhlcCsvParseResult:
                 continue
 
             jy, jm, jd = components
-            open_p = to_decimal(row.get(colmap.get("open", "")))
-            high_p = to_decimal(row.get(colmap.get("high", "")))
-            low_p = to_decimal(row.get(colmap.get("low", "")))
             close_p = to_decimal(row.get(colmap.get("close", "")))
-            final_p = to_decimal(row.get(colmap.get("final", "")))
-            adjusted = final_p if final_p is not None else close_p
+            volume = to_int(row.get(colmap["volume"]))
+            value = to_decimal(row.get(colmap["value"]))
+            trade_count = to_int(row.get(colmap["trade_count"]))
+            if close_p is None or volume is None or value is None or trade_count is None:
+                result.errors.append(f"line {line_no}: invalid Close, Volume, No, or Value")
+                continue
+            key = (ticker, jy, jm, jd)
+            payload = (close_p, volume, trade_count, value)
+            if key in seen:
+                kind = "identical" if seen[key][0] == payload else "conflicting"
+                result.errors.append(f"line {line_no}: {kind} duplicate for {ticker} {jdate_raw}; prior line {seen[key][1]}")
+                continue
+            seen[key] = (payload, line_no)
 
             result.rows.append(
                 OhlcRow(
@@ -107,14 +111,14 @@ def load_ohlc_csv_rows(path: Union[str, Path]) -> OhlcCsvParseResult:
                     jalali_year=jy,
                     jalali_month=jm,
                     jalali_day=jd,
-                    open_price=open_p,
-                    high_price=high_p,
-                    low_price=low_p,
+                    open_price=None,
+                    high_price=None,
+                    low_price=None,
                     close_price=close_p,
-                    adjusted_close=adjusted,
-                    volume=to_int(row.get(colmap.get("volume", ""))),
-                    value=to_decimal(row.get(colmap.get("value", ""))),
-                    trade_count=to_int(row.get(colmap.get("trade_count", ""))),
+                    adjusted_close=None,
+                    volume=volume,
+                    value=value,
+                    trade_count=trade_count,
                     line_no=line_no,
                 )
             )

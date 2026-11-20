@@ -11,10 +11,10 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from openpyxl import load_workbook
+from src.ingestion.fx.adapter import parse_fx_xlsx
 
 
-MARKET_REQUIRED = ("J-Date", "Close", "Volume", "No", "Value")
+MARKET_REQUIRED = ("J-Date", "Ticker", "Close", "Volume", "No", "Value")
 FX_DATE_HEADERS = ("تاریخ", "تاريخ")
 FX_SELL_HEADERS = ("فروش (ریال)", "فروش(ریال)", "فروش")
 NUMERIC_MARKET = ("Close", "Volume", "No", "Value")
@@ -168,55 +168,35 @@ def validate_market(path: Path) -> dict:
             "provenance": _provenance("CODAL (owner-approved; artifact linkage unverified)", UNKNOWN), "issues": issues}
 
 
-def validate_fx(path: Path) -> dict:
+def validate_fx(path: Path, *, rate_type: str = "EXCHANGE_CENTER") -> dict:
     ident = artifact_identity(path)
     issues: list[dict[str, str]] = []
-    wb = load_workbook(ident["path"], read_only=True, data_only=False)
-    ident["worksheet_names"] = wb.sheetnames
-    observations: list[dict] = []
-    seen_global: dict[str, tuple[str, str, str]] = {}
-    mapped = False
-    for ws in wb.worksheets:
-        header_row = None
-        date_col = sell_col = None
-        for row in ws.iter_rows(values_only=False):
-            values = [c.value.strip() if isinstance(c.value, str) else c.value for c in row]
-            ds = [i for i, v in enumerate(values) if v in FX_DATE_HEADERS]
-            ss = [i for i, v in enumerate(values) if v in FX_SELL_HEADERS]
-            if ds and ss:
-                header_row, date_col, sell_col = row[0].row, ds[0], ss[0]
-                break
-        if header_row is None: continue
-        mapped = True
-        for cells in ws.iter_rows(min_row=header_row + 1, values_only=False):
-            date_cell, sell_cell = cells[date_col], cells[sell_col]
-            date, rate = date_cell.value, sell_cell.value
-            if date is None and rate is None: continue
-            date_text = date.strip() if isinstance(date, str) else date
-            rownum = date_cell.row
-            if not _jalali(date_text):
-                _issue(issues, "FAIL", "INVALID_FX_DATE", f"{ws.title}!{date_cell.coordinate}: invalid Jalali date."); continue
-            if not _number(rate, positive=True):
-                _issue(issues, "FAIL", "INVALID_FX_RATE", f"{ws.title}!{sell_cell.coordinate}: missing, malformed, or non-positive sell rate."); continue
-            payload = str(rate)
-            key = f"{date_text}|USD/IRR|EXCHANGE_CENTER"
-            ref = f"{ws.title}!{date_cell.coordinate}/{sell_cell.coordinate}"
-            if key in seen_global:
-                prior_payload, prior_ref, _ = seen_global[key]
-                sev = "FAIL" if prior_payload != payload else "WARNING"
-                code = "CONFLICTING_DUPLICATE" if sev == "FAIL" else "IDENTICAL_DUPLICATE"
-                _issue(issues, sev, code, f"Duplicate FX economic key {key} at {prior_ref} and {ref}; no winner selected.")
-            else: seen_global[key] = (payload, ref, ws.title)
-            observations.append({"sheet": ws.title, "date_cell": date_cell.coordinate, "source_date": date,
-                                 "sell_cell": sell_cell.coordinate, "source_sell_rate": rate,
-                                 "economic_key": f"{date_text}|USD/IRR|EXCHANGE_CENTER"})
-    wb.close()
-    if not mapped: _issue(issues, "FAIL", "FX_MAPPING_NOT_FOUND", "Approved date and sell-rate headers were not found; no alternative mapping was inferred.")
-    if not observations and mapped: _issue(issues, "FAIL", "NO_VALID_FX_ROWS", "No valid sell-rate observations were found.")
+    parsed = parse_fx_xlsx(path, rate_type=rate_type)
+    mappings = parsed["mappings"]
+    ident["worksheet_names"] = list(dict.fromkeys(m["sheet"] for m in mappings))
+    observations = []
+    for item in parsed["inputs"]:
+        date = f"{item.jalali_year:04d}-{item.jalali_month:02d}-{item.jalali_day:02d}"
+        observations.append({"source_date": date, "source_sell_rate": str(item.rate),
+            "canonical_rate": str(item.rate), "economic_key": f"{date}|USD/IRR|{rate_type}"})
+    for message in parsed["errors"]:
+        if "conflicting duplicate" in message:
+            code = "CONFLICTING_DUPLICATE"
+        elif "identical duplicate" in message:
+            code = "IDENTICAL_DUPLICATE"
+        elif "invalid Jalali date" in message:
+            code = "INVALID_FX_DATE"
+        elif "invalid sell rate" in message:
+            code = "INVALID_FX_RATE"
+        else:
+            code = "FX_MAPPING_NOT_FOUND"
+        _issue(issues, "FAIL", code, message)
+    if not mappings: _issue(issues, "FAIL", "FX_MAPPING_NOT_FOUND", "Approved date and sell-rate headers were not found.")
+    if not observations and mappings: _issue(issues, "FAIL", "NO_VALID_FX_ROWS", "No valid sell-rate observations were found.")
     _issue(issues, "WARNING", "PROVENANCE_UNKNOWN", "Workbook-to-profile linkage, publication/availability times, and revision identity remain unverified.")
-    return {"feed": "EXCHANGE_CENTER", "status": _status(issues), "artifact": ident,
-            "mapping": {"date_headers": list(FX_DATE_HEADERS), "sell_headers": list(FX_SELL_HEADERS),
-                        "rate_type": "EXCHANGE_CENTER", "pair": "USD/IRR", "conversion": "none"},
+    return {"feed": rate_type, "status": _status(issues), "artifact": ident,
+            "mapping": {"worksheets": mappings, "rate_type": rate_type, "pair": "USD/IRR",
+                        "conversion": "Toman to Rial × 10" if rate_type == "FREE_MARKET" else "none"},
             "observations": observations, "validated_rows": len(observations),
             "provenance": _provenance("EXCHANGE_CENTER (owner-approved; workbook linkage unverified)", UNKNOWN), "issues": issues}
 
@@ -229,9 +209,9 @@ def find_free_market_sample(root: Path) -> dict:
             "message": "Sample available for independent review." if matches else "No FREE_MARKET sample found; schema and mapping not inferred."}
 
 
-def validate_all(market_path: Path, fx_path: Path, *, root: Path | None = None) -> dict:
-    results = [validate_market(market_path), validate_fx(fx_path),
-               find_free_market_sample(root or Path.cwd())]
+def validate_all(market_path: Path, fx_path: Path, *, root: Path | None = None,
+                 fx_rate_type: str = "EXCHANGE_CENTER") -> dict:
+    results = [validate_market(market_path), validate_fx(fx_path, rate_type=fx_rate_type)]
     statuses = {r["status"] for r in results}
     overall = "BLOCKED" if "BLOCKED" in statuses else "FAIL" if "FAIL" in statuses else "WARNING" if "WARNING" in statuses else "PASS"
     return {"generated_at_utc": datetime.now(timezone.utc).isoformat(),

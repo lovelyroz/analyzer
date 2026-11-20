@@ -1,15 +1,19 @@
-# Market/FX artifact preflight
+# Market/FX file adapter preflight
 
 Run from the repository root:
 
 ```powershell
-python -m src.scripts.market_fx_preflight --market saman_price_history.csv --fx dollar-history.xlsx --json-out database/reports/market_fx_preflight_sample.json
+.\.venv\Scripts\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out database/reports/market_fx_preflight_acceptance.json
 ```
 
-The command reads files only and does not import database modules, open a database, or ingest rows. Relative paths resolve from the repository root by default; `--root` selects a different root for relative inputs and the FREE_MARKET sample scan. It prints a short status for each feed and writes a JSON report. A FAIL or BLOCKED result returns exit code 1. The CSV `Ticker` field supplies `codal_symbol` when it is present, non-empty, and consistent across all records. Company name is never used as the economic key. If symbol identity cannot be resolved, only economic-key checks are blocked; row structure, Jalali dates, and available numeric fields are still checked.
+The CLI reads files only. It does not connect to a database or ingest rows. Exit code 1 means at least one input failed validation; warnings about provenance may still accompany structurally valid files. `--fx-rate-type` is required when interpreting a workbook: `EXCHANGE_CENTER` preserves Rial values; `FREE_MARKET` multiplies Toman sell values by exactly 10. Both use the same header-detecting parser. The parser searches worksheets and rows for a Jalali date header and a sell header, and never maps the buy column. Invalid dates, invalid sell values, duplicate dates, conflicting payloads, and missing mappings are reported as diagnostics.
 
-The MarketDaily allowlist is `J-Date`, `Close`, `Volume`, `No`, and `Value`; `Value` is checked and preserved as its own input. The validator does not map `Final`, `Open`, `High`, or `Low`. For FX it locates the approved date and sell-rate headers, reports the original cell addresses and values, and checks USD/IRR `EXCHANGE_CENTER` rates without converting them. It does not guess mappings when headers are missing.
+MarketDaily maps only `J-Date`, `Ticker`, `Close`, `Volume`, `No`, and `Value`. Source columns `Open`, `High`, `Low`, and `Final` are ignored. `Value` is validated and retained as supplied; it is never calculated from `Volume × Close`. Malformed rows and duplicate economic keys are reported without selecting a winner.
 
-`source_published_at`, `source_available_at`, and `ingested_at` are independent fields. Missing source evidence is `UNKNOWN`; this preflight does not ingest, so `ingested_at` is `NOT_INGESTED`. SHA-256 proves byte equality only. Successful structural checks do not establish publisher linkage, revision ordering, point-in-time availability, or production readiness. The FREE_MARKET scan reports `BLOCKED_NO_SAMPLE` when no actual sample file exists; no schema is inferred.
+The FREE_MARKET conversion can be verified independently using the isolated workbook fixture tests:
 
-Tests: `pytest -q src/tests/test_market_fx_preflight.py` (temporary fixtures only).
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q src/tests/test_market_fx_adapters.py
+```
+
+The fixture includes separate buy and sell values, an offset header row, and verifies `100 Toman → 1000 Rial`. This is a parser test, not user acceptance of a production workbook. Source publication/availability times and revision identities remain `UNKNOWN`; a successful preflight is not evidence of production readiness.

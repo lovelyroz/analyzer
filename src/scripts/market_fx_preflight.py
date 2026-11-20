@@ -10,6 +10,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Read-only MarketDaily / FX artifact preflight; no database access.")
     parser.add_argument("--market", type=Path, default=Path("saman_price_history.csv"))
     parser.add_argument("--fx", type=Path, default=Path("dollar-history.xlsx"))
+    parser.add_argument("--fx-rate-type", choices=("EXCHANGE_CENTER", "FREE_MARKET"),
+                        default="EXCHANGE_CENTER", help="Interpret sell values as Rial or Toman source rates.")
     parser.add_argument("--json-out", type=Path, help="Write JSON report to this path; otherwise stdout.")
     parser.add_argument("--root", type=Path, default=REPOSITORY_ROOT,
                         help="Root used to resolve relative inputs and scan for FREE_MARKET samples.")
@@ -22,7 +24,7 @@ def main() -> int:
         out_path = resolve_input(args.json_out)
         if out_path in {market_path, fx_path}:
             parser.error("--json-out must not overwrite either input artifact")
-    report = validate_all(market_path, fx_path, root=root)
+    report = validate_all(market_path, fx_path, root=root, fx_rate_type=args.fx_rate_type)
     out = report_json(report)
     if args.json_out:
         out_path.parent.mkdir(parents=True, exist_ok=True)
