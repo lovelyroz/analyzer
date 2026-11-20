@@ -1,94 +1,146 @@
-# EXECUTION PROMPT — Task 014 Correction / DB-ING-001
-## Close the implementation gaps found in code review
+# EXECUTION PROMPT — Task 015 / DB-ING-002
+## Canonical ingestion admission and persistence alignment — safe implementation increment
 
-**Repository:** `lovelyroz/analyzer`  
+**Repository:** `analyzer`  
 **Branch:** `master`  
-**Work type:** CODE CORRECTION + TESTS  
-**Priority:** High
+**Authority:** `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`  
+**Related implementation:** Task 014 / DB-ING-001
 
-The initial implementation of Task 014 is present. Do not repeat its implementation or produce another general audit.
+### Work mode
+CODE IMPLEMENTATION + focused tests + evidence report.
 
-Fix the following concrete gaps in the existing implementation.
+This is an execution task, not a general audit. Implement the safe parts of DB-ING-002 that can be completed without changing the database schema or violating the approved architecture.
 
-### Files
+### 1. Required objective
+
+Advance Task 015 by implementing a deterministic, fail-closed boundary between `CanonicalInputCandidate` and the existing canonical ingestion/persistence contracts.
+
+The boundary must address:
+
+- Complete-batch admission before any persistence is attempted.
+- Required identity and provenance validation.
+- Duplicate versus conflicting economic facts.
+- Correction/report-version identity and preservation of prior versions.
+- `OTHER_*` handling only where an explicit approved identity exists.
+- `ZERO_FALLBACK` remaining distinguishable from an actual reported zero.
+- Prohibition of raw-row and calculated-fact persistence.
+- Atomicity requirements and explicit transaction ownership.
+
+### 2. First inspect the exact current implementation
+
+Read only the relevant files needed to establish the actual contracts, including:
 
 - `src/ingestion/excel/canonical_input.py`
 - `src/ingestion/excel/deterministic_matcher.py`
-- `src/ingestion/excel/dto.py`
-- `src/tests/test_excel_canonical_input.py`
-- `src/tests/test_excel_template_matching.py`
+- `src/ingestion/service.py`
+- `src/ingestion/codal/` relevant ingestion modules
+- `src/models/normalized.py`
+- `src/models/report.py`
+- `src/models/period.py`
+- `src/models/ingestion_run.py` (or the actual IngestionRun model location)
+- Relevant identity, transaction and existing ingestion tests.
+- `database/reports/DB_DES_001_CANONICAL_INPUT_CONTRACT.md` or the actual current DB-DES-001 contract location.
+- `database/reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md`
+- `database/reports/DB_DES_006_CODAL_CANONICAL_INGESTION_PIPELINE.md`
 
-Read the relevant contracts before changing code.
+Do not assume filenames or model fields without reading their current definitions.
 
-### 1. Native numeric Excel values
+### 3. Implementation requirements
 
-The existing Reader supports `PRESENT_NUMBER`, but `build_candidate()` currently rejects every value except `PRESENT_TEXT`.
+Implement a pure, deterministic admission/preparation component that accepts a complete batch of canonical candidates and produces either:
 
-Implement safe handling:
+- A fully validated immutable persistence plan; or
+- A deterministic rejection containing stable diagnostic codes.
 
-- Accept native integer values without float conversion.
-- Do not silently convert a binary float into an allegedly exact source Decimal.
-- If the original numeric lexical representation is unavailable for a float, reject it explicitly with a stable diagnostic.
-- Preserve the distinction between literal text, native integer, native float, blank and zero.
-- Do not change the Reader's existing contract without a demonstrated need.
+At minimum:
 
-Add tests for native integer acceptance, native float rejection where exact source precision cannot be established, and explicit zero.
+1. Reject the entire batch if any candidate is invalid.
+2. Never silently discard an invalid or ambiguous candidate.
+3. Never convert missing values into zero.
+4. Preserve actual zero separately from `ZERO_FALLBACK`.
+5. Do not create or persist derived/calculated financial facts.
+6. Do not persist raw workbook rows or raw observations.
+7. Preserve company, report, report-version, period, Metric, unit/currency/scale and approval-reference identities.
+8. Distinguish an identical existing economic fact from a conflicting payload.
+9. Do not overwrite a conflicting existing fact.
+10. Do not replace or delete previous report versions when a correction arrives.
+11. Do not infer correction status, audit status, publication time or revision identity.
+12. Make transaction ownership explicit: the preparation/admission layer must not commit or open a database transaction.
 
-### 2. Preserve mapping approval references
+If the existing physical models cannot safely represent a required identity or invariant, reject that persistence path explicitly and document the exact incompatibility. Do not fabricate a workaround.
 
-`period_mapping` is currently validated but its identity is discarded.
+### 4. Schema and database restrictions
 
-The `ApprovedSelection.approval_ref` fields are also discarded after validation.
+**Absolutely prohibited in this task:**
 
-Extend the transient Candidate DTO to preserve the identities and approval references needed to audit:
+- ORM model changes.
+- Schema changes.
+- New or modified migrations.
+- Database creation or modification.
+- Running real ingestion.
+- Writing to the owner's database.
+- Changing `WORKFLOW_RULES.md`.
+- Reopening already-approved owner decisions.
 
-- Company
-- Report type
-- Report version
-- Metric
-- Unit
-- Currency
-- Scale
-- Period mapping
-- Optional source label/header
-- Dimensions and their values
+Migration 9 remains unresolved. Do not create Migration 10 or attempt to resolve Migration 9.
 
-Do not invent approval references. Preserve the exact values supplied by the approved selections.
+Do not claim production persistence is complete merely because a pure plan builder or synthetic test passes.
 
-Add tests proving that approval references and period-mapping identity survive candidate construction.
+### 5. Tests
 
-### 3. Validate actual coordinate ownership
+Add focused synthetic tests for:
 
-Inspect the matcher's `coordinate_map` and ownership rules.
+- Fully valid batch.
+- One invalid candidate rejects the complete batch.
+- Identical duplicate versus conflicting payload.
+- Explicit zero versus missing value.
+- `ZERO_FALLBACK` versus actual zero.
+- Correction version does not erase the previous version.
+- Missing or ambiguous identity.
+- Prohibited raw/calculated persistence.
+- No commit/transaction side effects from the pure boundary.
+- Deterministic output and stable diagnostics.
 
-A coordinate must belong to an explicitly owned extraction range, not merely fall somewhere inside a parent table's broad bounds.
+Use existing project test conventions. Do not run tests; the owner runs them.
 
-Reject coordinates in excluded, unowned, overlapping or ambiguous areas.
+### 6. Scope discipline
 
-Add tests for:
-- A valid owned coordinate.
-- A coordinate inside table bounds but outside all owned ranges.
-- A coordinate inside an excluded region.
-- An ambiguous ownership case.
+Do not spend this task repeating broad repository audits. Do not modify Task 014 unless a concrete integration defect prevents this task from proceeding; report such a defect with exact evidence instead.
 
-Do not weaken existing fail-closed matching.
+Do not connect unapproved Parsian templates or production semantic mappings.
 
-### Constraints
+### 7. Required deliverables
 
-- No ORM/schema/migration/database changes.
-- No real workbook ingestion.
-- No Parsian template approval or fabricated semantic mappings.
-- Do not modify `WORKFLOW_RULES.md`.
-- Do not mark Task 014 DONE while locale-specific parsing and authoritative production approval resolution remain unresolved.
-- Do not rerun unrelated audits or tests.
+1. Implemented pure admission/persistence-plan boundary, if compatible with the existing contracts.
+2. Focused synthetic tests.
+3. Report:
+   `database/reports/DB_ING_002_CANONICAL_INGESTION_ALIGNMENT.md`
+4. Update `reply.md`.
+5. Update the relevant Task 015 entry and progress dashboard in the Master Packet only if the Task status genuinely changes.
 
-### Deliverables
+The report must include:
 
-1. Corrected code and focused regression tests.
-2. Exact changed-file list.
-3. Actual test commands and outputs.
-4. Update `database/reports/DB_ING_001_CANONICAL_INPUT_DTO_IMPLEMENTATION.md`.
-5. Update `reply.md` and Master Packet §9.
-6. Recalculate the progress dashboard only if the Task status actually changes.
+- Exact changed-file list.
+- Implemented behavior.
+- Stable rejection codes.
+- Test command for owner execution.
+- Exact incompatibilities between the persistence plan and current ORM/schema.
+- Which parts of DB-ING-002 remain open.
+- Whether any production writer was actually connected (do not imply that it was if it was not).
 
-Deliver code, not another proposal. Keep Task 014 PARTIAL if any acceptance gap remains.
+### 8. Completion criteria
+
+Task 015 must remain PARTIAL unless all required canonical persistence behavior is implemented and validated against an approved physical schema.
+
+A pure preparation boundary is measurable progress, but it is not production persistence.
+
+Do not mark `[x]` or DONE on the basis of synthetic tests alone.
+
+At the end, report exactly:
+
+- `DONE`
+- `PARTIAL`
+- `NOT DONE`
+- `BLOCKED`
+
+for Task 015, with evidence and remaining work.

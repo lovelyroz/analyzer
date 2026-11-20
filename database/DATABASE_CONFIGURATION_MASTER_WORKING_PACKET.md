@@ -10,7 +10,7 @@
 
 **سند معماری مبنا:** `../12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-20 — اصلاح code review برای Task 014 / DB-ING-001 در §9.36 ثبت شد: Candidate اکنون native integer را دقیق می‌پذیرد، float فاقد lexical evidence را رد می‌کند، approval refs را نگه می‌دارد و extraction coordinate را به مالکیت یکتای range محدود می‌کند؛ 26 تست متمرکز گذشت. Task همچنان PARTIAL است: parser مصوب locale فارسی و resolver معتبر approvalها وجود ندارد (§9.35–§9.36). Task 033 / DB-ING-006 همچنان PARTIAL است؛ workbook نهایی Parsian با hash `55266751...4325db85` مستقیماً audit شد و خروجی کامل در §9.34 است. matcher عمومی fail-closed با 37 تست Excel/DTO و synthetic پیاده شد، اما هیچ Template Parsian approved نیست و persistence کاننیکال آماده نیست. Fillهای جاری 459 gray و 489 theme-dark هستند؛ مقدار تاریخی 492 فرض نشد. مالکیت 17 bounds/15 partitions، workbook دورهٔ مستقل برای drift، semantic approvals و writer transaction باقی‌اند. Task 035 پذیرش مالک `13 passed in 1.67s` دارد اما به‌علت محدودیت EXCHANGE_CENTER و یکتایی concurrency جلالی PARTIAL باقی می‌ماند (§9.33).
+آخرین بازنگری: 2026-11-20 — Task 015 / DB-ING-002 با مرز admission خالص و immutable تا طرح persistence منطقی پیش رفت؛ گزارش §9.37 جزئیات را ثبت می‌کند. Task PARTIAL است: ORM/physical schema کلید canonical و هویت‌های لازم را بیان نمی‌کند و writer/atomicity اجرا نشده؛ تست‌های جدید به دستور PROMPT اجرا نشدند. اصلاح code review برای Task 014 / DB-ING-001 در §9.36 ثبت شد: Candidate اکنون native integer را دقیق می‌پذیرد، float فاقد lexical evidence را رد می‌کند، approval refs را نگه می‌دارد و extraction coordinate را به مالکیت یکتای range محدود می‌کند؛ 26 تست متمرکز گذشت. Task همچنان PARTIAL است: parser مصوب locale فارسی و resolver معتبر approvalها وجود ندارد (§9.35–§9.36). Task 033 / DB-ING-006 همچنان PARTIAL است؛ workbook نهایی Parsian با hash `55266751...4325db85` مستقیماً audit شد و خروجی کامل در §9.34 است. matcher عمومی fail-closed با 37 تست Excel/DTO و synthetic پیاده شد، اما هیچ Template Parsian approved نیست و persistence کاننیکال آماده نیست. Fillهای جاری 459 gray و 489 theme-dark هستند؛ مقدار تاریخی 492 فرض نشد. مالکیت 17 bounds/15 partitions، workbook دورهٔ مستقل برای drift، semantic approvals و writer transaction باقی‌اند. Task 035 پذیرش مالک `13 passed in 1.67s` دارد اما به‌علت محدودیت EXCHANGE_CENTER و یکتایی concurrency جلالی PARTIAL باقی می‌ماند (§9.33).
 
 
 ## 1.1 داشبورد سادهٔ پیشرفت Database
@@ -23,11 +23,11 @@
 | ممیزی وضع موجود (DB-AUD) | **63%** | 2 | 6 | 0 | 0 |
 | طراحی قراردادها (DB-DES) | **64%** | 2 | 5 | 0 | 0 |
 | Migration (DB-MIG) | **0%** | 0 | 0 | 3 | 0 |
-| Ingestion و Adapterها (DB-ING) | **56%** | 3 | 3 | 2 | 0 |
+| Ingestion و Adapterها (DB-ING) | **63%** | 3 | 4 | 1 | 0 |
 | تست و خروج (DB-TEST / DB-EXIT) | **0%** | 0 | 0 | 4 | 0 |
-| **کل مسیر (35 Task)** | **49%** | **8** | **18** | **9** | **0** |
+| **کل مسیر (35 Task)** | **50%** | **8** | **19** | **8** | **0** |
 
-**روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014 و 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
+**روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014، 015، 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
 
 **قاعدهٔ STALLED:** اگر دو اجرای متوالی یک Task خروجی قابل‌قبول و پیشرفت قابل‌اثبات نداشته باشند، وضعیت آن STALLED ثبت می‌شود و تا رفع توقف، امتیاز پیشرفت نمی‌گیرد.
 
@@ -721,7 +721,7 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 ### فاز D — هم‌ترازی ingestion و adapterها
 
 - [~] **014 · DB-ING-001 — بازطراحی مرز DTO و تخصیص دوره:** مرز pure و immutable ساخت candidate با هویت‌ها/approval refs، Decimal، provenance، دورهٔ جلالی و ownership صریح extraction در §9.35–§9.36 پیاده‌سازی و با تست‌های متمرکز بررسی شد. Task PARTIAL است تا parser عدد متنی مطابق قواعد locale مصوب و resolver/template معنایی واقعی فراهم شوند؛ هیچ Excel/PDF واقعی به این مرز متصل نشده است. قرارداد ورودی صورت‌های مالی V1 بر پایه Excel است؛ PDF در دامنهٔ جاری نیست.
-- [ ] **015 · DB-ING-002 — هم‌ترازی ingestion با canonical persistence:** طبقه‌بندی در زمان ingestion، نگهداری حداقل provenance، OTHER_*، ZERO_FALLBACK، correction versions و atomicity پیاده‌سازی شود؛ raw rows و calculated facts persist نشوند.
+- [~] **015 · DB-ING-002 — هم‌ترازی ingestion با canonical persistence:** مرز pure و fail-closed برای admission کامل batch و ساخت طرح persistence منطقی، provenance، OTHER_*, ZERO_FALLBACK، correction/replay و prohibition دادهٔ خام/محاسباتی در §9.37 پیاده‌سازی شد. PARTIAL می‌ماند: physical schema/ORM با کلید canonical و هویت value/period/provenance سازگار نیست؛ writer و atomicity DB-DES-005 وصل نشده و تست‌های افزوده‌شده منتظر اجرای مالک هستند.
 - [ ] **016 · DB-ING-003 — آمادگی Excel:** adapter Excel باید پس از تصویب قرارداد استاندارد، مقادیر cached معتبر و context لازم Header/جدول/دوره را به مرز ingestion منتقل کند؛ نمونه‌های واقعی متنوع end-to-end بررسی شوند. ایجاد یا حفظ مسیر PDF بخشی از این Task نیست.
 
 ### فاز E — اثبات و بستن کار
@@ -2529,6 +2529,14 @@ The generic matcher was verified with synthetic fixtures only: focused run `7 pa
 Focused synthetic-fixture suite: `51 passed in 1.55s` using `src/tests/test_excel_canonical_input.py`, Reader, observation DTO, and deterministic matcher tests. Full command and report are in `database/reports/DB_ING_001_CANONICAL_INPUT_DTO_IMPLEMENTATION.md`. The tests make no claim that fixture identities are approved production mappings.
 
 Task 014 remains PARTIAL because no approved locale-specific parser exists for Persian digits/separators, no authoritative semantic mapping catalog/resolver is available to authenticate the supplied approval references, and no production template or semantic mapping has been approved. No real workbook, Parsian draft, ORM, schema, migration, database or writer was touched. Dashboard recalculated from 35 Task statuses: 8 DONE, 18 PARTIAL, 9 OPEN; overall 49%, DB-ING 56%.
+
+## 9.37 Task 015 / DB-ING-002 — canonical admission and persistence-plan increment
+
+**Status: PARTIAL.** Added `src/ingestion/canonical_admission.py`, a pure all-or-nothing boundary from `CanonicalInputCandidate` to a frozen, non-executable logical persistence plan, plus focused synthetic coverage in `src/tests/test_canonical_ingestion_admission.py`. It requires explicit report/version/company/source/revision/artifact/standard context, checks candidate identities, values, approvals and Jalali period, preserves exact Decimal alongside signed-64-bit `ROUND_HALF_UP` conversion, distinguishes reported zero from approved `ZERO_FALLBACK`, requires exact unique approval for `OTHER_*`, collapses identical duplicates, rejects conflicts/incomplete replays, and only represents corrections as explicit new versions with optional supersedes. Raw rows and calculated submissions reject. The plan declares caller-owned `REPORT_VERSION` atomicity, `execution_allowed=False`, and `physical_persistence_compatible=False`.
+
+Physical persistence is explicitly incompatible with current models: `NormalizedFinancialFact` stores `Numeric(30,4)` and keys without dimensions or value origin/state, and lacks canonical source-unit/currency/scale/standard/approval identity; `FinancialPeriod` uses Gregorian endpoints and period-wide `is_ytd` rather than the Jalali period tuple and per-fact basis; `ReportVersion` lacks explicit source revision and artifact hash identity. Existing CODAL writer is outside this boundary, persists raw facts and commits, and was not invoked or modified. No ORM/schema/migration/database or Task 014 change was made. DB-DES-005 report-version atomic writer/audit integration, physical-schema approval/mapping and authenticated approval resolution remain open. PROMPT.md directs owner test execution, so the new suite was not run.
+
+Evidence and exact owner command are in `database/reports/DB_ING_002_CANONICAL_INGESTION_ALIGNMENT.md`. Changed files: the admission module, its synthetic test file, this report, this Master Packet, and `reply.md`. Dashboard recalculated across 35 tasks: 8 DONE, 19 PARTIAL, 8 OPEN; overall 50%, DB-ING 63%. No production writer was connected. **Task 015 remains PARTIAL.**
 
 ## 9.36 Task 014 / DB-ING-001 — code-review corrections: numeric fidelity, approvals and coordinate ownership
 
