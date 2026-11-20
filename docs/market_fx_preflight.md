@@ -8,7 +8,7 @@ Run from the repository root:
 
 The CLI reads files only. It does not connect to a database or ingest rows. Exit code 1 means at least one input failed validation; warnings about provenance may still accompany structurally valid files. `--fx-rate-type` is required when interpreting a workbook: `EXCHANGE_CENTER` preserves Rial values; `FREE_MARKET` multiplies Toman sell values by exactly 10. Both use the same header-detecting parser. The parser searches worksheets and rows for a Jalali date header and a sell header, and never maps the buy column. Invalid dates, invalid sell values, duplicate dates, conflicting payloads, and missing mappings are reported as diagnostics.
 
-MarketDaily maps only `J-Date`, `Ticker`, `Close`, `Volume`, `No`, and `Value`. Source columns `Open`, `High`, `Low`, and `Final` are ignored. `Value` is validated and retained as supplied; it is never calculated from `Volume × Close`. Malformed rows and duplicate economic keys are reported without selecting a winner.
+MarketDaily maps only `J-Date`, `Ticker`, `Close`, `Volume`, `No`, and `Value`. Source columns `Open`, `High`, `Low`, and `Final` are ignored. `Volume` and `No` must be integer-valued; all numeric fields must be finite. Duplicate approved headers, malformed rows, and duplicate economic keys are reported without selecting a winner. `Value` is validated and retained as supplied; it is never calculated from `Volume × Close`.
 
 The FREE_MARKET conversion can be verified independently using the isolated workbook fixture tests:
 

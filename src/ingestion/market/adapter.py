@@ -12,7 +12,6 @@ from src.ingestion.common.parsing import (
     normalize_header,
     parse_jalali_components,
     to_decimal,
-    to_int,
 )
 
 
@@ -57,10 +56,15 @@ def load_ohlc_csv_rows(path: Union[str, Path]) -> OhlcCsvParseResult:
         header_map = {"jdate": "jdate", "ticker": "ticker", "close": "close",
                       "volume": "volume", "no": "trade_count", "value": "value"}
         colmap = {}
+        mapped_headers = {}
         for h in reader.fieldnames:
             key = normalize_header(h)
             if key in header_map:
-                colmap[header_map[key]] = h
+                canonical = header_map[key]
+                if canonical in mapped_headers:
+                    raise ValueError(f"CSV has duplicate approved column {canonical!r}: {mapped_headers[canonical]!r}, {h!r}")
+                mapped_headers[canonical] = h
+                colmap[canonical] = h
 
         required = ("jdate", "ticker", "close", "volume", "trade_count", "value")
         missing = [name for name in required if name not in colmap]
@@ -90,13 +94,17 @@ def load_ohlc_csv_rows(path: Union[str, Path]) -> OhlcCsvParseResult:
                 continue
 
             jy, jm, jd = components
-            close_p = to_decimal(row.get(colmap.get("close", "")))
-            volume = to_int(row.get(colmap["volume"]))
+            close_p = to_decimal(row.get(colmap["close"]))
+            volume_n = to_decimal(row.get(colmap["volume"]))
             value = to_decimal(row.get(colmap["value"]))
-            trade_count = to_int(row.get(colmap["trade_count"]))
-            if close_p is None or volume is None or value is None or trade_count is None:
+            count_n = to_decimal(row.get(colmap["trade_count"]))
+            if (close_p is None or not close_p.is_finite()
+                    or volume_n is None or not volume_n.is_finite() or volume_n != volume_n.to_integral_value()
+                    or value is None or not value.is_finite()
+                    or count_n is None or not count_n.is_finite() or count_n != count_n.to_integral_value()):
                 result.errors.append(f"line {line_no}: invalid Close, Volume, No, or Value")
                 continue
+            volume, trade_count = int(volume_n), int(count_n)
             key = (ticker, jy, jm, jd)
             payload = (close_p, volume, trade_count, value)
             if key in seen:

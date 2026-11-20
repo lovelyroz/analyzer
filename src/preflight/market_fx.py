@@ -70,7 +70,7 @@ def _jalali_leap(year: int) -> bool:
     return leap == 0
 
 
-def _number(value: Any, *, positive: bool = False) -> bool:
+def _number(value: Any, *, positive: bool = False, integer: bool = False) -> bool:
     if value is None or isinstance(value, bool):
         return False
     raw = str(value).strip().replace(",", "")
@@ -78,7 +78,7 @@ def _number(value: Any, *, positive: bool = False) -> bool:
         return False
     try:
         n = Decimal(raw)
-        return n.is_finite() and (not positive or n > 0)
+        return n.is_finite() and (not positive or n > 0) and (not integer or n == n.to_integral_value())
     except (InvalidOperation, ValueError):
         return False
 
@@ -117,6 +117,9 @@ def validate_market(path: Path) -> dict:
         _issue(issues, "FAIL", "CSV_READ_ERROR", str(exc))
     absent = [h for h in MARKET_REQUIRED if h not in headers]
     if absent: _issue(issues, "FAIL", "MISSING_REQUIRED_FIELDS", f"Missing approved fields: {absent}")
+    duplicated = sorted({h for h in headers if h in MARKET_REQUIRED and headers.count(h) > 1})
+    if duplicated:
+        _issue(issues, "FAIL", "DUPLICATE_HEADER", f"Approved fields occur more than once: {duplicated}")
     positions = {name: i for i, name in enumerate(headers)}
     ticker_idx = positions.get("Ticker")
     tickers = [row[ticker_idx] if ticker_idx is not None and ticker_idx < len(row) else "" for _, row in records]
@@ -144,9 +147,10 @@ def validate_market(path: Path) -> dict:
             if col in absent:
                 continue
             value = field(col)
-            if not _number(value):
+            if not _number(value, integer=col in {"Volume", "No"}):
                 bad.append(col)
-                _issue(issues, "FAIL", "INVALID_NUMERIC", f"CSV line {line}: {col} is missing or malformed (source={value!r}).")
+                rule = "integer" if col in {"Volume", "No"} else "finite numeric"
+                _issue(issues, "FAIL", "INVALID_NUMERIC", f"CSV line {line}: {col} must be a {rule} value (source={value!r}).")
         checked += 1
         if codal_symbol is not None and date_valid:
             key = f"{codal_symbol}|{date}"

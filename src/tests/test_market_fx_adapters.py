@@ -5,7 +5,7 @@ from openpyxl import Workbook
 
 from src.ingestion.market.adapter import load_ohlc_csv_rows
 from src.ingestion.fx.adapter import parse_fx_xlsx
-from src.preflight.market_fx import validate_fx
+from src.preflight.market_fx import validate_fx, validate_market
 
 
 def test_market_allowlist_ignores_ohlc_and_final(tmp_path):
@@ -21,6 +21,30 @@ def test_market_allowlist_ignores_ohlc_and_final(tmp_path):
     assert row.close_price == Decimal("20") and row.volume == 3 and row.trade_count == 1
     assert row.value == Decimal("60")
     assert row.open_price is row.high_price is row.low_price is row.adjusted_close is None
+
+
+def test_market_fractional_integer_fields_are_diagnosed(tmp_path):
+    path = tmp_path / "fractional.csv"
+    path.write_text("J-Date,Ticker,Close,Volume,No,Value\n1405-08-10,SAMAN,20,3.5,1,60\n",
+                    encoding="utf-8")
+    parsed = load_ohlc_csv_rows(path)
+    assert not parsed.rows
+    assert any("invalid Close, Volume, No, or Value" in e for e in parsed.errors)
+    report = validate_market(path)
+    assert any(i["code"] == "INVALID_NUMERIC" and "Volume" in i["message"] for i in report["issues"])
+
+
+def test_market_duplicate_approved_header_fails_explicitly(tmp_path):
+    path = tmp_path / "duplicate_header.csv"
+    path.write_text("J-Date,Ticker,Close,Volume,No,Value,Close\n1405-08-10,SAMAN,20,3,1,60,21\n",
+                    encoding="utf-8")
+    try:
+        load_ohlc_csv_rows(path)
+    except ValueError as exc:
+        assert "duplicate approved column 'close'" in str(exc)
+    else:
+        raise AssertionError("duplicate approved header must be rejected")
+    assert any(i["code"] == "DUPLICATE_HEADER" for i in validate_market(path)["issues"])
 
 
 def make_fx(tmp_path, records):
