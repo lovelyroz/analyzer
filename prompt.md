@@ -1,331 +1,299 @@
-# LOCAL DATA FEED AUDIT — Market Price & FX Rate
+# TASK: MARKET/FX DOCUMENTATION CONSISTENCY AUDIT & CLOSURE
 
-## نوع کار
-**REPORT ONLY — NO CODE CHANGE / NO DATABASE CHANGE**
+## Mission
 
-## پروژه
-- Repository: `lovelyroz/analyzer`
-- Local path: `D:\Winprojects\analyzer`
-- گزارش نهایی: `reply.md`
-- زبان گزارش: فارسی
-- فرمت: Markdown
+Perform a complete, evidence-based consistency and traceability audit of the Market/FX ingestion documentation in the `lovelyroz/analyzer` repository.
 
-## هدف
+The objective is to close documentation inconsistencies, verify that all approved decisions are represented consistently, and ensure that unresolved evidence gaps are explicitly recorded without being silently converted into assumptions.
 
-دو فایل زیر را مستقیماً از روی دیسک بررسی کن و یک گزارش فنی کامل تهیه کن:
+This is a bounded documentation task. Do not expand its scope into implementation, database changes, or new business decisions.
 
-1. `saman_price_history.csv`
-2. `dollar-history.xlsx`
+You are expected to complete the task autonomously, verify your changes, commit the approved documentation changes, and provide a concise, auditable completion report.
 
-این بررسی برای تکمیل استاندارد ورودی‌های غیرصورت‌مالی پروژه (DB-STD-005) است.
+## 1. Repository and branch
 
-هدف، استخراج ساختار واقعی فایل‌ها و مشخصات Feed است؛ نه طراحی فرضی یا پیشنهاد یک قالب جدید.
+- Repository: `analyzer`
+- Target branch: `master`
+- Before editing, inspect the current branch, working tree, latest commit, and current versions of all target files.
+- Fetch the latest version of each target file before modifying it.
+- Do not overwrite newer remote changes.
+- Preserve existing document structure, identifiers, historical decisions, and established terminology.
+- Do not modify `WORKFLOW_RULES.md`.
 
-**هیچ چیزی را حدس نزن. هر ویژگی که از فایل یا شواهد قابل مشاهده نیست، صریحاً UNKNOWN ثبت کن.**
+## 2. Authoritative documents in scope
 
----
+Inspect the latest versions of:
 
-## بخش اول — شناسایی فایل‌ها
+1. `database/reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md`
+   - Focus: §13.7, §13.8, §13.9 and related acceptance criteria.
 
-1. فایل‌ها را در پروژه پیدا کن.
-2. مسیر کامل هر فایل را در گزارش بنویس.
-3. اگر چند فایل با همین نام وجود دارد، همه را گزارش کن و بدون تصمیم‌گیری خودسرانه مشخص کن کدام نسخه باید بررسی شود.
-4. اندازه فایل، فرمت، تاریخ آخرین تغییر و SHA-256 هر فایل را ثبت کن.
-5. اگر فایلی پیدا نشد، آن را صریحاً اعلام کن و جایگزین انتخاب نکن.
+2. `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
+   - Focus: §9.28 and §9.29, plus any directly related Market/FX sections.
 
-## بخش دوم — بررسی saman_price_history.csv
+3. `database/reports/DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md`
+   - Focus: §18 and all relevant preceding evidence and decision registers.
 
-فایل را با حفظ داده‌های اصلی بررسی کن.
+Search for additional directly relevant documents only when necessary to verify a cross-reference or identify a contradiction. Do not expand the audit into unrelated database domains.
 
-### 2.1 مشخصات ساختاری
-- Encoding واقعی
-- Delimiter
-- نوع و تعداد ستون‌ها
-- نام دقیق تمام Headerها
-- تعداد کل رکوردها
-- تعداد ردیف‌های خالی
-- وجود Header تکراری
-- وجود ردیف توضیحات یا اطلاعات اضافی قبل و بعد از جدول
-- وجود BOM یا نشانه‌های غیرمعمول
+## 3. Approved facts that must be preserved
 
-### 2.2 بررسی ستون‌ها
+Treat the following as established owner decisions. Do not reinterpret or reverse them.
 
-برای تک‌تک ستون‌ها یک جدول بساز و این موارد را ثبت کن:
+### MarketDaily / CODAL
 
-| Field | Source Header | Detected Data Type | Sample Values | Null Count | Zero Count | Min | Max | Interpretation |
-|---|---|---|---|---|---|---|---|---|
+- The source is CODAL.
+- The owner downloads the data using their own script.
+- `J-Date` is a Jalali date in `YYYY-MM-DD` form.
+- `Close` represents the daily closing market price in Rial per share.
+- `Volume` represents the number of shares traded.
+- `No` represents the transaction count.
+- `Value` represents the source-provided total traded value in Rial.
+- Preserve `Value` independently. Do not replace it with `Volume × Close`.
+- `Final`, `Open`, `High`, and `Low` are excluded from the approved ingestion mapping.
+- The reviewed sample contains 21 records from 1402-01-08 through 1402-02-12.
+- Reviewed CSV SHA-256:
+  `d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413`
+- Publication time, first availability time, and revision/correction identity have not yet been evidenced.
 
-در ستون Interpretation فقط معنایی را بنویس که از نام ستون، داده‌ها یا شواهد معتبر قابل اثبات باشد.
+### FX / EXCHANGE_CENTER
 
-### 2.3 بررسی تاریخ
-- Header مربوط به تاریخ را شناسایی کن.
-- چند مقدار واقعی تاریخ را نمایش بده.
-- مشخص کن تاریخ به چه تقویمی است: Jalali، Gregorian یا UNKNOWN.
-- قالب دقیق تاریخ را تعیین کن.
-- ترتیب تاریخ‌ها را بررسی کن.
-- تعداد تاریخ‌های تکراری را گزارش کن.
-- بازه زمانی ابتدا و انتهای داده را مشخص کن.
-- وجود تاریخ نامعتبر یا ناقص را بررسی کن.
-- مشخص کن تاریخ معامله است یا تاریخ دیگری؛ اگر قابل اثبات نیست UNKNOWN بنویس.
+- The owner has identified the reviewed FX source as `EXCHANGE_CENTER`.
+- Use the sell-rate column only.
+- The canonical rate is Rial per USD.
+- Do not create an inferred buy/sell split in the canonical FX mapping.
+- Reviewed workbook SHA-256:
+  `eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf`
+- The hash identifies the exact reviewed file bytes. It does not independently prove publisher identity, source-profile identity, publication time, or revision identity.
+- The exact traceable link between this artifact and the `EXCHANGE_CENTER` source profile remains to be evidenced.
 
-### 2.4 بررسی داده‌های بازار
+### FX / FREE_MARKET
 
-مشخص کن آیا فایل حاوی هرکدام از موارد زیر است یا خیر:
+- The approved unit conversion is Toman per USD multiplied by 10 to obtain canonical Rial per USD.
+- A real sample artifact and its complete source/header/calendar/provenance audit are still outstanding.
+- Do not copy the `EXCHANGE_CENTER` column mapping into `FREE_MARKET`.
+- Do not activate this profile based only on the unit conversion decision.
 
-- Open
-- High
-- Low
-- Close
-- Raw Closing Price
-- Adjusted Closing Price
-- Volume
-- Trading Value
-- سایر فیلدها
+### Provenance and revision controls
 
-برای هر مورد:
-- Header اصلی منبع
-- معنای قابل اثبات
-- واحد و مقیاس
-- نوع داده
-- درصد مقادیر خالی
-- نمونه مقادیر واقعی
+Keep these timestamps distinct:
 
-را ثبت کن.
+- `source_published_at`: official source publication time.
+- `source_available_at`: first provable availability time.
+- `ingested_at`: system receipt/ingestion time.
 
-**مهم:** صرفاً به‌دلیل نام یک ستون، آن را قیمت تعدیل‌شده، قیمت پایانی، حجم یا ارزش معاملات فرض نکن.
+Do not infer publication or availability times from:
 
-### 2.5 کنترل‌های کیفیت
+- Upload time.
+- Filesystem modification time.
+- The date contained in a market or FX row.
+- The order in which files were received.
 
-موارد زیر را بررسی کن:
+A SHA-256 hash proves byte equality, not publisher identity or revision identity.
 
-- High < Low
-- Open/Close خارج از بازه High/Low
-- قیمت منفی
-- حجم یا ارزش منفی
-- مقادیر غیرعددی
-- صفرهای مشکوک
-- تاریخ‌های تکراری با مقادیر یکسان
-- تاریخ‌های تکراری با مقادیر متناقض
-- ترتیب نامنظم رکوردها
-- مقادیر پرت و غیرعادی
+A changed payload for an existing economic key without valid revision evidence must remain a conflict/review case. Do not introduce overwrite or last-arrival-wins behavior.
 
-برای هر کنترل، تعداد موارد نقض و چند نمونه دقیق را ارائه کن.
+Economic keys currently documented:
 
-هیچ رکوردی را اصلاح یا حذف نکن.
+- MarketDaily: Company + Jalali date.
+- FX: Jalali date + currency pair + rate type.
 
----
+Do not invent a revision identifier, fingerprint algorithm, conflict winner, or final version-ranking policy.
 
-## بخش سوم — بررسی dollar-history.xlsx
+## 4. Required work
 
-تمام Worksheetهای فایل را بررسی کن، نه فقط اولین Sheet.
+### Task A — Build a source-of-truth comparison matrix
 
-### 3.1 مشخصات Workbook
+Compare the three authoritative documents.
 
-- مسیر کامل
-- تعداد Worksheetها
-- نام دقیق هر Worksheet
-- وضعیت Hidden/Visible
-- ابعاد استفاده‌شده هر Sheet
-- تعداد ردیف و ستون دارای داده
-- وجود سلول Merge شده
-- وجود Formula
-- وجود جدول‌های Excel
-- جهت Worksheet در صورت قابل تشخیص بودن
+For every material Market/FX decision, record:
 
-### 3.2 بررسی ساختار هر Worksheet
+- Decision or fact.
+- Current value.
+- Evidence type: owner-approved, artifact-observed, or unresolved.
+- Documents and sections where it appears.
+- Whether all documents agree.
+- Any contradiction, omission, stale wording, or ambiguous statement.
+- Required documentation correction, if any.
 
-برای هر Sheet جداگانه:
+At minimum, audit:
 
-- Header واقعی را پیدا کن.
-- شماره ردیف Header را ثبت کن.
-- نام دقیق ستون‌ها را بنویس.
-- تعداد رکوردها را مشخص کن.
-- ردیف‌های توضیحی و خالی را مشخص کن.
-- اگر چند جدول در یک Sheet وجود دارد، آن‌ها را جداگانه گزارش کن.
+1. CODAL source identity.
+2. Market CSV hash and sample scope.
+3. Market field mappings and units.
+4. Jalali date handling.
+5. EXCHANGE_CENTER source identity.
+6. FX workbook hash and sell-column mapping.
+7. FREE_MARKET conversion and missing evidence.
+8. The three provenance timestamps.
+9. Artifact hash limitations.
+10. Economic keys.
+11. Duplicate and conflicting payload behavior.
+12. Revision/correction evidence requirements.
+13. Feed activation restrictions.
+14. DB-DES-005 acceptance criteria and unresolved decisions.
+15. Cross-references between the report and master packet.
 
-اگر ساختار Sheet پیچیده است، آدرس دقیق محدوده‌ها را با فرمت Excel ثبت کن.
+Do not treat repeated statements in multiple documents as independent evidence. Identify the original evidence or owner decision where possible.
 
-### 3.3 بررسی ستون‌ها
+### Task B — Verify evidence traceability
 
-برای تمام ستون‌ها جدولی مشابه زیر تهیه کن:
+Inspect the repository for the actual reviewed artifacts, evidence records, and references.
 
-| Field | Source Header | Detected Data Type | Sample Values | Null Count | Zero Count | Min | Max | Interpretation |
-|---|---|---|---|---|---|---|---|---|
+For each artifact:
 
-### 3.4 شناسایی نوع نرخ ارز
+- Determine whether the exact file is present.
+- If present, independently calculate its SHA-256.
+- Compare it with the documented hash.
+- Record the path and verification result.
+- Do not modify or resave source artifacts.
+- Do not claim an artifact was verified if it was not accessible.
 
-بررسی کن آیا فایل شامل موارد زیر است:
+For CODAL, distinguish the owner's source decision from proof of publication/availability/revision metadata.
 
-- FREE_MARKET
-- EXCHANGE_CENTER
+For EXCHANGE_CENTER, distinguish the owner's source decision from proof that the exact workbook bytes came from that source.
 
-یا نرخ‌های دیگری دارد.
+For FREE_MARKET, explicitly state whether a real sample and source evidence exist in the repository.
 
-مشخص کن نوع نرخ:
-- در یک ستون مشخص شده است؟
-- از Sheet جداگانه قابل تشخیص است؟
-- از نام فایل یا ساختار دیگری برداشت می‌شود؟
-- یا اصلاً قابل تشخیص نیست؟
+If evidence is missing, record the exact missing item. Do not search for a substitute artifact and silently treat it as the reviewed source.
 
-هیچ‌کدام از دو نوع نرخ را صرفاً بر اساس حدس به داده‌ها نسبت نده.
+### Task C — Correct documentation inconsistencies
 
-### 3.5 بررسی تاریخ و مقدار نرخ
+If the comparison reveals contradictions, stale statements, missing cross-references, or inconsistent status labels:
 
-- قالب تاریخ
-- تقویم تاریخ
-- بازه زمانی
-- تاریخ‌های تکراری
-- نرخ‌های خالی یا صفر
-- نرخ‌های غیرعددی
-- واحد نرخ
-- مقیاس نرخ
-- جداکننده هزارگان
-- جداکننده اعشار
-- تعداد ارقام اعشار
-- نحوه نمایش اعداد فارسی و انگلیسی
+- Correct them in the appropriate existing documents.
+- Preserve approved facts exactly.
+- Keep unresolved facts explicitly unresolved.
+- Make the smallest sufficient edits.
+- Do not duplicate entire sections unnecessarily.
+- Ensure the master packet accurately summarizes the detailed evidence report and ingestion contract.
+- Ensure the ingestion contract does not present provisional controls as final approved implementation policy.
 
-را بررسی کن.
+Do not create new business decisions merely to make the documents appear complete.
 
-**نکته مهم:** در استاندارد دامنه‌ای پروژه، نرخ ارز باید به شکل Rial به‌ازای USD ذخیره شود. همچنین تصمیم قبلی پروژه این است که اگر مقدار منبع Toman به‌ازای USD باشد، تبدیل با Decimal و ضرب در ۱۰ و سپس یک بار ROUND_HALF_UP انجام شود.
+### Task D — Produce a final audit register
 
-اما ابتدا باید از روی فایل مشخص شود واحد واقعی منبع چیست. این تبدیل را روی فایل اجرا نکن؛ فقط مشخص کن آیا شواهد فایل با این قرارداد سازگار است یا خیر.
+Add or update an appropriately located section in the existing Market/FX evidence review report.
 
----
+The register must contain:
 
-## بخش چهارم — بررسی قابلیت استفاده در DB-STD-005
+| ID | Subject | Evidence/status | Verified result | Remaining gap | Closure condition |
+|---|---|---|---|---|---|
 
-برای هر فایل یک نتیجه مستقل ارائه کن.
+Include separate entries for:
 
-### MarketDaily
+- CODAL source and mapping.
+- CODAL publication/availability evidence.
+- CODAL revision/correction behavior.
+- EXCHANGE_CENTER source and artifact linkage.
+- EXCHANGE_CENTER publication/availability evidence.
+- EXCHANGE_CENTER revision/correction behavior.
+- FREE_MARKET artifact and source audit.
+- Provenance timestamp policy.
+- Economic-key and conflict policy.
+- Feed activation status.
 
-بررسی کن آیا داده‌های فایل برای تعیین Feed Profile بازار کافی هستند یا خیر.
+Use precise status terminology. At minimum distinguish:
 
-موارد لازم:
+- VERIFIED
+- OWNER-APPROVED
+- ARTIFACT-OBSERVED
+- UNVERIFIED
+- BLOCKED
+- PARTIAL
 
-- Source identity
-- Company identity
-- Trading date
-- Open / High / Low / Close
-- Raw / Adjusted price distinction
-- Volume
-- Trading value
-- Unit and scale
-- Date calendar and format
-- Nullability
-- Duplicate policy
-- Source revision / publication metadata
+Do not label an item VERIFIED merely because an owner decision exists.
 
-برای هر مورد یکی از این وضعیت‌ها را تعیین کن:
+### Task E — Cross-document validation
 
-- CONFIRMED_FROM_FILE
-- PARTIALLY_CONFIRMED
-- NOT_PRESENT
-- UNKNOWN
-- REQUIRES_OWNER_CONFIRMATION
+After editing:
 
-### FXRate
+1. Re-read all modified sections.
+2. Check every hash character by character.
+3. Check that dates, units, field names, and economic keys agree.
+4. Check that the detailed report and master packet do not contradict each other.
+5. Check that no provisional control is described as a final implementation decision.
+6. Check that all unresolved evidence gaps remain visible.
+7. Check Markdown tables, headings, section numbering, and internal references.
+8. Check the final Git diff for unrelated changes.
 
-برای فایل ارز نیز موارد زیر را بررسی کن:
+If an inconsistency cannot be resolved from repository evidence, preserve it as an explicit blocker rather than guessing.
 
-- Source identity
-- Rate date
-- Rate type
-- Currency
-- Source unit
-- Canonical unit compatibility
-- Decimal precision
-- Duplicate policy
-- Publication / availability time
-- Revision metadata
+## 5. Strict change restrictions
 
-از وضعیت‌های بالا استفاده کن.
+You are authorized to edit documentation files in scope only.
 
----
+You are NOT authorized to:
 
-## بخش پنجم — نمونه داده و شواهد
+- Modify Python source code.
+- Modify tests.
+- Modify ORM models.
+- Modify schemas or migrations.
+- Open, create, modify, or query any database.
+- Modify ingestion behavior.
+- Activate or deactivate a feed in runtime configuration.
+- Change source mappings or units.
+- Invent a revision policy or conflict winner.
+- Modify `WORKFLOW_RULES.md`.
+- Delete or rewrite historical evidence.
+- Change any source artifact.
 
-برای هر فایل:
+Do not run application code or database scripts.
 
-1. حداقل ۱۰ ردیف واقعی از ابتدای داده‌ها را نشان بده.
-2. حداقل ۱۰ ردیف از انتهای داده‌ها را نشان بده.
-3. اگر داده‌ها کمتر از این مقدار هستند، تمام رکوردها را نشان بده.
-4. برای موارد مشکوک یا ناسازگار، نمونه دقیق ارائه کن.
-5. شماره ردیف یا آدرس سلول Excel را برای هر مشاهده مهم ثبت کن.
+Do not claim tests were run. This is a documentation audit, not an implementation test.
 
-داده‌های نمونه باید عیناً از فایل باشند؛ هیچ مقداری را تغییر نده.
+## 6. Completion criteria
 
-اگر نمایش کل داده‌ها در گزارش حجیم می‌شود، فقط نمونه‌های نماینده و خلاصه آماری را قرار بده؛ اما تمام بررسی‌ها باید روی کل داده انجام شوند.
+The task is complete only when all of the following are true:
 
----
+1. All three authoritative documents have been inspected at their latest available versions.
+2. A source-of-truth comparison has been completed.
+3. Artifact availability and hash verification have been reported honestly.
+4. Every identified documentation contradiction has either been corrected or explicitly recorded as unresolved with a reason.
+5. The final audit register exists and covers every required subject.
+6. The master packet accurately reflects the detailed report.
+7. Cross-document validation has been completed.
+8. The Git diff contains only authorized documentation changes.
+9. All authorized changes have been committed to `master`.
+10. The final report includes commit SHA, modified paths, and verification results.
 
-## بخش ششم — نتیجه‌گیری و پیشنهاد فنی
+Important: Missing external evidence does not prevent closure of this bounded documentation-consistency task. It does, however, prevent the relevant source-provenance item or feed from being marked VERIFIED or production-ready. Record those items as BLOCKED/UNVERIFIED with exact closure conditions.
 
-در انتهای گزارش، این موارد را مشخص کن:
+Do not claim that the underlying Market/FX ingestion design is fully approved merely because this documentation task is complete.
 
-1. آیا `saman_price_history.csv` برای تعریف Feed Profile مربوط به MarketDaily کافی است؟
-2. آیا `dollar-history.xlsx` برای تعریف Feed Profile مربوط به FXRate کافی است؟
-3. چه اطلاعاتی هنوز از مالک پروژه لازم است؟
-4. چه مواردی با همین فایل‌ها قابل تعیین هستند؟
-5. چه مواردی به اطلاعات خارج از فایل نیاز دارند؟
-6. آیا هر دو فایل برای پذیرش در DB-STD-005 آماده‌اند؟
-7. دقیقاً چه موانعی برای بستن Task 025 باقی می‌ماند؟
+## 7. Required final response
 
-یک جدول نهایی تهیه کن:
+Return a concise but complete report with these headings:
 
-| Domain | Confirmed | Unresolved | Blockers | Readiness |
-|---|---|---|---|---|
+### A. Completion
+- COMPLETE or NOT COMPLETE.
+- Exact reason.
 
-در بخش پیشنهادها، هیچ ساختار جدیدی را بدون شواهد به‌عنوان تصمیم قطعی پروژه معرفی نکن.
+### B. Changes
+- Each modified path.
+- Sections changed.
+- Short description of each correction.
 
----
+### C. Evidence verification
+- Each artifact path, expected hash, actual hash, and result.
+- Explicitly identify artifacts that were unavailable.
 
-## بخش هفتم — الزامات گزارش
+### D. Remaining blockers
+- Exact missing evidence.
+- What would close each blocker.
+- Whether any feed remains blocked from activation.
 
-گزارش باید شامل این بخش‌ها باشد:
+### E. Validation
+- Cross-document checks performed.
+- Git diff scope check.
+- Confirm no code, tests, ORM, schema, migration, or database changes.
+- Confirm no tests were run.
 
-1. Executive Summary
-2. File Identity and Integrity
-3. CSV Structural Audit
-4. CSV Field-Level Audit
-5. Excel Workbook Audit
-6. Excel Worksheet and Field-Level Audit
-7. Date and Numeric Format Analysis
-8. Data Quality Findings
-9. DB-STD-005 Compatibility Matrix
-10. Unresolved Questions
-11. Final Readiness Assessment
-12. Evidence Appendix
+### F. Git
+- Branch.
+- Commit SHA.
+- Working-tree status after commit.
 
-گزارش را به زبان فارسی و Markdown بنویس.
+### G. Next action
+Identify the single highest-value next task. Do not begin that next task without authorization.
 
-تمام اعداد، تاریخ‌ها، Headerها، مسیرها و نمونه‌ها باید قابل ردیابی به فایل اصلی باشند.
-
-## محدودیت‌های قطعی
-
-- هیچ کدی را تغییر نده.
-- هیچ فایل اصلی را تغییر نده.
-- هیچ فایل جدیدی به پروژه اضافه نکن، به‌جز گزارش نهایی.
-- هیچ داده‌ای وارد دیتابیس نکن.
-- هیچ Migration اجرا نکن.
-- هیچ تستی اجرا نکن.
-- هیچ داده‌ای را Normalize، اصلاح، حذف یا بازنویسی نکن.
-- هیچ واحد، تقویم، نوع نرخ یا معنای مالی را حدس نزن.
-- هیچ گزارش قبلی را به‌عنوان جایگزین بررسی مستقیم فایل‌ها در نظر نگیر.
-- فقط دو فایل مشخص‌شده را بررسی کن؛ سراغ بررسی گسترده سایر فایل‌های پروژه نرو.
-
-## خروجی
-
-گزارش کامل را در فایل زیر قرار بده:
-
-`reply.md`
-
-در پایان فقط خلاصه‌ای از این موارد را اعلام کن:
-
-- مسیر دقیق دو فایل بررسی‌شده
-- SHA-256 هر دو فایل
-- تعداد Worksheetها و رکوردهای هر فایل
-- تعداد یافته‌های مهم
-- موارد UNKNOWN و نیازمند تصمیم مالک
-- مسیر گزارش `reply.md`
-
-**گزارش باید آن‌قدر کامل باشد که ChatGPT بتواند بدون دسترسی مستقیم به فایل‌های Excel و CSV، استاندارد Feed را بر اساس شواهد آن بررسی و تصمیم‌گیری کند.**
+Be factual. Do not report success based on intention. A task is complete only when the requested outputs and verification evidence actually exist.

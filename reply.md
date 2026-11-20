@@ -161,3 +161,52 @@ Excel: ۱۹ رکورد کامل؛ تاریخ تکراری، Null، صفر/منف
 | Sheet!A20:C20 | 1405-08-12 | 1865971 | 1882917 |
 | Sheet!A21:C21 | 1405-08-11 | 1862246 | 1879158 |
 | Sheet!A22:C22 | 1405-08-10 | 1858528 | 1875407 |
+=======================================================
+
+### A. Completion
+
+**COMPLETE** برای ممیزی و اصلاح مستندات. تصمیم‌های مصوب مالک حفظ شدند و شکاف‌های provenance به‌صورت صریح باز ماندند؛ هیچ Feed به‌عنوان آمادهٔ تولید یا فعال اعلام نشد.
+
+### B. Changes
+
+- [گزارش شواهد Market/FX](/D:/winprojects/analyzer/database/reports/DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md): اصلاح وضعیت فعلی artifactها در §10.1؛ افزودن ماتریس تطبیق و رجیستر ۱۰ موردی در §19.
+- [Master Working Packet](/D:/winprojects/analyzer/database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md): افزودن خلاصهٔ وضعیت منبع، mapping، provenance و ارجاع به §19 در §9.30.
+- [قرارداد DB-DES-005](/D:/winprojects/analyzer/database/reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md): ثبت تصمیم‌های مالک و تفکیک source identity از artifact/revision identity در §13.10؛ تأکید بر موقتی‌بودن guardrailها و پیشنهادی‌بودن test plan §13.8.
+
+### C. Evidence verification
+
+هر دو artifact در checkout موجود و tracked بودند؛ hashها مستقیماً محاسبه و با مقدار مورد انتظار تطبیق داده شدند:
+
+- `D:\winprojects\analyzer\saman_price_history.csv` — مورد انتظار و واقعی: `d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413` — **تطبیق دارد**؛ ۲۱ رکورد.
+- `D:\winprojects\analyzer\dollar-history.xlsx` — مورد انتظار و واقعی: `eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf` — **تطبیق دارد**؛ یک Worksheet و ۱۹ رکورد.
+
+نمونهٔ واقعی FREE_MARKET در checkout یافت نشد؛ جایگزینی انتخاب نشد.
+
+### D. Remaining blockers
+
+- **CODAL:** زمان انتشار رسمی، نخستین زمان دسترس‌پذیری و شواهد revision/correction نداریم. برای بستن، مدرک قابل‌ردیابی همان خروجی به انتشار CODAL و metadata زمانی/اصلاحیه لازم است.
+- **EXCHANGE_CENTER:** mapping فروش به Rial/USD مصوب است و hash فایل تأیید شد؛ پیوند قابل‌ردیابی همین artifact به Feed profile، زمان‌های انتشار/دسترس‌پذیری و شواهد اصلاحیه هنوز موجود نیست.
+- **FREE_MARKET:** artifact واقعی و ممیزی منبع، header، تقویم و provenance لازم است؛ تبدیل Toman/USD × 10 به‌تنهایی برای فعال‌سازی کافی نیست.
+- سیاست نهایی fingerprint و رتبه‌بندی revision تعیین نشده است؛ payload متفاوت بدون revision معتبر همچنان conflict/review است.
+
+هر سه Feed برای activation همچنان **BLOCKED / not production-ready** هستند. DB-DES-005 و DB-STD-005 نیز **PARTIAL** باقی می‌مانند.
+
+### E. Validation
+
+- سه سند هدف و بخش‌های مرتبط، از جمله acceptance criteria §11 و test plan پیشنهادی §13.8، تطبیق داده شدند.
+- hashها، mappingها، تاریخ‌ها، کلیدهای اقتصادی و ارجاع‌های جدید بین اسناد کنترل شدند؛ جدول‌های افزوده‌شده معتبرند و `git diff --check` گذشت.
+- `origin/master` پیش از تغییر با شاخهٔ محلی هم‌تراز بود. commit فقط شامل سه سند مجاز است.
+- هیچ کد، تست، ORM، schema، migration یا دیتابیسی تغییر نکرد؛ هیچ تستی اجرا نشد.
+- یک جدول قدیمی نامتوازن در بخش نامرتبط Master Working Packet در بررسی کلی دیده شد؛ خارج از دامنه نگه داشته شد.
+- تغییر محلیِ موجود در `prompt.md` دست‌نخورده و خارج از commit باقی ماند.
+
+### F. Git
+
+- شاخه: `master`
+- commit: `a0f0ce811d2058345b93c1239ce0e936c4dcb298`
+- وضعیت پس از commit: فقط `prompt.md` همچنان با تغییر محلیِ قبلی مشخص است؛ فایل staged باقی نمانده.
+- commit محلی است و push انجام نشد.
+
+### G. Next action
+
+بالاترین اولویت بعدی، تهیهٔ بستهٔ provenance قابل‌ردیابی برای artifactهای بررسی‌شدهٔ CODAL و EXCHANGE_CENTER است: اتصال هر فایل به منبع/profile و شواهد زمان انتشار، نخستین دسترس‌پذیری و رفتار اصلاحیه.
