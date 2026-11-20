@@ -554,7 +554,7 @@ No parser, code, ORM, schema, migration, database, or test was changed/run. This
 
 ### 10.1 منشأ و تمامیت فایل‌ها
 
-مالک گزارش ممیزی مستقیم دو فایل محلی را از مسیر `D:\\winprojects\\analyzer` ارائه کرد. فایل‌ها در repository ثبت نشده‌اند؛ بنابراین شواهد این بخش بر اساس گزارش محلی مالک/Agent است و محتوای باینری فایل‌ها در این نوبت مستقلاً توسط دستیار بازگشایی نشده است.
+این بخش در زمان ثبت اولیه بر پایه ممیزی محلی فایل‌ها نوشته شد. inventory تاریخ‌دار در §9 مربوط به 2026-11-19 ساعت 02:10 +03:30 است. متن اولیه این بخش که می‌گفت فایل‌ها tracked نبوده‌اند و محتوای باینری مستقلاً بازبینی نشده، با وضعیت اکنون مخالف است: commit 4d5f7bb در 2026-11-19 ساعت 12:37 +03:30 هر دو artifact را به master افزود. ممیزی جاری آن‌ها را مستقیم از checkout خوانده و hash‌ها را مستقلاً تأیید کرده است. این تصحیح در رجیستر نهایی §19 ثبت شده و هیچ محتوای فایل اصلی تغییر نیافته است.
 
 | دامنه | فایل | اندازه | SHA-256 | رکورد |
 |---|---|---:|---|---:|
@@ -708,3 +708,60 @@ No parser, code, ORM, schema, migration, database, or test was changed/run. This
 نکتهٔ کیفیت داده: گزارش محلی CSV یک رکورد آماری پرت در Volume/Value/No برای 1402-01-15 علامت زده است، اما خود گزارش نیز تأکید می‌کند این علامت Tukey اثبات خطای منبع نیست. هیچ اصلاح، حذف یا winsorization مجاز نیست؛ مقدار منبع باید بدون دستکاری حفظ شود و این مورد صرفاً diagnostic است. همچنین تاریخ‌های FX در فایل جدید به‌صورت نزولی‌اند و رشتهٔ تاریخ به‌تنهایی تقویم را اثبات نمی‌کند؛ تقویم از قرارداد مالک اخذ می‌شود، نه از استنتاج فایل.
 
 این اصلاحیه صرفاً تعارض وضعیت ممیزی مشاهده‌ای و تصمیم‌های مالک را رفع می‌کند. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+
+## 19. ممیزی سازگاری اسناد و ثبت وضعیت شواهد — 2026-11-20
+
+### 19.1 دامنه، نسخه‌ها و مبنای حقیقت
+
+این تطبیق روی شاخه master در commit مبنای 1ed15d122983ead7bb819060c200b6beceb87809 انجام شد؛ git fetch origin master موفق بود و origin/master همان commit را نشان داد. سه سند تعیین‌شده بررسی شدند: DB-DES-005 §§11–13.9، Master Working Packet §§9.28–9.29، و همین گزارش §§9–18. دو artifact بازار و FX در ریشهٔ repository موجود و tracked هستند. SHA-256 بایت‌های فعلی مستقل محاسبه شد و با hashهای ثبت‌شده برابر است.
+
+ترتیب شواهد: تصمیم صریح مالک برای semantics/mapping؛ مشاهدهٔ مستقل artifact برای خواص فایل؛ سپس UNVERIFIED/BLOCKED برای هر چیزی که این دو اثبات نمی‌کنند. تکرار یک تصمیم در چند سند، شاهد مستقل جدید ایجاد نمی‌کند.
+
+### 19.2 ماتریس تطبیق source of truth
+
+| ID | تصمیم/واقعیت | مقدار جاری | نوع شاهد | اسناد/بخش‌ها | سازگاری و اصلاح |
+|---|---|---|---|---|---|
+| S01 | منبع MarketDaily | CODAL؛ دریافت با اسکریپت مالک | OWNER-APPROVED؛ artifact نیز مشاهده شد | این گزارش §§16,18؛ DES §13.9؛ Master §9.28 | همسو؛ این تأیید منبع به‌تنهایی زمان انتشار و revision را اثبات نمی‌کند. |
+| S02 | CSV و دامنه | ۲۱ رکورد، 1402-01-08 تا 1402-02-12؛ hash d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413 | ARTIFACT-OBSERVED؛ hash مستقلاً VERIFIED | این گزارش §§10,18,19؛ Master §§9.28,9.30 | hash فعلی match است. |
+| S03 | Mapping بازار | Close: قیمت روزانهٔ ریال/سهم؛ Volume: سهم؛ No: تعداد معامله؛ Value: ارزش کل منبع به ریال و مستقل از Close×Volume؛ Final/Open/High/Low خارج V1 | OWNER-APPROVED | این گزارش §§12–18؛ Master §§9.28,9.30 | همسو؛ تصمیم متأخر §16 دربارهٔ Value بر §14 تاریخی مقدم است. |
+| S04 | تاریخ بازار | J-Date جلالی، YYYY-MM-DD | OWNER-APPROVED و ARTIFACT-OBSERVED | این گزارش §§17–18؛ DES §13.9؛ Master §9.28 | همسو؛ تاریخ ردیف جای source_published_at نیست. |
+| S05 | FX source/type | EXCHANGE_CENTER | OWNER-APPROVED | این گزارش §§11,18؛ Master §§9.28–9.29 | همسو؛ Header به‌تنهایی منبع/type را اثبات نمی‌کند. |
+| S06 | FX artifact/mapping | dollar-history.xlsx؛ فقط ستون فروش؛ Rial/USD؛ بدون تبدیل | تصمیم mapping OWNER-APPROVED؛ artifact مشاهده‌شده؛ اتصال artifact به profile UNVERIFIED | این گزارش §§10–11,18,19؛ Master §9.28؛ DES §13.9 | hash eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf برابر است؛ linkage هنوز لازم است. |
+| S07 | FREE_MARKET | ورودی Toman/USD × 10 برای Rial/USD؛ نمونه و audit منبع موجود نیست | تبدیل OWNER-APPROVED؛ artifact/profile BLOCKED | این گزارش §11؛ DES §13.9؛ Master §9.29 | همسو؛ تصمیم واحد مجوز فعال‌سازی یا کپی mapping مرکز مبادله نیست. |
+| S08 | سه timestamp provenance | source_published_at، source_available_at و ingested_at مستقل؛ upload/mtime/row date جایگزین دو timestamp منبع نیست | OWNER-APPROVED / guardrail ثبت‌شده | DES §13.9؛ Master §9.29 | همسو؛ مقدار واقعی دو timestamp منبع هنوز اثبات نشده است. |
+| S09 | محدودیت hash | SHA-256 برابری بایت را اثبات می‌کند، نه ناشر، profile یا revision | ARTIFACT-OBSERVED limitation / documented | DES §13.9؛ Master §9.29؛ این گزارش §18 | همسو. |
+| S10 | Economic keys | Market: Company + تاریخ جلالی؛ FX: تاریخ جلالی + currency pair + rate_type | تصمیم مصوب و مستند | DES §§6,13.7,13.9؛ Master §9.29 | همسو؛ کلید اقتصادی revision ID نیست. |
+| S11 | Duplicate/conflict | payload متفاوت روی کلید موجود بدون revision معتبر، conflict/review؛ overwrite و last-arrival-wins ممنوع | guardrail مصوب؛ جزئیات implementation/fingerprint هنوز باز | DES §§13.7–13.9؛ Master §9.29 | همسو؛ final winner/fingerprint scope تصویب نشده. |
+| S12 | Revision/correction | evidence معتبر revision و chronology لازم؛ arrival order جانشین نیست | UNVERIFIED / unresolved | DES §§13.7,13.9؛ Master §9.29؛ این گزارش §18 | همسو؛ شناسه یا ranking policy اختراع نشده. |
+| S13 | Activation | هیچ Feed صرفاً با سند یا hash، VERIFIED/فعال نمی‌شود | BLOCKED/PARTIAL | این گزارش §18؛ Master §§9.28–9.29؛ DES §13.9 | همسو؛ mapping مصوب معادل production readiness نیست. |
+| S14 | Acceptance criteria | DES §11 معیار قرارداد است؛ §13.8 پیشنهاد آزمون است و اجرا نشده؛ §13.7/13.9 الگوریتم revision/fingerprint نهایی نمی‌کنند | متن اسناد مشاهده شد؛ implementation NOT VERIFIED | DES §§11,13.7–13.9؛ Master §9.29 | همسو؛ DES/STD همچنان PARTIAL. |
+| S15 | Cross-reference | Master §9.28 به این گزارش §18 و §9.29 به DES §13.9 ارجاع می‌دهد | ARTIFACT-OBSERVED | Master §§9.28–9.29؛ این گزارش §18 | §19 با Master §9.30 و DES §13.10 ارجاع می‌گیرد. |
+
+### 19.3 رفع ناهماهنگی سابقهٔ artifact
+
+§9 گزارش یک inventory تاریخی در 2026-11-19 ساعت 02:10 +03:30 است؛ در آن زمان فایل‌های نمونه tracked نبودند. سپس commit 4d5f7bb46036d393bb3ca5f907e7401889a009e6 در 2026-11-19 ساعت 12:37 +03:30 هر دو artifact را به master افزود. Snapshot §9 حفظ می‌شود. بااین‌حال، گزارهٔ §10.1 که فایل‌ها را در وضعیت فعلی repository ثبت‌نشده می‌خواند کهنه/ناسازگار شده بود. در ممیزی حاضر فایل‌ها از checkout مستقیماً خوانده و hash شدند؛ §10.1 با این نتیجه اصلاح می‌شود. منبع فایل تغییر نکرده است.
+
+| Artifact | مسیر checkout | اندازه | hash مورد انتظار | hash واقعی | نتیجه |
+|---|---|---:|---|---|---|
+| CODAL MarketDaily | D:\winprojects\analyzer\saman_price_history.csv | 2,400 bytes | d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413 | d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413 | VERIFIED (hash equality only)؛ publisher/revision metadata اثبات نشده |
+| EXCHANGE_CENTER workbook | D:\winprojects\analyzer\dollar-history.xlsx | 14,349 bytes | eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf | eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf | VERIFIED (hash equality only)؛ profile linkage و publisher/revision اثبات نشده |
+| FREE_MARKET sample | در checkout موجود نیست | — | — | — | BLOCKED؛ جایگزین انتخاب نشد |
+
+### 19.4 رجیستر نهایی audit و closure
+
+VERIFIED فقط برای چیزی به‌کار می‌رود که مستقلاً مشاهده/محاسبه شده؛ OWNER-APPROVED، ARTIFACT-OBSERVED و UNVERIFIED وضعیت‌های جدا هستند.
+
+| ID | Subject | Evidence/status | Verified result | Remaining gap | Closure condition |
+|---|---|---|---|---|---|
+| A01 | CODAL source and mapping | OWNER-APPROVED + ARTIFACT-OBSERVED؛ hash VERIFIED | منبع و mapping Close/Volume/No/Value با واحدهای مصوب؛ CSV ۲۱ ردیف و hash برابر | publisher linkage و provenance زمانی | مدرک قابل ردیابی خروجی اسکریپت به CODAL و metadata همان انتشار |
+| A02 | CODAL publication/availability | BLOCKED / UNVERIFIED | timestamp منبع در artifact نیست | زمان انتشار رسمی و نخستین availability همان خروجی | مدرک رسمی/قابل استناد و دو timestamp مجزا یا ثبت صریح عدم ارائه |
+| A03 | CODAL revision/correction | BLOCKED / UNVERIFIED | revision identity/history در CSV نیست | رفتار اصلاح و بازنشر | evidence دربارهٔ شناسه/chronology اصلاحیه یا تصریح نبود آن؛ conflictها تا آن زمان review |
+| A04 | EXCHANGE_CENTER source/artifact linkage | PARTIAL: source OWNER-APPROVED، bytes VERIFIED (hash equality only)، linkage UNVERIFIED | مالک source type را تأیید کرده؛ hash artifact تطبیق شد؛ mapping فقط Sell به Rial/USD | پیوند قابل ردیابی artifact به profile | provenance record/profile reference که همین hash را به profile و source وصل کند |
+| A05 | EXCHANGE_CENTER publication/availability | BLOCKED / UNVERIFIED | زمان منبع در workbook نیست | publication و first availability | evidence منبع/ثبت قابل اثبات برای هر دو timestamp؛ mtime/upload/row-date پذیرفته نیست |
+| A06 | EXCHANGE_CENTER revision/correction | BLOCKED / UNVERIFIED | workbook revision identity ندارد | رفتار اصلاح/بازنشر | revision evidence/sequence یا تصریح نبود آن؛ payload متعارض review |
+| A07 | FREE_MARKET artifact/source audit | BLOCKED | نمونهٔ واقعی در checkout نیست؛ فقط تبدیل Toman/USD ×10 مصوب است | artifact، source، headers، calendar، provenance، revision | نمونهٔ اصلی قابل انتساب و audit مستقل؛ هیچ mappingی از EXCHANGE_CENTER کپی نشود |
+| A08 | Provenance timestamp policy | OWNER-APPROVED / documented guardrail | سه timestamp مجزا؛ hash/mtime/upload/row-date جانشین زمان منبع نیست | evidence واقعی timestampهای هر artifact | evidence reference یا UNKNOWN صریح برای هر timestamp؛ implementation verification جدا |
+| A09 | Economic-key/conflict policy | PARTIAL | کلیدهای مستند؛ payload متفاوت بدون revision معتبر conflict و overwrite ممنوع | fingerprint scope، duplicate preflight/constraints، revision ranking/winner | تصمیم نسخه‌دار و preflight داده؛ winner حدس زده نشود |
+| A10 | Feed activation | BLOCKED / not production-ready | mappingهای معنایی مصوب و دو artifact hash-verified؛ به‌تنهایی activation نیستند | CODAL provenance/revision؛ FX linkage/time/revision؛ FREE_MARKET sample/profile؛ implementation alignment | بستن gateهای Feed و مجوز activation؛ تا آن زمان فعال اعلام نشود |
+
+این رجیستر پیاده‌سازی یا پذیرش Feed را تأیید نمی‌کند. DB-DES-005، DB-STD-005 و بخش مربوط DB-AUD-001 همچنان PARTIAL هستند. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تستی اجرا نشد.

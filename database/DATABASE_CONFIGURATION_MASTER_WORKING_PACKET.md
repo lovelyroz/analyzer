@@ -2396,3 +2396,15 @@ DB-ING-006 / Task 033 PARTIAL باقی می‌ماند. این گام صرفاً
 Guardrail موقت: برای کلید اقتصادی موجود MarketDaily یا FX، payload متفاوت بدون evidence معتبر revision باید conflict/review شود؛ overwrite و last-arrival-wins ممنوع است. نبود publication/availability نیز اجازهٔ ساخت chronology یا current-winner برای PIT نمی‌دهد. Hash فعلی XLSX ارز فقط به artifact بررسی‌شده متصل است و به‌تنهایی EXCHANGE_CENTER بودن آن را ثابت نمی‌کند. Feed بازار سامان همچنان نیازمند evidence زمان انتشار/دسترس‌پذیری و رفتار اصلاحیه است؛ Feed مرکز مبادله نیازمند اتصال provenance artifact به profile؛ FREE_MARKET نیازمند نمونهٔ واقعی و profile مستقل است.
 
 این ثبت، تصمیم نهایی fingerprint algorithm، revision key، retention، batch boundary یا conflict winner نیست و مجوز schema/implementation محسوب نمی‌شود. DB-DES-005 و DB-STD-005 PARTIAL باقی می‌مانند. فقط مستندات تغییر کردند؛ هیچ کد، ORM، schema، migration، DB یا داده‌ای تغییر نکرد و تستی اجرا نشد.
+
+## 9.30 رجیستر سازگاری و وضعیت فعلی شواهد Market/FX — 2026-11-20
+
+ممیزی سازگاری در DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md §19، همراه با جزئیات provenance در DB-DES-005 §13.10، source of truth و وضعیت closure را تثبیت می‌کند:
+
+- MarketDaily: CODAL و دریافت با اسکریپت مالک OWNER-APPROVED؛ CSV سامان دارای ۲۱ رکورد و hash مستقلِ برابر d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413 است. Mapping مصوب: J-Date جلالی YYYY-MM-DD؛ Close ریال/سهم؛ Volume سهم؛ No تعداد معاملات؛ Value کل ارزش مستقل منبع به ریال. Final/Open/High/Low خارج از V1 هستند.
+- EXCHANGE_CENTER: source/type و mapping فروش به Rial/USD بدون تبدیل OWNER-APPROVED؛ dollar-history.xlsx با hash مستقلِ برابر eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf موجود است. مالکیت source تصمیم‌شده است، اما اتصال provenance همین hash به Feed profile و evidence زمان انتشار/دسترس‌پذیری/revision هنوز UNVERIFIED است.
+- FREE_MARKET: تبدیل Toman/USD × 10 به Rial/USD مصوب است؛ نمونهٔ واقعی و ممیزی source/feed در checkout موجود نیست و پروفایل BLOCKED می‌ماند.
+- source_published_at، source_available_at و ingested_at متمایزند؛ hash، mtime، upload و تاریخ ردیف‌ها publication/revision evidence نیستند. Economic key بازار Company + تاریخ جلالی و FX تاریخ جلالی + جفت ارز + rate_type است. payload متفاوت بدون revision معتبر conflict/review است؛ overwrite/last-arrival-wins ممنوع، اما الگوریتم fingerprint و ranking/winner نهایی تصویب نشده‌اند.
+- هیچ یک از این وضعیت‌ها feed activation را مجاز نمی‌کند؛ DB-DES-005، DB-STD-005 و بخش مربوط DB-AUD-001 همچنان PARTIAL هستند.
+
+تاریخچهٔ موجودی حفظ می‌شود: گزارش §9 از 2026-11-19 ساعت 02:10 پیش از اضافه‌شدن artifactها بود؛ commit 4d5f7bb در همان روز ساعت 12:37 فایل‌ها را tracked کرد. بنابراین statement قدیمی §10.1 دربارهٔ tracked نبودن فایل‌ها اصلاح شده است؛ جزئیات hash verification فعلی در گزارش §19 است. این یادداشت صرفاً اسناد را همسو می‌کند؛ هیچ implementation یا feed profileای تغییر/فعال نشده است.

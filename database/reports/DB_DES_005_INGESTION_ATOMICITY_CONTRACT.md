@@ -387,3 +387,15 @@ Counts نهایی باید با نتیجهٔ commit سازگار باشند. د�
 | FX / FREE_MARKET | artifact واقعی و قابل انتساب به منبع، header و نمونهٔ داده، واحد، تقویم، زمان انتشار و رفتار revision | Feed profile غیرفعال؛ هیچ schema یا mapping از EXCHANGE_CENTER کپی نشود |
 
 **وضعیت تصمیم:** این بخش فقط حداقل شواهد و fail-closed guardrail را مشخص می‌کند. هیچ fingerprint algorithm، revision key، retention policy، schema، batch boundary یا conflict winner نهایی تصویب نشده است. DB-DES-005 و DB-STD-005 همچنان PARTIAL هستند. هیچ کد، ORM، schema، migration، دیتابیس، داده یا تستی تغییر/اجرا نشده است.
+
+### 13.10 تطبیق دفتر provenance با تصمیم‌های مالک و رجیستر evidence — 2026-11-20
+
+این یادداشت، ابهام ارجاع §13.7 به «تعیین Feed/source identity» را با تصمیم‌های مالک روشن می‌کند؛ هویت کلی منبع با stable artifact/revision identity یکسان نیست.
+
+- MarketDaily نمونهٔ سامان: source برابر CODAL و دریافت با اسکریپت مالک OWNER-APPROVED است. J-Date جلالی YYYY-MM-DD؛ Close قیمت روزانه به Rial/share؛ Volume تعداد سهم؛ No تعداد معامله؛ Value مقدار مستقل منبع به Rial است. Final/Open/High/Low خارج mapping مصوب‌اند. فایل CSV با SHA-256 برابر d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413 در checkout قابل مشاهده و hash آن مستقلاً match شده است. stable publisher artifact ID، source_published_at، source_available_at و evidence اصلاح/بازنشر هنوز اثبات نشده‌اند.
+- FX: source/type کلی EXCHANGE_CENTER و قرارداد استفاده از sell column تنها با Rial/USD و بدون تبدیل OWNER-APPROVED است. فایل dollar-history.xlsx موجود و hash آن eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf است. این تطبیق بایت‌ها به‌تنهایی اتصال provenance همین artifact به profile، ناشر، زمان انتشار/دسترس‌پذیری یا revision رسمی را اثبات نمی‌کند؛ پیوند قابل ردیابی همچنان لازم است.
+- FREE_MARKET: ورودی Toman/USD و تبدیل canonical با ضریب دقیق ۱۰ OWNER-APPROVED است؛ نمونهٔ واقعی و audit کامل source/header/calendar/provenance/revision در checkout وجود ندارد. پروفایل نباید فعال شود و mapping EXCHANGE_CENTER نباید کپی شود.
+- source_published_at، source_available_at و ingested_at مفاهیم جدا هستند. upload، mtime و row date جای publication/availability نیستند. SHA-256 فقط byte equality را نشان می‌دهد.
+- کلیدهای اقتصادی مستند: MarketDaily برابر Company + تاریخ جلالی؛ FX برابر تاریخ جلالی + جفت ارز + rate_type. payload متفاوت روی کلید موجود بدون evidence revision معتبر conflict/review می‌ماند؛ overwrite و last-arrival-wins مجاز نیست. fingerprint scope، revision ranking و conflict winner نهایی تصویب نشده‌اند.
+
+برای ماتریس و closure register نهایی به DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md §19 و خلاصهٔ Master Working Packet §9.30 مراجعه شود. §13.8 همچنان test plan پیشنهادی است، نه ادعای اجرای تست یا سیاست implementation نهایی؛ acceptance criteria §11 نیز به‌تنهایی evidence اجرای کد نیست. DB-DES-005 همچنان PARTIAL است و هیچ feed با این note production-ready اعلام نمی‌شود. این یادداشت مستنداتی است؛ کد، ORM، schema، migration، database و داده تغییر نکرده و تستی اجرا نشده است.
