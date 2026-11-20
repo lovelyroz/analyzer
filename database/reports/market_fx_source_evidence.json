@@ -1,0 +1,922 @@
+{
+  "dossier_id": "DB_AUD_011_MARKET_FX_SOURCE_PROVENANCE_DOSSIER",
+  "generated_at_utc": "2026-11-20T10:09:53.267945+00:00",
+  "evidence_status_legend": [
+    "OFFICIAL_SOURCE_VERIFIED",
+    "LOCALLY_TRACEABLE",
+    "ARTIFACT_OBSERVED",
+    "INFERRED",
+    "UNVERIFIED",
+    "UNKNOWN",
+    "BLOCKED"
+  ],
+  "scope": "Read-only source trace; no owner download script executed, no source artifact changed, no database inspected or modified.",
+  "official_sources": [
+    {
+      "name": "CODAL",
+      "homepage_url": "https://www.codal.ir/",
+      "search_api_url": "https://search.codal.ir/api/search/v2/q",
+      "status": "UNVERIFIED",
+      "note": "These are official-site/API locations, but no evidence ties a specific endpoint invocation or publication record to saman_price_history.csv."
+    },
+    {
+      "name": "Iran Exchange Center",
+      "homepage_url": "https://ice.ir/",
+      "market_view_url": "https://ice.ir/market-view/currency",
+      "status": "OFFICIAL_SOURCE_VERIFIED",
+      "note": "The official page identifies a market-view page for remittance rates and exposes a date label. Its retrieved content did not expose dated historical records or a source profile/record identity for the workbook rows."
+    }
+  ],
+  "artifacts": {
+    "market": {
+      "path": "saman_price_history.csv",
+      "sha256": "d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413",
+      "size_bytes": 2400,
+      "file_type": "csv",
+      "records": 21,
+      "headers_as_read": [
+        "J-Date",
+        "Open",
+        "High",
+        "Low",
+        "Close",
+        "Final",
+        "Volume",
+        "Value",
+        "No",
+        "Ticker",
+        "Name",
+        "Market"
+      ],
+      "provenance": {
+        "source_identity": {
+          "value": "CODAL (owner-approved semantic source)",
+          "status": "LOCALLY_TRACEABLE",
+          "note": "Owner decisions are recorded in database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md ?9.30 and DB_DES_005 ?13.10; this does not link this file to a specific CODAL record."
+        },
+        "source_profile": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No owner downloader/configuration/profile file was located in the available project files."
+        },
+        "source_record_identity": {
+          "value": "UNKNOWN",
+          "status": "BLOCKED",
+          "note": "No publication ID, TracingNo, official page URL, response manifest, or other stable identifier is present in the CSV or linked by a local producer script."
+        },
+        "source_revision_identity": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No source-issued revision/correction ID or chronology evidence found."
+        },
+        "source_published_at": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No source publication metadata/record identified."
+        },
+        "source_available_at": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No first-availability evidence identified."
+        },
+        "ingested_at": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No database ingestion audit was performed in this task."
+        },
+        "artifact_sha256": {
+          "value": "d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413",
+          "status": "ARTIFACT_OBSERVED",
+          "note": "Hash identifies these bytes only."
+        },
+        "artifact_created_at": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "CSV has no embedded created-at field; filesystem timestamps are excluded as evidence."
+        },
+        "transformation_method": {
+          "value": "UNKNOWN",
+          "status": "BLOCKED",
+          "note": "Owner-specific producer script/command and source response were not present in accessible project files; direct download vs transformed/manual output cannot be classified."
+        }
+      },
+      "local_to_source_comparison": {
+        "counts": {
+          "total": 21,
+          "official_exact_matches": 0,
+          "official_differences": 0,
+          "not_comparable": 21
+        },
+        "reason": "No CODAL source record can be selected without the producer evidence or a stable publication identifier. All records and local values are retained below; no guessed record ID.",
+        "observations": [
+          {
+            "local_csv_line": 2,
+            "local_values_as_read": {
+              "J-Date": "1402-01-08",
+              "Close": "3022",
+              "Volume": "14738930",
+              "No": "263",
+              "Value": "44541046460",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 3,
+            "local_values_as_read": {
+              "J-Date": "1402-01-09",
+              "Close": "3112",
+              "Volume": "10918715",
+              "No": "208",
+              "Value": "33979041080",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 4,
+            "local_values_as_read": {
+              "J-Date": "1402-01-14",
+              "Close": "3205",
+              "Volume": "6853871",
+              "No": "169",
+              "Value": "21966656555",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 5,
+            "local_values_as_read": {
+              "J-Date": "1402-01-15",
+              "Close": "3254",
+              "Volume": "326247149",
+              "No": "5223",
+              "Value": "1072602451231",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 6,
+            "local_values_as_read": {
+              "J-Date": "1402-01-16",
+              "Close": "3386",
+              "Volume": "104154742",
+              "No": "2077",
+              "Value": "349843581079",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 7,
+            "local_values_as_read": {
+              "J-Date": "1402-01-19",
+              "Close": "3335",
+              "Volume": "107774424",
+              "No": "2608",
+              "Value": "362649702532",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 8,
+            "local_values_as_read": {
+              "J-Date": "1402-01-20",
+              "Close": "3390",
+              "Volume": "77622414",
+              "No": "1812",
+              "Value": "262562412711",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 9,
+            "local_values_as_read": {
+              "J-Date": "1402-01-21",
+              "Close": "3349",
+              "Volume": "65834443",
+              "No": "1591",
+              "Value": "224275643918",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 10,
+            "local_values_as_read": {
+              "J-Date": "1402-01-22",
+              "Close": "3363",
+              "Volume": "63971513",
+              "No": "1121",
+              "Value": "213366619095",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 11,
+            "local_values_as_read": {
+              "J-Date": "1402-01-26",
+              "Close": "3435",
+              "Volume": "54881290",
+              "No": "832",
+              "Value": "188416747098",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 12,
+            "local_values_as_read": {
+              "J-Date": "1402-01-27",
+              "Close": "3535",
+              "Volume": "71717296",
+              "No": "1230",
+              "Value": "252979985587",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 13,
+            "local_values_as_read": {
+              "J-Date": "1402-01-28",
+              "Close": "3632",
+              "Volume": "100339604",
+              "No": "1616",
+              "Value": "363936087392",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 14,
+            "local_values_as_read": {
+              "J-Date": "1402-01-29",
+              "Close": "3735",
+              "Volume": "31021654",
+              "No": "546",
+              "Value": "115852158005",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 15,
+            "local_values_as_read": {
+              "J-Date": "1402-01-30",
+              "Close": "3847",
+              "Volume": "66422735",
+              "No": "1689",
+              "Value": "253256754007",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 16,
+            "local_values_as_read": {
+              "J-Date": "1402-02-04",
+              "Close": "3927",
+              "Volume": "32251027",
+              "No": "833",
+              "Value": "126033590915",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 17,
+            "local_values_as_read": {
+              "J-Date": "1402-02-05",
+              "Close": "4025",
+              "Volume": "47467746",
+              "No": "859",
+              "Value": "191046354343",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 18,
+            "local_values_as_read": {
+              "J-Date": "1402-02-06",
+              "Close": "3950",
+              "Volume": "48334345",
+              "No": "1538",
+              "Value": "193124863601",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 19,
+            "local_values_as_read": {
+              "J-Date": "1402-02-09",
+              "Close": "3920",
+              "Volume": "83642317",
+              "No": "1922",
+              "Value": "326369438567",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 20,
+            "local_values_as_read": {
+              "J-Date": "1402-02-10",
+              "Close": "3901",
+              "Volume": "25980468",
+              "No": "570",
+              "Value": "102287320767",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 21,
+            "local_values_as_read": {
+              "J-Date": "1402-02-11",
+              "Close": "3936",
+              "Volume": "97572277",
+              "No": "1979",
+              "Value": "374941422663",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          },
+          {
+            "local_csv_line": 22,
+            "local_values_as_read": {
+              "J-Date": "1402-02-12",
+              "Close": "3820",
+              "Volume": "59390437",
+              "No": "1677",
+              "Value": "229512565736",
+              "Ticker": "\u0633\u0627\u0645\u0627\u0646"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "comparison_outcome": "NOT_COMPARABLE",
+            "comparison_evidence_status": "BLOCKED",
+            "comparison_reason": "No producer script/configuration, CODAL TracingNo/publication URL, or source response manifest was available to select the corresponding official record. No record ID was inferred from ticker/date."
+          }
+        ]
+      }
+    },
+    "fx": {
+      "path": "dollar-history.xlsx",
+      "sha256": "eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf",
+      "size_bytes": 14349,
+      "file_type": "xlsx",
+      "worksheets": [
+        "Sheet"
+      ],
+      "observation_count": 19,
+      "header_row": 3,
+      "provenance": {
+        "source_identity": {
+          "value": "EXCHANGE_CENTER (owner-approved semantic source/type)",
+          "status": "LOCALLY_TRACEABLE",
+          "note": "Owner decision is documented in database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md ?9.30 and DB_DES_005 ?13.10; it does not establish this workbook?s origin."
+        },
+        "source_profile": {
+          "value": "UNKNOWN",
+          "status": "UNVERIFIED",
+          "note": "No download URL/profile ID/configuration or source export manifest links the workbook hash to EXCHANGE_CENTER."
+        },
+        "source_record_identity": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No official record IDs or archival record URLs identified."
+        },
+        "source_revision_identity": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No source-issued update/correction/revision identifier evidenced."
+        },
+        "source_published_at": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No dated publication metadata linked to this workbook."
+        },
+        "source_available_at": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No first-availability timestamp linked to this workbook."
+        },
+        "ingested_at": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "No ingestion audit performed."
+        },
+        "artifact_sha256": {
+          "value": "eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf",
+          "status": "ARTIFACT_OBSERVED",
+          "note": "Hash identifies these bytes only."
+        },
+        "artifact_created_at": {
+          "value": "UNKNOWN",
+          "status": "UNKNOWN",
+          "note": "Embedded workbook properties are self-asserted and not independent evidence; filesystem times are excluded."
+        },
+        "embedded_core_properties_observed": {
+          "created": "2026-11-19 08:07:13",
+          "modified": "2026-11-19 08:12:50",
+          "creator": "openpyxl",
+          "last_modified_by": "Papa",
+          "status": "ARTIFACT_OBSERVED",
+          "note": "Workbook metadata only; not source publication/availability or independently verified creation time."
+        },
+        "transformation_method": {
+          "value": "UNKNOWN",
+          "status": "BLOCKED",
+          "note": "No owner download/export script or workbook acquisition record was present; direct download vs transformed/exported/manual artifact cannot be classified."
+        }
+      },
+      "approved_local_field": {
+        "worksheet": "Sheet",
+        "header_cell": "C3",
+        "header_as_read": "\u0641\u0631\u0648\u0634 (\u0631\u06cc\u0627\u0644)",
+        "semantic": "Sell rate only; Rial/USD; no conversion, per owner-approved mapping.",
+        "official_source_field_id": "UNKNOWN",
+        "evidence_status": "LOCALLY_TRACEABLE"
+      },
+      "local_to_source_comparison": {
+        "counts": {
+          "total": 19,
+          "official_exact_matches": 0,
+          "official_differences": 0,
+          "official_not_comparable": 19,
+          "secondary_exact_matches": 1
+        },
+        "official_comparison_reason": "The public official market view exposes a current currency market display (date/currency/buy/sell Rial) but the accessible page provided no inspectable historical rows/export identifiers. The local project has no acquisition profile or manifest. No claim is made that matching values alone establish provenance.",
+        "observations": [
+          {
+            "worksheet": "Sheet",
+            "excel_row": 4,
+            "date_cell": "A4",
+            "sell_cell": "C4",
+            "local_values_as_read": {
+              "date": "1405-08-28",
+              "sell_rate": "1936329"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B4",
+              "value": "1918902"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": {
+              "source": "TGJU public secondary mirror of Exchange Center rates",
+              "source_date_label": "28 Aban 1405",
+              "source_sell_value": "1936329",
+              "outcome": "EXACT_DATE_AND_VALUE_MATCH",
+              "evidence_status": "INFERRED",
+              "note": "Secondary corroboration only; it does not prove this workbook came from the official source.",
+              "url": "https://www.tgju.org/%D9%85%D8%B1%DA%A9%D8%B2-%D9%85%D8%A8%D8%A7%D8%AF%D9%84%D9%87-%D8%A7%D8%B1%D8%B2-%D9%88-%D8%B7%D9%84%D8%A7%DB%8C-%D8%A7%DB%8C%D8%B1%D8%A7%D9%86"
+            }
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 5,
+            "date_cell": "A5",
+            "sell_cell": "C5",
+            "local_values_as_read": {
+              "date": "1405-08-27",
+              "sell_rate": "1932464"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B5",
+              "value": "1915072"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 6,
+            "date_cell": "A6",
+            "sell_cell": "C6",
+            "local_values_as_read": {
+              "date": "1405-08-26",
+              "sell_rate": "1928607"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B6",
+              "value": "1911250"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 7,
+            "date_cell": "A7",
+            "sell_cell": "C7",
+            "local_values_as_read": {
+              "date": "1405-08-25",
+              "sell_rate": "1924758"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B7",
+              "value": "1907435"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 8,
+            "date_cell": "A8",
+            "sell_cell": "C8",
+            "local_values_as_read": {
+              "date": "1405-08-24",
+              "sell_rate": "1920916"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B8",
+              "value": "1903628"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 9,
+            "date_cell": "A9",
+            "sell_cell": "C9",
+            "local_values_as_read": {
+              "date": "1405-08-23",
+              "sell_rate": "1917082"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B9",
+              "value": "1899828"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 10,
+            "date_cell": "A10",
+            "sell_cell": "C10",
+            "local_values_as_read": {
+              "date": "1405-08-22",
+              "sell_rate": "1913255"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B10",
+              "value": "1896036"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 11,
+            "date_cell": "A11",
+            "sell_cell": "C11",
+            "local_values_as_read": {
+              "date": "1405-08-21",
+              "sell_rate": "1913255"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B11",
+              "value": "1896036"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 12,
+            "date_cell": "A12",
+            "sell_cell": "C12",
+            "local_values_as_read": {
+              "date": "1405-08-20",
+              "sell_rate": "1909436"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B12",
+              "value": "1892251"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 13,
+            "date_cell": "A13",
+            "sell_cell": "C13",
+            "local_values_as_read": {
+              "date": "1405-08-19",
+              "sell_rate": "1905625"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B13",
+              "value": "1888474"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 14,
+            "date_cell": "A14",
+            "sell_cell": "C14",
+            "local_values_as_read": {
+              "date": "1405-08-18",
+              "sell_rate": "1901821"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B14",
+              "value": "1884705"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 15,
+            "date_cell": "A15",
+            "sell_cell": "C15",
+            "local_values_as_read": {
+              "date": "1405-08-17",
+              "sell_rate": "1898025"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B15",
+              "value": "1880943"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 16,
+            "date_cell": "A16",
+            "sell_cell": "C16",
+            "local_values_as_read": {
+              "date": "1405-08-16",
+              "sell_rate": "1894237"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B16",
+              "value": "1877189"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 17,
+            "date_cell": "A17",
+            "sell_cell": "C17",
+            "local_values_as_read": {
+              "date": "1405-08-15",
+              "sell_rate": "1890456"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B17",
+              "value": "1873442"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 18,
+            "date_cell": "A18",
+            "sell_cell": "C18",
+            "local_values_as_read": {
+              "date": "1405-08-14",
+              "sell_rate": "1890456"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B18",
+              "value": "1873442"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 19,
+            "date_cell": "A19",
+            "sell_cell": "C19",
+            "local_values_as_read": {
+              "date": "1405-08-13",
+              "sell_rate": "1886682"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B19",
+              "value": "1869702"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 20,
+            "date_cell": "A20",
+            "sell_cell": "C20",
+            "local_values_as_read": {
+              "date": "1405-08-12",
+              "sell_rate": "1882917"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B20",
+              "value": "1865971"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 21,
+            "date_cell": "A21",
+            "sell_cell": "C21",
+            "local_values_as_read": {
+              "date": "1405-08-11",
+              "sell_rate": "1879158"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B21",
+              "value": "1862246"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          },
+          {
+            "worksheet": "Sheet",
+            "excel_row": 22,
+            "date_cell": "A22",
+            "sell_cell": "C22",
+            "local_values_as_read": {
+              "date": "1405-08-10",
+              "sell_rate": "1875407"
+            },
+            "buy_cell_excluded_from_canonical": {
+              "cell": "B22",
+              "value": "1858528"
+            },
+            "official_source_record_identity": "UNKNOWN",
+            "official_comparison_outcome": "NOT_COMPARABLE",
+            "official_comparison_evidence_status": "BLOCKED",
+            "official_comparison_reason": "The retrieved official market-view page showed market-view fields but no inspectable dated historical row, source record/revision metadata, or downloadable record; no workbook provenance/profile link or archive endpoint was located in project files.",
+            "secondary_cross_check": null
+          }
+        ]
+      }
+    }
+  },
+  "project_local_trace": [
+    {
+      "path": "src/scripts/audit_codal_fiscal_year_metadata.py",
+      "status": "ARTIFACT_OBSERVED",
+      "details": "Contains CODAL `/api/search/v1` and `/api/search/v2/q` calls used by its own annual filing/fiscal-year audit. It requests filing metadata for other issuers; it neither references saman_price_history.csv nor extracts daily market prices. Not evidence of this CSV source."
+    },
+    {
+      "path": "src/ingestion/codal/*",
+      "status": "ARTIFACT_OBSERVED",
+      "details": "Implements CODAL financial-report/PDF acquisition and ingestion; no reference to this CSV or daily market-history extraction."
+    },
+    {
+      "path": "dollar-history.xlsx",
+      "status": "ARTIFACT_OBSERVED",
+      "details": "Worksheet Sheet; title A1; approved headers row 3; 19 source observations rows 4?22; approved sell values in column C."
+    },
+    {
+      "path": "saman_price_history.csv",
+      "status": "ARTIFACT_OBSERVED",
+      "details": "UTF-8 BOM CSV; 12 columns; 21 data rows; J-Date 1402-01-08 through 1402-02-12; no source URL, publication ID, producer metadata, or revision field."
+    }
+  ],
+  "closure_mapping": {
+    "Task_025_DB_STD_005": "PARTIAL: requires traceable source/profile link, source publication/availability evidence and revision/correction evidence for MarketDaily/EXCHANGE_CENTER; FREE_MARKET remains separate and sample-blocked.",
+    "Task_009_DB_DES_004": "Semantic mappings remain owner-approved; source/profile identity, publication lineage, revision identity, and conflict chronology are not closed by this audit."
+  },
+  "next_prerequisites": [
+    "Provide the owner?s original CSV producer script/configuration and the exact invocation or a non-secret acquisition manifest linking the CSV SHA-256 to the official endpoint, query parameters, stable CODAL publication/record identifier (for example an actual TracingNo if applicable), response bytes, and transformations. Do not infer the identifier from symbol/date.",
+    "Provide the original workbook download/export URL or non-secret acquisition manifest linking its SHA-256 to an official EXCHANGE_CENTER profile/endpoint and export parameters; provide source record IDs or a retrievable official archive for the 19 dates, including publication/availability and correction metadata if supplied by the source.",
+    "Until evidence is received, keep source record/revision/time fields UNKNOWN or BLOCKED; do not ingest or activate the feeds."
+  ]
+}

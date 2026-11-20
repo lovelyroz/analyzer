@@ -1,139 +1,127 @@
-# TASK 3-CORRECTION — COMPLETE THE MARKET/FX PREFLIGHT CLI AND VALIDATION
+# TASK 4 — CLOSE MARKET/FX SOURCE PROVENANCE GAPS
 
-The previous DB-IMP-003 implementation is incomplete. This is a code correction task. Do not repeat the investigation or rewrite the entire module unnecessarily.
+## Master Packet mapping
 
-## 1. Fix the missing CLI
+- Task 025 — DB-STD-005
+- Task 009 — DB-DES-004
+- DB-AUD-001 — Market/FX evidence review
 
-The report and usage document claim that this command exists:
+This is an evidence acquisition and source-tracing task. The goal is to obtain concrete source evidence and close as many provenance gaps as possible. Do not merely restate existing documentation.
 
-`python -m src.scripts.market_fx_preflight`
+## 1. CODAL / MarketDaily — trace the actual CSV
 
-But `src/scripts/market_fx_preflight.py` is missing, and the current `src/preflight/market_fx.py` does not provide a CLI entry point.
+Investigate `saman_price_history.csv`.
 
-Implement the missing CLI at exactly that path.
+Actions:
+1. Inspect project-local scripts and configuration that the owner has made available for downloading or producing this CSV.
+2. Identify the exact CODAL endpoint, page, query parameters, company identifier, symbol, and extraction method used.
+3. Determine whether the script retrieves official published data directly or transforms an intermediate source.
+4. Identify available CODAL publication identifiers, tracking IDs, publication timestamps, correction indicators, and any source-issued revision identifiers.
+5. If the original publication can be identified, retrieve or inspect its official public record and compare the relevant data with the local CSV.
+6. Record whether the local CSV is a direct source download, transformed output, or manually assembled file.
+7. Identify which transformations, filters, sorting, or field selections occur between source and CSV.
 
-Required behavior:
-- Accept `--market`, `--fx`, `--json-out`, and optional `--root`.
-- Run both validators and the FREE_MARKET sample check.
-- Print a concise per-feed summary.
-- Write the complete JSON report.
-- Exit with code 1 for FAIL or BLOCKED; otherwise exit 0.
-- Do not import database modules or connect to a database.
-- Resolve paths predictably from the repository root or explicit CLI arguments.
-- Do not overwrite input artifacts.
+Do not infer a publication ID from the ticker or date.
 
-## 2. Fix MarketDaily company identity
+## 2. EXCHANGE_CENTER — trace the actual workbook
 
-The owner has confirmed that listed-company symbols are unique.
+Investigate `dollar-history.xlsx`.
 
-Use the CSV `Ticker` value as the canonical `codal_symbol` for the MarketDaily economic key, provided it is non-empty and consistent across all rows.
+Actions:
+1. Inspect project-local scripts and configuration that the owner has made available.
+2. Identify the exact official EXCHANGE_CENTER page, API, endpoint, or downloadable source profile used to obtain the workbook.
+3. Determine whether the workbook is a direct download or a transformed/exported artifact.
+4. Identify the exact source field corresponding to the approved sell-rate column.
+5. Determine whether official source records expose publication timestamps, first-availability evidence, update timestamps, or correction/revision identifiers.
+6. Compare available official records with the 19 workbook observations.
+7. Record any transformations or manual steps between the official source and the workbook.
 
-Economic key:
-`codal_symbol + J-Date`
+Do not assume that an official source page with similar values proves this exact workbook originated from it.
 
-Do not require an external `--company-key` argument for the existing CSV.
+## 3. Provenance evidence model
 
-If Ticker is missing, empty, or inconsistent within one artifact, report a blocking issue.
+For each artifact, report separately:
 
-Do not use company name as the key.
+- `source_identity`
+- `source_profile`
+- `source_record_identity`
+- `source_revision_identity`
+- `source_published_at`
+- `source_available_at`
+- `ingested_at`
+- `artifact_sha256`
+- `artifact_created_at` if independently evidenced
+- `transformation_method`
 
-## 3. Separate independent validation from economic-key validation
+Use these evidence statuses:
 
-Currently, missing `company_key` prevents the validator from checking all MarketDaily rows.
+- `OFFICIAL_SOURCE_VERIFIED`
+- `LOCALLY_TRACEABLE`
+- `ARTIFACT_OBSERVED`
+- `INFERRED`
+- `UNVERIFIED`
+- `UNKNOWN`
+- `BLOCKED`
 
-Correct this behavior.
+A timestamp must not be inferred from a file modification time, upload time, row date, or Git timestamp.
 
-Always validate independently:
-- Jalali date syntax and validity.
-- Required numeric fields.
-- Missing values.
-- CSV row width and malformed records.
-- Header requirements.
+A matching hash proves byte equality only.
 
-Only economic-key duplicate/conflict checks may be blocked when the company identity is unresolved.
+## 4. Source comparison
 
-Do not skip unrelated validation because one identity field is missing.
+For MarketDaily:
+- Compare the official source record with the local CSV for the 21 observations.
+- Report exact matching and differing fields.
+- Preserve the distinction between source data and locally transformed output.
 
-## 4. Improve validation coverage
+For EXCHANGE_CENTER:
+- Compare all 19 sell-rate observations against official records where available.
+- Record exact matching dates and values.
+- Do not use the buy-rate column as canonical FXRate.
+- Do not perform any unit conversion.
 
-Review the current implementation and add/fix these cases:
+If historical official records cannot be retrieved, state the exact limitation and preserve the unresolved status.
 
-- Detect conflicting and identical duplicate economic keys.
-- Check duplicate FX keys across all worksheets, not only within one worksheet.
-- Preserve source row/cell references.
-- Validate every required field independently.
-- Ensure malformed rows do not silently disappear.
-- Do not interpret blank trailing CSV lines as data records.
-- Do not change or normalize original source values in the report.
-- Keep `Value` independent; never calculate it from `Volume × Close`.
-- Keep `Final`, `Open`, `High`, and `Low` outside the approved MarketDaily mapping.
-- Keep FX conversion disabled.
-- Do not infer FREE_MARKET schema.
+## 5. Deliverables
 
-The validator must not select a winner for conflicting payloads.
+Create:
 
-## 5. Add automated tests
+1. `database/reports/DB_AUD_011_MARKET_FX_SOURCE_PROVENANCE_DOSSIER.md`
+2. `database/reports/market_fx_source_evidence.json`
+3. Append a concise result to `reply.md`, preserving all previous content.
 
-Keep the existing tests and add tests for:
+The dossier must contain:
+- Exact local artifact identity and SHA-256.
+- Source URL/endpoint and source record identifiers, when verified.
+- Local script/configuration references.
+- Source-to-artifact transformation chain.
+- Field-level comparison results.
+- Publication, availability, and revision evidence.
+- Explicit unresolved gaps.
+- Evidence status for every important claim.
+- Exact next prerequisite for ingestion readiness.
 
-1. CLI runs successfully and produces JSON.
-2. CLI returns non-zero for BLOCKED/FAIL.
-3. MarketDaily uses Ticker as codal_symbol.
-4. Missing Ticker blocks economic-key validation but does not skip date/numeric checks.
-5. Inconsistent Ticker values are blocked.
-6. Malformed CSV row width is detected.
-7. FX duplicate economic key across separate worksheets is detected.
-8. Source artifacts remain unchanged after CLI execution.
+## 6. Restrictions
 
-Use temporary fixtures. Do not modify real source artifacts.
+- Do not read shell history, browser profiles, cookies, credentials, tokens, or secrets.
+- Do not expose private credentials or include them in reports.
+- Do not execute owner scripts or download jobs.
+- Do not modify source CSV/XLSX files.
+- Do not modify application code, ORM, schemas, migrations, or database records.
+- Do not change `WORKFLOW_RULES.md` or `prompt.md`.
+- Do not invent missing source records or timestamps.
+- Do not mark a feed production-ready merely because values match.
+- Do not spend time reporting Git activity.
 
-Run the complete relevant test file and report the actual command and output.
+## 7. Completion criteria
 
-## 6. Regenerate the real-artifact report
+Complete this task when:
+1. Both artifacts have been traced as far as available evidence permits.
+2. Official source URLs and records are independently verifiable wherever claimed.
+3. Local extraction/transformation paths are documented.
+4. All 21 MarketDaily and 19 FX observations have comparison outcomes, or an exact documented reason why comparison is impossible.
+5. Unknown provenance fields remain explicitly UNKNOWN.
+6. The dossier and JSON evidence manifest are created.
+7. Remaining blockers are mapped to Task 025 and Task 009.
 
-Run the completed CLI against:
-- `saman_price_history.csv`
-- `dollar-history.xlsx`
-
-Use the actual Ticker in the CSV as codal_symbol.
-
-Regenerate:
-`database/reports/market_fx_preflight_sample.json`
-
-Expected interpretation:
-- MarketDaily must no longer be BLOCKED merely because no external company key was supplied.
-- EXCHANGE_CENTER may remain WARNING because source-profile linkage and provenance are unresolved.
-- FREE_MARKET must remain BLOCKED_NO_SAMPLE if no real sample exists.
-- Overall status may remain BLOCKED because FREE_MARKET is not available.
-
-Do not weaken validation to obtain PASS.
-
-## 7. Update documentation and report
-
-Update:
-- `docs/market_fx_preflight.md`
-- `database/reports/DB_IMP_003_MARKET_FX_PREFLIGHT_VALIDATOR.md`
-- `reply.md` (append only; preserve all historical content)
-
-The report must list exact files changed, test command/output, CLI command/output, and real-artifact status.
-
-## Restrictions
-
-- No database connection or writes.
-- No ORM, schema, migration, or migration-runner changes.
-- No ingestion.
-- No changes to the source CSV/XLSX files.
-- No changes to approved financial mappings.
-- Do not spend time on Git or prompt.md reporting.
-- Do not stop at documentation; implement and execute the CLI and tests.
-
-## Completion criteria
-
-TASK 3 remains open until:
-- CLI file exists at the documented path.
-- CLI actually executes.
-- JSON output is generated by that CLI.
-- Tests pass.
-- Ticker-based company identity is validated.
-- Independent row validation works even when identity is missing.
-- Real source artifact hashes remain unchanged.
+Investigation completion does not imply source verification or ingestion readiness. Close every gap that evidence allows; do not fabricate the rest.
