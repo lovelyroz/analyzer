@@ -11,7 +11,7 @@ Added a pure, deterministic admission boundary in `src/ingestion/canonical_admis
 Focused synthetic tests were added in `src/tests/test_canonical_ingestion_admission.py`. **Tests were not run**, as PROMPT.md assigns execution to the owner. Owner command:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task015_20261120 src/tests/test_canonical_ingestion_admission.py
+.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task015_20261120 src/tests/test_canonical_ingestion_admission.py src/tests/test_excel_canonical_input.py
 ```
 
 ## Implemented behavior
@@ -28,7 +28,15 @@ Focused synthetic tests were added in `src/tests/test_canonical_ingestion_admiss
 
 `BATCH_EMPTY`, `BATCH_CONTEXT_INVALID`, `CANDIDATE_TYPE_INVALID`, `RAW_ROW_PROHIBITED`, `CALCULATED_FACT_PROHIBITED`, `IDENTITY_MISSING`, `APPROVAL_REFERENCE_MISSING`, `MAPPING_AMBIGUOUS`, `REPORT_VERSION_MISMATCH`, `COMPANY_MISMATCH`, `SOURCE_ARTIFACT_MISMATCH`, `CANDIDATE_INVALID`, `VALUE_MISSING`, `VALUE_INVALID`, `SOURCE_NUMBER_MISMATCH`, `SOURCE_FLOAT_PRECISION_UNAVAILABLE`, `ZERO_FALLBACK_INVALID`, `ZERO_FALLBACK_APPROVAL_MISSING`, `OTHER_APPROVAL_MISSING`, `INTEGER_RANGE_EXCEEDED`, `INTRA_BATCH_CONFLICT`, `EXISTING_FACT_CONFLICT`, `EXISTING_VERSION_CONFLICT`, `SOURCE_REVISION_REUSED`, `SUPERSESSION_TARGET_MISSING`, `SUPERSESSION_IDENTITY_INVALID`, and `ZERO_FALLBACK_SOURCE_UNSUPPORTED`.
 
-Diagnostics are deduplicated and sorted by code and identity, so rejection output does not depend on candidate ordering.
+Diagnostics are deduplicated and sorted by code and identity, so rejection output does not depend on candidate ordering. Duplicate economic payloads now collapse only when complete plan provenance also matches: template ID/version/hash, source label/header identities and their approval references, extraction owner, and all other identity/reference pairs. Different provenance rejects with `DUPLICATE_PROVENANCE_CONFLICT`; no first-candidate provenance is selected or merged away. Existing-fact replay equality includes the same provenance.
+
+Additional stable codes for this correction: `DUPLICATE_PROVENANCE_CONFLICT` at the batch boundary and `ZERO_FALLBACK_APPROVAL_INVALID` at the candidate builder boundary.
+
+## Correction update — duplicate provenance and ZERO_FALLBACK builder path
+
+`PlannedFact` retains extraction owner and exposes a normalized provenance key. The admission duplicate-collapse path compares both economic payload and that key. Synthetic cases cover a different template hash, a different header approval, a different label approval, and a different extraction owner; each is evaluated in both input orders and expects identical diagnostics. The old identical duplicate and conflicting-value cases remain.
+
+The Excel builder now accepts an optional `zero_fallback_rule`. With no rule, BLANK still fails with `SOURCE_VALUE_MISSING`; a rule must be approved, unique, carry an approval reference, and match the selected Metric. Only then can it produce a candidate whose source kind remains `BLANK`, with no source text/native number and a logical Decimal zero. `build_candidate_submission()` binds that candidate to `ValueOrigin.ZERO_FALLBACK` and the exact rule. Populated cells reject a supplied fallback rule. A builder-to-submission-to-batch synthetic test exercises this full path and checks reported zero remains separate. This is a narrow, backward-compatible extension to the Task 014 builder boundary required to avoid manufacturing source evidence.
 
 ## Physical incompatibilities and open work
 
@@ -39,16 +47,19 @@ The logical plan is **not compatible with production persistence on the current 
 3. `ReportVersion` has version/publication/current/restatement/supersedes fields but no explicit source revision identity and source artifact hash to enforce the plan's idempotency boundary. `IngestionRun` does not supply the full required source/standard revision identity either.
 4. The existing CODAL ingestion path writes raw financial facts and commits independently; it does not implement this boundary or DB-DES-005's report-version atomicity. It was not modified or invoked.
 
-Accordingly the new plan sets `physical_persistence_compatible=False` and cannot be submitted to an ORM writer. Migration 9 remains unresolved. Open work includes approved physical schema/migration decisions, complete model mapping for these identities/invariants, authenticated approval resolution, writer integration with DB-DES-005 transaction/audit semantics, and owner-run execution of the focused suite. Task 014 was not modified; no Parsian template or production mapping was connected.
+Accordingly the new plan sets `physical_persistence_compatible=False` and cannot be submitted to an ORM writer. Migration 9 remains unresolved. Open work includes approved physical schema/migration decisions, complete model mapping for these identities/invariants, authenticated approval resolution, writer integration with DB-DES-005 transaction/audit semantics, and owner-run execution of the focused suite. The original admission increment did not modify Task 014; this correction makes only the documented, backward-compatible builder extension for approved BLANK fallback. No Parsian template or production mapping was connected.
 
 ## Changed files
 
 - `src/ingestion/canonical_admission.py` — pure admission and logical-plan boundary.
+- `src/ingestion/excel/canonical_input.py` — explicit rule-gated BLANK candidate construction.
 - `src/tests/test_canonical_ingestion_admission.py` — synthetic focused coverage; not executed.
 - `database/reports/DB_ING_002_CANONICAL_INGESTION_ALIGNMENT.md` — this evidence report.
 - `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md` — Task 015 status, dashboard and evidence entry.
 - `reply.md` — execution note.
 
-No ORM, schema, migration, database, workbook, Task 014 implementation or production writer was changed or used.
+No ORM, schema, migration, database, workbook, unrelated Task 014 behavior or production writer was changed or used. The narrow fallback-gated builder extension is described above.
 
 **Final Task 015 status: PARTIAL.** Evidence: pure non-executable admission plan and synthetic tests added. Remaining: physical schema approval/compatibility, production writer and atomicity integration, and owner-run tests.
+
+Correction update changed six files: `src/ingestion/canonical_admission.py`, `src/ingestion/excel/canonical_input.py`, `src/tests/test_canonical_ingestion_admission.py`, this report, `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md` (evidence wording only; status/dashboard unchanged), and `reply.md`. Tests were not run.

@@ -4,8 +4,10 @@ Owner execution only; this suite is intentionally not run by the implementer.
 """
 from dataclasses import replace
 from decimal import Decimal
+from io import BytesIO
 
 import pytest
+from openpyxl import Workbook
 
 from src.ingestion.canonical_admission import (
     AdmissionCode,
@@ -15,15 +17,21 @@ from src.ingestion.canonical_admission import (
     RevisionContext,
     SubmittedRecordKind,
     ValueOrigin,
+    build_candidate_submission,
     prepare_canonical_batch,
 )
 from src.ingestion.excel.canonical_input import (
     ApprovedSelection,
+    CanonicalInputSpec,
     CanonicalInputCandidate,
+    CandidateValidationError,
     DurationBasis,
+    JalaliPeriod,
     TemporalType,
 )
+from src.ingestion.excel.deterministic_matcher import TableRule, TemplateVersion, match_template
 from src.ingestion.excel.dto import CellValueKind
+from src.ingestion.excel.reader import read_excel_source
 
 
 def _candidate(
@@ -93,6 +101,43 @@ def _codes(exc):
     return {item.code for item in exc.value.diagnostics}
 
 
+def _approved(identity, approval_ref="fixture-approval"):
+    return ApprovedSelection(identity, True, 1, approval_ref)
+
+
+def _blank_observation_and_match():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Annual"
+    sheet["A1"] = "Revenue"
+    sheet["B1"] = "Amount"
+    sheet["B2"] = ""
+    stream = BytesIO()
+    workbook.save(stream)
+    observation = read_excel_source(stream.getvalue(), file_name="blank-fixture.xlsx")
+    template = TemplateVersion(
+        template_id="template-fixture", version="1", approved=True,
+        source_workbook_sha256=observation.source.sha256,
+        worksheet_name="Annual", worksheet_ordinal=1,
+        tables=(TableRule(
+            code="revenue", title_cell="A1", title_text="Revenue",
+            bounds="A1:B2", header_cells=(("B1", "Amount"),),
+            owned_ranges=("B2:B2",),
+        ),),
+    )
+    match = match_template(template, observation)
+    spec = CanonicalInputSpec(
+        company=_approved("company-1"), report_type=_approved("report-periodic"),
+        report_version=_approved("version-1"), metric=_approved("metric-sales"),
+        source_unit=_approved("unit-rial"), source_currency=_approved("currency-irr"),
+        source_scale=_approved("scale-unit"),
+        period=JalaliPeriod(TemporalType.DURATION, (1404, 1, 1), (1404, 12, 29), DurationBasis.YTD),
+        period_mapping=_approved("period-map"), source_label=_approved("label-sales"),
+        source_header=_approved("header-current"),
+    )
+    return observation, match, spec
+
+
 def test_valid_batch_returns_immutable_caller_owned_non_executable_plan():
     candidate = _candidate()
     plan = prepare_canonical_batch((candidate,), revision=_revision())
@@ -128,6 +173,28 @@ def test_identical_in_batch_duplicate_collapses_and_payload_conflict_rejects_all
     assert AdmissionCode.INTRA_BATCH_CONFLICT in _codes(exc)
 
 
+@pytest.mark.parametrize("provenance_change", [
+    lambda candidate: replace(candidate, template_sha256="c" * 64),
+    lambda candidate: replace(
+        candidate, source_header_id="header-prior", source_header_approval_ref="approval-header-prior",
+    ),
+    lambda candidate: replace(
+        candidate, source_label_id="label-prior", source_label_approval_ref="approval-label-prior",
+    ),
+    lambda candidate: replace(candidate, extraction_owner="table-body-alternate"),
+])
+def test_economically_identical_duplicates_with_different_provenance_reject_order_independently(provenance_change):
+    candidate = _candidate()
+    alternate = provenance_change(candidate)
+    diagnostics = []
+    for batch in ((candidate, alternate), (alternate, candidate)):
+        with pytest.raises(AdmissionRejected) as exc:
+            prepare_canonical_batch(batch, revision=_revision())
+        diagnostics.append(exc.value.diagnostics)
+    assert diagnostics[0] == diagnostics[1]
+    assert diagnostics[0][0].code is AdmissionCode.DUPLICATE_PROVENANCE_CONFLICT
+
+
 def test_source_zero_and_approved_zero_fallback_have_distinct_states():
     reported_zero = _candidate(value=Decimal(0), source_text="0")
     reported_plan = prepare_canonical_batch((reported_zero,), revision=_revision())
@@ -146,6 +213,33 @@ def test_source_zero_and_approved_zero_fallback_have_distinct_states():
     assert fallback_plan.facts[0].value_integer == 0
     assert fallback_plan.facts[0].value_origin is ValueOrigin.ZERO_FALLBACK
     assert fallback_plan.facts[0].value_origin is not reported_plan.facts[0].value_origin
+
+
+def test_blank_observation_builds_candidate_only_through_explicit_approved_fallback_path():
+    observation, match, spec = _blank_observation_and_match()
+    with pytest.raises(CandidateValidationError) as exc:
+        build_candidate_submission(observation, match, coordinate="B2", spec=spec)
+    assert exc.value.code == "SOURCE_VALUE_MISSING"
+    with pytest.raises(CandidateValidationError) as exc:
+        build_candidate_submission(
+            observation, match, coordinate="B2", spec=spec,
+            zero_fallback_rule=ApprovedSelection("different-metric", True, 1, "wrong-rule"),
+        )
+    assert exc.value.code == "ZERO_FALLBACK_APPROVAL_INVALID"
+
+    rule = ApprovedSelection("metric-sales", True, 1, "approved-zero-fallback-rule")
+    submission = build_candidate_submission(
+        observation, match, coordinate="B2", spec=spec, zero_fallback_rule=rule,
+    )
+    assert submission.candidate.source_value_kind is CellValueKind.BLANK
+    assert submission.candidate.source_text is None
+    assert submission.candidate.source_native_integer is None
+    assert submission.candidate.value == Decimal(0)
+    assert submission.value_origin is ValueOrigin.ZERO_FALLBACK
+    plan = prepare_canonical_batch(
+        (submission,), revision=_revision(source_sha=observation.source.sha256),
+    )
+    assert plan.facts[0].value_origin is ValueOrigin.ZERO_FALLBACK
 
 
 def test_unapproved_or_inconsistent_zero_fallback_is_rejected():

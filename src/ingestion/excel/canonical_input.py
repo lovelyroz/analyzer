@@ -163,8 +163,9 @@ def build_candidate(
     *,
     coordinate: str,
     spec: CanonicalInputSpec,
+    zero_fallback_rule: ApprovedSelection | None = None,
 ) -> CanonicalInputCandidate:
-    """Build one immutable candidate from one observed cell and explicit approvals."""
+    """Build one candidate; a BLANK requires an explicit metric-bound fallback rule."""
     if match.status != "MATCHED" or not match.template_id or not match.template_version:
         raise CandidateValidationError("STRUCTURE_NOT_APPROVED", "A successful approved-template match is required.")
     if (not _SHA256.fullmatch(match.template_sha256 or "") or
@@ -196,11 +197,16 @@ def build_candidate(
                   and item.literal_name == match.worksheet_name), None)
     if sheet is None:
         raise CandidateValidationError("SOURCE_PROVENANCE_MISSING", "Observed cell has no worksheet identity.")
-    if cell.value_kind is CellValueKind.BLANK:
+    is_blank_source = cell.value_kind is CellValueKind.BLANK
+    if is_blank_source and zero_fallback_rule is None:
         raise CandidateValidationError("SOURCE_VALUE_MISSING", "Blank source value cannot be replaced with zero.")
+    if not is_blank_source and zero_fallback_rule is not None:
+        raise CandidateValidationError("ZERO_FALLBACK_SOURCE_UNSUPPORTED", "ZERO_FALLBACK approval can only accompany an observed BLANK cell.")
     source_text: str | None = None
     native_integer: int | None = None
-    if cell.value_kind is CellValueKind.PRESENT_TEXT and cell.text_value is not None:
+    if is_blank_source:
+        amount = Decimal(0)
+    elif cell.value_kind is CellValueKind.PRESENT_TEXT and cell.text_value is not None:
         source_text = cell.text_value
         literal = source_text
         if not _DECIMAL_TEXT.fullmatch(literal):
@@ -230,6 +236,17 @@ def build_candidate(
     report_type = _selection(spec.report_type, "report type")
     report_version = _selection(spec.report_version, "report version")
     metric = _selection(spec.metric, "metric")
+    if is_blank_source and (
+        zero_fallback_rule is None
+        or not zero_fallback_rule.approved
+        or zero_fallback_rule.candidate_count != 1
+        or zero_fallback_rule.identity != metric
+        or not zero_fallback_rule.approval_ref
+    ):
+        raise CandidateValidationError(
+            "ZERO_FALLBACK_APPROVAL_INVALID",
+            "Blank can become a candidate only with one approved fallback rule for the selected Metric.",
+        )
     unit = _selection(spec.source_unit, "source unit")
     currency = _selection(spec.source_currency, "source currency")
     scale = _selection(spec.source_scale, "source scale")

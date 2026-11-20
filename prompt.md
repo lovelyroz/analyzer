@@ -1,146 +1,84 @@
-# EXECUTION PROMPT — Task 015 / DB-ING-002
-## Canonical ingestion admission and persistence alignment — safe implementation increment
+# CORRECTION PROMPT — Task 015 / DB-ING-002
+## Duplicate provenance determinism and ZERO_FALLBACK integration
 
-**Repository:** `analyzer`  
-**Branch:** `master`  
-**Authority:** `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`  
-**Related implementation:** Task 014 / DB-ING-001
+**Mode:** CODE CORRECTION + focused tests  
+**Do not broaden scope.**
 
-### Work mode
-CODE IMPLEMENTATION + focused tests + evidence report.
+### 1. Fix duplicate provenance handling
 
-This is an execution task, not a general audit. Implement the safe parts of DB-ING-002 that can be completed without changing the database schema or violating the approved architecture.
+In `src/ingestion/canonical_admission.py`, inspect:
 
-### 1. Required objective
+- `PlannedFact.payload`
+- `PlannedFact.identity`
+- `prepare_canonical_batch()` duplicate-collapse logic
+- `_with_refs()`
 
-Advance Task 015 by implementing a deterministic, fail-closed boundary between `CanonicalInputCandidate` and the existing canonical ingestion/persistence contracts.
+Currently, economically identical facts can collapse even when their template/source-mapping provenance differs. `PlannedFact` retains only one template identity, so provenance from the other candidate can be lost.
 
-The boundary must address:
+Implement one explicit safe policy:
 
-- Complete-batch admission before any persistence is attempted.
-- Required identity and provenance validation.
-- Duplicate versus conflicting economic facts.
-- Correction/report-version identity and preservation of prior versions.
-- `OTHER_*` handling only where an explicit approved identity exists.
-- `ZERO_FALLBACK` remaining distinguishable from an actual reported zero.
-- Prohibition of raw-row and calculated-fact persistence.
-- Atomicity requirements and explicit transaction ownership.
+- Either reject duplicate candidates when their non-mergeable provenance differs, using a stable diagnostic code; or
+- Preserve all distinct provenance in an immutable, normalized, deterministically sorted representation in the plan.
 
-### 2. First inspect the exact current implementation
+Do not silently select whichever candidate appeared first.
 
-Read only the relevant files needed to establish the actual contracts, including:
+At minimum, account for:
+- template ID, version and SHA-256;
+- source label/header identities and their approval references;
+- extraction owner;
+- all approval references and their associated identities.
 
-- `src/ingestion/excel/canonical_input.py`
-- `src/ingestion/excel/deterministic_matcher.py`
-- `src/ingestion/service.py`
-- `src/ingestion/codal/` relevant ingestion modules
-- `src/models/normalized.py`
-- `src/models/report.py`
-- `src/models/period.py`
-- `src/models/ingestion_run.py` (or the actual IngestionRun model location)
-- Relevant identity, transaction and existing ingestion tests.
-- `database/reports/DB_DES_001_CANONICAL_INPUT_CONTRACT.md` or the actual current DB-DES-001 contract location.
-- `database/reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md`
-- `database/reports/DB_DES_006_CODAL_CANONICAL_INGESTION_PIPELINE.md`
+Economic payload equality alone must not imply provenance equivalence.
 
-Do not assume filenames or model fields without reading their current definitions.
+### 2. Test order-independent behavior
 
-### 3. Implementation requirements
+Add tests where two candidates have:
+- Same economic identity and same value, but different template hashes.
+- Same economic identity and same value, but different source header/label approvals.
+- Same economic identity and same value, but different extraction owners.
 
-Implement a pure, deterministic admission/preparation component that accepts a complete batch of canonical candidates and produces either:
+For every case, reverse the input order and assert that:
+- The result is identical in both orders; or
+- Both orders reject with exactly the same diagnostics.
 
-- A fully validated immutable persistence plan; or
-- A deterministic rejection containing stable diagnostic codes.
+Retain the existing identical-duplicate and conflicting-value tests.
 
-At minimum:
+### 3. Resolve ZERO_FALLBACK builder integration
 
-1. Reject the entire batch if any candidate is invalid.
-2. Never silently discard an invalid or ambiguous candidate.
-3. Never convert missing values into zero.
-4. Preserve actual zero separately from `ZERO_FALLBACK`.
-5. Do not create or persist derived/calculated financial facts.
-6. Do not persist raw workbook rows or raw observations.
-7. Preserve company, report, report-version, period, Metric, unit/currency/scale and approval-reference identities.
-8. Distinguish an identical existing economic fact from a conflicting payload.
-9. Do not overwrite a conflicting existing fact.
-10. Do not replace or delete previous report versions when a correction arrives.
-11. Do not infer correction status, audit status, publication time or revision identity.
-12. Make transaction ownership explicit: the preparation/admission layer must not commit or open a database transaction.
+Inspect `src/ingestion/excel/canonical_input.py`.
 
-If the existing physical models cannot safely represent a required identity or invariant, reject that persistence path explicitly and document the exact incompatibility. Do not fabricate a workaround.
+`build_candidate()` currently rejects blank cells, while `prepare_canonical_batch()` permits `ZERO_FALLBACK` only when the Candidate represents a blank source cell.
 
-### 4. Schema and database restrictions
+Define a safe, explicit integration path that does not turn blanks into zero implicitly:
 
-**Absolutely prohibited in this task:**
+- A blank observation may become a Candidate only through an explicit, approved ZERO_FALLBACK rule supplied to the relevant preparation boundary.
+- Without that explicit approval, blank remains rejected.
+- The source observation must remain identifiable as BLANK; do not fabricate source text or a reported zero.
+- Actual reported zero must remain distinct from ZERO_FALLBACK.
 
-- ORM model changes.
-- Schema changes.
-- New or modified migrations.
-- Database creation or modification.
-- Running real ingestion.
-- Writing to the owner's database.
-- Changing `WORKFLOW_RULES.md`.
-- Reopening already-approved owner decisions.
+Add a focused test that exercises the actual supported construction path, not only direct manual construction of `CanonicalInputCandidate`.
 
-Migration 9 remains unresolved. Do not create Migration 10 or attempt to resolve Migration 9.
+If the current architecture cannot support this without changing the Task 014 contract, do not introduce a workaround. Document the exact incompatibility and propose the smallest required boundary adjustment.
 
-Do not claim production persistence is complete merely because a pure plan builder or synthetic test passes.
+### 4. Restrictions
 
-### 5. Tests
+- No ORM, schema, migration or database changes.
+- No real workbook or production ingestion.
+- Do not run tests; provide the exact owner test command.
+- Do not modify `WORKFLOW_RULES.md`.
+- Do not reopen unrelated Task 014 or Task 015 decisions.
+- Do not mark Task 015 DONE.
 
-Add focused synthetic tests for:
+### 5. Deliverables
 
-- Fully valid batch.
-- One invalid candidate rejects the complete batch.
-- Identical duplicate versus conflicting payload.
-- Explicit zero versus missing value.
-- `ZERO_FALLBACK` versus actual zero.
-- Correction version does not erase the previous version.
-- Missing or ambiguous identity.
-- Prohibited raw/calculated persistence.
-- No commit/transaction side effects from the pure boundary.
-- Deterministic output and stable diagnostics.
+Update:
+- `src/ingestion/canonical_admission.py` if needed.
+- `src/ingestion/excel/canonical_input.py` only if the explicit ZERO_FALLBACK boundary requires it.
+- `src/tests/test_canonical_ingestion_admission.py`.
+- `database/reports/DB_ING_002_CANONICAL_INGESTION_ALIGNMENT.md`.
+- `reply.md`.
+- Relevant Master Packet evidence/status only if necessary.
 
-Use existing project test conventions. Do not run tests; the owner runs them.
+Report exact changed files, correction behavior, test command, and test execution status.
 
-### 6. Scope discipline
-
-Do not spend this task repeating broad repository audits. Do not modify Task 014 unless a concrete integration defect prevents this task from proceeding; report such a defect with exact evidence instead.
-
-Do not connect unapproved Parsian templates or production semantic mappings.
-
-### 7. Required deliverables
-
-1. Implemented pure admission/persistence-plan boundary, if compatible with the existing contracts.
-2. Focused synthetic tests.
-3. Report:
-   `database/reports/DB_ING_002_CANONICAL_INGESTION_ALIGNMENT.md`
-4. Update `reply.md`.
-5. Update the relevant Task 015 entry and progress dashboard in the Master Packet only if the Task status genuinely changes.
-
-The report must include:
-
-- Exact changed-file list.
-- Implemented behavior.
-- Stable rejection codes.
-- Test command for owner execution.
-- Exact incompatibilities between the persistence plan and current ORM/schema.
-- Which parts of DB-ING-002 remain open.
-- Whether any production writer was actually connected (do not imply that it was if it was not).
-
-### 8. Completion criteria
-
-Task 015 must remain PARTIAL unless all required canonical persistence behavior is implemented and validated against an approved physical schema.
-
-A pure preparation boundary is measurable progress, but it is not production persistence.
-
-Do not mark `[x]` or DONE on the basis of synthetic tests alone.
-
-At the end, report exactly:
-
-- `DONE`
-- `PARTIAL`
-- `NOT DONE`
-- `BLOCKED`
-
-for Task 015, with evidence and remaining work.
+Task 015 remains PARTIAL.

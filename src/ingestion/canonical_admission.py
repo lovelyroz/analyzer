@@ -6,7 +6,7 @@ transaction; it is not an executable ORM write plan.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from enum import StrEnum
 import re
@@ -15,11 +15,13 @@ from src.core.jalali import validate_jalali_date
 from src.ingestion.excel.canonical_input import (
     ApprovedSelection,
     CanonicalInputCandidate,
-    CandidateValidationError,
+    CanonicalInputSpec,
     DurationBasis,
     TemporalType,
+    build_candidate,
 )
-from src.ingestion.excel.dto import CellValueKind
+from src.ingestion.excel.deterministic_matcher import TemplateMatchResult
+from src.ingestion.excel.dto import CellValueKind, WorkbookObservation
 
 
 class AdmissionCode(StrEnum):
@@ -44,6 +46,7 @@ class AdmissionCode(StrEnum):
     OTHER_APPROVAL_MISSING = "OTHER_APPROVAL_MISSING"
     INTEGER_RANGE_EXCEEDED = "INTEGER_RANGE_EXCEEDED"
     INTRA_BATCH_CONFLICT = "INTRA_BATCH_CONFLICT"
+    DUPLICATE_PROVENANCE_CONFLICT = "DUPLICATE_PROVENANCE_CONFLICT"
     EXISTING_FACT_CONFLICT = "EXISTING_FACT_CONFLICT"
     EXISTING_VERSION_CONFLICT = "EXISTING_VERSION_CONFLICT"
     SOURCE_REVISION_REUSED = "SOURCE_REVISION_REUSED"
@@ -134,6 +137,7 @@ class PlannedFact:
     template_id: str
     template_version: str
     template_sha256: str
+    extraction_owner: str
     approval_references: tuple[tuple[str, str, str], ...]
 
     @property
@@ -160,6 +164,17 @@ class PlannedFact:
             self.source_scale,
             self.period_identity[0],
             self.duration_basis,
+        )
+
+    @property
+    def provenance(self) -> tuple[object, ...]:
+        source_mapping = tuple(
+            item for item in self.approval_references
+            if item[0] in ("source_label", "source_header")
+        )
+        return (
+            self.template_id, self.template_version, self.template_sha256,
+            source_mapping, self.extraction_owner, self.approval_references,
         )
 
 
@@ -281,10 +296,13 @@ def prepare_canonical_batch(
         if prior is None:
             unique_by_identity[fact.identity] = fact
         elif prior.payload == fact.payload:
-            duplicate_count += 1
-            # Keep output independent of input ordering while retaining all approval refs.
-            refs = tuple(sorted(set(prior.approval_references + fact.approval_references)))
-            unique_by_identity[fact.identity] = _with_refs(prior, refs)
+            if prior.provenance == fact.provenance:
+                duplicate_count += 1
+            else:
+                diagnostics.append(AdmissionDiagnostic(
+                    AdmissionCode.DUPLICATE_PROVENANCE_CONFLICT,
+                    _identity_text(fact.identity),
+                ))
         else:
             diagnostics.append(AdmissionDiagnostic(AdmissionCode.INTRA_BATCH_CONFLICT, _identity_text(fact.identity)))
 
@@ -305,6 +323,7 @@ def prepare_canonical_batch(
                 output_facts.append(fact)
         elif (
             old.payload == fact.payload
+            and old.provenance == fact.provenance
             and old.revision_identity == fact.revision_identity
             and old.extraction_standard_id == fact.extraction_standard_id
             and old.source_identity == fact.source_identity
@@ -337,6 +356,30 @@ def prepare_canonical_batch(
         duplicate_count=duplicate_count,
         unchanged_existing_count=unchanged_existing_count,
         preserved_report_version_ids=tuple(sorted({item.report_version_id for item in existing_versions})),
+    )
+
+
+def build_candidate_submission(
+    observation: WorkbookObservation,
+    match: TemplateMatchResult,
+    *,
+    coordinate: str,
+    spec: CanonicalInputSpec,
+    zero_fallback_rule: ApprovedSelection | None = None,
+    other_metric_approval: ApprovedSelection | None = None,
+) -> CandidateSubmission:
+    """Build and bind a candidate, permitting BLANK only with explicit fallback approval."""
+    candidate = build_candidate(
+        observation, match, coordinate=coordinate, spec=spec,
+        zero_fallback_rule=zero_fallback_rule,
+    )
+    if zero_fallback_rule is None:
+        return CandidateSubmission(candidate, other_metric_approval=other_metric_approval)
+    return CandidateSubmission(
+        candidate,
+        value_origin=ValueOrigin.ZERO_FALLBACK,
+        zero_fallback_rule=zero_fallback_rule,
+        other_metric_approval=other_metric_approval,
     )
 
 
@@ -538,12 +581,9 @@ def _prepare_fact(
         template_id=candidate.template_id,
         template_version=candidate.template_version,
         template_sha256=candidate.template_sha256.lower(),
+        extraction_owner=candidate.extraction_owner,
         approval_references=tuple(sorted(set(approvals))),
     )
-
-
-def _with_refs(fact: PlannedFact, refs: tuple[tuple[str, str, str], ...]) -> PlannedFact:
-    return replace(fact, approval_references=refs)
 
 
 def _identity_text(identity: tuple[object, ...]) -> tuple[str, ...]:
