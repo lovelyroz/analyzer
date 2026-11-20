@@ -416,11 +416,13 @@ def _prepare_fact(
         candidate.source_unit_approval_ref, candidate.source_currency_approval_ref,
         candidate.source_scale_approval_ref, candidate.period_mapping_approval_ref,
     )
-    if any(not isinstance(value, str) or not value.strip() for value in required_ids):
+    identity_missing = any(not isinstance(value, str) or not value.strip() for value in required_ids)
+    approvals_missing = any(not isinstance(value, str) or not value.strip() for value in required_refs)
+    if identity_missing:
         diagnostics.append(AdmissionDiagnostic(AdmissionCode.IDENTITY_MISSING, key))
-        return None
-    if any(not isinstance(value, str) or not value.strip() for value in required_refs):
+    if approvals_missing:
         diagnostics.append(AdmissionDiagnostic(AdmissionCode.APPROVAL_REFERENCE_MISSING, key))
+    if identity_missing or approvals_missing:
         return None
     if candidate.report_version_id != revision.report_version_id:
         diagnostics.append(AdmissionDiagnostic(AdmissionCode.REPORT_VERSION_MISMATCH, key))

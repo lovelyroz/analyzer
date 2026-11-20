@@ -8,6 +8,7 @@ from io import BytesIO
 
 import pytest
 from openpyxl import Workbook
+from openpyxl.styles import PatternFill
 
 from src.ingestion.canonical_admission import (
     AdmissionCode,
@@ -105,13 +106,16 @@ def _approved(identity, approval_ref="fixture-approval"):
     return ApprovedSelection(identity, True, 1, approval_ref)
 
 
-def _blank_observation_and_match():
+def _blank_observation_and_match(source_value=""):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Annual"
     sheet["A1"] = "Revenue"
     sheet["B1"] = "Amount"
-    sheet["B2"] = ""
+    if source_value == "":
+        sheet["B2"].fill = PatternFill(fill_type="solid", fgColor="FFFFFF")
+    else:
+        sheet["B2"] = source_value
     stream = BytesIO()
     workbook.save(stream)
     observation = read_excel_source(stream.getvalue(), file_name="blank-fixture.xlsx")
@@ -236,10 +240,23 @@ def test_blank_observation_builds_candidate_only_through_explicit_approved_fallb
     assert submission.candidate.source_native_integer is None
     assert submission.candidate.value == Decimal(0)
     assert submission.value_origin is ValueOrigin.ZERO_FALLBACK
+    assert next(cell for cell in observation.cells if cell.cell_ref.coordinate == "B2").value_kind is CellValueKind.BLANK
     plan = prepare_canonical_batch(
         (submission,), revision=_revision(source_sha=observation.source.sha256),
     )
     assert plan.facts[0].value_origin is ValueOrigin.ZERO_FALLBACK
+
+    zero_observation, zero_match, zero_spec = _blank_observation_and_match("0")
+    reported_zero = build_candidate_submission(
+        zero_observation, zero_match, coordinate="B2", spec=zero_spec,
+    )
+    assert reported_zero.candidate.source_value_kind is CellValueKind.PRESENT_TEXT
+    assert reported_zero.candidate.source_text == "0"
+    assert reported_zero.candidate.value == Decimal(0)
+    zero_plan = prepare_canonical_batch(
+        (reported_zero,), revision=_revision(source_sha=zero_observation.source.sha256),
+    )
+    assert zero_plan.facts[0].value_origin is ValueOrigin.SOURCE_REPORTED
 
 
 def test_unapproved_or_inconsistent_zero_fallback_is_rejected():
