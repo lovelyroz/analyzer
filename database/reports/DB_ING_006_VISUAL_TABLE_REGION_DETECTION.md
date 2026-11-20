@@ -1,4 +1,4 @@
-# DB-ING-006 — Conservative Visual Table-Region Detection
+﻿# DB-ING-006 — Conservative Visual Table-Region Detection
 
 **Date:** 2026-11-15  
 **Task:** 033  
@@ -888,3 +888,40 @@ python src/scripts/excel_template_annotation_audit.py --max-color-cells 1 excel/
 4. سپس Template همان sample با deterministic worksheet identity و Header/row-axis matching اعتبارسنجی شود؛ workbook مستقل دورهٔ بعد همچنان gate جداگانهٔ drift است.
 
 **وضعیت:** هیچ bounds یا child-column range در این بخش approved نیست. DB-ING-006 / Task 033 همچنان PARTIAL. این ثبت فقط مستندات review را ساخت؛ workbook باز/تغییر داده نشد، کد/ORM/schema/migration/DB تغییر نکرد و تستی اجرا نشد.
+
+## 8.33 — اجرای audit روی workbook نهایی و matcher قطعی fail-closed — 2026-11-20
+
+### Artifact and full annotation audit
+
+فایل مبنا همان workbook نهایی `excel/parsian_periodic.xlsx` است؛ فایل آزمایشی یا نسخهٔ قدیمی جایگزین نشد. SHA-256 پیش و پس از audit برابر `55266751a5ae60666ebce05f1ed4ee1c4df94a4f78fa0c764aa4a0dc4325db85` و اندازه 34,450 bytes است. Reader آن را پذیرفت: یک worksheet به نام `Recovered_Sheet1`، used range برابر `A1:L411`، 101 merged ranges و `right_to_left=True`.
+
+فرمان کامل اجراشده:
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+.\.venv\Scripts\python.exe -m src.scripts.excel_template_annotation_audit --max-color-cells 2000 --candidate-register database/reports/parsian_template_candidate_register.json --candidate-audit-json database/reports/parsian_template_candidate_audit_current.json excel/parsian_periodic.xlsx *> database/reports/template_annotation_audit_parsian_current.txt
+```
+
+خروجی نهایی: exit code 0؛ `Reader: ACCEPTED`؛ hash بالا؛ `THICK_OUTSIDE_RECTANGLES count=0` (در فایل هیچ قاب با style دقیق `thick` نیست)؛ `BORDER_SIDE_STYLE_COUNTS` در transcript همهٔ borderها را با مختصات نگه می‌دارد؛ `COLOR_CELLS_PRINTED=1656`؛ `THICK_BORDER_CELLS_COUNT=0`؛ `CANDIDATE_REVIEW_STATUS=REVIEW_READY`.
+
+Audit fillها را مستقیماً از artifact شمرد: 17 سلول `RED_TITLE`، 15 `GREEN_SUBTABLE_MARKER`، 459 `GRAY_POSITIVE`، 489 `BLACK_THEME` (theme=1)، 178 `YELLOW_OPTIONAL`، 96 `BLUE_HEADER` با RGB `FF0197C8` و 4 fill آبی دیگر با RGB `FF0070C0`. عدد سیاه واقعی روی workbook فعلی 489 است؛ عدد تاریخی 492 و انتظار 60 span به‌عنوان invariant استفاده نشده‌اند. transcript کامل رنگ/فونت/مختصات، border-sideها و merged ranges در `template_annotation_audit_parsian_current.txt` است.
+
+### Candidate geometry and ownership
+
+`parsian_template_candidate_register.json` منبع ماشینیِ 17 parent bounds و 15 green-row partition است. `parsian_template_candidate_audit_current.json` همان‌ها را روی workbook و hash فعلی تطبیق می‌دهد و برای هر parent محدودهٔ A1، ستون شروع/پایان، header candidate و پیوستگی چهار ضلع را گزارش می‌کند. برای هر child، مختصات دقیق، column range مشتق از candidate parent، marker سبز و رابطهٔ پیشنهادی `PARENT_HEADER_CANDIDATE` با header محدد همان parent را ثبت می‌کند. این رابطه و bounds همچنان **candidate** هستند و مالک آن‌ها را approved نکرده است.
+
+بررسی ماشینی: 17 parent و 15 partition؛ هر 17 قاب candidate چهار ضلع پیوستهٔ `medium` دارند؛ هیچ overlap بین parentها یا sibling partitionها دیده نشد؛ هر 459 gray-positive cell دقیقاً یک owner دارد؛ `unowned_gray_cells=[]` و `duplicate_ownership=[]`. Parent owner فقط gray cells داخل parent ولی خارج از child ranges را می‌گیرد؛ child فقط gray cells داخل partition خودش را می‌گیرد. این مالکیت، semantic mapping نیست.
+
+### Deterministic matcher and tests
+
+Matcher عمومی و بدون اثر جانبی در `src/ingestion/excel/deterministic_matcher.py` اضافه شد. Matcher فقط template نسخه‌دار و صریحاً approved را می‌پذیرد؛ worksheet identity، title/header text و partition marker را به‌صورت exact/fixed بررسی می‌کند؛ template/hash ورودی را در نتیجه ثبت می‌کند؛ ambiguity، coordinate drift، overlap در owned ranges، bounds نامعتبر یا fingerprint نامنطبق را fail-closed رد می‌کند. هیچ رنگ/Borderی در runtime matching به کار نمی‌رود. تست‌ها fixture مصنوعی دارند و matcher به workbook Parsian وصل یا با candidateهای آن اجرا نشده است، چون approval لازم موجود نیست.
+
+فرمان تست ایزوله: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task033_matching_20261120 src/tests/test_excel_template_matching.py` — **7 passed in 1.08s**. سناریوها: match دقیق و trace hashها، template تأییدنشده، anchor مبهم، fingerprint نامنطبق، overlap مالکیت، partition خارج parent، و تغییر template hash.
+
+### Status and gates
+
+Task 033 / DB-ING-006 همچنان **PARTIAL** است. این اجرا gateهای hash جاری، audit کامل فایل، و ماشینی‌کردن کنترل overlap/ownership را بست. تأیید مالک برای تمام 17 bounds و 15 partition و header inheritance، workbook مستقل دورهٔ بعد برای drift، semantic approvalهای Metric/currency/scale/period/duration_basis و پیاده‌سازی writer transactional همچنان بازند. هیچ mapping پیشنهادی به mapping اجرایی تبدیل نشد؛ هیچ observation کاننیکال نوشته نشد. Excel-to-canonical persistence هنوز **آماده نیست**. مسیر PDF/Raw، legacy schema، ORM، schema، migration و دیتابیس واقعی دست‌نخورده ماندند.
+
+یادداشت اجرا: فراخوانی مستقیم `python src/scripts/...` به علت `ModuleNotFoundError: src` شکست خورد؛ فراخوانی module بدون `PYTHONIOENCODING=utf-8` نیز هنگام چاپ متن فارسی با `UnicodeEncodeError` متوقف شد. اجرای نهایی بالا هر دو مشکل invocation/encoding را رفع کرد و audit کامل را با exit code صفر تولید کرد.
+
+Regression run after the initial focused matcher run: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task033_final_verify_20261120 src/tests/test_excel_template_matching.py src/tests/test_excel_source_reader.py src/tests/test_excel_observation_dto.py` — **37 passed in 1.36s**, exit code 0.

@@ -32,3 +32,6 @@ The owner may run the isolated acceptance fixture suite from the repository root
 ```
 
 This uses temporary test databases. It does not validate real-database Jalali concurrency or enable EXCHANGE_CENTER persistence.
+## Owner acceptance update — 2026-11-20
+
+The owner reports running `.\.venv\Scripts\python.exe -m pytest -q src/tests/test_market_fx_atomic_ingestion.py` with **13 passed in 1.67s**. This accepts the isolated execution suite. Overall status remains **PARTIAL**: the current CheckConstraint does not support EXCHANGE_CENTER, and current constraints do not guarantee concurrent uniqueness for Jalali identities. No ORM/schema/migration/database change is authorized or included here.

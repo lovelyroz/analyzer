@@ -1,0 +1,4334 @@
+{
+  "status": "REVIEW_READY",
+  "register_id": "parsian-periodic-template-candidates",
+  "register_version": "1.0.0-review-draft",
+  "approval_status": "CANDIDATE_ONLY_NOT_APPROVED",
+  "workbook": "excel\\parsian_periodic.xlsx",
+  "source_sha256": "55266751a5ae60666ebce05f1ed4ee1c4df94a4f78fa0c764aa4a0dc4325db85",
+  "worksheet": {
+    "name": "Recovered_Sheet1",
+    "ordinal": 1,
+    "used_range": "A1:L411",
+    "merged_ranges": [
+      "A10:A11",
+      "A176:A177",
+      "A221:E221",
+      "A222:E222",
+      "A223:E223",
+      "A224:E224",
+      "A225:E225",
+      "A226:E226",
+      "A235:K235",
+      "A238:A239",
+      "A256:B256",
+      "A259:B259",
+      "A262:B262",
+      "A266:A267",
+      "A285:I285",
+      "A294:K294",
+      "A333:B333",
+      "A341:G341",
+      "A350:K350",
+      "A353:B354",
+      "A355:B355",
+      "A356:B356",
+      "A357:B357",
+      "A358:B358",
+      "A372:B372",
+      "A382:B382",
+      "A391:B391",
+      "A401:B401",
+      "A410:I410",
+      "A411:I411",
+      "A44:E44",
+      "A45:E45",
+      "A46:E46",
+      "A47:E47",
+      "A48:E48",
+      "A49:E49",
+      "A60:A61",
+      "A79:A80",
+      "B239:C239",
+      "B266:C266",
+      "B284:F284",
+      "B310:G310",
+      "B407:E407",
+      "C256:I256",
+      "C259:I259",
+      "C262:I262",
+      "C333:I333",
+      "C353:F353",
+      "C372:F372",
+      "C382:F382",
+      "C391:F391",
+      "C401:F401",
+      "D239:E239",
+      "D266:E266",
+      "D276:J276",
+      "D302:E302",
+      "D303:E303",
+      "D304:E304",
+      "D305:E305",
+      "D306:E306",
+      "D307:E307",
+      "D308:E308",
+      "D336:E336",
+      "D337:E337",
+      "D338:E338",
+      "D339:E339",
+      "D340:E340",
+      "E10:E11",
+      "E176:E177",
+      "E60:E61",
+      "E79:E80",
+      "F239:G239",
+      "F266:F267",
+      "F313:G313",
+      "F314:G314",
+      "F315:G315",
+      "F316:G316",
+      "F317:G317",
+      "F318:G318",
+      "F319:G319",
+      "F320:G320",
+      "F321:G321",
+      "F322:G322",
+      "F323:G323",
+      "F324:G324",
+      "F325:G325",
+      "F326:G326",
+      "F327:G327",
+      "F328:G328",
+      "F329:G329",
+      "F330:G330",
+      "F331:G331",
+      "F332:G332",
+      "G353:I353",
+      "H239:I239",
+      "J239:K239",
+      "J353:K354",
+      "J355:K355",
+      "J356:K356",
+      "J357:K357",
+      "J358:K358"
+    ]
+  },
+  "fill_category_counts": {
+    "BLACK_THEME": 489,
+    "BLUE_HEADER": 96,
+    "BLUE_OTHER": 4,
+    "GRAY_POSITIVE": 459,
+    "GREEN_SUBTABLE_MARKER": 15,
+    "RED_TITLE": 17,
+    "YELLOW_OPTIONAL": 178
+  },
+  "fill_category_cells": {
+    "RED_TITLE": [
+      "A8",
+      "A58",
+      "A77",
+      "A128",
+      "A174",
+      "A236",
+      "A264",
+      "A277",
+      "A300",
+      "A311",
+      "A334",
+      "A351",
+      "A359",
+      "A374",
+      "A384",
+      "A393",
+      "A403"
+    ],
+    "BLUE_HEADER": [
+      "A10",
+      "B10",
+      "D10",
+      "E10",
+      "B11",
+      "D11",
+      "A60",
+      "B60",
+      "D60",
+      "E60",
+      "B61",
+      "D61",
+      "A79",
+      "B79",
+      "C79",
+      "D79",
+      "E79",
+      "B80",
+      "C80",
+      "D80",
+      "A130",
+      "B130",
+      "C130",
+      "D130",
+      "E130",
+      "F130",
+      "G130",
+      "H130",
+      "I130",
+      "J130",
+      "K130",
+      "L130",
+      "A176",
+      "B176",
+      "D176",
+      "E176",
+      "B177",
+      "D177",
+      "A238",
+      "C238",
+      "E238",
+      "G238",
+      "I238",
+      "J238",
+      "K238",
+      "B239",
+      "D239",
+      "F239",
+      "H239",
+      "J239",
+      "A266",
+      "B266",
+      "D266",
+      "F266",
+      "C267",
+      "D267",
+      "E267",
+      "A279",
+      "B279",
+      "C279",
+      "D279",
+      "E279",
+      "F279",
+      "A297",
+      "B297",
+      "C297",
+      "D297",
+      "A302",
+      "C302",
+      "D302",
+      "A313",
+      "D313",
+      "E313",
+      "F313",
+      "A336",
+      "C336",
+      "D336",
+      "A353",
+      "G353",
+      "J353",
+      "G354",
+      "H354",
+      "I354",
+      "A361",
+      "C361",
+      "A376",
+      "C376",
+      "A386",
+      "C386",
+      "A395",
+      "C395",
+      "A404",
+      "B404",
+      "C404",
+      "D404",
+      "E404"
+    ],
+    "BLACK_THEME": [
+      "C10",
+      "C11",
+      "C12",
+      "C13",
+      "C14",
+      "C15",
+      "C16",
+      "C17",
+      "C18",
+      "C19",
+      "C20",
+      "C21",
+      "C22",
+      "C23",
+      "C24",
+      "C25",
+      "C26",
+      "C27",
+      "C28",
+      "C29",
+      "C30",
+      "C31",
+      "C32",
+      "C33",
+      "C34",
+      "C35",
+      "C36",
+      "C37",
+      "C38",
+      "C39",
+      "C40",
+      "C41",
+      "C42",
+      "C60",
+      "C61",
+      "C62",
+      "C63",
+      "C64",
+      "C65",
+      "C66",
+      "C67",
+      "C68",
+      "A131",
+      "B131",
+      "C131",
+      "D131",
+      "E131",
+      "F131",
+      "G131",
+      "H131",
+      "I131",
+      "J131",
+      "K131",
+      "L131",
+      "A132",
+      "B132",
+      "C132",
+      "D132",
+      "E132",
+      "F132",
+      "G132",
+      "H132",
+      "I132",
+      "J132",
+      "K132",
+      "L132",
+      "A133",
+      "B133",
+      "C133",
+      "D133",
+      "E133",
+      "F133",
+      "G133",
+      "H133",
+      "I133",
+      "J133",
+      "K133",
+      "L133",
+      "A134",
+      "B134",
+      "C134",
+      "D134",
+      "E134",
+      "F134",
+      "G134",
+      "H134",
+      "I134",
+      "J134",
+      "K134",
+      "L134",
+      "A135",
+      "B135",
+      "C135",
+      "D135",
+      "E135",
+      "F135",
+      "G135",
+      "H135",
+      "I135",
+      "J135",
+      "K135",
+      "L135",
+      "A136",
+      "B136",
+      "C136",
+      "D136",
+      "E136",
+      "F136",
+      "G136",
+      "H136",
+      "I136",
+      "J136",
+      "K136",
+      "L136",
+      "A137",
+      "B137",
+      "C137",
+      "D137",
+      "E137",
+      "F137",
+      "G137",
+      "H137",
+      "I137",
+      "J137",
+      "K137",
+      "L137",
+      "A138",
+      "B138",
+      "C138",
+      "D138",
+      "E138",
+      "F138",
+      "G138",
+      "H138",
+      "I138",
+      "J138",
+      "K138",
+      "L138",
+      "A139",
+      "B139",
+      "C139",
+      "D139",
+      "E139",
+      "F139",
+      "G139",
+      "H139",
+      "I139",
+      "J139",
+      "K139",
+      "L139",
+      "A140",
+      "B140",
+      "C140",
+      "D140",
+      "E140",
+      "F140",
+      "G140",
+      "H140",
+      "I140",
+      "J140",
+      "K140",
+      "L140",
+      "A141",
+      "B141",
+      "C141",
+      "D141",
+      "E141",
+      "F141",
+      "G141",
+      "H141",
+      "I141",
+      "J141",
+      "K141",
+      "L141",
+      "A142",
+      "B142",
+      "C142",
+      "D142",
+      "E142",
+      "F142",
+      "G142",
+      "H142",
+      "I142",
+      "J142",
+      "K142",
+      "L142",
+      "A143",
+      "B143",
+      "C143",
+      "D143",
+      "E143",
+      "F143",
+      "G143",
+      "H143",
+      "I143",
+      "J143",
+      "K143",
+      "L143",
+      "A144",
+      "B144",
+      "C144",
+      "D144",
+      "E144",
+      "F144",
+      "G144",
+      "H144",
+      "I144",
+      "J144",
+      "K144",
+      "L144",
+      "A145",
+      "B145",
+      "C145",
+      "D145",
+      "E145",
+      "F145",
+      "G145",
+      "H145",
+      "I145",
+      "J145",
+      "K145",
+      "L145",
+      "A146",
+      "B146",
+      "C146",
+      "D146",
+      "E146",
+      "F146",
+      "G146",
+      "H146",
+      "I146",
+      "J146",
+      "K146",
+      "L146",
+      "A147",
+      "B147",
+      "C147",
+      "D147",
+      "E147",
+      "F147",
+      "G147",
+      "H147",
+      "I147",
+      "J147",
+      "K147",
+      "L147",
+      "A148",
+      "B148",
+      "C148",
+      "D148",
+      "E148",
+      "F148",
+      "G148",
+      "H148",
+      "I148",
+      "J148",
+      "K148",
+      "L148",
+      "A149",
+      "B149",
+      "C149",
+      "D149",
+      "E149",
+      "F149",
+      "G149",
+      "H149",
+      "I149",
+      "J149",
+      "K149",
+      "L149",
+      "A150",
+      "B150",
+      "C150",
+      "D150",
+      "E150",
+      "F150",
+      "G150",
+      "H150",
+      "I150",
+      "J150",
+      "K150",
+      "L150",
+      "A151",
+      "B151",
+      "C151",
+      "D151",
+      "E151",
+      "F151",
+      "G151",
+      "H151",
+      "I151",
+      "J151",
+      "K151",
+      "L151",
+      "C176",
+      "C177",
+      "C178",
+      "C179",
+      "C180",
+      "C181",
+      "C182",
+      "C183",
+      "C184",
+      "C185",
+      "C186",
+      "C187",
+      "C188",
+      "C189",
+      "C190",
+      "C191",
+      "C192",
+      "C193",
+      "C194",
+      "C195",
+      "C196",
+      "C197",
+      "C198",
+      "C199",
+      "C200",
+      "C201",
+      "C202",
+      "C203",
+      "C204",
+      "C205",
+      "C206",
+      "C207",
+      "C208",
+      "C209",
+      "C210",
+      "C211",
+      "C212",
+      "C213",
+      "B238",
+      "D238",
+      "F238",
+      "H238",
+      "B240",
+      "D240",
+      "F240",
+      "H240",
+      "B241",
+      "D241",
+      "F241",
+      "H241",
+      "B242",
+      "D242",
+      "F242",
+      "H242",
+      "B243",
+      "D243",
+      "F243",
+      "H243",
+      "B244",
+      "D244",
+      "F244",
+      "H244",
+      "B245",
+      "D245",
+      "F245",
+      "H245",
+      "B246",
+      "D246",
+      "F246",
+      "H246",
+      "B247",
+      "D247",
+      "F247",
+      "H247",
+      "B248",
+      "D248",
+      "F248",
+      "H248",
+      "B249",
+      "D249",
+      "F249",
+      "H249",
+      "B250",
+      "D250",
+      "F250",
+      "H250",
+      "B251",
+      "D251",
+      "F251",
+      "H251",
+      "B252",
+      "D252",
+      "F252",
+      "H252",
+      "B253",
+      "D253",
+      "F253",
+      "H253",
+      "B267",
+      "B268",
+      "B269",
+      "B270",
+      "B271",
+      "B272",
+      "B273",
+      "B274",
+      "B275",
+      "B302",
+      "B303",
+      "B304",
+      "B305",
+      "B306",
+      "B307",
+      "B308",
+      "B313",
+      "C313",
+      "B314",
+      "C314",
+      "B315",
+      "C315",
+      "B316",
+      "C316",
+      "B317",
+      "C317",
+      "B318",
+      "C318",
+      "B319",
+      "C319",
+      "B320",
+      "C320",
+      "B321",
+      "C321",
+      "B322",
+      "C322",
+      "B323",
+      "C323",
+      "B324",
+      "C324",
+      "B325",
+      "C325",
+      "B326",
+      "C326",
+      "B327",
+      "C327",
+      "B328",
+      "C328",
+      "B329",
+      "C329",
+      "B330",
+      "C330",
+      "B331",
+      "C331",
+      "B332",
+      "C332",
+      "B336",
+      "B337",
+      "B338",
+      "B339",
+      "C353",
+      "C354",
+      "D354",
+      "E354",
+      "F354",
+      "C355",
+      "D355",
+      "E355",
+      "F355",
+      "C356",
+      "D356",
+      "E356",
+      "F356",
+      "C357",
+      "D357",
+      "E357",
+      "F357",
+      "C358",
+      "D358",
+      "E358",
+      "F358",
+      "B361",
+      "B362",
+      "B363",
+      "B364",
+      "B365",
+      "B366",
+      "B367",
+      "B376",
+      "B377",
+      "B378",
+      "B386",
+      "B387",
+      "B395",
+      "B396",
+      "B397",
+      "B398"
+    ],
+    "GREEN_SUBTABLE_MARKER": [
+      "A12",
+      "A32",
+      "A35",
+      "A63",
+      "A81",
+      "A96",
+      "A108",
+      "A152",
+      "A178",
+      "A182",
+      "A191",
+      "A268",
+      "A314",
+      "A362",
+      "A366"
+    ],
+    "YELLOW_OPTIONAL": [
+      "A13",
+      "A14",
+      "A15",
+      "A16",
+      "A17",
+      "A18",
+      "A19",
+      "A20",
+      "A21",
+      "A22",
+      "A23",
+      "A24",
+      "A25",
+      "A26",
+      "A27",
+      "A28",
+      "A29",
+      "A30",
+      "A31",
+      "A33",
+      "A34",
+      "A36",
+      "A37",
+      "A38",
+      "A39",
+      "A40",
+      "A41",
+      "A42",
+      "A62",
+      "A64",
+      "A65",
+      "A66",
+      "A67",
+      "A68",
+      "A82",
+      "A83",
+      "A84",
+      "A85",
+      "A86",
+      "A87",
+      "A88",
+      "A89",
+      "A90",
+      "A91",
+      "A92",
+      "A93",
+      "A94",
+      "A97",
+      "A98",
+      "A99",
+      "A100",
+      "A101",
+      "A102",
+      "A103",
+      "A104",
+      "A105",
+      "A106",
+      "A107",
+      "A109",
+      "A110",
+      "A111",
+      "A112",
+      "A113",
+      "A114",
+      "A115",
+      "A116",
+      "A117",
+      "A118",
+      "A119",
+      "A153",
+      "A154",
+      "A155",
+      "A156",
+      "A157",
+      "A158",
+      "A159",
+      "A160",
+      "A161",
+      "A162",
+      "A163",
+      "A164",
+      "A165",
+      "A179",
+      "A180",
+      "A181",
+      "A183",
+      "A184",
+      "A185",
+      "A186",
+      "A187",
+      "A188",
+      "A189",
+      "A190",
+      "A192",
+      "A193",
+      "A194",
+      "A195",
+      "A196",
+      "A197",
+      "A198",
+      "A199",
+      "A200",
+      "A201",
+      "A202",
+      "A203",
+      "A204",
+      "A205",
+      "A206",
+      "A207",
+      "A208",
+      "A209",
+      "A210",
+      "A211",
+      "A212",
+      "A213",
+      "A240",
+      "A241",
+      "A242",
+      "A245",
+      "A246",
+      "A247",
+      "A248",
+      "A249",
+      "A250",
+      "A251",
+      "A252",
+      "A253",
+      "A269",
+      "A270",
+      "A271",
+      "A272",
+      "A273",
+      "A274",
+      "A275",
+      "A280",
+      "A281",
+      "A282",
+      "A283",
+      "A303",
+      "A304",
+      "A305",
+      "A306",
+      "A307",
+      "A308",
+      "A315",
+      "A316",
+      "A317",
+      "A318",
+      "A319",
+      "A320",
+      "A321",
+      "A322",
+      "A323",
+      "A324",
+      "A325",
+      "A326",
+      "A327",
+      "A328",
+      "A329",
+      "A330",
+      "A331",
+      "A332",
+      "A337",
+      "A338",
+      "A339",
+      "A355",
+      "A356",
+      "A357",
+      "A358",
+      "A363",
+      "A365",
+      "A367",
+      "A377",
+      "A378",
+      "A387",
+      "A396",
+      "A397",
+      "A398"
+    ],
+    "GRAY_POSITIVE": [
+      "B13",
+      "D13",
+      "B14",
+      "D14",
+      "B15",
+      "D15",
+      "B16",
+      "D16",
+      "B17",
+      "D17",
+      "B18",
+      "D18",
+      "B19",
+      "D19",
+      "B20",
+      "D20",
+      "B21",
+      "D21",
+      "B22",
+      "D22",
+      "B23",
+      "D23",
+      "B24",
+      "D24",
+      "B25",
+      "D25",
+      "B26",
+      "D26",
+      "B27",
+      "D27",
+      "B28",
+      "D28",
+      "B29",
+      "D29",
+      "B30",
+      "D30",
+      "B31",
+      "D31",
+      "B33",
+      "D33",
+      "B34",
+      "D34",
+      "B36",
+      "D36",
+      "B37",
+      "D37",
+      "B38",
+      "D38",
+      "B39",
+      "D39",
+      "B40",
+      "D40",
+      "B41",
+      "D41",
+      "B42",
+      "D42",
+      "B62",
+      "D62",
+      "B64",
+      "D64",
+      "B65",
+      "D65",
+      "B66",
+      "D66",
+      "B67",
+      "D67",
+      "B68",
+      "D68",
+      "B82",
+      "C82",
+      "B83",
+      "C83",
+      "B84",
+      "C84",
+      "B85",
+      "C85",
+      "B86",
+      "C86",
+      "B87",
+      "C87",
+      "B88",
+      "C88",
+      "B89",
+      "C89",
+      "B90",
+      "C90",
+      "B91",
+      "C91",
+      "B92",
+      "C92",
+      "B93",
+      "C93",
+      "B94",
+      "C94",
+      "B97",
+      "C97",
+      "B98",
+      "C98",
+      "B99",
+      "C99",
+      "B100",
+      "C100",
+      "B101",
+      "C101",
+      "B102",
+      "C102",
+      "B103",
+      "C103",
+      "B104",
+      "C104",
+      "B105",
+      "C105",
+      "B106",
+      "C106",
+      "B107",
+      "C107",
+      "B109",
+      "C109",
+      "B110",
+      "C110",
+      "B111",
+      "C111",
+      "B112",
+      "C112",
+      "B113",
+      "C113",
+      "B114",
+      "C114",
+      "B115",
+      "C115",
+      "B116",
+      "C116",
+      "B117",
+      "C117",
+      "B118",
+      "C118",
+      "B119",
+      "C119",
+      "B153",
+      "C153",
+      "D153",
+      "E153",
+      "F153",
+      "G153",
+      "H153",
+      "I153",
+      "J153",
+      "K153",
+      "L153",
+      "B154",
+      "C154",
+      "D154",
+      "E154",
+      "F154",
+      "G154",
+      "H154",
+      "I154",
+      "J154",
+      "K154",
+      "L154",
+      "B155",
+      "C155",
+      "D155",
+      "E155",
+      "F155",
+      "G155",
+      "H155",
+      "I155",
+      "J155",
+      "K155",
+      "L155",
+      "B156",
+      "C156",
+      "D156",
+      "E156",
+      "F156",
+      "G156",
+      "H156",
+      "I156",
+      "J156",
+      "K156",
+      "L156",
+      "B157",
+      "C157",
+      "D157",
+      "E157",
+      "F157",
+      "G157",
+      "H157",
+      "I157",
+      "J157",
+      "K157",
+      "L157",
+      "B158",
+      "C158",
+      "D158",
+      "E158",
+      "F158",
+      "G158",
+      "H158",
+      "I158",
+      "J158",
+      "K158",
+      "L158",
+      "B159",
+      "C159",
+      "D159",
+      "E159",
+      "F159",
+      "G159",
+      "H159",
+      "I159",
+      "J159",
+      "K159",
+      "L159",
+      "B160",
+      "C160",
+      "D160",
+      "E160",
+      "F160",
+      "G160",
+      "H160",
+      "I160",
+      "J160",
+      "K160",
+      "L160",
+      "B161",
+      "C161",
+      "D161",
+      "E161",
+      "F161",
+      "G161",
+      "H161",
+      "I161",
+      "J161",
+      "K161",
+      "L161",
+      "B162",
+      "C162",
+      "D162",
+      "E162",
+      "F162",
+      "G162",
+      "H162",
+      "I162",
+      "J162",
+      "K162",
+      "L162",
+      "B163",
+      "C163",
+      "D163",
+      "E163",
+      "F163",
+      "G163",
+      "H163",
+      "I163",
+      "J163",
+      "K163",
+      "L163",
+      "B164",
+      "C164",
+      "D164",
+      "E164",
+      "F164",
+      "G164",
+      "H164",
+      "I164",
+      "J164",
+      "K164",
+      "L164",
+      "B165",
+      "C165",
+      "D165",
+      "E165",
+      "F165",
+      "G165",
+      "H165",
+      "I165",
+      "J165",
+      "K165",
+      "L165",
+      "B179",
+      "D179",
+      "B180",
+      "D180",
+      "B181",
+      "D181",
+      "B183",
+      "D183",
+      "B184",
+      "D184",
+      "B185",
+      "D185",
+      "B186",
+      "D186",
+      "B187",
+      "D187",
+      "B188",
+      "D188",
+      "B189",
+      "D189",
+      "B190",
+      "D190",
+      "B192",
+      "D192",
+      "B193",
+      "D193",
+      "B194",
+      "D194",
+      "B195",
+      "D195",
+      "B196",
+      "D196",
+      "B197",
+      "D197",
+      "B198",
+      "D198",
+      "B199",
+      "D199",
+      "B200",
+      "D200",
+      "B201",
+      "D201",
+      "B202",
+      "D202",
+      "B203",
+      "D203",
+      "B204",
+      "D204",
+      "B205",
+      "D205",
+      "B206",
+      "D206",
+      "B207",
+      "D207",
+      "B208",
+      "D208",
+      "B209",
+      "D209",
+      "B210",
+      "D210",
+      "B211",
+      "D211",
+      "B212",
+      "D212",
+      "B213",
+      "D213",
+      "C240",
+      "E240",
+      "G240",
+      "I240",
+      "C241",
+      "E241",
+      "G241",
+      "I241",
+      "C242",
+      "E242",
+      "G242",
+      "I242",
+      "C245",
+      "E245",
+      "G245",
+      "I245",
+      "C246",
+      "E246",
+      "G246",
+      "I246",
+      "C247",
+      "E247",
+      "G247",
+      "I247",
+      "C248",
+      "E248",
+      "G248",
+      "I248",
+      "C249",
+      "E249",
+      "G249",
+      "I249",
+      "C250",
+      "E250",
+      "G250",
+      "I250",
+      "C251",
+      "E251",
+      "G251",
+      "I251",
+      "C252",
+      "E252",
+      "G252",
+      "I252",
+      "C253",
+      "E253",
+      "G253",
+      "I253",
+      "C269",
+      "C270",
+      "C271",
+      "C272",
+      "C273",
+      "C274",
+      "C275",
+      "B280",
+      "B281",
+      "B282",
+      "B283",
+      "C303",
+      "C304",
+      "C305",
+      "C306",
+      "C307",
+      "C308",
+      "D315",
+      "D316",
+      "D317",
+      "D318",
+      "D319",
+      "D320",
+      "D321",
+      "D322",
+      "D323",
+      "D324",
+      "D325",
+      "D326",
+      "D327",
+      "D328",
+      "D329",
+      "D330",
+      "D331",
+      "D332",
+      "C337",
+      "C338",
+      "C339",
+      "G355",
+      "H355",
+      "I355",
+      "G356",
+      "H356",
+      "I356",
+      "G357",
+      "H357",
+      "I357",
+      "G358",
+      "H358",
+      "I358",
+      "C363",
+      "C365",
+      "C367",
+      "C377",
+      "C378",
+      "C387",
+      "C396",
+      "C397",
+      "C398",
+      "A405",
+      "B405",
+      "C405",
+      "D405",
+      "E405"
+    ],
+    "BLUE_OTHER": [
+      "A95",
+      "B95",
+      "C95",
+      "D95"
+    ]
+  },
+  "tables": [
+    {
+      "id": "T01",
+      "title_cell": "A8",
+      "title_value": "صورت سود و زیان",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A10:D42",
+        "min_row": 10,
+        "max_row": 42,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_candidate": {
+        "a1": "A10:D11",
+        "min_row": 10,
+        "max_row": 11,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "blue_header_cells_observed": [
+        "A10",
+        "B10",
+        "D10",
+        "B11",
+        "D11"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 4
+        },
+        "bottom": {
+          "medium": 4
+        },
+        "left": {
+          "medium": 33
+        },
+        "right": {
+          "medium": 33
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T02",
+      "title_cell": "A58",
+      "title_value": "صورت سود و زیان جامع",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A60:D68",
+        "min_row": 60,
+        "max_row": 68,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_candidate": {
+        "a1": "A60:D61",
+        "min_row": 60,
+        "max_row": 61,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "blue_header_cells_observed": [
+        "A60",
+        "B60",
+        "D60",
+        "B61",
+        "D61"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 4
+        },
+        "bottom": {
+          "medium": 4
+        },
+        "left": {
+          "medium": 9
+        },
+        "right": {
+          "medium": 9
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T03",
+      "title_cell": "A77",
+      "title_value": "صورت وضعیت مالی",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A79:C119",
+        "min_row": 79,
+        "max_row": 119,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_candidate": {
+        "a1": "A79:C80",
+        "min_row": 79,
+        "max_row": 80,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "blue_header_cells_observed": [
+        "A79",
+        "B79",
+        "C79",
+        "B80",
+        "C80"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 3
+        },
+        "bottom": {
+          "medium": 3
+        },
+        "left": {
+          "medium": 41
+        },
+        "right": {
+          "medium": 41
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T04",
+      "title_cell": "A128",
+      "title_value": "صورت تغییرات در حقوق مالکانه",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A130:L165",
+        "min_row": 130,
+        "max_row": 165,
+        "min_column": 1,
+        "max_column": 12,
+        "column_range": "A:L"
+      },
+      "header_candidate": {
+        "a1": "A130:L130",
+        "min_row": 130,
+        "max_row": 130,
+        "min_column": 1,
+        "max_column": 12,
+        "column_range": "A:L"
+      },
+      "blue_header_cells_observed": [
+        "A130",
+        "B130",
+        "C130",
+        "D130",
+        "E130",
+        "F130",
+        "G130",
+        "H130",
+        "I130",
+        "J130",
+        "K130",
+        "L130"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 12
+        },
+        "bottom": {
+          "medium": 12
+        },
+        "left": {
+          "medium": 36
+        },
+        "right": {
+          "medium": 36
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T05",
+      "title_cell": "A174",
+      "title_value": "صورت جریان های نقدی",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A176:D213",
+        "min_row": 176,
+        "max_row": 213,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_candidate": {
+        "a1": "A176:D177",
+        "min_row": 176,
+        "max_row": 177,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "blue_header_cells_observed": [
+        "A176",
+        "B176",
+        "D176",
+        "B177",
+        "D177"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 4
+        },
+        "bottom": {
+          "medium": 4
+        },
+        "left": {
+          "medium": 38
+        },
+        "right": {
+          "medium": 38
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T06",
+      "title_cell": "A236",
+      "title_value": "مانده تسهیلات اعطایی و ذخیره مطالبات مشکوک الوصول:",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A238:I253",
+        "min_row": 238,
+        "max_row": 253,
+        "min_column": 1,
+        "max_column": 9,
+        "column_range": "A:I"
+      },
+      "header_candidate": {
+        "a1": "A238:I239",
+        "min_row": 238,
+        "max_row": 239,
+        "min_column": 1,
+        "max_column": 9,
+        "column_range": "A:I"
+      },
+      "blue_header_cells_observed": [
+        "A238",
+        "C238",
+        "E238",
+        "G238",
+        "I238",
+        "B239",
+        "D239",
+        "F239",
+        "H239"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 9
+        },
+        "bottom": {
+          "medium": 9
+        },
+        "left": {
+          "medium": 16
+        },
+        "right": {
+          "medium": 16
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T07",
+      "title_cell": "A264",
+      "title_value": "مانده سپرده های دریافتی از مشتریان :",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A266:C275",
+        "min_row": 266,
+        "max_row": 275,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_candidate": {
+        "a1": "A266:C267",
+        "min_row": 266,
+        "max_row": 267,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "blue_header_cells_observed": [
+        "A266",
+        "B266",
+        "C267"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 3
+        },
+        "bottom": {
+          "medium": 3
+        },
+        "left": {
+          "medium": 10
+        },
+        "right": {
+          "medium": 10
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T08",
+      "title_cell": "A277",
+      "title_value": "اقلام زیر خط:",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A279:B283",
+        "min_row": 279,
+        "max_row": 283,
+        "min_column": 1,
+        "max_column": 2,
+        "column_range": "A:B"
+      },
+      "header_candidate": {
+        "a1": "A279:B279",
+        "min_row": 279,
+        "max_row": 279,
+        "min_column": 1,
+        "max_column": 2,
+        "column_range": "A:B"
+      },
+      "blue_header_cells_observed": [
+        "A279",
+        "B279"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 2
+        },
+        "bottom": {
+          "medium": 2
+        },
+        "left": {
+          "medium": 5
+        },
+        "right": {
+          "medium": 5
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T09",
+      "title_cell": "A300",
+      "title_value": "اطلاعات حق الوکاله و کفایت سرمایه",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A302:C308",
+        "min_row": 302,
+        "max_row": 308,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_candidate": {
+        "a1": "A302:C302",
+        "min_row": 302,
+        "max_row": 302,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "blue_header_cells_observed": [
+        "A302",
+        "C302"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 3
+        },
+        "bottom": {
+          "medium": 3
+        },
+        "left": {
+          "medium": 7
+        },
+        "right": {
+          "medium": 7
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T10",
+      "title_cell": "A311",
+      "title_value": "درآمد حاصل از تسهيلات اعطايي و سپرده گذاري",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A313:D332",
+        "min_row": 313,
+        "max_row": 332,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_candidate": {
+        "a1": "A313:D313",
+        "min_row": 313,
+        "max_row": 313,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "blue_header_cells_observed": [
+        "A313",
+        "D313"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 4
+        },
+        "bottom": {
+          "medium": 4
+        },
+        "left": {
+          "medium": 20
+        },
+        "right": {
+          "medium": 20
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T11",
+      "title_cell": "A334",
+      "title_value": "خالص سود (زیان) سرمایه گذاری‌ ها",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A336:C339",
+        "min_row": 336,
+        "max_row": 339,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_candidate": {
+        "a1": "A336:C336",
+        "min_row": 336,
+        "max_row": 336,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "blue_header_cells_observed": [
+        "A336",
+        "C336"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 3
+        },
+        "bottom": {
+          "medium": 3
+        },
+        "left": {
+          "medium": 4
+        },
+        "right": {
+          "medium": 4
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T12",
+      "title_cell": "A351",
+      "title_value": "وضعیت شرکتهای سرمایه پذیر:",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A353:I358",
+        "min_row": 353,
+        "max_row": 358,
+        "min_column": 1,
+        "max_column": 9,
+        "column_range": "A:I"
+      },
+      "header_candidate": {
+        "a1": "A353:I354",
+        "min_row": 353,
+        "max_row": 354,
+        "min_column": 1,
+        "max_column": 9,
+        "column_range": "A:I"
+      },
+      "blue_header_cells_observed": [
+        "A353",
+        "G353",
+        "G354",
+        "H354",
+        "I354"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 9
+        },
+        "bottom": {
+          "medium": 9
+        },
+        "left": {
+          "medium": 6
+        },
+        "right": {
+          "medium": 6
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T13",
+      "title_cell": "A359",
+      "title_value": "ساير درآمدها و هزینه های عملياتي:",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A361:C367",
+        "min_row": 361,
+        "max_row": 367,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_candidate": {
+        "a1": "A361:C361",
+        "min_row": 361,
+        "max_row": 361,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "blue_header_cells_observed": [
+        "A361",
+        "C361"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 3
+        },
+        "bottom": {
+          "medium": 3
+        },
+        "left": {
+          "medium": 7
+        },
+        "right": {
+          "medium": 7
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T14",
+      "title_cell": "A374",
+      "title_value": "خالص ساير درآمدها و هزینه ها:",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A376:C378",
+        "min_row": 376,
+        "max_row": 378,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_candidate": {
+        "a1": "A376:C376",
+        "min_row": 376,
+        "max_row": 376,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "blue_header_cells_observed": [
+        "A376",
+        "C376"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 3
+        },
+        "bottom": {
+          "medium": 3
+        },
+        "left": {
+          "medium": 3
+        },
+        "right": {
+          "medium": 3
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T15",
+      "title_cell": "A384",
+      "title_value": "هزینه های اداری و عمومی:",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A386:C387",
+        "min_row": 386,
+        "max_row": 387,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_candidate": {
+        "a1": "A386:C386",
+        "min_row": 386,
+        "max_row": 386,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "blue_header_cells_observed": [
+        "A386",
+        "C386"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 3
+        },
+        "bottom": {
+          "medium": 3
+        },
+        "left": {
+          "medium": 2
+        },
+        "right": {
+          "medium": 2
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T16",
+      "title_cell": "A393",
+      "title_value": "هزینه مالی:",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A395:C398",
+        "min_row": 395,
+        "max_row": 398,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_candidate": {
+        "a1": "A395:C395",
+        "min_row": 395,
+        "max_row": 395,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "blue_header_cells_observed": [
+        "A395",
+        "C395"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 3
+        },
+        "bottom": {
+          "medium": 3
+        },
+        "left": {
+          "medium": 4
+        },
+        "right": {
+          "medium": 4
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T17",
+      "title_cell": "A403",
+      "title_value": "برنامه شرکت در خصوص تقسیم سود",
+      "title_fill_category": "RED_TITLE",
+      "bounds": {
+        "a1": "A404:E405",
+        "min_row": 404,
+        "max_row": 405,
+        "min_column": 1,
+        "max_column": 5,
+        "column_range": "A:E"
+      },
+      "header_candidate": {
+        "a1": "A404:E404",
+        "min_row": 404,
+        "max_row": 404,
+        "min_column": 1,
+        "max_column": 5,
+        "column_range": "A:E"
+      },
+      "blue_header_cells_observed": [
+        "A404",
+        "B404",
+        "C404",
+        "D404",
+        "E404"
+      ],
+      "border_edge_styles": {
+        "top": {
+          "medium": 5
+        },
+        "bottom": {
+          "medium": 5
+        },
+        "left": {
+          "medium": 2
+        },
+        "right": {
+          "medium": 2
+        }
+      },
+      "candidate_border_complete": true,
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    }
+  ],
+  "partitions": [
+    {
+      "id": "T01-P01",
+      "parent": "T01",
+      "marker": "A12",
+      "marker_value": "عملیات در حال تداوم: ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        12,
+        31
+      ],
+      "bounds": {
+        "a1": "A12:D31",
+        "min_row": 12,
+        "max_row": 31,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A10:D11",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T01-P02",
+      "parent": "T01",
+      "marker": "A32",
+      "marker_value": "عملیات متوقف شده: ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        32,
+        34
+      ],
+      "bounds": {
+        "a1": "A32:D34",
+        "min_row": 32,
+        "max_row": 34,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A10:D11",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T01-P03",
+      "parent": "T01",
+      "marker": "A35",
+      "marker_value": "سود (زیان)پایه هر سهم (ريال) ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        35,
+        42
+      ],
+      "bounds": {
+        "a1": "A35:D42",
+        "min_row": 35,
+        "max_row": 42,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A10:D11",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T02-P01",
+      "parent": "T02",
+      "marker": "A63",
+      "marker_value": "سایر اقلام سود و زیان جامع: ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        63,
+        68
+      ],
+      "bounds": {
+        "a1": "A63:D68",
+        "min_row": 63,
+        "max_row": 68,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A60:D61",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T03-P01",
+      "parent": "T03",
+      "marker": "A81",
+      "marker_value": "دارایی ها ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        81,
+        94
+      ],
+      "bounds": {
+        "a1": "A81:C94",
+        "min_row": 81,
+        "max_row": 94,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A79:C80",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T03-P02",
+      "parent": "T03",
+      "marker": "A96",
+      "marker_value": "حقوق مالکانه ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        96,
+        107
+      ],
+      "bounds": {
+        "a1": "A96:C107",
+        "min_row": 96,
+        "max_row": 107,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A79:C80",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T03-P03",
+      "parent": "T03",
+      "marker": "A108",
+      "marker_value": "بدهی‌ها ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        108,
+        119
+      ],
+      "bounds": {
+        "a1": "A108:C119",
+        "min_row": 108,
+        "max_row": 119,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A79:C80",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T04-P01",
+      "parent": "T04",
+      "marker": "A152",
+      "marker_value": "تغییرات حقوق مالکانه در سال ۱۴۰۳/۰۶/۳۱ ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        152,
+        165
+      ],
+      "bounds": {
+        "a1": "A152:L165",
+        "min_row": 152,
+        "max_row": 165,
+        "min_column": 1,
+        "max_column": 12,
+        "column_range": "A:L"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A130:L130",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T05-P01",
+      "parent": "T05",
+      "marker": "A178",
+      "marker_value": "جریان­های نقدی حاصل از فعاليت‌هاي عملياتي: ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        178,
+        181
+      ],
+      "bounds": {
+        "a1": "A178:D181",
+        "min_row": 178,
+        "max_row": 181,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A176:D177",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T05-P02",
+      "parent": "T05",
+      "marker": "A182",
+      "marker_value": "فعاليت‌هاي سرمایه‌گذاری ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        182,
+        190
+      ],
+      "bounds": {
+        "a1": "A182:D190",
+        "min_row": 182,
+        "max_row": 190,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A176:D177",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T05-P03",
+      "parent": "T05",
+      "marker": "A191",
+      "marker_value": "فعاليت‌هاي تأمين مالي ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        191,
+        213
+      ],
+      "bounds": {
+        "a1": "A191:D213",
+        "min_row": 191,
+        "max_row": 213,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A176:D177",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T07-P01",
+      "parent": "T07",
+      "marker": "A268",
+      "marker_value": "سپرده های ریالی: ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        268,
+        275
+      ],
+      "bounds": {
+        "a1": "A268:C275",
+        "min_row": 268,
+        "max_row": 275,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A266:C267",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T10-P01",
+      "parent": "T10",
+      "marker": "A314",
+      "marker_value": "درآمد تسهیلات اعطایی: ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        314,
+        332
+      ],
+      "bounds": {
+        "a1": "A314:D332",
+        "min_row": 314,
+        "max_row": 332,
+        "min_column": 1,
+        "max_column": 4,
+        "column_range": "A:D"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A313:D313",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T13-P01",
+      "parent": "T13",
+      "marker": "A362",
+      "marker_value": "ساير درآمدهاي عملياتي: ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        362,
+        365
+      ],
+      "bounds": {
+        "a1": "A362:C365",
+        "min_row": 362,
+        "max_row": 365,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A361:C361",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    },
+    {
+      "id": "T13-P02",
+      "parent": "T13",
+      "marker": "A366",
+      "marker_value": "ساير هزينه هاي عملياتي: ",
+      "marker_fill_category": "GREEN_SUBTABLE_MARKER",
+      "rows": [
+        366,
+        367
+      ],
+      "bounds": {
+        "a1": "A366:C367",
+        "min_row": 366,
+        "max_row": 367,
+        "min_column": 1,
+        "max_column": 3,
+        "column_range": "A:C"
+      },
+      "header_inheritance": "PARENT_HEADER_CANDIDATE",
+      "inherited_header_candidate": "A361:C361",
+      "approval_status": "CANDIDATE_NOT_APPROVED"
+    }
+  ],
+  "ownership": [
+    {
+      "cell": "B13",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D13",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B14",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D14",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B15",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D15",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B16",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D16",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B17",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D17",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B18",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D18",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B19",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D19",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B20",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D20",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B21",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D21",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B22",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D22",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B23",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D23",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B24",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D24",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B25",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D25",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B26",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D26",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B27",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D27",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B28",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D28",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B29",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D29",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B30",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D30",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B31",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "D31",
+      "owner": "T01-P01"
+    },
+    {
+      "cell": "B33",
+      "owner": "T01-P02"
+    },
+    {
+      "cell": "D33",
+      "owner": "T01-P02"
+    },
+    {
+      "cell": "B34",
+      "owner": "T01-P02"
+    },
+    {
+      "cell": "D34",
+      "owner": "T01-P02"
+    },
+    {
+      "cell": "B36",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "D36",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "B37",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "D37",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "B38",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "D38",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "B39",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "D39",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "B40",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "D40",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "B41",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "D41",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "B42",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "D42",
+      "owner": "T01-P03"
+    },
+    {
+      "cell": "B62",
+      "owner": "T02"
+    },
+    {
+      "cell": "D62",
+      "owner": "T02"
+    },
+    {
+      "cell": "B64",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "D64",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "B65",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "D65",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "B66",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "D66",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "B67",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "D67",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "B68",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "D68",
+      "owner": "T02-P01"
+    },
+    {
+      "cell": "B82",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C82",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B83",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C83",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B84",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C84",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B85",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C85",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B86",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C86",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B87",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C87",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B88",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C88",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B89",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C89",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B90",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C90",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B91",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C91",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B92",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C92",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B93",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C93",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B94",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "C94",
+      "owner": "T03-P01"
+    },
+    {
+      "cell": "B97",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C97",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B98",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C98",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B99",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C99",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B100",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C100",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B101",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C101",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B102",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C102",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B103",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C103",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B104",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C104",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B105",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C105",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B106",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C106",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B107",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "C107",
+      "owner": "T03-P02"
+    },
+    {
+      "cell": "B109",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C109",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B110",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C110",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B111",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C111",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B112",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C112",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B113",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C113",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B114",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C114",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B115",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C115",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B116",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C116",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B117",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C117",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B118",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C118",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B119",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "C119",
+      "owner": "T03-P03"
+    },
+    {
+      "cell": "B153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L153",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L154",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L155",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L156",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L157",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L158",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L159",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L160",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L161",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L162",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L163",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L164",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "C165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "D165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "E165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "F165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "G165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "H165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "I165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "J165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "K165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "L165",
+      "owner": "T04-P01"
+    },
+    {
+      "cell": "B179",
+      "owner": "T05-P01"
+    },
+    {
+      "cell": "D179",
+      "owner": "T05-P01"
+    },
+    {
+      "cell": "B180",
+      "owner": "T05-P01"
+    },
+    {
+      "cell": "D180",
+      "owner": "T05-P01"
+    },
+    {
+      "cell": "B181",
+      "owner": "T05-P01"
+    },
+    {
+      "cell": "D181",
+      "owner": "T05-P01"
+    },
+    {
+      "cell": "B183",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "D183",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "B184",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "D184",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "B185",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "D185",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "B186",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "D186",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "B187",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "D187",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "B188",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "D188",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "B189",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "D189",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "B190",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "D190",
+      "owner": "T05-P02"
+    },
+    {
+      "cell": "B192",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D192",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B193",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D193",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B194",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D194",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B195",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D195",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B196",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D196",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B197",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D197",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B198",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D198",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B199",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D199",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B200",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D200",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B201",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D201",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B202",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D202",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B203",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D203",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B204",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D204",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B205",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D205",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B206",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D206",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B207",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D207",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B208",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D208",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B209",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D209",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B210",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D210",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B211",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D211",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B212",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D212",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "B213",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "D213",
+      "owner": "T05-P03"
+    },
+    {
+      "cell": "C240",
+      "owner": "T06"
+    },
+    {
+      "cell": "E240",
+      "owner": "T06"
+    },
+    {
+      "cell": "G240",
+      "owner": "T06"
+    },
+    {
+      "cell": "I240",
+      "owner": "T06"
+    },
+    {
+      "cell": "C241",
+      "owner": "T06"
+    },
+    {
+      "cell": "E241",
+      "owner": "T06"
+    },
+    {
+      "cell": "G241",
+      "owner": "T06"
+    },
+    {
+      "cell": "I241",
+      "owner": "T06"
+    },
+    {
+      "cell": "C242",
+      "owner": "T06"
+    },
+    {
+      "cell": "E242",
+      "owner": "T06"
+    },
+    {
+      "cell": "G242",
+      "owner": "T06"
+    },
+    {
+      "cell": "I242",
+      "owner": "T06"
+    },
+    {
+      "cell": "C245",
+      "owner": "T06"
+    },
+    {
+      "cell": "E245",
+      "owner": "T06"
+    },
+    {
+      "cell": "G245",
+      "owner": "T06"
+    },
+    {
+      "cell": "I245",
+      "owner": "T06"
+    },
+    {
+      "cell": "C246",
+      "owner": "T06"
+    },
+    {
+      "cell": "E246",
+      "owner": "T06"
+    },
+    {
+      "cell": "G246",
+      "owner": "T06"
+    },
+    {
+      "cell": "I246",
+      "owner": "T06"
+    },
+    {
+      "cell": "C247",
+      "owner": "T06"
+    },
+    {
+      "cell": "E247",
+      "owner": "T06"
+    },
+    {
+      "cell": "G247",
+      "owner": "T06"
+    },
+    {
+      "cell": "I247",
+      "owner": "T06"
+    },
+    {
+      "cell": "C248",
+      "owner": "T06"
+    },
+    {
+      "cell": "E248",
+      "owner": "T06"
+    },
+    {
+      "cell": "G248",
+      "owner": "T06"
+    },
+    {
+      "cell": "I248",
+      "owner": "T06"
+    },
+    {
+      "cell": "C249",
+      "owner": "T06"
+    },
+    {
+      "cell": "E249",
+      "owner": "T06"
+    },
+    {
+      "cell": "G249",
+      "owner": "T06"
+    },
+    {
+      "cell": "I249",
+      "owner": "T06"
+    },
+    {
+      "cell": "C250",
+      "owner": "T06"
+    },
+    {
+      "cell": "E250",
+      "owner": "T06"
+    },
+    {
+      "cell": "G250",
+      "owner": "T06"
+    },
+    {
+      "cell": "I250",
+      "owner": "T06"
+    },
+    {
+      "cell": "C251",
+      "owner": "T06"
+    },
+    {
+      "cell": "E251",
+      "owner": "T06"
+    },
+    {
+      "cell": "G251",
+      "owner": "T06"
+    },
+    {
+      "cell": "I251",
+      "owner": "T06"
+    },
+    {
+      "cell": "C252",
+      "owner": "T06"
+    },
+    {
+      "cell": "E252",
+      "owner": "T06"
+    },
+    {
+      "cell": "G252",
+      "owner": "T06"
+    },
+    {
+      "cell": "I252",
+      "owner": "T06"
+    },
+    {
+      "cell": "C253",
+      "owner": "T06"
+    },
+    {
+      "cell": "E253",
+      "owner": "T06"
+    },
+    {
+      "cell": "G253",
+      "owner": "T06"
+    },
+    {
+      "cell": "I253",
+      "owner": "T06"
+    },
+    {
+      "cell": "C269",
+      "owner": "T07-P01"
+    },
+    {
+      "cell": "C270",
+      "owner": "T07-P01"
+    },
+    {
+      "cell": "C271",
+      "owner": "T07-P01"
+    },
+    {
+      "cell": "C272",
+      "owner": "T07-P01"
+    },
+    {
+      "cell": "C273",
+      "owner": "T07-P01"
+    },
+    {
+      "cell": "C274",
+      "owner": "T07-P01"
+    },
+    {
+      "cell": "C275",
+      "owner": "T07-P01"
+    },
+    {
+      "cell": "B280",
+      "owner": "T08"
+    },
+    {
+      "cell": "B281",
+      "owner": "T08"
+    },
+    {
+      "cell": "B282",
+      "owner": "T08"
+    },
+    {
+      "cell": "B283",
+      "owner": "T08"
+    },
+    {
+      "cell": "C303",
+      "owner": "T09"
+    },
+    {
+      "cell": "C304",
+      "owner": "T09"
+    },
+    {
+      "cell": "C305",
+      "owner": "T09"
+    },
+    {
+      "cell": "C306",
+      "owner": "T09"
+    },
+    {
+      "cell": "C307",
+      "owner": "T09"
+    },
+    {
+      "cell": "C308",
+      "owner": "T09"
+    },
+    {
+      "cell": "D315",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D316",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D317",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D318",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D319",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D320",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D321",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D322",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D323",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D324",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D325",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D326",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D327",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D328",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D329",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D330",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D331",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "D332",
+      "owner": "T10-P01"
+    },
+    {
+      "cell": "C337",
+      "owner": "T11"
+    },
+    {
+      "cell": "C338",
+      "owner": "T11"
+    },
+    {
+      "cell": "C339",
+      "owner": "T11"
+    },
+    {
+      "cell": "G355",
+      "owner": "T12"
+    },
+    {
+      "cell": "H355",
+      "owner": "T12"
+    },
+    {
+      "cell": "I355",
+      "owner": "T12"
+    },
+    {
+      "cell": "G356",
+      "owner": "T12"
+    },
+    {
+      "cell": "H356",
+      "owner": "T12"
+    },
+    {
+      "cell": "I356",
+      "owner": "T12"
+    },
+    {
+      "cell": "G357",
+      "owner": "T12"
+    },
+    {
+      "cell": "H357",
+      "owner": "T12"
+    },
+    {
+      "cell": "I357",
+      "owner": "T12"
+    },
+    {
+      "cell": "G358",
+      "owner": "T12"
+    },
+    {
+      "cell": "H358",
+      "owner": "T12"
+    },
+    {
+      "cell": "I358",
+      "owner": "T12"
+    },
+    {
+      "cell": "C363",
+      "owner": "T13-P01"
+    },
+    {
+      "cell": "C365",
+      "owner": "T13-P01"
+    },
+    {
+      "cell": "C367",
+      "owner": "T13-P02"
+    },
+    {
+      "cell": "C377",
+      "owner": "T14"
+    },
+    {
+      "cell": "C378",
+      "owner": "T14"
+    },
+    {
+      "cell": "C387",
+      "owner": "T15"
+    },
+    {
+      "cell": "C396",
+      "owner": "T16"
+    },
+    {
+      "cell": "C397",
+      "owner": "T16"
+    },
+    {
+      "cell": "C398",
+      "owner": "T16"
+    },
+    {
+      "cell": "A405",
+      "owner": "T17"
+    },
+    {
+      "cell": "B405",
+      "owner": "T17"
+    },
+    {
+      "cell": "C405",
+      "owner": "T17"
+    },
+    {
+      "cell": "D405",
+      "owner": "T17"
+    },
+    {
+      "cell": "E405",
+      "owner": "T17"
+    }
+  ],
+  "unowned_gray_cells": [],
+  "duplicate_ownership": [],
+  "checks": {
+    "table_count_is_17": true,
+    "partition_count_is_15": true,
+    "all_candidate_borders_complete": true,
+    "all_green_markers_match": true,
+    "no_overlapping_top_level_bounds": true,
+    "no_overlapping_sibling_partitions": true,
+    "all_gray_positive_cells_owned_once": true
+  },
+  "findings": [],
+  "historical_gray_459_and_spans_60_are_not_assertions": true
+}

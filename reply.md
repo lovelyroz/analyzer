@@ -275,3 +275,22 @@ Excel: ۱۹ رکورد کامل؛ تاریخ تکراری، Null، صفر/منف
 - Actual output: `61 passed in 78.16s (0:01:18)` (exit code 0).
 - Owner acceptance command, not run by the agent: `.\.venv\Scripts\python.exe -m pytest -q src/tests/test_market_fx_atomic_ingestion.py`. It uses isolated temporary test databases. Task 035 owner UAT has not been claimed.
 - `git diff --check` passed. Git reported only LF-to-CRLF normalization notices.
+
+# TASK 035 owner acceptance and TASK 033 / DB-ING-006 execution — 2026-11-20
+
+## Task 035 / DB-ING-008 — PARTIAL, owner acceptance recorded
+
+- مالک فرمان پذیرش را اجرا کرده و نتیجه را اعلام کرده است: `13 passed in 1.67s` با فرمان `.\.venv\Scripts\python.exe -m pytest -q src/tests/test_market_fx_atomic_ingestion.py`.
+- Master Packet §9.33 و این گزارش به‌روزرسانی شدند. این نتیجه پذیرش بخش اجرایی است و Task را DONE نمی‌کند. `EXCHANGE_CENTER` همچنان به‌دلیل CheckConstraint فعلی نیازمند تغییر schema/migration است و یکتایی هم‌زمان کلیدهای Jalali با قیود فعلی تضمین نمی‌شود. هیچ schema یا migration تغییر نکرد.
+
+## Task 033 / DB-ING-006 — PARTIAL, implementation progress and evidence
+
+- Workbook نهایی `excel/parsian_periodic.xlsx` بدون تغییر بازبینی شد؛ SHA-256: `55266751a5ae60666ebce05f1ed4ee1c4df94a4f78fa0c764aa4a0dc4325db85`. یک شیت `Recovered_Sheet1`، used range `A1:L411`، 101 merged ranges، RTL. hash پیش و پس از اجرا ثابت ماند.
+- ابزار موجود `excel_template_annotation_audit.py` تکمیل شد تا candidate register را با artifact تطبیق دهد و overlap/duplicate ownership/unowned gray-positive cells را گزارش کند. خروجی کامل: `database/reports/template_annotation_audit_parsian_current.txt` و `database/reports/parsian_template_candidate_audit_current.json`; منبع register: `database/reports/parsian_template_candidate_register.json`.
+- Fillهای فعلی: 17 red title، 15 green sub-table marker، 459 gray-positive، 489 theme-1 dark، 178 yellow، 96 blue-header و 4 additional blue. هر 17 bounds candidate دارای اضلاع medium پیوسته‌اند. هر 459 gray cell دقیقاً یک owner دارد؛ صفر unowned، صفر duplicate و صفر overlap بین parent bounds/sibling partitions. عدد تاریخی 492 gray و 60 span به‌عنوان واقعیت فرض نشد.
+- Candidate JSON برای تمام 17 parent محدودهٔ دقیق، ستون‌ها، header candidate و چهار ضلع border را دارد؛ برای 15 child نیز محدودهٔ دقیق، ستون‌های candidate، marker و parent-header inheritance پیشنهادی را ثبت می‌کند. این‌ها همچنان CANDIDATE هستند و تأیید مالک نیستند.
+- Matcher عمومی و pure در `src/ingestion/excel/deterministic_matcher.py` اضافه شد؛ template باید versioned و explicitly approved باشد و exact worksheet/title/header/marker را بگذراند؛ خروجی template id/version/hash، source hash و coordinate map دارد. ambiguity، mismatch، coordinate drift، overlapping ownership و partition نامعتبر fail-closed رد می‌شوند. هیچ matcher اجرایی به Parsian draft متصل نشد و هیچ annotation رنگی در runtime به‌عنوان شرط matching استفاده نمی‌شود.
+- تست متمرکز matcher: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task033_matching_20261120 src/tests/test_excel_template_matching.py` — **7 passed in 1.08s**. Regression suite: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task033_final_verify_20261120 src/tests/test_excel_template_matching.py src/tests/test_excel_source_reader.py src/tests/test_excel_observation_dto.py` — **37 passed in 1.36s**, exit code 0. تست‌ها روی workbookهای مصنوعی/ایزوله اجرا شدند.
+- فایل‌های تغییر/ایجادشده در این نوبت: `src/scripts/excel_template_annotation_audit.py`, `src/ingestion/excel/deterministic_matcher.py`, `src/tests/test_excel_template_matching.py`, `database/reports/parsian_template_candidate_register.json`, `database/reports/parsian_template_candidate_audit_current.json`, `database/reports/template_annotation_audit_parsian_current.txt`, `database/reports/DB_ING_006_VISUAL_TABLE_REGION_DETECTION.md`, `database/reports/DB_ING_008_MARKET_FX_ATOMIC_INGESTION.md`, `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`, و `reply.md`. فایل workbook و `WORKFLOW_RULES.md` تغییر نکردند.
+- Gateهای باز: تأیید مالک برای همهٔ bounds/partitions/header inheritance؛ workbook مستقل دورهٔ بعد برای drift validation؛ semantic approvalهای Metric/currency/scale/period/duration_basis؛ و writer کاننیکال تراکنشی. Task 033 همچنان PARTIAL و Excel-to-canonical persistence آماده نیست. هیچ observation کاننیکال یا دیتابیس واقعی لمس نشد.
+- فرمان audit نهایی و خروجی واقعی در `database/reports/DB_ING_006_VISUAL_TABLE_REGION_DETECTION.md` §8.33 ثبت شده است. آزمون مالک برای Task 033 اجرا یا ادعا نشده؛ فرمان test agent در بالا برای owner قابل تکرار است.
