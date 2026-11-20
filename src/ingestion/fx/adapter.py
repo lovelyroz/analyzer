@@ -33,6 +33,7 @@ def parse_fx_xlsx(path: Union[str, Path], *, rate_type: str, source_label: Optio
     inputs: List[FxRateInput] = []
     errors: List[str] = []
     mappings = []
+    observations = []
     seen = {}
     factor = Decimal(10) if rate_type == "FREE_MARKET" else Decimal(1)
     label = source_label or f"XLSX_{rate_type}"
@@ -73,13 +74,18 @@ def parse_fx_xlsx(path: Union[str, Path], *, rate_type: str, source_label: Optio
                     continue
                 from openpyxl.utils import get_column_letter
                 seen[key] = (canonical, f"{ws.title}!{get_column_letter(date_col + 1)}{row_idx}/{get_column_letter(sell_col + 1)}{row_idx}")
+                observations.append({"sheet": ws.title, "row": row_idx, "date": str(date).strip(),
+                    "source_sell_rate": str(parsed), "canonical_rate": str(canonical),
+                    "date_cell": f"{get_column_letter(date_col + 1)}{row_idx}",
+                    "sell_cell": f"{get_column_letter(sell_col + 1)}{row_idx}"})
                 inputs.append(FxRateInput(rate=canonical, rate_type=rate_type,
                     jalali_year=comp[0], jalali_month=comp[1], jalali_day=comp[2], source=label))
     finally:
         wb.close()
     if not mappings:
         errors.append("Workbook has no row containing both a recognized date header and sell header")
-    return {"inputs": inputs, "errors": errors, "mappings": mappings, "conversion_factor": str(factor)}
+    return {"inputs": inputs, "errors": errors, "mappings": mappings,
+            "observations": observations, "conversion_factor": str(factor)}
 
 
 def load_fx_xlsx_inputs(path: Union[str, Path], *, rate_type: str,

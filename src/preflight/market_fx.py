@@ -175,22 +175,24 @@ def validate_fx(path: Path, *, rate_type: str = "EXCHANGE_CENTER") -> dict:
     mappings = parsed["mappings"]
     ident["worksheet_names"] = list(dict.fromkeys(m["sheet"] for m in mappings))
     observations = []
-    for item in parsed["inputs"]:
-        date = f"{item.jalali_year:04d}-{item.jalali_month:02d}-{item.jalali_day:02d}"
-        observations.append({"source_date": date, "source_sell_rate": str(item.rate),
-            "canonical_rate": str(item.rate), "economic_key": f"{date}|USD/IRR|{rate_type}"})
+    for item in parsed["observations"]:
+        observations.append({"sheet": item["sheet"], "row": item["row"],
+            "date_cell": item["date_cell"], "source_date": item["date"],
+            "sell_cell": item["sell_cell"], "source_sell_rate": item["source_sell_rate"],
+            "canonical_rate": item["canonical_rate"],
+            "economic_key": f"{item['date']}|USD/IRR|{rate_type}"})
     for message in parsed["errors"]:
         if "conflicting duplicate" in message:
-            code = "CONFLICTING_DUPLICATE"
+            code, severity = "CONFLICTING_DUPLICATE", "FAIL"
         elif "identical duplicate" in message:
-            code = "IDENTICAL_DUPLICATE"
+            code, severity = "IDENTICAL_DUPLICATE", "WARNING"
         elif "invalid Jalali date" in message:
-            code = "INVALID_FX_DATE"
+            code, severity = "INVALID_FX_DATE", "FAIL"
         elif "invalid sell rate" in message:
-            code = "INVALID_FX_RATE"
+            code, severity = "INVALID_FX_RATE", "FAIL"
         else:
-            code = "FX_MAPPING_NOT_FOUND"
-        _issue(issues, "FAIL", code, message)
+            code, severity = "FX_MAPPING_NOT_FOUND", "FAIL"
+        _issue(issues, severity, code, message)
     if not mappings: _issue(issues, "FAIL", "FX_MAPPING_NOT_FOUND", "Approved date and sell-rate headers were not found.")
     if not observations and mappings: _issue(issues, "FAIL", "NO_VALID_FX_ROWS", "No valid sell-rate observations were found.")
     _issue(issues, "WARNING", "PROVENANCE_UNKNOWN", "Workbook-to-profile linkage, publication/availability times, and revision identity remain unverified.")
@@ -198,7 +200,7 @@ def validate_fx(path: Path, *, rate_type: str = "EXCHANGE_CENTER") -> dict:
             "mapping": {"worksheets": mappings, "rate_type": rate_type, "pair": "USD/IRR",
                         "conversion": "Toman to Rial × 10" if rate_type == "FREE_MARKET" else "none"},
             "observations": observations, "validated_rows": len(observations),
-            "provenance": _provenance("EXCHANGE_CENTER (owner-approved; workbook linkage unverified)", UNKNOWN), "issues": issues}
+            "provenance": _provenance(f"{rate_type} (owner-approved; workbook linkage unverified)", UNKNOWN), "issues": issues}
 
 
 def find_free_market_sample(root: Path) -> dict:

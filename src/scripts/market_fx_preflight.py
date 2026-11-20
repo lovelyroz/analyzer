@@ -14,7 +14,7 @@ def main() -> int:
                         default="EXCHANGE_CENTER", help="Interpret sell values as Rial or Toman source rates.")
     parser.add_argument("--json-out", type=Path, help="Write JSON report to this path; otherwise stdout.")
     parser.add_argument("--root", type=Path, default=REPOSITORY_ROOT,
-                        help="Root used to resolve relative inputs and scan for FREE_MARKET samples.")
+                        help="Root used to resolve relative input and report paths.")
     args = parser.parse_args()
     root = args.root.expanduser().resolve()
     def resolve_input(p: Path) -> Path:

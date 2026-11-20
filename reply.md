@@ -242,3 +242,12 @@ Excel: ۱۹ رکورد کامل؛ تاریخ تکراری، Null، صفر/منف
 - Real-artifact read-only preflight command: `.\\.venv\\Scripts\\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out $env:TEMP\\market_fx_acceptance_preflight.json` — output `MarketDaily: WARNING`, `EXCHANGE_CENTER: WARNING`, `Overall: WARNING (read-only; no DB/ingestion)`, exit code 0. Warnings are provenance related; no FREE_MARKET real artifact was supplied.
 - `git diff --check` passed (Git reported only LF-to-CRLF normalization notices). No ORM, schema, migration, database, UI, or persistence changes were made; no DB was opened and no data was ingested.
 - Changed files: `src/ingestion/market/adapter.py`, `src/ingestion/fx/adapter.py`, `src/preflight/market_fx.py`, `src/scripts/market_fx_preflight.py`, `src/tests/test_market_fx_adapters.py`, and `docs/market_fx_preflight.md`. Pre-existing local modification `prompt.md` remains untouched.
+
+# TASK 034 follow-up verification — 2026-11-20
+
+- A second audit corrected FX preflight observation reporting: source sell values and canonical values are now distinct, with sheet and cell coordinates. FREE_MARKET applies ×10 only to the canonical value; EXCHANGE_CENTER leaves the value unchanged.
+- Identical FX duplicates now produce WARNING; conflicting duplicate payloads remain FAIL. Provenance identifies the selected rate type. CLI `--root` help text no longer claims a FREE_MARKET scan.
+- Added assertions for raw/canonical rates and identical duplicate severity.
+- Final isolated test command: `.\\.venv\\Scripts\\python.exe -m pytest -q src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py` — **24 passed**, 0 failed, in 4.68s.
+- Final real-artifact command: `.\\.venv\\Scripts\\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out $env:TEMP\\market_fx_acceptance_preflight.json` — `MarketDaily: WARNING`, `EXCHANGE_CENTER: WARNING`, overall `WARNING`, exit code 0. JSON confirms FX headers at row 3, sell column C, with `source_sell_rate=1936329`, `canonical_rate=1936329`, and sell cell `C4`.
+- `git diff --check` passed with only Git LF-to-CRLF normalization notices. No DB/production access or user acceptance was performed.
