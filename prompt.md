@@ -1,147 +1,139 @@
-# TASK 3 — IMPLEMENT MARKET/FX ARTIFACT PREFLIGHT VALIDATOR
+# TASK 3-CORRECTION — COMPLETE THE MARKET/FX PREFLIGHT CLI AND VALIDATION
 
-## Objective
+The previous DB-IMP-003 implementation is incomplete. This is a code correction task. Do not repeat the investigation or rewrite the entire module unnecessarily.
 
-Implement a working, read-only preflight validation tool for the existing MarketDaily and FX source artifacts.
+## 1. Fix the missing CLI
 
-This is an implementation task, not an investigation or documentation-only task.
+The report and usage document claim that this command exists:
 
-The deliverable must include executable code, automated tests, and a sample validation report.
+`python -m src.scripts.market_fx_preflight`
 
-## Scope
+But `src/scripts/market_fx_preflight.py` is missing, and the current `src/preflight/market_fx.py` does not provide a CLI entry point.
 
-Inspect the existing repository structure and implement a validator for:
+Implement the missing CLI at exactly that path.
 
-1. `saman_price_history.csv`
-2. `dollar-history.xlsx`
+Required behavior:
+- Accept `--market`, `--fx`, `--json-out`, and optional `--root`.
+- Run both validators and the FREE_MARKET sample check.
+- Print a concise per-feed summary.
+- Write the complete JSON report.
+- Exit with code 1 for FAIL or BLOCKED; otherwise exit 0.
+- Do not import database modules or connect to a database.
+- Resolve paths predictably from the repository root or explicit CLI arguments.
+- Do not overwrite input artifacts.
 
-Also inspect whether a FREE_MARKET sample exists. If it does not exist, report that feed as `BLOCKED_NO_SAMPLE`; do not fabricate a sample or infer its schema.
+## 2. Fix MarketDaily company identity
 
-## Required implementation
+The owner has confirmed that listed-company symbols are unique.
 
-Create a reusable validation module and a command-line entry point consistent with the project's existing language, architecture, and conventions.
+Use the CSV `Ticker` value as the canonical `codal_symbol` for the MarketDaily economic key, provided it is non-empty and consistent across all rows.
 
-The validator must:
+Economic key:
+`codal_symbol + J-Date`
 
-### A. Artifact identity
-- Resolve input paths safely.
-- Calculate SHA-256.
-- Record file size and file type.
-- Record worksheet names for Excel files.
-- Never modify, rename, or overwrite source artifacts.
+Do not require an external `--company-key` argument for the existing CSV.
 
-### B. MarketDaily validation
-- Inspect CSV headers and actual row structure.
-- Validate the approved fields where present:
-  - `J-Date`
-  - `Close`
-  - `Volume`
-  - `No`
-  - `Value`
-- Validate Jalali date format without silently converting or changing the source value.
-- Detect missing values, malformed numeric values, duplicate economic keys, and conflicting payloads for the same economic key.
-- Preserve `Value` independently. Never replace it with `Volume × Close`.
-- Do not introduce mappings for `Final`, `Open`, `High`, or `Low`.
+If Ticker is missing, empty, or inconsistent within one artifact, report a blocking issue.
 
-### C. FX validation
-- Inspect workbook sheets and actual headers.
-- Validate the approved sell-rate mapping only.
-- Validate Jalali date values and numeric sell rates.
-- Preserve the original source values and row references.
-- Detect duplicate economic keys and conflicting rates.
-- Do not infer a buy/sell mapping beyond the approved sell-rate field.
-- Do not multiply or divide rates unless the existing approved mapping explicitly requires it.
+Do not use company name as the key.
 
-### D. Provenance checks
-For every artifact, report these fields separately:
-- `source_published_at`
-- `source_available_at`
-- `ingested_at`
+## 3. Separate independent validation from economic-key validation
 
-Do not derive the first two from filesystem timestamps, file upload times, row dates, or Git timestamps.
+Currently, missing `company_key` prevents the validator from checking all MarketDaily rows.
 
-If a timestamp is not evidenced, return `UNKNOWN`, not a guessed value.
+Correct this behavior.
 
-Clearly distinguish:
-- artifact identity,
-- source identity,
-- source publication identity,
-- revision identity.
+Always validate independently:
+- Jalali date syntax and validity.
+- Required numeric fields.
+- Missing values.
+- CSV row width and malformed records.
+- Header requirements.
 
-A matching SHA-256 proves byte equality only. It does not prove publisher identity or revision order.
+Only economic-key duplicate/conflict checks may be blocked when the company identity is unresolved.
 
-### E. Validation result
-Produce structured results with:
-- `PASS`
-- `WARNING`
-- `FAIL`
-- `BLOCKED`
+Do not skip unrelated validation because one identity field is missing.
 
-The overall status must fail closed when required fields are missing, economic keys are invalid, or conflicting payloads cannot be resolved.
+## 4. Improve validation coverage
 
-Do not invent a winning revision. Do not use last-arrival-wins.
+Review the current implementation and add/fix these cases:
 
-## Tests
+- Detect conflicting and identical duplicate economic keys.
+- Check duplicate FX keys across all worksheets, not only within one worksheet.
+- Preserve source row/cell references.
+- Validate every required field independently.
+- Ensure malformed rows do not silently disappear.
+- Do not interpret blank trailing CSV lines as data records.
+- Do not change or normalize original source values in the report.
+- Keep `Value` independent; never calculate it from `Volume × Close`.
+- Keep `Final`, `Open`, `High`, and `Low` outside the approved MarketDaily mapping.
+- Keep FX conversion disabled.
+- Do not infer FREE_MARKET schema.
 
-Write automated tests covering at least:
+The validator must not select a winner for conflicting payloads.
 
-1. Valid MarketDaily input.
-2. Missing required MarketDaily field.
-3. Invalid Jalali date.
-4. Invalid numeric value.
-5. Duplicate identical economic key and payload.
-6. Duplicate economic key with conflicting payload.
-7. Valid FX workbook.
-8. Missing FX sell-rate field.
-9. Invalid FX date or rate.
-10. Missing FREE_MARKET sample.
-11. Unknown provenance timestamps.
-12. SHA-256 stability and source-file immutability.
+## 5. Add automated tests
 
-Use temporary test fixtures. Never modify the actual source artifacts during tests.
+Keep the existing tests and add tests for:
 
-## CLI behavior
+1. CLI runs successfully and produces JSON.
+2. CLI returns non-zero for BLOCKED/FAIL.
+3. MarketDaily uses Ticker as codal_symbol.
+4. Missing Ticker blocks economic-key validation but does not skip date/numeric checks.
+5. Inconsistent Ticker values are blocked.
+6. Malformed CSV row width is detected.
+7. FX duplicate economic key across separate worksheets is detected.
+8. Source artifacts remain unchanged after CLI execution.
 
-Provide a documented command that runs validation against the existing artifacts.
+Use temporary fixtures. Do not modify real source artifacts.
 
-The command must:
-- Run without opening a database connection.
-- Perform no ingestion or database writes.
-- Return a non-zero exit code when validation has FAIL or BLOCKED status.
-- Produce a machine-readable JSON report.
-- Produce a concise human-readable summary.
+Run the complete relevant test file and report the actual command and output.
 
-## Output files
+## 6. Regenerate the real-artifact report
 
-Create:
-1. The validator implementation.
-2. Automated tests.
-3. A usage document.
-4. A sample JSON validation report.
-5. `database/reports/DB_IMP_003_MARKET_FX_PREFLIGHT_VALIDATOR.md`
+Run the completed CLI against:
+- `saman_price_history.csv`
+- `dollar-history.xlsx`
 
-Append a concise completion entry to `reply.md`. Preserve all previous content.
+Use the actual Ticker in the CSV as codal_symbol.
+
+Regenerate:
+`database/reports/market_fx_preflight_sample.json`
+
+Expected interpretation:
+- MarketDaily must no longer be BLOCKED merely because no external company key was supplied.
+- EXCHANGE_CENTER may remain WARNING because source-profile linkage and provenance are unresolved.
+- FREE_MARKET must remain BLOCKED_NO_SAMPLE if no real sample exists.
+- Overall status may remain BLOCKED because FREE_MARKET is not available.
+
+Do not weaken validation to obtain PASS.
+
+## 7. Update documentation and report
+
+Update:
+- `docs/market_fx_preflight.md`
+- `database/reports/DB_IMP_003_MARKET_FX_PREFLIGHT_VALIDATOR.md`
+- `reply.md` (append only; preserve all historical content)
+
+The report must list exact files changed, test command/output, CLI command/output, and real-artifact status.
 
 ## Restrictions
 
-- Do not modify database schemas, ORM models, migrations, migration runners, or database records.
-- Do not run ingestion.
-- Do not modify source CSV/XLSX files.
-- Do not fabricate missing provenance.
-- Do not claim that validation success means a feed is production-ready.
-- Do not change approved source mappings.
-- Do not spend this task on prompt.md or Git reporting.
-- Do not stop after writing a plan. Implement the code and tests.
+- No database connection or writes.
+- No ORM, schema, migration, or migration-runner changes.
+- No ingestion.
+- No changes to the source CSV/XLSX files.
+- No changes to approved financial mappings.
+- Do not spend time on Git or prompt.md reporting.
+- Do not stop at documentation; implement and execute the CLI and tests.
 
 ## Completion criteria
 
-This task is complete only when:
-1. The implementation exists.
-2. Automated tests execute and their actual results are reported.
-3. The CLI runs against the available real artifacts.
-4. The JSON report is generated.
-5. Source artifact hashes before and after execution match.
-6. No database connection or write occurred.
-7. Known limitations and blocked feeds are explicitly reported.
-
-If an implementation detail is genuinely blocked by missing project information, implement all independent parts and document the exact blocker. Do not replace implementation with another investigation report.
+TASK 3 remains open until:
+- CLI file exists at the documented path.
+- CLI actually executes.
+- JSON output is generated by that CLI.
+- Tests pass.
+- Ticker-based company identity is validated.
+- Independent row validation works even when identity is missing.
+- Real source artifact hashes remain unchanged.

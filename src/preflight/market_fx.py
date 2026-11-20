@@ -103,46 +103,68 @@ def _provenance(source_identity: str, publication_identity: str) -> dict:
             "ingested_at": "NOT_INGESTED"}
 
 
-def validate_market(path: Path, company_key: str | None = None) -> dict:
+def validate_market(path: Path) -> dict:
     ident = artifact_identity(path)
     issues: list[dict[str, str]] = []
     try:
         with Path(ident["path"]).open("r", encoding="utf-8-sig", newline="") as f:
-            reader = csv.DictReader(f)
-            headers = reader.fieldnames or []
-            rows = list(reader)
+            reader = csv.reader(f)
+            all_rows = list(reader)
+        headers = all_rows[0] if all_rows else []
+        records = [(line, row) for line, row in enumerate(all_rows[1:], 2) if row != []]
     except (UnicodeError, csv.Error) as exc:
-        headers, rows = [], []
+        headers, records = [], []
         _issue(issues, "FAIL", "CSV_READ_ERROR", str(exc))
     absent = [h for h in MARKET_REQUIRED if h not in headers]
     if absent: _issue(issues, "FAIL", "MISSING_REQUIRED_FIELDS", f"Missing approved fields: {absent}")
-    if not company_key: _issue(issues, "BLOCKED", "COMPANY_KEY_UNRESOLVED", "Supply a stable, owner-resolved company key; ticker alone is not canonical.")
-    seen: dict[str, tuple] = {}
+    positions = {name: i for i, name in enumerate(headers)}
+    ticker_idx = positions.get("Ticker")
+    tickers = [row[ticker_idx] if ticker_idx is not None and ticker_idx < len(row) else "" for _, row in records]
+    codal_symbol = tickers[0] if tickers and tickers[0] else None
+    if ticker_idx is None or not tickers or any(not ticker for ticker in tickers):
+        _issue(issues, "BLOCKED", "CODAL_SYMBOL_MISSING", "Ticker is missing or empty; economic-key checks cannot run.")
+        codal_symbol = None
+    elif any(ticker != codal_symbol for ticker in tickers):
+        _issue(issues, "BLOCKED", "CODAL_SYMBOL_INCONSISTENT", "Ticker values differ within the artifact; economic-key checks cannot run.")
+        codal_symbol = None
+    seen: dict[str, tuple[tuple[str, ...], int]] = {}
     checked = 0
-    if not absent and company_key:
-        for n, row in enumerate(rows, 2):
-            date = (row.get("J-Date") or "").strip()
-            if not date or not _jalali(date):
-                _issue(issues, "FAIL", "INVALID_JALALI_DATE", f"Row {n}: J-Date is missing or invalid."); continue
-            vals = [row.get(col) for col in NUMERIC_MARKET]
-            bad = [col for col in NUMERIC_MARKET if not _number(row.get(col))]
-            if bad:
-                _issue(issues, "FAIL", "INVALID_NUMERIC", f"Row {n}: missing/malformed numeric fields {bad}."); continue
-            checked += 1
-            key = f"{company_key}|{date}"
-            payload = tuple((row.get(c) or "").strip() for c in NUMERIC_MARKET)
+    for line, row in records:
+        if len(row) != len(headers):
+            _issue(issues, "FAIL", "CSV_ROW_WIDTH", f"Record at CSV line {line} has {len(row)} fields; header has {len(headers)}.")
+        def field(name: str) -> str | None:
+            idx = positions.get(name)
+            return row[idx] if idx is not None and idx < len(row) else None
+        date = field("J-Date")
+        date_valid = bool(date and _jalali(date))
+        if not date_valid:
+            _issue(issues, "FAIL", "INVALID_JALALI_DATE", f"CSV line {line}: J-Date is missing or invalid (source={date!r}).")
+        bad = []
+        for col in NUMERIC_MARKET:
+            if col in absent:
+                continue
+            value = field(col)
+            if not _number(value):
+                bad.append(col)
+                _issue(issues, "FAIL", "INVALID_NUMERIC", f"CSV line {line}: {col} is missing or malformed (source={value!r}).")
+        checked += 1
+        if codal_symbol is not None and date_valid:
+            key = f"{codal_symbol}|{date}"
+            payload = tuple(field(c) if field(c) is not None else "<MISSING>" for c in NUMERIC_MARKET)
             if key in seen:
-                sev = "FAIL" if seen[key] != payload else "WARNING"
+                prior_payload, prior_line = seen[key]
+                sev = "FAIL" if prior_payload != payload else "WARNING"
                 code = "CONFLICTING_DUPLICATE" if sev == "FAIL" else "IDENTICAL_DUPLICATE"
-                _issue(issues, sev, code, f"Row {n}: duplicate economic key {key}; source rows are retained, no winner selected.")
-            else: seen[key] = payload
-    if not rows: _issue(issues, "FAIL", "NO_DATA_ROWS", "No CSV data rows were found.")
+                _issue(issues, sev, code, f"CSV lines {prior_line} and {line}: duplicate economic key {key}; no winner selected.")
+            else:
+                seen[key] = (payload, line)
+    if not records: _issue(issues, "FAIL", "NO_DATA_ROWS", "No CSV data rows were found.")
     _issue(issues, "WARNING", "PROVENANCE_UNKNOWN", "Publication, first availability, and revision evidence are absent; artifact hash does not establish source identity.")
     return {"feed": "MarketDaily", "status": _status(issues), "artifact": ident, "headers": headers,
-            "data_rows": len(rows), "validated_rows": checked, "approved_fields": list(MARKET_REQUIRED),
+            "data_rows": len(records), "validated_rows": checked, "approved_fields": list(MARKET_REQUIRED),
             "ignored_fields": [h for h in ("Final", "Open", "High", "Low") if h in headers],
             "value_policy": "Value validated and preserved independently; never computed from Volume × Close.",
-            "economic_key": {"company_key": company_key or UNKNOWN, "date_field": "J-Date"},
+            "economic_key": {"codal_symbol": codal_symbol or UNKNOWN, "date_field": "J-Date"},
             "provenance": _provenance("CODAL (owner-approved; artifact linkage unverified)", UNKNOWN), "issues": issues}
 
 
@@ -152,6 +174,7 @@ def validate_fx(path: Path) -> dict:
     wb = load_workbook(ident["path"], read_only=True, data_only=False)
     ident["worksheet_names"] = wb.sheetnames
     observations: list[dict] = []
+    seen_global: dict[str, tuple[str, str, str]] = {}
     mapped = False
     for ws in wb.worksheets:
         header_row = None
@@ -165,7 +188,6 @@ def validate_fx(path: Path) -> dict:
                 break
         if header_row is None: continue
         mapped = True
-        seen: dict[str, tuple] = {}
         for cells in ws.iter_rows(min_row=header_row + 1, values_only=False):
             date_cell, sell_cell = cells[date_col], cells[sell_col]
             date, rate = date_cell.value, sell_cell.value
@@ -176,12 +198,15 @@ def validate_fx(path: Path) -> dict:
                 _issue(issues, "FAIL", "INVALID_FX_DATE", f"{ws.title}!{date_cell.coordinate}: invalid Jalali date."); continue
             if not _number(rate, positive=True):
                 _issue(issues, "FAIL", "INVALID_FX_RATE", f"{ws.title}!{sell_cell.coordinate}: missing, malformed, or non-positive sell rate."); continue
-            payload = str(rate).strip()
-            if date_text in seen:
-                sev = "FAIL" if seen[date_text] != payload else "WARNING"
+            payload = str(rate)
+            key = f"{date_text}|USD/IRR|EXCHANGE_CENTER"
+            ref = f"{ws.title}!{date_cell.coordinate}/{sell_cell.coordinate}"
+            if key in seen_global:
+                prior_payload, prior_ref, _ = seen_global[key]
+                sev = "FAIL" if prior_payload != payload else "WARNING"
                 code = "CONFLICTING_DUPLICATE" if sev == "FAIL" else "IDENTICAL_DUPLICATE"
-                _issue(issues, sev, code, f"{ws.title} row {rownum}: duplicate FX economic key {date_text}|USD/IRR|EXCHANGE_CENTER.")
-            else: seen[date_text] = payload
+                _issue(issues, sev, code, f"Duplicate FX economic key {key} at {prior_ref} and {ref}; no winner selected.")
+            else: seen_global[key] = (payload, ref, ws.title)
             observations.append({"sheet": ws.title, "date_cell": date_cell.coordinate, "source_date": date,
                                  "sell_cell": sell_cell.coordinate, "source_sell_rate": rate,
                                  "economic_key": f"{date_text}|USD/IRR|EXCHANGE_CENTER"})
@@ -204,8 +229,8 @@ def find_free_market_sample(root: Path) -> dict:
             "message": "Sample available for independent review." if matches else "No FREE_MARKET sample found; schema and mapping not inferred."}
 
 
-def validate_all(market_path: Path, fx_path: Path, *, company_key: str | None = None, root: Path | None = None) -> dict:
-    results = [validate_market(market_path, company_key), validate_fx(fx_path),
+def validate_all(market_path: Path, fx_path: Path, *, root: Path | None = None) -> dict:
+    results = [validate_market(market_path), validate_fx(fx_path),
                find_free_market_sample(root or Path.cwd())]
     statuses = {r["status"] for r in results}
     overall = "BLOCKED" if "BLOCKED" in statuses else "FAIL" if "FAIL" in statuses else "WARNING" if "WARNING" in statuses else "PASS"

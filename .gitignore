@@ -16,6 +16,9 @@ Include/
 pdf/
 pdf_test/
 excel/
+!src/scripts/
+src/scripts/*
+!src/scripts/market_fx_preflight.py
 
 
 # Local databases / runtime data
