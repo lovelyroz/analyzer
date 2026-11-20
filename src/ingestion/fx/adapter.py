@@ -34,6 +34,7 @@ def parse_fx_xlsx(path: Union[str, Path], *, rate_type: str, source_label: Optio
     errors: List[str] = []
     mappings = []
     observations = []
+    records_found = 0
     seen = {}
     factor = Decimal(10) if rate_type == "FREE_MARKET" else Decimal(1)
     label = source_label or f"XLSX_{rate_type}"
@@ -56,6 +57,7 @@ def parse_fx_xlsx(path: Union[str, Path], *, rate_type: str, source_label: Optio
                 rate = row[sell_col] if sell_col < len(row) else None
                 if date is None and rate is None:
                     continue
+                records_found += 1
                 comp = parse_jalali_components(str(date).strip()) if date is not None else None
                 parsed = to_decimal(str(rate)) if rate is not None else None
                 if comp is None:
@@ -85,7 +87,8 @@ def parse_fx_xlsx(path: Union[str, Path], *, rate_type: str, source_label: Optio
     if not mappings:
         errors.append("Workbook has no row containing both a recognized date header and sell header")
     return {"inputs": inputs, "errors": errors, "mappings": mappings,
-            "observations": observations, "conversion_factor": str(factor)}
+            "observations": observations, "records_found": records_found,
+            "conversion_factor": str(factor)}
 
 
 def load_fx_xlsx_inputs(path: Union[str, Path], *, rate_type: str,
@@ -94,8 +97,9 @@ def load_fx_xlsx_inputs(path: Union[str, Path], *, rate_type: str,
     if rates_in_toman and rate_type != "FREE_MARKET":
         raise ValueError("Toman conversion is only valid for FREE_MARKET")
     result = parse_fx_xlsx(path, rate_type=rate_type, source_label=source_label)
-    if result["errors"]:
-        raise ValueError("FX workbook validation failed: " + "; ".join(result["errors"]))
+    hard_errors = [e for e in result["errors"] if "identical duplicate" not in e]
+    if hard_errors:
+        raise ValueError("FX workbook validation failed: " + "; ".join(hard_errors))
     if not result["inputs"]:
         raise ValueError("FX workbook contains no valid sell observations")
     return result["inputs"]

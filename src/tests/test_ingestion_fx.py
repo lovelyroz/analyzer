@@ -68,7 +68,7 @@ def test_free_market_and_operational_are_stored_separately(session):
         assert r.rate_date is None
 
 
-def test_fx_idempotent_upsert_jalali(session):
+def test_fx_replay_conflict_does_not_overwrite_jalali(session):
     r1 = ingest_fx_rates(
         session,
         [
@@ -98,13 +98,14 @@ def test_fx_idempotent_upsert_jalali(session):
             )
         ],
     )
-    assert r2.status == "COMPLETED"
-    assert r2.records_updated == 1
+    assert r2.status == "FAILED"
+    assert r2.records_updated == 0
+    assert r2.records_invalid == 1
     assert r2.records_inserted == 0
     assert session.query(FXRate).count() == 1
     saved = session.query(FXRate).one()
-    assert saved.rate == Decimal("615000")
-    assert saved.source == "B"
+    assert saved.rate == Decimal("610000")
+    assert saved.source == "A"
 
 
 def test_invalid_rate_type_and_non_positive_rate_fail_explicitly(session):
@@ -117,10 +118,11 @@ def test_invalid_rate_type_and_non_positive_rate_fail_explicitly(session):
             FxRateInput(rate=Decimal("500000"), rate_type="FREE_MARKET", rate_date=date(2024, 6, 1), source="OK"),
         ],
     )
-    assert result.status == "COMPLETED"
-    assert result.records_failed == 3
-    assert result.records_inserted == 1
-    assert session.query(FXRate).count() == 1
+    assert result.status == "FAILED"
+    assert result.records_failed == 4
+    assert result.records_invalid == 3
+    assert result.records_inserted == 0
+    assert session.query(FXRate).count() == 0
 
 
 def test_operational_never_defaults_to_free_market(session):
@@ -190,37 +192,43 @@ def test_same_month_across_years_fx(session):
     assert [r.jalali_year for r in month2] == [1402, 1403, 1404]
 
 
-def test_ingest_fx_xlsx_toman_and_rial(session, tmp_path):
+def test_ingest_fx_xlsx_conversion_and_exchange_schema_blocker(session, tmp_path):
     import openpyxl
 
     free_path = tmp_path / "free.xlsx"
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.append(["1404-01-05", 101785])
-    ws.append(["1404-01-06", 102000])
+    ws.append(["FX rates"])
+    ws.append(["\u062a\u0627\u0631\u06cc\u062e", "\u062e\u0631\u06cc\u062f \u0631\u06cc\u0627\u0644", "\u0641\u0631\u0648\u0634 \u0631\u06cc\u0627\u0644"])
+    ws.append(["1404-01-05", 101000, 101785])
+    ws.append(["1404-01-06", 101500, 102000])
     wb.save(free_path)
 
-    ops_path = tmp_path / "ops.xlsx"
+    exchange_path = tmp_path / "exchange.xlsx"
     wb2 = openpyxl.Workbook()
     ws2 = wb2.active
-    ws2.append(["تاریخ", "دلار مبادله ای (ریال)"])
-    ws2.append(["1404-01-05", 687390])
-    wb2.save(ops_path)
+    ws2.append(["FX rates"])
+    ws2.append(["\u062a\u0627\u0631\u06cc\u062e", "\u062e\u0631\u06cc\u062f \u0631\u06cc\u0627\u0644", "\u0641\u0631\u0648\u0634 \u0631\u06cc\u0627\u0644"])
+    ws2.append(["1404-01-05", 687000, 687390])
+    wb2.save(exchange_path)
 
     r_free = ingest_fx_xlsx(session, free_path, rate_type="FREE_MARKET", rates_in_toman=True, source_label="FREE_XLSX")
     assert r_free.status == "COMPLETED"
     assert r_free.records_inserted == 2
     free_row = session.query(FXRate).filter_by(rate_type="FREE_MARKET", jalali_day=5).one()
     assert free_row.rate == Decimal("1017850")
-    assert free_row.rate_date is None
-    assert free_row.jalali_year == 1404
 
-    r_ops = ingest_fx_xlsx(session, ops_path, rate_type="OPERATIONAL", rates_in_toman=False, source_label="OPS_XLSX")
+    r_exchange = ingest_fx_xlsx(session, exchange_path, rate_type="EXCHANGE_CENTER", rates_in_toman=False, source_label="EXCHANGE_XLSX")
+    assert r_exchange.status == "FAILED"
+    assert "SCHEMA_RATE_TYPE_UNSUPPORTED" in session.get(IngestionRun, r_exchange.ingestion_id).error_log
+    assert session.query(FXRate).filter_by(rate_type="EXCHANGE_CENTER").count() == 0
+
+    # Supported legacy Rial inputs pass through unchanged; service performs no unit conversion.
+    r_ops = ingest_fx_rates(session, [FxRateInput(
+        rate=Decimal("687390"), rate_type="OPERATIONAL", jalali_year=1404,
+        jalali_month=1, jalali_day=5, source="OPS_XLSX")])
     assert r_ops.records_inserted == 1
-    ops_row = session.query(FXRate).filter_by(rate_type="OPERATIONAL").one()
-    assert ops_row.rate == Decimal("687390")
-    assert ops_row.jalali_month == 1
-
+    assert session.query(FXRate).filter_by(rate_type="OPERATIONAL").one().rate == Decimal("687390")
 
 def test_migration_6_adds_fx_jalali_columns():
     engine = create_engine("sqlite:///:memory:")

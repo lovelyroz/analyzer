@@ -228,8 +228,7 @@ def test_market_price_as_of_rejects_duplicate_latest_jalali_observations(session
         select_market_price_as_of(session, company.company_id, (1403, 1, 9))
 
 
-def test_null_not_zero(session, tmp_path):
-    """Missing volume must stay NULL, never become 0."""
+def test_missing_volume_rejects_entire_batch(session, tmp_path):
     csv_content = (
         "J-Date,Open,High,Low,Close,Final,Volume,Value,No,Ticker,Name,Market\n"
         "1402-01-08,100,110,95,105,105,,1000000,10,سامان,بانک سامان,فرابورس\n"
@@ -238,15 +237,10 @@ def test_null_not_zero(session, tmp_path):
     p.write_text(csv_content, encoding="utf-8")
 
     result = ingest_ohlc_csv(session, p)
-    assert result.status == "COMPLETED"
-    assert result.records_inserted == 1
-    md = session.query(MarketDaily).one()
-    assert md.volume is None  # NULL != 0
-    assert md.close_price == Decimal("105")
-    assert md.jalali_year == 1402
-    assert md.jalali_month == 1
-    assert md.jalali_day == 8
-    assert md.trade_date is None  # no Gregorian conversion
+    assert result.status == "FAILED"
+    assert result.records_inserted == 0
+    assert result.records_invalid == 1
+    assert session.query(MarketDaily).count() == 0
 
 
 def test_same_month_across_years(session, tmp_path):
@@ -279,7 +273,7 @@ def test_same_month_across_years(session, tmp_path):
     assert month12[0].jalali_year == 1402
 
 
-def test_ingest_ohlc_idempotent(session, tmp_path):
+def test_ingest_ohlc_replay_is_unchanged(session, tmp_path):
     csv_content = (
         "J-Date,Open,High,Low,Close,Final,Volume,Value,No,Ticker,Name,Market\n"
         "1402-01-08,3022,3022,3022,3022,3022,14738930,44541046460,263,سامان,بانک سامان,پایه زرد\n"
@@ -301,7 +295,8 @@ def test_ingest_ohlc_idempotent(session, tmp_path):
     r2 = ingest_ohlc_csv(session, p)
     assert r2.status == "COMPLETED"
     assert session.query(MarketDaily).count() == 2  # no uncontrolled duplicates
-    assert r2.records_updated == 2
+    assert r2.records_updated == 0
+    assert r2.records_duplicated == 2
     selected = select_market_price_as_of(session, company.company_id, (1402, 1, 9))
     assert selected is not None
     assert selected == first_selection

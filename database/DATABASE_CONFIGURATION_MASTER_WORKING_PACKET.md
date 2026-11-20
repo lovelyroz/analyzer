@@ -1,4 +1,4 @@
-# Database Configuration — Master Working Packet
+﻿# Database Configuration — Master Working Packet
 
 ## 1. Purpose and authority
 
@@ -2425,6 +2425,10 @@ Guardrail موقت: برای کلید اقتصادی موجود MarketDaily یا
 
 این ممیزی، وضعیت ثبت‌شدهٔ Taskها را با تصمیم قطعی مالک در §9.31 و کد فعلی مسیر Market/FX تطبیق می‌دهد. این بخش برای جلوگیری از تکرار blockerهای منسوخ، بر برداشت‌های قدیمی‌تر تقدم دارد.
 
+### Current status correction — Task 034 / DB-ING-007
+
+**DONE — owner UAT completed.** The owner confirmed acceptance of Task 034. Recorded UAT evidence: 24 tests passed; MarketDaily: WARNING; EXCHANGE_CENTER: WARNING; Overall: WARNING. The remaining WARNINGs concern external provenance evidence and are not blockers under the owner decision in §9.31. The following implementation findings and closing sentence in this §9.32 are a historical pre-implementation snapshot; they must not be read as the current Task 034 status.
+
 ### الف) وضعیت Taskها بر اساس شواهد موجود
 
 - DONEهای صریح و مستند در آخرین وضعیت قابل مشاهده: Task 024 (DB-STD-004)، Task 028 (DB-DES-007)، Task 029 (DB-AUD-007)، Task 030 (DB-AUD-008)، Task 031 (DB-ING-004) و Task 032 (DB-ING-005). DONE بودن این موارد به معنی تکمیل کل مسیر دیتابیس نیست.
@@ -2442,7 +2446,7 @@ Guardrail موقت: برای کلید اقتصادی موجود MarketDaily یا
 5. مدل‌های MarketDaily و FXRate قید یکتایی فیزیکی مؤثر بر کلیدهای Jalali ندارند: unique فعلی MarketDaily بر (company_id, trade_date) و FX بر (rate_date, currency_from, currency_to, rate_type) است، درحالی‌که مسیر Jalali مقدار Gregorian date را NULL می‌گذارد. اصلاح فیزیکی این مسئله به بررسی و مجوز مستقل schema/migration نیاز دارد.
 6. src/ingestion/service.py::ingest_fx_rates نیز payload موجود را overwrite می‌کند و partial acceptance دارد؛ این رفتار باید پیش از فعال‌سازی persistence با قرارداد atomicity/conflict تعیین تکلیف شود.
 
-### ج) گام اجرایی بعدی پیشنهادی — Task 034
+### Historical proposed Task 034 scope (superseded by completed implementation)
 
 **Task 034 — DB-ING-007: هم‌راستاسازی Market/FX File Adapters با قرارداد مصوب (بدون persistence/schema)**
 
@@ -2465,4 +2469,21 @@ Guardrail موقت: برای کلید اقتصادی موجود MarketDaily یا
 
 **معیار پایان Task 034:** mapping دقیق هر دو فایل مطابق قرارداد مالک؛ parser مشترک FX با تفاوت واحد صریح؛ نبود silent row drops؛ diagnostics و duplicate/conflict detection قابل آزمون؛ automated tests موفق؛ CLI و مستندات به‌روز؛ هیچ persistence/schema/DB change. پس از آن، گام جداگانه برای بستن physical Jalali identity و atomic persistence در Taskهای 009/010 تعریف می‌شود.
 
-این ممیزی فقط source-level و مستنداتی است؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرده و هیچ تستی اجرا نشده است. Task 034 در این مرحله به‌عنوان گام بعدی تعریف شده، نه DONE؛ پیاده‌سازی آن هنوز انجام نشده است.
+این جمله فقط وضعیت در زمان ممیزی پیش از پیاده‌سازی در 2026-11-20 را ثبت می‌کند و با اصلاح وضعیت جاری ابتدای این بخش superseded شده است: Task 034 / DB-ING-007 بعداً تکمیل و UAT آن توسط مالک پذیرفته شد.
+
+
+## 9.33 Task 035 / DB-ING-008 — Atomic Market/FX ingestion implementation status
+
+**Status: PARTIAL — application-level fail-closed implementation is present and isolated tests pass; physical concurrency uniqueness and EXCHANGE_CENTER schema support remain blocked by the no-schema-change boundary.**
+
+Implemented in `src/ingestion/market/ingestion.py`, `src/ingestion/service.py`, and `src/ingestion/common/atomic.py`:
+- A durable STARTED audit commit occurs before canonical work. The canonical records and COMPLETED state are flushed and committed together. On validation/commit failure, canonical work is rolled back and FAILED is recorded in a separate transaction; errors are reduced to safe codes/counts.
+- Market and FX batches are validated in full before canonical rows are staged. Any invalid row or payload conflict rejects the whole batch. Identical payload duplicates are reported as unchanged, and existing data is never overwritten.
+- Market identity uses Company plus Jalali date. `Value` is compared and stored independently; only approved Close/Volume/No/Value fields are written. The adapter's already-canonical Rial rate is persisted without another ×10 conversion.
+- The existing IngestionRun model has no dedicated duplicate/invalid counter columns. These counts are exposed in ingestion results and stored as explicit `duplicate_count`/`invalid_count` keys in the existing sanitized `error_log`; `records_updated` remains zero.
+
+**Unresolved boundaries:**
+1. `FXRate.rate_type` CheckConstraint and `VALID_FX_RATE_TYPES` omit `EXCHANGE_CENTER`. The service rejects this type with `SCHEMA_RATE_TYPE_UNSUPPORTED`; persisting it requires a separately authorized schema/migration change. No constraint workaround was added.
+2. MarketDaily unique constraint is `(company_id, trade_date)` and FXRate unique constraint is `(rate_date, currency_from, currency_to, rate_type)`. Jalali writes leave those date fields NULL, so these constraints do not prevent concurrent duplicate Jalali keys. Application preflight detects sequential replays/conflicts but cannot guarantee uniqueness under concurrent sessions. A Jalali unique migration is still required for that guarantee.
+
+Automated evidence: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task035_final_20261120 src/tests/test_market_fx_atomic_ingestion.py src/tests/test_ingestion_ohlc.py src/tests/test_ingestion_fx.py src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py` — **61 passed in 78.16s**. Tests use isolated temporary SQLite databases; no owner database was opened. Owner acceptance remains outstanding for Task 035.

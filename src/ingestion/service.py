@@ -24,9 +24,16 @@ from typing import Optional, Sequence, Tuple, Union
 from sqlalchemy.orm import Session
 
 from src.ingestion.codal.numbers import normalize_digits
+from src.ingestion.common.atomic import (
+    IngestionAuditError,
+    create_started_run,
+    finish_completed_run,
+    finish_failed_run,
+)
 from src.ingestion.common.identity import find_fx_existing
 from src.ingestion.common.parsing import parse_jalali_components as _parse_jalali_components
 from src.ingestion.common.validation import VALID_FX_RATE_TYPES
+from src.core.jalali import is_valid_jalali_components
 from src.models.audit import IngestionRun
 from src.models.fx import FXRate
 from src.models.normalized import RawFinancialFact
@@ -74,6 +81,8 @@ class OhlcIngestionResult:
     records_updated: int
     records_failed: int
     status: str
+    records_duplicated: int = 0
+    records_invalid: int = 0
 
 
 @dataclass(frozen=True)
@@ -107,6 +116,8 @@ class FxIngestionResult:
     records_updated: int
     records_failed: int
     status: str
+    records_duplicated: int = 0
+    records_invalid: int = 0
 
 
 def ingest_codal_report(
@@ -285,6 +296,8 @@ def ingest_ohlc_csv(
         records_updated=result.records_updated,
         records_failed=result.records_failed,
         status=result.status,
+        records_duplicated=result.records_duplicated,
+        records_invalid=result.records_invalid,
     )
 
 
@@ -293,134 +306,129 @@ def ingest_fx_rates(
     rates: Sequence[FxRateInput],
     *,
     source_label: str = "FX",
+    _prevalidation_errors: Sequence[str] = (),
+    _records_found: Optional[int] = None,
+    _parser_duplicate_count: int = 0,
 ) -> FxIngestionResult:
-    """Persist FX rate observations into fx_rates (CHANGE-001 / CHANGE-006).
+    """Validate and persist a whole FX batch atomically; never overwrite."""
+    items = list(rates)
+    found = len(items) if _records_found is None else _records_found
+    run_id, can_continue = create_started_run(session, "FX", found)
+    if not can_continue:
+        return FxIngestionResult(run_id, found, 0, 0, found, "FAILED", 0, 0)
 
-    Accepts already-built FxRateInput DTOs only — no file parsing here.
-    """
-    run = IngestionRun(source="FX", status="STARTED", records_found=len(rates))
-    session.add(run)
-    session.flush()
-
-    inserted = 0
-    updated = 0
-    failed = 0
-    errors: list = []
-
+    invalid: list[str] = []
+    duplicate_count = _parser_duplicate_count
+    prepared: list[FXRate] = []
+    seen: dict[tuple, Decimal] = {}
     try:
-        for idx, item in enumerate(rates):
-            label = f"item {idx}"
-            if item.rate_type not in VALID_FX_RATE_TYPES:
-                failed += 1
-                errors.append(f"{label}: invalid rate_type={item.rate_type!r}")
-                continue
-            if item.rate is None:
-                failed += 1
-                errors.append(f"{label}: rate is required (NULL not allowed)")
-                continue
+        run = session.get(IngestionRun, run_id)
+        if run is None:
+            raise IngestionAuditError("started FX audit row is missing")
+        if _prevalidation_errors or not items:
+            if not items and not _prevalidation_errors:
+                invalid.append("EMPTY_BATCH")
+            for idx, message in enumerate(_prevalidation_errors, 1):
+                if "conflicting duplicate" in message:
+                    code = "IN_BATCH_CONFLICT"
+                elif "invalid Jalali date" in message:
+                    code = "INVALID_JALALI_DATE"
+                elif "invalid sell rate" in message:
+                    code = "INVALID_RATE"
+                elif "no row containing" in message:
+                    code = "FX_HEADER_NOT_FOUND"
+                else:
+                    code = "FX_SOURCE_ROW_INVALID"
+                invalid.append(f"ROW_{idx}_{code}")
+            session.rollback()
+            finish_failed_run(session, run_id, records_found=found,
+                              duplicate_count=duplicate_count, invalid_count=len(invalid), codes=invalid)
+            return FxIngestionResult(run_id, found, 0, 0, found, "FAILED", duplicate_count, len(invalid))
+        for idx, item in enumerate(items, 1):
+            code = None
+            if item.rate_type == "EXCHANGE_CENTER":
+                code = "SCHEMA_RATE_TYPE_UNSUPPORTED"
+            elif not isinstance(item.rate_type, str) or item.rate_type not in VALID_FX_RATE_TYPES:
+                code = "INVALID_RATE_TYPE"
             try:
-                rate_val = Decimal(item.rate)
+                rate = Decimal(item.rate) if item.rate is not None else None
             except Exception:
-                failed += 1
-                errors.append(f"{label}: rate not numeric")
+                rate = None
+            if code is None and (rate is None or not rate.is_finite() or rate <= 0):
+                code = "INVALID_RATE"
+            if code is None and rate is not None:
+                scale = max(0, -rate.as_tuple().exponent)
+                integer_digits = max(0, len(rate.as_tuple().digits) - scale)
+                if scale > 4 or integer_digits > 14:
+                    code = "RATE_PRECISION_OUT_OF_RANGE"
+            has_any_jalali = any(v is not None for v in (item.jalali_year, item.jalali_month, item.jalali_day))
+            has_full_jalali = all(v is not None for v in (item.jalali_year, item.jalali_month, item.jalali_day))
+            if code is None:
+                if has_any_jalali and not has_full_jalali:
+                    code = "INCOMPLETE_JALALI_IDENTITY"
+                elif has_full_jalali:
+                    parts = (item.jalali_year, item.jalali_month, item.jalali_day)
+                    if any(type(v) is not int for v in parts) or not is_valid_jalali_components(*parts):
+                        code = "INVALID_JALALI_DATE"
+                    elif item.rate_date is not None:
+                        code = "AMBIGUOUS_DATE_IDENTITY"
+                elif type(item.rate_date) is not date:
+                    code = "MISSING_OR_INVALID_DATE_IDENTITY"
+            c_from = item.currency_from.strip().upper() if isinstance(item.currency_from, str) else ""
+            c_to = item.currency_to.strip().upper() if isinstance(item.currency_to, str) else ""
+            src = item.source if item.source is not None else source_label
+            if code is None and (not c_from or not c_to or len(c_from) > 10 or len(c_to) > 10):
+                code = "INVALID_CURRENCY_PAIR"
+            if code is None and src is not None and (not isinstance(src, str) or len(src) > 100):
+                code = "SOURCE_LABEL_TOO_LONG"
+            if code is not None:
+                invalid.append(f"ROW_{idx}_{code}")
                 continue
-            if rate_val <= 0:
-                failed += 1
-                errors.append(f"{label}: rate must be positive")
+
+            jy, jm, jd = (item.jalali_year, item.jalali_month, item.jalali_day) if has_full_jalali else (None, None, None)
+            rdate = None if has_full_jalali else item.rate_date
+            key = (jy, jm, jd, rdate, c_from, c_to, item.rate_type)
+            if key in seen:
+                if seen[key] == rate:
+                    duplicate_count += 1
+                else:
+                    invalid.append(f"ROW_{idx}_IN_BATCH_CONFLICT")
                 continue
+            seen[key] = rate
 
-            has_jalali = (
-                item.jalali_year is not None
-                and item.jalali_month is not None
-                and item.jalali_day is not None
-            )
-            if not has_jalali and item.rate_date is None:
-                failed += 1
-                errors.append(f"{label}: need jalali components or rate_date")
+            existing = find_fx_existing(session, rate_type=item.rate_type, c_from=c_from,
+                c_to=c_to, rate_date=rdate, jy=jy, jm=jm, jd=jd)
+            if existing is not None:
+                if Decimal(existing.rate) == rate:
+                    duplicate_count += 1
+                else:
+                    invalid.append(f"ROW_{idx}_EXISTING_KEY_CONFLICT")
                 continue
+            prepared.append(FXRate(rate_date=rdate, jalali_year=jy, jalali_month=jm,
+                jalali_day=jd, currency_from=c_from, currency_to=c_to, rate=rate,
+                rate_type=item.rate_type, source=src))
 
-            c_from = (item.currency_from or "USD").strip().upper()
-            c_to = (item.currency_to or "IRR").strip().upper()
-            src = item.source or source_label
+        if invalid:
+            session.rollback()
+            finish_failed_run(session, run_id, records_found=found,
+                              duplicate_count=duplicate_count, invalid_count=len(invalid), codes=invalid)
+            return FxIngestionResult(run_id, found, 0, 0, found, "FAILED", duplicate_count, len(invalid))
 
-            jy = item.jalali_year if has_jalali else None
-            jm = item.jalali_month if has_jalali else None
-            jd = item.jalali_day if has_jalali else None
-            rdate = None if has_jalali else item.rate_date
-
-            existing = find_fx_existing(
-                session,
-                rate_type=item.rate_type,
-                c_from=c_from,
-                c_to=c_to,
-                rate_date=rdate,
-                jy=jy,
-                jm=jm,
-                jd=jd,
-            )
-
-            if existing is None:
-                session.add(
-                    FXRate(
-                        rate_date=rdate,
-                        jalali_year=jy,
-                        jalali_month=jm,
-                        jalali_day=jd,
-                        currency_from=c_from,
-                        currency_to=c_to,
-                        rate=rate_val,
-                        rate_type=item.rate_type,
-                        source=src,
-                    )
-                )
-                inserted += 1
-            else:
-                existing.rate = rate_val
-                existing.source = src
-                if has_jalali:
-                    existing.jalali_year = jy
-                    existing.jalali_month = jm
-                    existing.jalali_day = jd
-                    existing.rate_date = None
-                updated += 1
-
-        run.records_inserted = inserted
-        run.records_updated = updated
-        run.records_failed = failed
-        run.error_log = "\n".join(errors[:50]) if errors else None
-        run.status = "COMPLETED"
-        run.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        session.add_all(prepared)
+        finish_completed_run(run, records_found=found, records_inserted=len(prepared),
+                             duplicate_count=duplicate_count)
+        session.flush()
         session.commit()
-
-        return FxIngestionResult(
-            ingestion_id=run.ingestion_id,
-            records_found=len(rates),
-            records_inserted=inserted,
-            records_updated=updated,
-            records_failed=failed,
-            status=run.status,
-        )
-    except Exception as exc:
+        return FxIngestionResult(run_id, found, len(prepared), 0, 0, "COMPLETED", duplicate_count, 0)
+    except IngestionAuditError:
         session.rollback()
-        failed_run = IngestionRun(
-            source="FX",
-            status="FAILED",
-            records_found=len(rates),
-            records_failed=len(rates),
-            error_log=str(exc),
-            finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
-        )
-        session.add(failed_run)
-        session.commit()
-        return FxIngestionResult(
-            ingestion_id=failed_run.ingestion_id,
-            records_found=len(rates),
-            records_inserted=0,
-            records_updated=0,
-            records_failed=len(rates),
-            status="FAILED",
-        )
-
+        raise
+    except Exception:
+        session.rollback()
+        finish_failed_run(session, run_id, records_found=found,
+                          duplicate_count=duplicate_count, invalid_count=len(invalid),
+                          codes=invalid + ["CANONICAL_TRANSACTION_FAILED"])
+        return FxIngestionResult(run_id, found, 0, 0, found, "FAILED", duplicate_count, len(invalid))
 
 def ingest_fx_xlsx(
     session: Session,
@@ -431,16 +439,24 @@ def ingest_fx_xlsx(
     source_label: Optional[str] = None,
 ) -> FxIngestionResult:
     """Facade: XLSX parsing in fx.adapter; persistence via ingest_fx_rates."""
-    from src.ingestion.fx.adapter import load_fx_xlsx_inputs
+    from src.ingestion.fx.adapter import parse_fx_xlsx
 
     label = source_label or f"XLSX_{rate_type}"
-    inputs = load_fx_xlsx_inputs(
-        path,
-        rate_type=rate_type,
-        rates_in_toman=rates_in_toman,
-        source_label=label,
-    )
-    return ingest_fx_rates(session, inputs, source_label=label)
+    if rates_in_toman and rate_type != "FREE_MARKET":
+        raise ValueError("Toman conversion is only valid for FREE_MARKET")
+    if rate_type not in {"FREE_MARKET", "EXCHANGE_CENTER"}:
+        raise ValueError("rate_type must be FREE_MARKET or EXCHANGE_CENTER")
+    try:
+        parsed = parse_fx_xlsx(path, rate_type=rate_type, source_label=label)
+    except Exception:
+        return ingest_fx_rates(session, [], source_label=label,
+                               _prevalidation_errors=("FX_WORKBOOK_READ_FAILED",), _records_found=0)
+    identical_duplicates = sum("identical duplicate" in e for e in parsed["errors"])
+    hard_errors = tuple(e for e in parsed["errors"] if "identical duplicate" not in e)
+    return ingest_fx_rates(session, parsed["inputs"], source_label=label,
+                           _prevalidation_errors=hard_errors,
+                           _records_found=parsed["records_found"],
+                           _parser_duplicate_count=identical_duplicates)
 
 
 def parse_jalali_components(s: str) -> Optional[Tuple[int, int, int]]:

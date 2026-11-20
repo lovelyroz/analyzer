@@ -1,4 +1,4 @@
-# ممیزی محلی Feed بازار و نرخ ارز
+﻿# ممیزی محلی Feed بازار و نرخ ارز
 
 - نوع کار: فقط گزارش؛ هیچ کد، فایل اصلی یا پایگاه‌داده‌ای تغییر نکرده است.
 - تاریخ ممیزی: ۱۹ نوامبر ۲۰۲۶.
@@ -238,8 +238,8 @@ Excel: ۱۹ رکورد کامل؛ تاریخ تکراری، Null، صفر/منف
 - Market CSV adapter now requires and maps only `J-Date`, `Ticker`, `Close`, `Volume`, `No`, and `Value`. `Open`, `High`, `Low`, and `Final` are ignored and never populated into its DTO; malformed rows and duplicate/conflicting economic keys produce explicit parser errors.
 - Added shared workbook parser used by the adapter and read-only preflight. It finds date/sell headers across worksheet rows, maps sell only, diagnoses invalid dates/rates and duplicates, preserves EXCHANGE_CENTER Rial values, and applies FREE_MARKET Toman × 10 using Decimal arithmetic. CLI accepts `--fx-rate-type EXCHANGE_CENTER|FREE_MARKET`.
 - Updated [preflight guide](docs/market_fx_preflight.md) with exact user acceptance command and FREE_MARKET fixture test command. User acceptance was not claimed.
-- Automated isolated test command: `.\\.venv\\Scripts\\python.exe -m pytest -q src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py` — **23 passed**, 0 failed, in 4.75s.
-- Real-artifact read-only preflight command: `.\\.venv\\Scripts\\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out $env:TEMP\\market_fx_acceptance_preflight.json` — output `MarketDaily: WARNING`, `EXCHANGE_CENTER: WARNING`, `Overall: WARNING (read-only; no DB/ingestion)`, exit code 0. Warnings are provenance related; no FREE_MARKET real artifact was supplied.
+- Automated isolated test command: `.\.venv\Scripts\python.exe -m pytest -q src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py` — **23 passed**, 0 failed, in 4.75s.
+- Real-artifact read-only preflight command: `.\.venv\Scripts\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out $env:TEMP\\market_fx_acceptance_preflight.json` — output `MarketDaily: WARNING`, `EXCHANGE_CENTER: WARNING`, `Overall: WARNING (read-only; no DB/ingestion)`, exit code 0. Warnings are provenance related; no FREE_MARKET real artifact was supplied.
 - `git diff --check` passed (Git reported only LF-to-CRLF normalization notices). No ORM, schema, migration, database, UI, or persistence changes were made; no DB was opened and no data was ingested.
 - Changed files: `src/ingestion/market/adapter.py`, `src/ingestion/fx/adapter.py`, `src/preflight/market_fx.py`, `src/scripts/market_fx_preflight.py`, `src/tests/test_market_fx_adapters.py`, and `docs/market_fx_preflight.md`. Pre-existing local modification `prompt.md` remains untouched.
 
@@ -248,13 +248,30 @@ Excel: ۱۹ رکورد کامل؛ تاریخ تکراری، Null، صفر/منف
 - A second audit corrected FX preflight observation reporting: source sell values and canonical values are now distinct, with sheet and cell coordinates. FREE_MARKET applies ×10 only to the canonical value; EXCHANGE_CENTER leaves the value unchanged.
 - Identical FX duplicates now produce WARNING; conflicting duplicate payloads remain FAIL. Provenance identifies the selected rate type. CLI `--root` help text no longer claims a FREE_MARKET scan.
 - Added assertions for raw/canonical rates and identical duplicate severity.
-- Final isolated test command: `.\\.venv\\Scripts\\python.exe -m pytest -q src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py` — **24 passed**, 0 failed, in 4.68s.
-- Final real-artifact command: `.\\.venv\\Scripts\\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out $env:TEMP\\market_fx_acceptance_preflight.json` — `MarketDaily: WARNING`, `EXCHANGE_CENTER: WARNING`, overall `WARNING`, exit code 0. JSON confirms FX headers at row 3, sell column C, with `source_sell_rate=1936329`, `canonical_rate=1936329`, and sell cell `C4`.
+- Final isolated test command: `.\.venv\Scripts\python.exe -m pytest -q src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py` — **24 passed**, 0 failed, in 4.68s.
+- Final real-artifact command: `.\.venv\Scripts\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out $env:TEMP\\market_fx_acceptance_preflight.json` — `MarketDaily: WARNING`, `EXCHANGE_CENTER: WARNING`, overall `WARNING`, exit code 0. JSON confirms FX headers at row 3, sell column C, with `source_sell_rate=1936329`, `canonical_rate=1936329`, and sell cell `C4`.
 - `git diff --check` passed with only Git LF-to-CRLF normalization notices. No DB/production access or user acceptance was performed.
 
 # TASK 034 re-run — 2026-11-20
 
 - Re-read the current `PROMPT.md` and revalidated the Market/FX adapter work. Tightened MarketDaily numeric validation: `Volume` and `No` must be integer-valued, all numeric fields must be finite, and duplicate approved headers are diagnosed/rejected. Updated the guide and added isolated tests for fractional integer fields and duplicate headers.
-- First pytest attempt printed 26 passing tests but failed during pytest's Windows temporary-directory cleanup with `PermissionError` (`pytest-current`). Re-ran with an isolated workspace-local basetemp; final command `.\\.venv\\Scripts\\python.exe -m pytest -q --basetemp .pytest_task034_20261120 src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py` completed successfully: **26 passed**, 0 failed, in 5.15s. The temporary directory was removed after verifying it was inside the project.
-- Re-ran real-artifact preflight: `.\\.venv\\Scripts\\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out .task034_preflight.json` — MarketDaily WARNING (21 rows), EXCHANGE_CENTER WARNING (19 rows), overall WARNING; exit code 0. Verified workbook header row 3, sell column C, and `Sheet!C4` raw/canonical rate `1936329`. Temporary report was removed after inspection.
+- First pytest attempt printed 26 passing tests but failed during pytest's Windows temporary-directory cleanup with `PermissionError` (`pytest-current`). Re-ran with an isolated workspace-local basetemp; final command `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task034_20261120 src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py` completed successfully: **26 passed**, 0 failed, in 5.15s. The temporary directory was removed after verifying it was inside the project.
+- Re-ran real-artifact preflight: `.\.venv\Scripts\python.exe -m src.scripts.market_fx_preflight --root . --market saman_price_history.csv --fx dollar-history.xlsx --fx-rate-type EXCHANGE_CENTER --json-out .task034_preflight.json` — MarketDaily WARNING (21 rows), EXCHANGE_CENTER WARNING (19 rows), overall WARNING; exit code 0. Verified workbook header row 3, sell column C, and `Sheet!C4` raw/canonical rate `1936329`. Temporary report was removed after inspection.
 - `git diff --check` passed; Git emitted LF-to-CRLF normalization notices only. No database, ORM, schema, migrations, or production state was touched. User acceptance remains for the user to run using the command in `docs/market_fx_preflight.md`.
+
+# TASK 034 and TASK 035 — status correction and atomic ingestion — 2026-11-20
+
+## Task 034 / DB-ING-007 — DONE (owner UAT accepted)
+
+- Owner-confirmed UAT: `24 passed`; preflight `MarketDaily: WARNING`, `EXCHANGE_CENTER: WARNING`, `Overall: WARNING`. The remaining provenance warnings are not blockers under the owner decision recorded in Master Packet §9.31.
+- Corrected the Master Packet current status and explicitly marked the old §9.32 “not done” conclusion as a historical pre-implementation snapshot.
+
+## Task 035 / DB-ING-008 — PARTIAL (implementation and isolated tests complete; schema/concurrency boundaries remain)
+
+- Implemented whole-batch validation and atomic canonical writes for Market and supported FX types; identical duplicates do not modify existing data; differing payloads reject the batch. Failure rollback and separate FAILED audit handling are covered. `Value` remains independent, unsupported Market OHLC/Final fields are not persisted, and FX rates are not multiplied by 10 a second time.
+- `EXCHANGE_CENTER` ingestion is explicitly rejected with `SCHEMA_RATE_TYPE_UNSUPPORTED` because the existing FX type constraint omits it. Jalali concurrent uniqueness cannot be guaranteed by the existing Gregorian-date unique constraints. No ORM, schema, migration, real DB, or real ingestion was changed or used. These limitations keep the task PARTIAL.
+- Changed/added files: `src/ingestion/common/atomic.py`, `src/ingestion/market/ingestion.py`, `src/ingestion/service.py`, `src/tests/test_market_fx_atomic_ingestion.py`, `src/tests/test_ingestion_ohlc.py`, `src/tests/test_ingestion_fx.py`, `database/reports/DB_ING_008_MARKET_FX_ATOMIC_INGESTION.md`, `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`, and this `reply.md`. `src/ingestion/fx/adapter.py` was already modified by Task 034 and was not changed for Task 035. Pre-existing user edit `prompt.md` was left untouched.
+- Automated test command: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task035_final_20261120 src/tests/test_market_fx_atomic_ingestion.py src/tests/test_ingestion_ohlc.py src/tests/test_ingestion_fx.py src/tests/test_market_fx_adapters.py src/tests/test_market_fx_preflight.py`
+- Actual output: `61 passed in 78.16s (0:01:18)` (exit code 0).
+- Owner acceptance command, not run by the agent: `.\.venv\Scripts\python.exe -m pytest -q src/tests/test_market_fx_atomic_ingestion.py`. It uses isolated temporary test databases. Task 035 owner UAT has not been claimed.
+- `git diff --check` passed. Git reported only LF-to-CRLF normalization notices.

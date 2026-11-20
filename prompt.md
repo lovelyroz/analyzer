@@ -1,82 +1,94 @@
-# Task 035 — DB-ING-008
-## Market/FX Atomic Ingestion and Conflict Protection
+# اصلاح اجرای Task 035 — اجرای واقعی DB-ING-008 و اصلاح وضعیت Task 034
 
-این Task اجرایی است. هدف اصلاح کدهای موجود است، نه تهیه گزارش یا تکرار ممیزی‌های قبلی.
+**نوع کار: کدنویسی و تغییر واقعی کد + تست خودکار + اصلاح مستندات. گزارش‌نویسی صرف پذیرفته نیست.**
 
-### مراجع
-- `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
-- `database/reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md`
+در بررسی شاخه `master` مشخص شد:
+- Task 034 / DB-ING-007 توسط مالک UAT شده است: 24 تست موفق و preflight با وضعیت WARNING.
+- با این وجود، Master Packet هنوز Task 034 را انجام‌نشده معرفی می‌کند.
+- کدهای `src/ingestion/market/ingestion.py` و `src/ingestion/service.py` هنوز partial commit و overwrite رکورد موجود را انجام می‌دهند.
+- گزارش و تست مشخصی برای DB-ING-008 وجود ندارد.
+
+## بخش اول — اصلاح مستندات Task 034
+
+در Master Packet:
+1. Task 034 را با استناد به UAT واقعی مالک DONE ثبت کن.
+2. نتایج زیر را دقیق ثبت کن:
+   - `24 passed`
+   - preflight: `MarketDaily: WARNING`
+   - `EXCHANGE_CENTER: WARNING`
+   - `Overall: WARNING`
+3. WARNINGهای باقی‌مانده را فقط در صورت ارتباط با provenance خارجی blocker تلقی نکن؛ تصمیم §9.31 مالک بر آن‌ها مقدم است.
+4. متن قدیمی §9.32 را که Task 034 را انجام‌نشده معرفی می‌کند اصلاح کن. تاریخچه را حذف نکن؛ وضعیت جاری را صریح و بدون تناقض ثبت کن.
+
+## بخش دوم — اجرای واقعی Task 035 / DB-ING-008
+
+**هدف:** پیاده‌سازی atomic ingestion و جلوگیری از overwrite بی‌ضابطه در Market و FX.
+
+فایل‌های اصلی:
 - `src/ingestion/market/ingestion.py`
 - `src/ingestion/service.py`
 - `src/ingestion/common/identity.py`
 - `src/ingestion/common/validation.py`
+- مدل‌ها و تست‌های موجود فقط برای بررسی سازگاری
 
-### بخش A — اصلاح Market ingestion
-1. کل فایل باید پیش از هر canonical write اعتبارسنجی شود.
-2. اگر حتی یک ردیف دارای خطای سخت باشد، کل فایل رد شود.
-3. داده‌های معتبر همان فایل نباید در صورت وجود ردیف نامعتبر ذخیره شوند.
-4. اگر کلید اقتصادی موجود است:
-   - payload یکسان: duplicate بدون تغییر؛
-   - payload متفاوت: conflict و رد کل batch؛
+فایل‌های تست جدید/موجود را متناسب با ساختار پروژه ایجاد یا اصلاح کن.
+
+### الزامات پیاده‌سازی
+
+1. کل Batch باید پیش از نوشتن داده canonical اعتبارسنجی شود.
+2. وجود حتی یک ردیف نامعتبر، کل Batch را رد کند؛ هیچ ردیف معتبری از همان Batch نباید ذخیره شود.
+3. کلید اقتصادی موجود:
+   - payload کاملاً یکسان: duplicate بدون تغییر.
+   - payload متفاوت: conflict و رد کل Batch.
    - overwrite ممنوع.
-5. فیلدهای خارج از قرارداد MarketDaily نباید ذخیره شوند.
-6. مقدار Value باید مستقل از Volume × Close حفظ شود.
+4. برای Market از هویت جلالی موجود استفاده کن.
+5. فیلد `Value` مستقل باقی بماند و از `Volume × Close` محاسبه نشود.
+6. ستون‌های Open/High/Low/Final وارد قرارداد مصوب Market نشوند.
+7. نرخ FX که Adapter قبلاً به Rial/USD تبدیل کرده، نباید در persistence دوباره ×10 شود.
+8. `IngestionRun` باید تعداد رکوردهای پیدا‌شده، درج‌شده، تکراری، نامعتبر و وضعیت نهایی را درست منعکس کند.
+9. ثبت STARTED باید از تراکنش داده canonical مستقل و پایدار باشد.
+10. تمام canonical writes و وضعیت COMPLETED باید در یک تراکنش باشند.
+11. در هر خطا یا شکست commit، تمام canonical writes rollback شوند و FAILED در تراکنش جداگانه ثبت شود.
+12. هیچ commit داخل حلقه ردیف‌ها انجام نشود.
+13. error log نباید payload حساس یا traceback خام غیرضروری را افشا کند.
 
-### بخش B — اصلاح FX ingestion
-1. اعتبارسنجی کامل تمام DTOها پیش از ثبت انجام شود.
-2. خطای یک نرخ موجب رد کل batch شود.
-3. کلید اقتصادی Jalali مطابق قرارداد بررسی شود.
-4. نرخ تکراری با payload یکسان بدون تغییر پذیرفته شود.
-5. نرخ متعارض برای کلید موجود موجب رد کل batch شود.
-6. overwrite ممنوع باشد.
-7. تبدیل واحد در adapter انجام می‌شود؛ service نباید دوباره ×۱۰ اعمال کند.
+### سناریوهای تست الزامی
 
-### بخش C — Atomicity و IngestionRun
-1. هیچ commit داخل حلقهٔ رکوردها مجاز نیست.
-2. canonical writes و وضعیت COMPLETED باید در یک transaction باشند.
-3. در صورت شکست، تمام canonical writes همان batch rollback شوند.
-4. وضعیت FAILED باید با transaction مستقل ثبت شود.
-5. تعداد inserted، unchanged، rejected و failed باید معنای دقیق و سازگار داشته باشند.
-6. exception خام، اطلاعات حساس یا مسیر خصوصی نباید در error_log ذخیره شود.
-7. رفتار session پس از rollback و خطای audit نیز باید مشخص و تست شود.
+- Batch معتبر چندردیفی
+- یک ردیف نامعتبر در Batch چندردیفی و اثبات نبود هرگونه ذخیره جزئی
+- duplicate با payload یکسان
+- duplicate با payload متفاوت
+- کلید از قبل موجود با payload یکسان
+- کلید از قبل موجود با payload متفاوت
+- شکست پس از ایجاد حداقل یک pending write و اثبات rollback
+- ثبت صحیح FAILED و شمارنده‌ها
+- شکست commit
+- شکست ثبت audit
+- رفتار دو Session مستقل و محدودیت concurrency
 
-### بخش D — محدودیت‌های قطعی
+### محدودیت‌های قطعی
+
 - هیچ ORM، schema، migration یا دیتابیس واقعی تغییر نکند.
-- Migration 9 و cleanup مربوط به آن دست‌نخورده بمانند.
-- هیچ عملیات ingestion روی دیتابیس مالک انجام نشود.
-- CODAL خارج از دامنه این Task است.
-- ShareCountHistory و CorporateAction خارج از دامنه‌اند.
-- کلید یکتای فیزیکی Jalali بدون migration حل‌شده فرض نشود.
-- در صورت نبود constraint فیزیکی، محدودیت concurrency و race condition صریحاً مستند شود؛ ادعای تضمین uniqueness هم‌زمان مجاز نیست.
-- EXCHANGE_CENTER را در persistence معتبر فرض نکن؛ سازگاری CheckConstraint و مدل موجود را بررسی کن. اگر بدون schema change قابل حل نیست، آن را به‌عنوان مانع مشخص گزارش کن و workaround نساز.
-- تصمیم‌های قطعی مالک دوباره سؤال نشوند.
+- Migration 9 دست‌نخورده بماند.
+- migration جدید ساخته نشود.
+- cleanup یا ingestion واقعی اجرا نشود.
+- CODAL و ShareCountHistory و CorporateAction خارج از دامنه‌اند.
+- نبود unique constraint فیزیکی روی کلید جلالی را پنهان نکن. محدودیت concurrency را دقیق مستند کن و ادعای تضمین یکتایی هم‌زمان نداشته باش.
+- اگر CheckConstraint یا مدل فعلی FX از `EXCHANGE_CENTER` پشتیبانی نمی‌کند و اصلاح آن به schema/migration نیاز دارد، آن را به‌عنوان blocker دقیق گزارش کن؛ constraint را دور نزن و schema را تغییر نده.
 
-### AGENT VERIFICATION
-ایجنت باید تست‌های خودکار مستقل برای Market و FX بنویسد و اجرا کند. حداقل سناریوها:
-- batch کاملاً معتبر
-- خطای یک ردیف در میان چند ردیف معتبر
-- duplicate یکسان
-- duplicate متعارض
-- کلید موجود با payload یکسان
-- کلید موجود با payload متفاوت
-- failure پس از حداقل یک write موقت و اثبات rollback
-- عدم باقی‌ماندن canonical write پس از FAILED
-- صحت counts و وضعیت IngestionRun
-- خطای commit و rollback
-- دو Session مستقل برای بررسی محدودیت concurrency
+## بخش سوم — تست و تحویل
 
-فرمان و خروجی واقعی تست‌ها گزارش شود.
+**AGENT VERIFICATION:** تست‌های خودکار را در محیط تست ایزوله اجرا کن. فرمان‌ها و خروجی واقعی را گزارش بده.
 
-### USER ACCEPTANCE TEST
-پس از پیاده‌سازی، فرمان‌های دقیق تست پذیرش برای کاربر ارائه شود. تست‌ها باید روی دیتابیس آزمایشی و fixtureهای کنترل‌شده اجرا شوند؛ نه دیتابیس واقعی.
+**USER ACCEPTANCE TEST:** فرمان‌های لازم برای بررسی مالک را جداگانه ارائه کن. مالک تست پذیرش را اجرا می‌کند؛ آن را انجام‌شده اعلام نکن.
 
-کاربر تست پذیرش را اجرا می‌کند. ایجنت نباید آن را اجراشده یا تأییدشده اعلام کند.
+فایل‌های تحویلی:
+- کد اصلاح‌شده
+- تست‌های خودکار
+- گزارش `database/reports/DB_ING_008_MARKET_FX_ATOMIC_INGESTION.md`
+- اصلاح Master Packet
+- `reply.md` با گزارش اجرای واقعی
 
-### مستندات و تحویل
-- Master Packet را با نتیجهٔ Task 034 و پذیرش موفق کاربر به‌روزرسانی کن.
-- Task 035 را با وضعیت واقعی ثبت کن.
-- `reply.md` را با شواهد، فایل‌های تغییرکرده، تست‌ها و محدودیت‌های باقی‌مانده به‌روزرسانی کن.
-- هیچ Task دیگری را صرفاً به‌دلیل تکمیل گزارش DONE نکن.
+در `reply.md` برای هر Task شناسه و وضعیت دقیق را بنویس. فایل‌های تغییرکرده، سناریوهای تست، فرمان‌ها و خروجی واقعی را ثبت کن.
 
-### معیار تکمیل
-هر دو سرویس Market و FX باید در برابر خطای batch، duplicate و conflict رفتار امن و تست‌شده داشته باشند؛ هیچ partial canonical write یا overwrite غیرمجاز باقی نماند. محدودیت‌های نیازمند Migration جداگانه نیز دقیقاً ثبت شوند.
+**مهم:** این بار Task را با تحلیل مجدد، گزارش provenance یا فهرست کارهای آینده جایگزین نکن. کار اصلی، تغییر کد و اثبات رفتار fail-closed با تست است. اگر بخشی واقعاً به تغییر schema نیاز دارد، همان بخش را مستند کن و بقیه دامنه قابل‌اجرا را تکمیل کن.
