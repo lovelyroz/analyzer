@@ -10,7 +10,7 @@
 
 **سند معماری مبنا:** `../12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-20 — Task 033 / DB-ING-006 همچنان PARTIAL است؛ workbook نهایی Parsian با hash `55266751...4325db85` مستقیماً audit شد و خروجی کامل در §9.34 است. matcher عمومی fail-closed با 37 تست Excel/DTO و synthetic پیاده شد، اما هیچ Template Parsian approved نیست و persistence کاننیکال آماده نیست. Fillهای جاری 459 gray و 489 theme-dark هستند؛ مقدار تاریخی 492 فرض نشد. مالکیت 17 bounds/15 partitions، workbook دورهٔ مستقل برای drift، semantic approvals و writer transaction باقی‌اند. Task 035 پذیرش مالک `13 passed in 1.67s` دارد اما به‌علت محدودیت EXCHANGE_CENTER و یکتایی concurrency جلالی PARTIAL باقی می‌ماند (§9.33).
+آخرین بازنگری: 2026-11-20 — Task 014 / DB-ING-001 مرز pure و immutable ساخت Candidate با Decimal، هویت‌های صریح و دورهٔ جلالی را پیاده‌سازی کرد؛ 51 تست متمرکز Excel/DTO گذشت. Task همچنان PARTIAL است: هیچ locale parser مصوب برای ارقام/جداکننده‌های متنی فارسی در این مرز وجود ندارد و template/semantic mapping واقعی نیز مصوب نشده است (§9.35). Task 033 / DB-ING-006 همچنان PARTIAL است؛ workbook نهایی Parsian با hash `55266751...4325db85` مستقیماً audit شد و خروجی کامل در §9.34 است. matcher عمومی fail-closed با 37 تست Excel/DTO و synthetic پیاده شد، اما هیچ Template Parsian approved نیست و persistence کاننیکال آماده نیست. Fillهای جاری 459 gray و 489 theme-dark هستند؛ مقدار تاریخی 492 فرض نشد. مالکیت 17 bounds/15 partitions، workbook دورهٔ مستقل برای drift، semantic approvals و writer transaction باقی‌اند. Task 035 پذیرش مالک `13 passed in 1.67s` دارد اما به‌علت محدودیت EXCHANGE_CENTER و یکتایی concurrency جلالی PARTIAL باقی می‌ماند (§9.33).
 
 
 ## 1.1 داشبورد سادهٔ پیشرفت Database
@@ -23,11 +23,11 @@
 | ممیزی وضع موجود (DB-AUD) | **63%** | 2 | 6 | 0 | 0 |
 | طراحی قراردادها (DB-DES) | **64%** | 2 | 5 | 0 | 0 |
 | Migration (DB-MIG) | **0%** | 0 | 0 | 3 | 0 |
-| Ingestion و Adapterها (DB-ING) | **50%** | 3 | 2 | 3 | 0 |
+| Ingestion و Adapterها (DB-ING) | **56%** | 3 | 3 | 2 | 0 |
 | تست و خروج (DB-TEST / DB-EXIT) | **0%** | 0 | 0 | 4 | 0 |
-| **کل مسیر (35 Task)** | **47%** | **8** | **17** | **7** | **0** |
+| **کل مسیر (35 Task)** | **49%** | **8** | **18** | **9** | **0** |
 
-**روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 034 و 035 که در به‌روزرسانی‌های اجرایی §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
+**روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014 و 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
 
 **قاعدهٔ STALLED:** اگر دو اجرای متوالی یک Task خروجی قابل‌قبول و پیشرفت قابل‌اثبات نداشته باشند، وضعیت آن STALLED ثبت می‌شود و تا رفع توقف، امتیاز پیشرفت نمی‌گیرد.
 
@@ -720,7 +720,7 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 ### فاز D — هم‌ترازی ingestion و adapterها
 
-- [ ] **014 · DB-ING-001 — بازطراحی مرز DTO و تخصیص دوره:** DTOها باید امکان اتصال هر مقدار canonical به هویت قلم مالی موردنیاز قرارداد، Label/طبقه‌بندی مصوب، واحد و دورهٔ مستقل خودش را داشته باشند؛ برای گزارش چندجدولی/چندستونه، Header و context زمانی واقعی در مرحلهٔ extraction حفظ شود تا دوره از روی ترتیب یا حدس تعیین نشود. قرارداد ورودی صورت‌های مالی V1 بر پایه Excel است؛ PDF در دامنهٔ جاری نیست.
+- [~] **014 · DB-ING-001 — بازطراحی مرز DTO و تخصیص دوره:** مرز pure و immutable ساخت candidate با هویت‌های مصوب، provenance، Decimal و دورهٔ مستقل جلالی در §9.35 پیاده‌سازی و با تست‌های متمرکز بررسی شد. Task PARTIAL است تا parser عدد متنی مطابق قواعد locale مصوب و semantic approvals/template واقعی فراهم شوند؛ هیچ Excel/PDF واقعی به این مرز متصل نشده است. قرارداد ورودی صورت‌های مالی V1 بر پایه Excel است؛ PDF در دامنهٔ جاری نیست.
 - [ ] **015 · DB-ING-002 — هم‌ترازی ingestion با canonical persistence:** طبقه‌بندی در زمان ingestion، نگهداری حداقل provenance، OTHER_*، ZERO_FALLBACK، correction versions و atomicity پیاده‌سازی شود؛ raw rows و calculated facts persist نشوند.
 - [ ] **016 · DB-ING-003 — آمادگی Excel:** adapter Excel باید پس از تصویب قرارداد استاندارد، مقادیر cached معتبر و context لازم Header/جدول/دوره را به مرز ingestion منتقل کند؛ نمونه‌های واقعی متنوع end-to-end بررسی شوند. ایجاد یا حفظ مسیر PDF بخشی از این Task نیست.
 
@@ -2521,3 +2521,11 @@ The current artifact has 17 red titles, 15 green markers, 459 gray-positive fill
 A pure, exact, fail-closed matcher was added at `src/ingestion/excel/deterministic_matcher.py`. It requires an explicitly approved, versioned template, an exact worksheet identity, fixed title/header/partition text, valid containment, and non-overlapping owned ranges; ambiguous anchors, coordinate drift, and mismatches reject the whole match. Results include template ID/version, a deterministic template SHA-256, source workbook SHA-256, and a coordinate map. It does not use annotation colors at runtime, select a Parsian Template, assign semantic metrics, or persist canonical facts.
 
 The generic matcher was verified with synthetic fixtures only: focused run `7 passed in 1.08s`; combined matcher/Reader/DTO regression run `37 passed in 1.36s`. The Parsian candidate register remains `CANDIDATE_ONLY_NOT_APPROVED`; no attempt was made to pass it as an executable production template. Owner approval of all 17 bounds and 15 partitions/header relationships, an independent later-period workbook for drift validation, semantic approvals, and an end-to-end canonical writer remain open. Excel-to-canonical persistence is **not ready**; no invalid or unapproved observation was ingested.
+
+## 9.35 Task 014 / DB-ING-001 — canonical Excel input candidate boundary
+
+**Status: PARTIAL.** Added the pure candidate builder and frozen DTO in `src/ingestion/excel/canonical_input.py`. It requires a `MATCHED` deterministic template result with exact source hash, worksheet and coordinate provenance; explicit unique approval selections for company/report/report version/Metric/unit/currency/scale/period and optional source labels/headers/dimensions; valid Jalali endpoints; and valid temporal/basis combinations. It parses the Reader's literal ASCII decimal text directly to `Decimal`, keeps the source literal, preserves high precision and explicit zero, and rejects blanks, missing provenance, implicit defaults and unsupported number syntax. Matcher results now include matched worksheet identity for source traceability.
+
+Focused synthetic-fixture suite: `51 passed in 1.55s` using `src/tests/test_excel_canonical_input.py`, Reader, observation DTO, and deterministic matcher tests. Full command and report are in `database/reports/DB_ING_001_CANONICAL_INPUT_DTO_IMPLEMENTATION.md`. The tests make no claim that fixture identities are approved production mappings.
+
+Task 014 remains PARTIAL because no approved locale-specific parser exists for Persian digits/separators, no authoritative semantic mapping catalog/resolver is available to authenticate the supplied approval references, and no production template or semantic mapping has been approved. No real workbook, Parsian draft, ORM, schema, migration, database or writer was touched. Dashboard recalculated from 35 Task statuses: 8 DONE, 18 PARTIAL, 9 OPEN; overall 49%, DB-ING 56%.

@@ -1,102 +1,120 @@
-# analyzer — اجرای گروهی کارهای بعدی دیتابیس
+# EXECUTION PROMPT — Task 014 / DB-ING-001
+## Implement the canonical Excel-to-financial-input DTO boundary
 
-## نوع کار
-**Code + Tests + Documentation Update**
+**Repository:** `analyzer`  
+**Branch:** `master`  
+**Project:** `analyzer`  
+**Work type:** CODE IMPLEMENTATION + TESTS  
+**Priority:** High
 
-این دستور برای پیشبرد واقعی کار است، نه گزارش‌نویسی یا ممیزی تکراری. کارها را به ترتیب زیر انجام بده و تا حد امکان در همین نوبت هر دو بخش را به نتیجه برسان.
+### Objective
 
-## اسناد مرجع
+Implement the next concrete layer of the Excel-to-canonical ingestion path.
+
+The current Excel observation DTO and Reader already exist. Do not rebuild them. Implement the missing boundary that converts structurally identified Excel observations into validated, immutable canonical-input candidates, with explicit per-value temporal and semantic context.
+
+The purpose is to make each selected financial value independently identifiable and prevent guessing of its Metric, unit, period, or YTD/standalone basis.
+
+### Authoritative documents — read first
+
 1. `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
-2. `database/reports/DB_ING_008_MARKET_FX_ATOMIC_INGESTION.md`
-3. `reply.md`
-4. بخش‌های مرتبط DB-ING-006 در Master Packet و گزارش‌های موجود Parsian
-5. کد و تست‌های فعلی Excel ingestion در `src/ingestion/excel/`
+2. `12_Database_Architecture_V1.1.md`
+3. `database/reports/DB_DES_007_EXCEL_OBSERVATION_DTO_CONTRACT.md`
+4. `database/reports/DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md`
+5. `database/reports/DB_DES_011_JALALI_FINANCIAL_PERIOD_AND_TEMPORAL_BASIS.md`
+6. `database/reports/DB_DES_013_DETERMINISTIC_EXCEL_TEMPLATE_MATCHING.md`
+7. `database/reports/DB_DES_014_HIERARCHICAL_HEADER_SEMANTIC_COLUMN_MAPPING.md`
 
-`WORKFLOW_RULES.md` را فقط بخوان؛ تحت هیچ شرایطی آن را تغییر نده.
+If a referenced path differs, locate the exact existing file. Do not create a replacement document.
 
----
+### Existing implementation — inspect before editing
 
-## بخش اول — ثبت پذیرش مالک Task 035
+- `src/ingestion/excel/dto.py`
+- `src/ingestion/excel/reader.py`
+- `src/ingestion/excel/deterministic_matcher.py`
+- `src/tests/test_excel_observation_dto.py`
+- `src/tests/test_excel_source_reader.py`
+- `src/tests/test_excel_template_matching.py`
 
-مالک این فرمان پذیرش را اجرا کرده است:
+### Required implementation
 
-```text
-13 passed in 1.67s
-```
+1. Add an immutable canonical-input candidate DTO. It must preserve:
+   - Company identity reference.
+   - Report type and report-version reference.
+   - Approved template identity/version/hash.
+   - Source workbook hash.
+   - Source worksheet and exact cell/coordinate references.
+   - Approved Metric identity.
+   - Source label/header identity where applicable.
+   - Numeric value without binary-float conversion or silent rounding.
+   - Explicit source unit, currency and scale.
+   - Explicit temporal type: `INSTANT` or `DURATION`.
+   - Explicit Jalali period start/end components.
+   - Explicit `duration_basis=YTD|STANDALONE` for DURATION only.
+   - Approved dimensions and their identities, where applicable.
 
-این خروجی مربوط به فرمان زیر است:
+2. Implement a pure validation/builder boundary:
+   - Accept only explicitly approved structural and semantic mappings.
+   - Reject missing or ambiguous Metric, unit, currency, scale, period, or duration basis.
+   - Reject inconsistent INSTANT/DURATION combinations.
+   - Reject invalid Jalali dates and invalid period ranges.
+   - Reject a DURATION fact without an explicit valid duration basis.
+   - Reject an INSTANT fact with a duration basis.
+   - Preserve zero versus missing; never turn missing into zero.
+   - Never infer a period from column order, workbook title, publication date, or neighboring values.
+   - Never infer a Metric from a Header name alone.
+   - Never create implicit dimensions or default units.
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q src/tests/test_market_fx_atomic_ingestion.py
-```
+3. Keep the implementation independent of persistence:
+   - No ORM changes.
+   - No schema or migration changes.
+   - No database writes.
+   - No canonical writer or ingestion activation.
+   - No changes to existing financial data or workbook files.
 
-اقدامات:
-1. در `reply.md` پذیرش مالک را ثبت کن.
-2. در Master Packet، بخش جاری Task 035 را به‌روزرسانی کن.
-3. وضعیت کلی Task 035 همچنان `PARTIAL` باشد؛ پذیرش مالک فقط بخش اجرایی را تأیید می‌کند.
-4. محدودیت‌های باقی‌مانده را دقیق نگه دار:
-   - پشتیبانی `EXCHANGE_CENTER` به دلیل CheckConstraint فعلی نیازمند تغییر schema/migration است.
-   - یکتایی هم‌زمان کلیدهای Jalali با قیود فعلی تضمین نمی‌شود.
-5. هیچ migration، ORM، schema یا دیتابیسی را تغییر نده.
+4. Add focused tests for:
+   - Valid INSTANT candidate.
+   - Valid DURATION/YTD candidate.
+   - Valid DURATION/STANDALONE candidate.
+   - Missing Metric.
+   - Ambiguous mapping.
+   - Missing currency/unit/scale.
+   - Missing period.
+   - Invalid Jalali date/range.
+   - Missing or invalid duration basis.
+   - INSTANT with duration basis.
+   - Missing versus explicit zero.
+   - Numeric precision preservation.
+   - Missing source coordinate/provenance.
+   - Rejection of implicit/default semantic values.
 
-## بخش دوم — پیشبرد اجرایی Task 033 / DB-ING-006
+### Important constraints
 
-هدف این بخش، پیشبرد واقعی مسیر Excel و Template Matching است؛ نه تکرار گزارش‌های معنایی قبلی.
+- Do not modify `WORKFLOW_RULES.md`.
+- Do not modify existing approved owner decisions.
+- Do not reopen decisions already settled in the Master Packet.
+- Do not connect this implementation to the Parsian draft template.
+- Do not create fake approved mappings or fake Metric IDs.
+- Do not weaken fail-closed behavior to make tests pass.
+- Do not run tests on the owner's real database.
+- Do not claim Task 014 is DONE merely because the DTO is implemented.
 
-### مرحله A — اجرای ابزارهای موجود روی workbook نهایی
+### Deliverables
 
-فایل نهایی موجود Parsian را پیدا کن و hash آن را ثبت کن. سپس:
+1. Working implementation and focused tests.
+2. Exact list of changed/added files.
+3. Exact test commands and actual outputs.
+4. A short implementation report:
+   `database/reports/DB_ING_001_CANONICAL_INPUT_DTO_IMPLEMENTATION.md`
+5. Update `reply.md` with the execution result.
+6. Update the Master Packet:
+   - Record the implementation evidence under a new §9 entry.
+   - Update Task 014 status only according to its actual acceptance criteria.
+   - Recalculate the progress dashboard.
+   - Do not mark Task 014 DONE if any required behavior remains unimplemented.
 
-1. ابزار annotation/template موجود در پروژه را پیدا کن.
-2. آن را روی همان workbook نهایی اجرا کن؛ فایل آزمایشی یا نسخهٔ قدیمی را جایگزین نکن.
-3. خروجی کامل هندسه، رنگ‌ها، merged cells، bounds و partitionها را تولید کن.
-4. نتایج را با گزارش‌های قبلی و hashهای ثبت‌شده تطبیق بده.
-5. اگر ابزار موجود نمی‌تواند یک مرحله را انجام دهد، همان قابلیت مشخص را تکمیل کن؛ ابزار موازی و تکراری نساز.
-6. برای تمام 17 candidate bounds و 15 partition، خروجی قابل‌بررسی شامل مختصات دقیق، محدودهٔ ستون‌ها، Header inheritance و child partition تولید کن.
-7. overlap، duplicate ownership و سلول‌های بدون مالک را به‌صورت ماشینی بررسی کن.
-8. عدد تاریخی 459 gray cells و 60 span را فرض قطعی نگیر؛ مقادیر واقعی را از artifact فعلی محاسبه کن.
+### Completion standard
 
-### مرحله B — Template Matching و تست
+Deliver executable code and tests, not another architecture proposal or inventory report.
 
-با استفاده از شواهد معتبر موجود:
-
-1. کد Template Matching فعلی را بررسی کن.
-2. اگر matcher ناقص است، قابلیت deterministic matching را در محدوده‌ای که شواهد قطعی اجازه می‌دهند پیاده‌سازی کن.
-3. ورودی مبهم یا template نامنطبق باید fail-closed شود؛ انتخاب حدسی template ممنوع است.
-4. نسخه و hash template باید در نتیجهٔ matching قابل ردیابی باشند.
-5. تست‌های مثبت و منفی برای matching قطعی، ambiguity، template نامنطبق، overlap و partition نامعتبر اضافه کن.
-6. اگر تصمیم معنایی Metric، currency، scale، period یا duration_basis هنوز PROPOSED/BLOCKED است، آن را به mapping اجرایی تبدیل نکن.
-7. هیچ observation نامعتبر یا تأییدنشده‌ای را وارد canonical database نکن.
-
-### مرحله C — محدودیت‌های مالک
-
-- هیچ bounds یا mapping معنایی را به‌جای مالک تأیید نکن.
-- نبود workbook مستقل دورهٔ بعد را پنهان نکن؛ آن را به‌عنوان gate مستقل drift validation ثبت کن.
-- اگر تأیید دستی مالک لازم است، خروجی دقیق و محدود همان موارد را آماده کن؛ کل کار را به علت آن متوقف نکن.
-- مسیر PDF/Raw و schema legacy را تغییر نده.
-- هیچ ORM، schema، migration، دیتابیس واقعی یا ingestion واقعی را تغییر نده یا اجرا نکن.
-
-## گزارش و وضعیت Task
-
-در گزارش Task 033 مشخص کن:
-- چه قابلیت‌هایی واقعاً پیاده‌سازی شد؟
-- چه فایل‌هایی تغییر کردند؟
-- چه فرمان‌هایی اجرا شدند و خروجی واقعی چه بود؟
-- کدام gateها بسته شدند؟
-- کدام gateها به تأیید مالک یا workbook دورهٔ بعد وابسته‌اند؟
-- آیا end-to-end canonical persistence واقعاً آماده است یا هنوز نیست؟
-
-در `reply.md` و Master Packet وضعیت‌ها را با شواهد واقعی به‌روز کن. فقط موارد کاملاً تکمیل‌شده را DONE علامت بزن؛ Task 033 را صرفاً به دلیل تولید گزارش یا اجرای تست DONE اعلام نکن.
-
-## تست و تحویل
-
-تست‌های خودکار مرتبط را در محیط ایزوله اجرا کن و خروجی واقعی را ثبت کن. دیتابیس واقعی یا داده‌های کاربر را لمس نکن.
-
-در پایان:
-1. فهرست دقیق فایل‌های تغییرکرده را بده.
-2. تست‌های اجراشده و تعداد موفق/ناموفق را ثبت کن.
-3. فرمان پذیرش محلی مالک را جداگانه ارائه کن؛ اجرای آن را به مالک نسبت نده.
-4. محدودیت‌های واقعی و gateهای باز را صریح بنویس.
-5. از تکرار بررسی‌هایی که قبلاً در گزارش‌های موجود انجام شده‌اند خودداری کن.
-
-**اولویت اصلی: خروجی اجرایی قابل‌آزمون تولید کن؛ نه گزارش جدیدی که صرفاً بگوید هنوز کار باقی مانده است.**
+If a contract conflict blocks implementation, identify the exact conflicting clauses and implement every independent, non-conflicting part. Do not stop the entire task because one isolated item is unresolved.

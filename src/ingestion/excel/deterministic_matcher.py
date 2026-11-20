@@ -96,6 +96,8 @@ class TemplateMatchResult:
     source_workbook_sha256: str
     coordinate_map: tuple[tuple[str, str], ...] = ()
     diagnostics: tuple[MatchDiagnostic, ...] = ()
+    worksheet_name: str | None = None
+    worksheet_ordinal: int | None = None
 
 
 def _inside(inner: str, outer: str) -> bool:
@@ -243,5 +245,7 @@ def match_template(template: TemplateVersion, observation: WorkbookObservation) 
         source_workbook_sha256=observation.source.sha256,
         coordinate_map=tuple(coordinate_map) if status == "MATCHED" else (),
         diagnostics=tuple(diagnostics),
+        worksheet_name=template.worksheet_name if status == "MATCHED" else None,
+        worksheet_ordinal=template.worksheet_ordinal if status == "MATCHED" else None,
     )
     
