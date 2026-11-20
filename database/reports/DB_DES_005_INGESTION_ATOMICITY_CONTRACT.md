@@ -338,3 +338,52 @@ Counts نهایی باید با نتیجهٔ commit سازگار باشند. د�
 - تست‌های قدیمی که partial acceptance یا overwrite را موفقیت تلقی می‌کنند باید بازنویسی شوند؛ تا وقتی قرارداد revision نهایی نشده، AT-12/13 را فقط می‌توان در سطح fail-closed/conflict آزمود و replacement را نباید حدس زد.
 
 **وضعیت:** هیچ‌یک از سناریوهای این ماتریس در این مرحله اجرا نشده‌اند. ماتریس، مجوز تغییر تست یا implementation نیست؛ ابتدا تصمیم‌های §13.7، preflight هویت جلالی DB-DES-004 §15 و قراردادهای Feed باید بسته شوند. DB-DES-005 همچنان PARTIAL است.
+
+### 13.9 حداقل قرارداد provenance و رفتار fail-closed موقت برای Market/FX — 2026-11-20
+
+این بخش میان metadata قابل ثبت در لحظهٔ بارگذاری و metadataای که فقط از ناشر/منبع قابل دریافت است تفکیک می‌کند. هدف، جلوگیری از جعل chronology یا revision با استفاده از زمان ورود فایل است. موارد زیر guardrail موقت مستنداتی‌اند؛ الگوریتم fingerprint، مدل نهایی revision و سیاست supersession را تصویب نمی‌کنند.
+
+#### الف) سه زمان مستقل
+
+| فیلد مفهومی | معنای دقیق | منبع مجاز | قاعده |
+|---|---|---|---|
+| source_published_at | زمان انتشار رسمی artifact/داده توسط ناشر | metadata رسمی منبع یا شواهد قابل استناد همان انتشار | اگر ارائه نشده، NULL/UNKNOWN؛ از تاریخ داخل فایل یا زمان بارگذاری استنتاج نشود |
+| source_available_at | نخستین زمان قابل اثبات دسترسی به همان artifact/نسخه | timestamp معتبر منبع یا ثبت قابل اثبات دریافت | با published_at یکی فرض نشود؛ اگر نامعلوم است NULL/UNKNOWN |
+| ingested_at | زمان دریافت/ثبت فایل در سامانه | ساعت سامانه هنگام upload/ingestion | زمان عملیاتی مستقل؛ هرگز جانشین publication/availability نیست |
+
+برای upload کاربر، uploader/actor و زمان upload باید در audit ثبت شوند، اما این دو مقدار publication evidence نیستند. زمان فایل‌سیستم، زمان تغییر workbook و تاریخ ردیف‌ها به‌تنهایی شواهد انتشار رسمی محسوب نمی‌شوند.
+
+#### ب) حداقل provenance artifact
+
+برای هر تلاش بارگذاری، تا حدی که واقعاً معلوم است، این شواهد باید قابل ثبت/بازسازی باشند:
+- feed/profile identity و نسخهٔ قرارداد parser/mapping؛
+- source identity و روش دریافت اعلام‌شده؛
+- نام artifact صرفاً به‌عنوان نام ارائه‌شده، نه شناسهٔ پایدار؛
+- SHA-256 بایت‌های artifact دقیقاً همان‌طور که دریافت شده، بدون normalize یا بازذخیره؛
+- اندازهٔ بایت، زمان دریافت، actor/uploader و شناسهٔ Run؛
+- source_published_at و source_available_at همراه evidence reference و وضعیت KNOWN/UNKNOWN؛
+- تقویم، واحد و شرکت/نوع نرخ resolveشده که هنگام parse اعمال شده‌اند؛
+- parser/mapping version و نتیجهٔ validation.
+
+ثبت hash فایل، به‌تنهایی هویت انتشار یا revision رسمی را اثبات نمی‌کند؛ فقط برابری بایت‌های دو artifact را می‌سنجد. نگهداری artifact خام و محل امن آن باید در سیاست retention/security جداگانه تعیین شود؛ این بخش مجوز ذخیره‌سازی payload یا تغییر schema نیست.
+
+#### ج) حداقل قواعد موقت replay و conflict
+
+1. Artifact با SHA-256 و feed/profile identity یکسان، فقط byte-identical replay candidate است. اعلام UNCHANGED نهایی مستلزم تطبیق identity، scope و نتیجهٔ parse با قرارداد مصوب است.
+2. Hash متفاوت برای artifact، به‌تنهایی correction معتبر نیست؛ ممکن است صرفاً formatting، ترتیب ردیف/ستون یا metadata غیرمؤثر تغییر کرده باشد.
+3. برای MarketDaily، کلید اقتصادی هر مشاهده همان Company + تاریخ جلالی است. برای FX، تاریخ جلالی + جفت ارز + rate_type است. مقدار متفاوت روی کلید موجود، بدون evidence معتبر revision، conflict است؛ overwrite و last-arrival-wins ممنوع‌اند.
+4. اگر همان کلید در یک artifact چند بار بیاید، payloadهای یکسان duplicate داخلی و payloadهای متفاوت conflict داخلی‌اند؛ تا تعیین سیاست نهایی، هر دو حالت باید diagnostic کامل داشته باشند و هیچ انتخاب ردیف برنده خودکار انجام نشود.
+5. اگر ناشر revision ID/sequence رسمی ارائه نکند، ترتیب دریافت فایل‌ها ترتیب نسخه‌ها نیست. زمان upload، mtime فایل و ترتیب ردیف‌ها مجوز supersession نیستند.
+6. اگر publication/availability ناشناخته باشد، داده می‌تواند از نظر محتوایی بررسی شود، اما chronology/PIT و current-winner نباید از آن زمان‌سازی شود. پذیرش canonical نیز تابع gateهای identity، uniqueness و atomicity مستقل است.
+7. برای FX workbook، hash فعلی eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf فقط به artifact بررسی‌شده متصل است؛ تا provenance منبع و profile identity آن ثبت نشود، این hash به‌تنهایی EXCHANGE_CENTER بودن یا revision رسمی را اثبات نمی‌کند.
+8. برای Market CSV سامان، منبع CODAL و روش دریافت با اسکریپت اختصاصی مالک ثبت شده‌اند؛ اما publication/availability و revision metadata همچنان UNKNOWN هستند. نباید از تاریخ جلالی معاملات به‌عنوان زمان انتشار استفاده کرد.
+
+#### د) evidence checklist برای بستن Feedها
+
+| Feed | شواهد لازم بعدی | در صورت نبود شواهد |
+|---|---|---|
+| MarketDaily / CODAL | نمونهٔ metadata انتشار یا صفحه/شناسهٔ رسمی مرتبط با همان خروجی؛ زمان انتشار/دسترس‌پذیری؛ توضیح مستند CODAL دربارهٔ اصلاح/بازنشر یا تصریح نبود revision ID | هر تغییر مقدار روی Company+Jalali date conflict/review؛ chronology و supersession حل‌نشده |
+| FX / EXCHANGE_CENTER | تأیید قابل ردیابی اینکه artifact با hash فوق متعلق به profile مرکز مبادله است؛ منبع/صفحهٔ دریافت؛ metadata زمان انتشار/دسترس‌پذیری؛ رفتار اصلاحیه | artifact در سطح provenance unverified؛ مقدار متعارض روی تاریخ/نوع نرخ conflict/review |
+| FX / FREE_MARKET | artifact واقعی و قابل انتساب به منبع، header و نمونهٔ داده، واحد، تقویم، زمان انتشار و رفتار revision | Feed profile غیرفعال؛ هیچ schema یا mapping از EXCHANGE_CENTER کپی نشود |
+
+**وضعیت تصمیم:** این بخش فقط حداقل شواهد و fail-closed guardrail را مشخص می‌کند. هیچ fingerprint algorithm، revision key، retention policy، schema، batch boundary یا conflict winner نهایی تصویب نشده است. DB-DES-005 و DB-STD-005 همچنان PARTIAL هستند. هیچ کد، ORM، schema، migration، دیتابیس، داده یا تستی تغییر/اجرا نشده است.
