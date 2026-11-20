@@ -2420,3 +2420,49 @@ Guardrail موقت: برای کلید اقتصادی موجود MarketDaily یا
 - سایر کنترل‌های فنیِ مستقل از منبع، از جمله اعتبارسنجی قالب و مقادیر، تاریخ جلالی، کلیدهای اقتصادی، تشخیص duplicate/conflict و جلوگیری از overwrite بی‌ضابطه، همچنان برقرارند؛ این تصمیم به‌تنهایی مجوز فعال‌سازی Feed، تغییر schema/migration یا تغییر داده‌های موجود نیست.
 
 این ثبت، مستندکنندهٔ تصمیم مالک است؛ به‌تنهایی ادعای تغییر implementation یا اجرای تست نیست. هر عبارت قدیمی دربارهٔ الزام به اتصال provenance خارجی، منبع/اسکریپت دانلود مالک یا مسدودبودن FREE_MARKET صرفاً به علت نبود نمونه/منبع باید مطابق این تصمیم بازتفسیر و در Taskهای بعدی اصلاح شود.
+
+## 9.32 ممیزی اجرایی پس از تصمیم فرانت‌اند Market/FX و تعیین گام بعدی — 2026-11-20
+
+این ممیزی، وضعیت ثبت‌شدهٔ Taskها را با تصمیم قطعی مالک در §9.31 و کد فعلی مسیر Market/FX تطبیق می‌دهد. این بخش برای جلوگیری از تکرار blockerهای منسوخ، بر برداشت‌های قدیمی‌تر تقدم دارد.
+
+### الف) وضعیت Taskها بر اساس شواهد موجود
+
+- DONEهای صریح و مستند در آخرین وضعیت قابل مشاهده: Task 024 (DB-STD-004)، Task 028 (DB-DES-007)، Task 029 (DB-AUD-007)، Task 030 (DB-AUD-008)، Task 031 (DB-ING-004) و Task 032 (DB-ING-005). DONE بودن این موارد به معنی تکمیل کل مسیر دیتابیس نیست.
+- Task 033 / DB-ING-006 همچنان PARTIAL است؛ گیت‌های Template/Parsian و پذیرش owner-run که در §8.97 آمده‌اند مستقل از تصمیم جدید Market/FX هستند.
+- Task 021 و Task 025 همچنان PARTIAL هستند، اما عبارت‌های قدیمی دربارهٔ الزام منبع خارجی، اثبات publisher/download URL، نمونهٔ مستقل برای کشف ساختار FREE_MARKET یا parser جداگانه برای آن، با تصمیم مالک در §9.31 superseded شده‌اند و نباید blocker تلقی شوند.
+- Task 009 / DB-DES-004 و Task 010 / DB-DES-005 همچنان PARTIAL هستند؛ موضوعات باز آن‌ها گسترده‌تر از منبع Market/FX است و شامل قراردادهای فیزیکی/کلیدهای Jalali، سازگاری legacy، atomicity، duplicate/conflict و reconciliation است.
+- Migration 9 همچنان UNRECONCILED است. این ممیزی مجوز migration جدید، تغییر schema، cleanup یا عملیات روی دیتابیس واقعی نیست.
+
+### ب) یافته‌های مستقیم از کد فعلی Market/FX
+
+1. src/ingestion/market/adapter.py هنوز Open/High/Low/Final را parse می‌کند و Final را به adjusted_close نگاشت می‌کند؛ درحالی‌که mapping مصوب MarketDaily در §9.28 و §9.30 فقط Close، Volume، No و Value را می‌پذیرد و ستون‌های خارج از V1 نباید وارد persistence شوند.
+2. src/ingestion/market/ingestion.py در صورت وجود کلید اقتصادی، payload موجود را بی‌قید به‌روزرسانی می‌کند؛ همچنین ردیف‌های نامعتبر را می‌شمارد اما ردیف‌های معتبر همان فایل را commit می‌کند. این رفتار با guardrail تعارض و atomicity در DB-DES-005 هم‌راستا نیست.
+3. src/ingestion/fx/adapter.py به‌جای شناسایی Headerها، فرض می‌کند تاریخ در ستون اول و نرخ در ستون دوم است؛ در نتیجه با workbook واقعی dollar-history.xlsx که Headerها در ردیف ۳ و ستون فروش در ستون سوم است، mapping مصوب فروش را اجرا نمی‌کند. تشخیص Header فعلی نیز فقط heuristic محدود ردیف اول است و ردیف‌های malformed را بی‌صدا کنار می‌گذارد.
+4. مسیر FX فعلی rate_typeهای FREE_MARKET و چند نوع قدیمی را می‌شناسد، اما EXCHANGE_CENTER در VALID_FX_RATE_TYPES و CheckConstraint مدل FXRate وجود ندارد؛ بنابراین تصمیم مصوب دو نوع نرخ هنوز با قرارداد فیزیکی/کد persistence هم‌راستا نیست.
+5. مدل‌های MarketDaily و FXRate قید یکتایی فیزیکی مؤثر بر کلیدهای Jalali ندارند: unique فعلی MarketDaily بر (company_id, trade_date) و FX بر (rate_date, currency_from, currency_to, rate_type) است، درحالی‌که مسیر Jalali مقدار Gregorian date را NULL می‌گذارد. اصلاح فیزیکی این مسئله به بررسی و مجوز مستقل schema/migration نیاز دارد.
+6. src/ingestion/service.py::ingest_fx_rates نیز payload موجود را overwrite می‌کند و partial acceptance دارد؛ این رفتار باید پیش از فعال‌سازی persistence با قرارداد atomicity/conflict تعیین تکلیف شود.
+
+### ج) گام اجرایی بعدی پیشنهادی — Task 034
+
+**Task 034 — DB-ING-007: هم‌راستاسازی Market/FX File Adapters با قرارداد مصوب (بدون persistence/schema)**
+
+هدف، اصلاح لایهٔ parse و preflight است تا فایل‌های ورودی واقعی طبق تصمیم مالک خوانده شوند؛ این Task نباید به migration، تغییر ORM/schema، نوشتن دیتابیس یا فعال‌سازی Feed گسترش یابد.
+
+دامنهٔ مجاز:
+- Market CSV: فقط استخراج J-Date، Ticker، Close، Volume، No و Value با mapping و واحدهای مصوب؛ عدم استفاده از Open/High/Low/Final.
+- FX: یک parser مشترک برای ساختار فایل EXCHANGE_CENTER و FREE_MARKET؛ شناسایی Header/ردیف داده بر اساس ساختار workbook واقعی، انتخاب ستون فروش (نه خرید)، تقویم جلالی، و اعمال ×۱۰ فقط برای FREE_MARKET.
+- خطای تاریخ/عدد/ستون/ردیف، duplicate داخلی و payload متعارض باید diagnostic صریح بدهند؛ دادهٔ malformed نباید بی‌صدا حذف شود.
+- parser/preflight باید pure و بدون DB write بماند. persistence موجود تا تکمیل Taskهای قرارداد atomicity و کلیدهای Jalali مجاز به overwrite یا partial commit جدید نیست.
+- تست‌های خودکار برای fixtureهای واقعی/مصنوعی مثبت و منفی و فرمان CLI قابل تکرار اضافه شوند.
+
+خارج از دامنه و ممنوع:
+- تغییر ORM، schema، migration، دیتابیس یا دادهٔ موجود؛ اجرای cleanup یا migration؛ فعال‌سازی Feed؛ تغییر مسیر UI؛ تغییر قواعد ShareCountHistory/CorporateAction؛ اجرای owner script یا عملیات production.
+- هیچ الزام source URL/API/publisher/download manifest برای ورود فرانت‌اندی ایجاد نشود.
+
+**AGENT VERIFICATION:** ایجنت تست‌های خودکار parser/preflight را در محیط تست ایزوله اجرا کند و فرمان دقیق، خروجی واقعی و تعداد تست‌ها را گزارش دهد. هیچ DB واقعی یا production لمس نشود.
+
+**USER ACCEPTANCE TEST:** ایجنت فرمان دقیق اجرای preflight روی saman_price_history.csv و dollar-history.xlsx را ارائه کند؛ برای FREE_MARKET همان workbook با rate_type مربوط و تبدیل ×۱۰ به‌صورت fixture/حالت آزمایشی کنترل شود. کاربر فرمان‌ها را اجرا و خروجی را ارسال می‌کند. ایجنت حق ندارد پذیرش کاربر را انجام‌شده اعلام کند.
+
+**معیار پایان Task 034:** mapping دقیق هر دو فایل مطابق قرارداد مالک؛ parser مشترک FX با تفاوت واحد صریح؛ نبود silent row drops؛ diagnostics و duplicate/conflict detection قابل آزمون؛ automated tests موفق؛ CLI و مستندات به‌روز؛ هیچ persistence/schema/DB change. پس از آن، گام جداگانه برای بستن physical Jalali identity و atomic persistence در Taskهای 009/010 تعریف می‌شود.
+
+این ممیزی فقط source-level و مستنداتی است؛ هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرده و هیچ تستی اجرا نشده است. Task 034 در این مرحله به‌عنوان گام بعدی تعریف شده، نه DONE؛ پیاده‌سازی آن هنوز انجام نشده است.
