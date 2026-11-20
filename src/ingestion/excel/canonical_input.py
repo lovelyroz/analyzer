@@ -87,7 +87,10 @@ class CanonicalInputCandidate:
     worksheet_ordinal: int
     worksheet_name: str
     source_coordinate: str
-    source_text: str
+    extraction_owner: str
+    source_value_kind: CellValueKind
+    source_text: str | None
+    source_native_integer: int | None
     metric_id: str
     source_label_id: str | None
     source_header_id: str | None
@@ -100,6 +103,18 @@ class CanonicalInputCandidate:
     period_end_jalali: tuple[int, int, int]
     duration_basis: DurationBasis | None
     dimensions: tuple[tuple[str, str], ...]
+    company_approval_ref: str
+    report_type_approval_ref: str
+    report_version_approval_ref: str
+    metric_approval_ref: str
+    source_unit_approval_ref: str
+    source_currency_approval_ref: str
+    source_scale_approval_ref: str
+    period_mapping_id: str
+    period_mapping_approval_ref: str
+    source_label_approval_ref: str | None
+    source_header_approval_ref: str | None
+    dimension_approval_refs: tuple[tuple[str, str, str, str], ...]
 
 
 _DECIMAL_TEXT = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
@@ -163,12 +178,17 @@ def build_candidate(
         row, col = coordinate_to_tuple(coordinate)
     except (ValueError, TypeError) as exc:
         raise CandidateValidationError("SOURCE_COORDINATE_INVALID", "Source coordinate is not a valid A1 reference.") from exc
+    owners = tuple(node for node, bounds in match.owned_coordinate_map if _coordinate_in_range(coordinate, bounds))
+    if not owners:
+        raise CandidateValidationError("STRUCTURAL_OWNERSHIP_MISSING", "Coordinate is not in an explicitly owned extraction range.")
+    if len(owners) != 1:
+        raise CandidateValidationError("STRUCTURAL_OWNERSHIP_AMBIGUOUS", "Coordinate has multiple extraction owners.")
     cells = [cell for cell in observation.cells if cell.cell_ref.coordinate == coordinate
              and cell.cell_ref.worksheet_ordinal == match.worksheet_ordinal]
     if len(cells) != 1:
         if not cells and any(sheet.ordinal == match.worksheet_ordinal and sheet.literal_name == match.worksheet_name
                              for sheet in observation.worksheets):
-            if any(_coordinate_in_range(coordinate, bounds) for _, bounds in match.coordinate_map):
+            if owners:
                 raise CandidateValidationError("SOURCE_VALUE_MISSING", "No literal value was observed at this in-scope coordinate.")
         raise CandidateValidationError("SOURCE_PROVENANCE_MISSING", "Coordinate must identify exactly one observed source cell.")
     cell: CellObservation = cells[0]
@@ -176,19 +196,33 @@ def build_candidate(
                   and item.literal_name == match.worksheet_name), None)
     if sheet is None:
         raise CandidateValidationError("SOURCE_PROVENANCE_MISSING", "Observed cell has no worksheet identity.")
-    if not any(_coordinate_in_range(coordinate, bounds) for _, bounds in match.coordinate_map):
-        raise CandidateValidationError("STRUCTURAL_MAPPING_MISSING", "Source coordinate is outside matched template bounds.")
     if cell.value_kind is CellValueKind.BLANK:
         raise CandidateValidationError("SOURCE_VALUE_MISSING", "Blank source value cannot be replaced with zero.")
-    if cell.value_kind is not CellValueKind.PRESENT_TEXT or cell.text_value is None:
+    source_text: str | None = None
+    native_integer: int | None = None
+    if cell.value_kind is CellValueKind.PRESENT_TEXT and cell.text_value is not None:
+        source_text = cell.text_value
+        literal = source_text
+        if not _DECIMAL_TEXT.fullmatch(literal):
+            raise CandidateValidationError("SOURCE_NUMBER_INVALID", "Literal numeric text does not match the approved invariant decimal syntax.")
+        try:
+            amount = Decimal(literal)
+        except InvalidOperation as exc:
+            raise CandidateValidationError("SOURCE_NUMBER_INVALID", "Literal value cannot be represented as Decimal.") from exc
+    elif cell.value_kind is CellValueKind.PRESENT_NUMBER:
+        numeric = cell.numeric_value
+        if type(numeric) is int:
+            native_integer = numeric
+            amount = Decimal(numeric)
+        elif type(numeric) is float:
+            raise CandidateValidationError(
+                "SOURCE_FLOAT_PRECISION_UNAVAILABLE",
+                "Native float has no original numeric lexical representation; exact Decimal cannot be established.",
+            )
+        else:
+            raise CandidateValidationError("SOURCE_NUMBER_INVALID", "Native numeric value is not a supported integer or float.")
+    else:
         raise CandidateValidationError("SOURCE_VALUE_UNSUPPORTED", "V1 source value must be literal text.")
-    literal = cell.text_value
-    if not _DECIMAL_TEXT.fullmatch(literal):
-        raise CandidateValidationError("SOURCE_NUMBER_INVALID", "Literal numeric text does not match the approved invariant decimal syntax.")
-    try:
-        amount = Decimal(literal)
-    except InvalidOperation as exc:
-        raise CandidateValidationError("SOURCE_NUMBER_INVALID", "Literal value cannot be represented as Decimal.") from exc
     if not amount.is_finite():
         raise CandidateValidationError("SOURCE_NUMBER_INVALID", "NaN and Infinity are not financial values.")
 
@@ -199,7 +233,7 @@ def build_candidate(
     unit = _selection(spec.source_unit, "source unit")
     currency = _selection(spec.source_currency, "source currency")
     scale = _selection(spec.source_scale, "source scale")
-    _selection(spec.period_mapping, "period mapping")
+    period_mapping_id = _selection(spec.period_mapping, "period mapping")
     label = _selection(spec.source_label, "source label") if spec.source_label is not None else None
     header = _selection(spec.source_header, "source header") if spec.source_header is not None else None
     temporal, start, end, basis = _period(spec.period)
@@ -207,11 +241,38 @@ def build_candidate(
     if len({key for key, _ in dimensions}) != len(dimensions):
         raise CandidateValidationError("DIMENSION_AMBIGUOUS", "Dimension identities must be unique; implicit or duplicate dimensions are rejected.")
 
+    def approval_ref(selection: ApprovedSelection | None, label: str) -> str:
+        _selection(selection, label)
+        assert selection is not None and selection.approval_ref is not None
+        return selection.approval_ref
+
+    dimension_refs = tuple(
+        (item.dimension.identity or "", approval_ref(item.dimension, "dimension"),
+         item.value.identity or "", approval_ref(item.value, "dimension value"))
+        for item in spec.dimensions
+    )
     return CanonicalInputCandidate(
-        company, report_type, report_version, match.template_id, match.template_version,
-        match.template_sha256.lower(), observation.source.sha256.lower(), sheet.ordinal,
-        sheet.literal_name, coordinate, literal, metric, label, header, amount, unit,
-        currency, scale, temporal, start, end, basis, dimensions,
+        company_id=company, report_type_id=report_type, report_version_id=report_version,
+        template_id=match.template_id, template_version=match.template_version,
+        template_sha256=match.template_sha256.lower(), source_workbook_sha256=observation.source.sha256.lower(),
+        worksheet_ordinal=sheet.ordinal, worksheet_name=sheet.literal_name, source_coordinate=coordinate,
+        extraction_owner=owners[0],
+        source_value_kind=cell.value_kind, source_text=source_text, source_native_integer=native_integer,
+        metric_id=metric, source_label_id=label, source_header_id=header, value=amount,
+        source_unit=unit, source_currency=currency, source_scale=scale, temporal_type=temporal,
+        period_start_jalali=start, period_end_jalali=end, duration_basis=basis, dimensions=dimensions,
+        company_approval_ref=approval_ref(spec.company, "company"),
+        report_type_approval_ref=approval_ref(spec.report_type, "report type"),
+        report_version_approval_ref=approval_ref(spec.report_version, "report version"),
+        metric_approval_ref=approval_ref(spec.metric, "metric"),
+        source_unit_approval_ref=approval_ref(spec.source_unit, "source unit"),
+        source_currency_approval_ref=approval_ref(spec.source_currency, "source currency"),
+        source_scale_approval_ref=approval_ref(spec.source_scale, "source scale"),
+        period_mapping_id=period_mapping_id,
+        period_mapping_approval_ref=approval_ref(spec.period_mapping, "period mapping"),
+        source_label_approval_ref=approval_ref(spec.source_label, "source label") if spec.source_label else None,
+        source_header_approval_ref=approval_ref(spec.source_header, "source header") if spec.source_header else None,
+        dimension_approval_refs=dimension_refs,
     )
 
 

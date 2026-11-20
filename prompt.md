@@ -1,120 +1,94 @@
-# EXECUTION PROMPT — Task 014 / DB-ING-001
-## Implement the canonical Excel-to-financial-input DTO boundary
+# EXECUTION PROMPT — Task 014 Correction / DB-ING-001
+## Close the implementation gaps found in code review
 
-**Repository:** `analyzer`  
+**Repository:** `lovelyroz/analyzer`  
 **Branch:** `master`  
-**Project:** `analyzer`  
-**Work type:** CODE IMPLEMENTATION + TESTS  
+**Work type:** CODE CORRECTION + TESTS  
 **Priority:** High
 
-### Objective
+The initial implementation of Task 014 is present. Do not repeat its implementation or produce another general audit.
 
-Implement the next concrete layer of the Excel-to-canonical ingestion path.
+Fix the following concrete gaps in the existing implementation.
 
-The current Excel observation DTO and Reader already exist. Do not rebuild them. Implement the missing boundary that converts structurally identified Excel observations into validated, immutable canonical-input candidates, with explicit per-value temporal and semantic context.
+### Files
 
-The purpose is to make each selected financial value independently identifiable and prevent guessing of its Metric, unit, period, or YTD/standalone basis.
-
-### Authoritative documents — read first
-
-1. `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
-2. `12_Database_Architecture_V1.1.md`
-3. `database/reports/DB_DES_007_EXCEL_OBSERVATION_DTO_CONTRACT.md`
-4. `database/reports/DB_DES_009_CANONICAL_FINANCIAL_FACT_PHYSICAL_MODEL.md`
-5. `database/reports/DB_DES_011_JALALI_FINANCIAL_PERIOD_AND_TEMPORAL_BASIS.md`
-6. `database/reports/DB_DES_013_DETERMINISTIC_EXCEL_TEMPLATE_MATCHING.md`
-7. `database/reports/DB_DES_014_HIERARCHICAL_HEADER_SEMANTIC_COLUMN_MAPPING.md`
-
-If a referenced path differs, locate the exact existing file. Do not create a replacement document.
-
-### Existing implementation — inspect before editing
-
-- `src/ingestion/excel/dto.py`
-- `src/ingestion/excel/reader.py`
+- `src/ingestion/excel/canonical_input.py`
 - `src/ingestion/excel/deterministic_matcher.py`
-- `src/tests/test_excel_observation_dto.py`
-- `src/tests/test_excel_source_reader.py`
+- `src/ingestion/excel/dto.py`
+- `src/tests/test_excel_canonical_input.py`
 - `src/tests/test_excel_template_matching.py`
 
-### Required implementation
+Read the relevant contracts before changing code.
 
-1. Add an immutable canonical-input candidate DTO. It must preserve:
-   - Company identity reference.
-   - Report type and report-version reference.
-   - Approved template identity/version/hash.
-   - Source workbook hash.
-   - Source worksheet and exact cell/coordinate references.
-   - Approved Metric identity.
-   - Source label/header identity where applicable.
-   - Numeric value without binary-float conversion or silent rounding.
-   - Explicit source unit, currency and scale.
-   - Explicit temporal type: `INSTANT` or `DURATION`.
-   - Explicit Jalali period start/end components.
-   - Explicit `duration_basis=YTD|STANDALONE` for DURATION only.
-   - Approved dimensions and their identities, where applicable.
+### 1. Native numeric Excel values
 
-2. Implement a pure validation/builder boundary:
-   - Accept only explicitly approved structural and semantic mappings.
-   - Reject missing or ambiguous Metric, unit, currency, scale, period, or duration basis.
-   - Reject inconsistent INSTANT/DURATION combinations.
-   - Reject invalid Jalali dates and invalid period ranges.
-   - Reject a DURATION fact without an explicit valid duration basis.
-   - Reject an INSTANT fact with a duration basis.
-   - Preserve zero versus missing; never turn missing into zero.
-   - Never infer a period from column order, workbook title, publication date, or neighboring values.
-   - Never infer a Metric from a Header name alone.
-   - Never create implicit dimensions or default units.
+The existing Reader supports `PRESENT_NUMBER`, but `build_candidate()` currently rejects every value except `PRESENT_TEXT`.
 
-3. Keep the implementation independent of persistence:
-   - No ORM changes.
-   - No schema or migration changes.
-   - No database writes.
-   - No canonical writer or ingestion activation.
-   - No changes to existing financial data or workbook files.
+Implement safe handling:
 
-4. Add focused tests for:
-   - Valid INSTANT candidate.
-   - Valid DURATION/YTD candidate.
-   - Valid DURATION/STANDALONE candidate.
-   - Missing Metric.
-   - Ambiguous mapping.
-   - Missing currency/unit/scale.
-   - Missing period.
-   - Invalid Jalali date/range.
-   - Missing or invalid duration basis.
-   - INSTANT with duration basis.
-   - Missing versus explicit zero.
-   - Numeric precision preservation.
-   - Missing source coordinate/provenance.
-   - Rejection of implicit/default semantic values.
+- Accept native integer values without float conversion.
+- Do not silently convert a binary float into an allegedly exact source Decimal.
+- If the original numeric lexical representation is unavailable for a float, reject it explicitly with a stable diagnostic.
+- Preserve the distinction between literal text, native integer, native float, blank and zero.
+- Do not change the Reader's existing contract without a demonstrated need.
 
-### Important constraints
+Add tests for native integer acceptance, native float rejection where exact source precision cannot be established, and explicit zero.
 
+### 2. Preserve mapping approval references
+
+`period_mapping` is currently validated but its identity is discarded.
+
+The `ApprovedSelection.approval_ref` fields are also discarded after validation.
+
+Extend the transient Candidate DTO to preserve the identities and approval references needed to audit:
+
+- Company
+- Report type
+- Report version
+- Metric
+- Unit
+- Currency
+- Scale
+- Period mapping
+- Optional source label/header
+- Dimensions and their values
+
+Do not invent approval references. Preserve the exact values supplied by the approved selections.
+
+Add tests proving that approval references and period-mapping identity survive candidate construction.
+
+### 3. Validate actual coordinate ownership
+
+Inspect the matcher's `coordinate_map` and ownership rules.
+
+A coordinate must belong to an explicitly owned extraction range, not merely fall somewhere inside a parent table's broad bounds.
+
+Reject coordinates in excluded, unowned, overlapping or ambiguous areas.
+
+Add tests for:
+- A valid owned coordinate.
+- A coordinate inside table bounds but outside all owned ranges.
+- A coordinate inside an excluded region.
+- An ambiguous ownership case.
+
+Do not weaken existing fail-closed matching.
+
+### Constraints
+
+- No ORM/schema/migration/database changes.
+- No real workbook ingestion.
+- No Parsian template approval or fabricated semantic mappings.
 - Do not modify `WORKFLOW_RULES.md`.
-- Do not modify existing approved owner decisions.
-- Do not reopen decisions already settled in the Master Packet.
-- Do not connect this implementation to the Parsian draft template.
-- Do not create fake approved mappings or fake Metric IDs.
-- Do not weaken fail-closed behavior to make tests pass.
-- Do not run tests on the owner's real database.
-- Do not claim Task 014 is DONE merely because the DTO is implemented.
+- Do not mark Task 014 DONE while locale-specific parsing and authoritative production approval resolution remain unresolved.
+- Do not rerun unrelated audits or tests.
 
 ### Deliverables
 
-1. Working implementation and focused tests.
-2. Exact list of changed/added files.
-3. Exact test commands and actual outputs.
-4. A short implementation report:
-   `database/reports/DB_ING_001_CANONICAL_INPUT_DTO_IMPLEMENTATION.md`
-5. Update `reply.md` with the execution result.
-6. Update the Master Packet:
-   - Record the implementation evidence under a new §9 entry.
-   - Update Task 014 status only according to its actual acceptance criteria.
-   - Recalculate the progress dashboard.
-   - Do not mark Task 014 DONE if any required behavior remains unimplemented.
+1. Corrected code and focused regression tests.
+2. Exact changed-file list.
+3. Actual test commands and outputs.
+4. Update `database/reports/DB_ING_001_CANONICAL_INPUT_DTO_IMPLEMENTATION.md`.
+5. Update `reply.md` and Master Packet §9.
+6. Recalculate the progress dashboard only if the Task status actually changes.
 
-### Completion standard
-
-Deliver executable code and tests, not another architecture proposal or inventory report.
-
-If a contract conflict blocks implementation, identify the exact conflicting clauses and implement every independent, non-conflicting part. Do not stop the entire task because one isolated item is unresolved.
+Deliver code, not another proposal. Keep Task 014 PARTIAL if any acceptance gap remains.

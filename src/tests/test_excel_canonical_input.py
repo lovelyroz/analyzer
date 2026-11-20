@@ -45,7 +45,8 @@ def _inputs(value="12345678901234567890.1234567890123456789"):
         template_id="fixture-template", version="1", approved=True,
         source_workbook_sha256="a" * 64, worksheet_name="Annual", worksheet_ordinal=1,
         tables=(TableRule(code="fixture-table", title_cell="A1", title_text="Revenue",
-                          bounds="A1:B2", header_cells=(("B1", "Amount"),)),),
+                          bounds="A1:B2", header_cells=(("B1", "Amount"),),
+                          owned_ranges=("B2:B2",)),),
     )
     match = match_template(template, observed)
     assert match.status == "MATCHED"
@@ -64,6 +65,8 @@ def test_builds_immutable_instant_candidate_with_decimal_precision():
     assert candidate.temporal_type is TemporalType.INSTANT
     assert candidate.duration_basis is None
     assert candidate.source_coordinate == "B2"
+    assert candidate.source_value_kind.value == "PRESENT_TEXT"
+    assert candidate.source_text == "12345678901234567890.1234567890123456789"
     assert candidate.source_workbook_sha256
     with pytest.raises(FrozenInstanceError):
         candidate.metric_id = "other"
@@ -119,11 +122,83 @@ def test_missing_is_not_zero_and_explicit_zero_is_preserved():
     assert _build(value="0").value == Decimal(0)
 
 
+def test_native_integer_is_exact_and_native_float_is_rejected():
+    integer_candidate = _build(value=123456789)
+    assert integer_candidate.value == Decimal(123456789)
+    assert integer_candidate.source_value_kind.value == "PRESENT_NUMBER"
+    assert integer_candidate.source_native_integer == 123456789
+    zero_candidate = _build(value=0)
+    assert zero_candidate.value == Decimal(0)
+    assert zero_candidate.source_value_kind.value == "PRESENT_NUMBER"
+    assert zero_candidate.source_native_integer == 0
+    assert integer_candidate.source_text is None
+
+    with pytest.raises(CandidateValidationError, match="SOURCE_FLOAT_PRECISION_UNAVAILABLE"):
+        _build(value=0.1)
+
+
+def test_candidate_preserves_approval_refs_and_period_mapping_identity():
+    spec = _spec()
+    spec = replace(
+        spec,
+        company=ApprovedSelection("company-1", True, 1, "company-approval-9"),
+        report_type=ApprovedSelection("report-type-2", True, 1, "report-type-approval-8"),
+        report_version=ApprovedSelection("report-version-3", True, 1, "report-version-approval-7"),
+        metric=ApprovedSelection("metric-4", True, 1, "metric-approval-6"),
+        source_unit=ApprovedSelection("unit-5", True, 1, "unit-approval-5"),
+        source_currency=ApprovedSelection("currency-6", True, 1, "currency-approval-4"),
+        source_scale=ApprovedSelection("scale-7", True, 1, "scale-approval-3"),
+        period_mapping=ApprovedSelection("period-map-8", True, 1, "period-approval-2"),
+        source_label=ApprovedSelection("label-9", True, 1, "label-approval-1"),
+        source_header=ApprovedSelection("header-10", True, 1, "header-approval-0"),
+        dimensions=(DimensionSelection(
+            ApprovedSelection("dimension-11", True, 1, "dimension-approval-a"),
+            ApprovedSelection("dimension-value-12", True, 1, "dimension-value-approval-b"),
+        ),),
+    )
+    candidate = _build(spec)
+    assert (candidate.company_id, candidate.company_approval_ref) == ("company-1", "company-approval-9")
+    assert (candidate.report_type_id, candidate.report_type_approval_ref) == ("report-type-2", "report-type-approval-8")
+    assert (candidate.report_version_id, candidate.report_version_approval_ref) == ("report-version-3", "report-version-approval-7")
+    assert (candidate.metric_id, candidate.metric_approval_ref) == ("metric-4", "metric-approval-6")
+    assert (candidate.source_unit, candidate.source_unit_approval_ref) == ("unit-5", "unit-approval-5")
+    assert (candidate.source_currency, candidate.source_currency_approval_ref) == ("currency-6", "currency-approval-4")
+    assert (candidate.source_scale, candidate.source_scale_approval_ref) == ("scale-7", "scale-approval-3")
+    assert (candidate.period_mapping_id, candidate.period_mapping_approval_ref) == ("period-map-8", "period-approval-2")
+    assert candidate.source_label_approval_ref == "label-approval-1"
+    assert candidate.source_header_approval_ref == "header-approval-0"
+    assert candidate.dimension_approval_refs == (("dimension-11", "dimension-approval-a", "dimension-value-12", "dimension-value-approval-b"),)
+
+
+def test_rejects_coordinates_without_unique_explicit_ownership():
+    observation, match = _inputs()
+    with pytest.raises(CandidateValidationError, match="STRUCTURAL_OWNERSHIP_MISSING"):
+        build_candidate(observation, match, coordinate="A2", spec=_spec())
+    ambiguous = replace(match, owned_coordinate_map=(("owner-a", "B2:B2"), ("owner-b", "B2:B2")))
+    with pytest.raises(CandidateValidationError, match="STRUCTURAL_OWNERSHIP_AMBIGUOUS"):
+        build_candidate(observation, ambiguous, coordinate="B2", spec=_spec())
+
+
+def test_explicitly_excluded_coordinate_has_no_extraction_owner():
+    observation, match = _inputs()
+    template = TemplateVersion(
+        template_id="fixture-template", version="1", approved=True,
+        source_workbook_sha256="a" * 64, worksheet_name="Annual", worksheet_ordinal=1,
+        tables=(TableRule(code="fixture-table", title_cell="A1", title_text="Revenue",
+                          bounds="A1:B2", header_cells=(("B1", "Amount"),),
+                          owned_ranges=("B2:B2",), excluded_ranges=("A2:A2",)),),
+    )
+    excluded_match = match_template(template, observation)
+    assert excluded_match.status == "MATCHED"
+    with pytest.raises(CandidateValidationError, match="STRUCTURAL_OWNERSHIP_MISSING"):
+        build_candidate(observation, excluded_match, coordinate="A2", spec=_spec())
+
+
 def test_rejects_missing_source_coordinate_and_invalid_numeric_text():
     observation, match = _inputs()
     with pytest.raises(CandidateValidationError, match="SOURCE_COORDINATE_MISSING"):
         build_candidate(observation, match, coordinate="", spec=_spec())
-    with pytest.raises(CandidateValidationError, match="SOURCE_PROVENANCE_MISSING"):
+    with pytest.raises(CandidateValidationError, match="STRUCTURAL_OWNERSHIP_MISSING"):
         build_candidate(observation, match, coordinate="C9", spec=_spec())
     with pytest.raises(CandidateValidationError, match="SOURCE_NUMBER_INVALID"):
         _build(value="1,000")

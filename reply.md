@@ -302,3 +302,11 @@ Excel: ۱۹ رکورد کامل؛ تاریخ تکراری، Null، صفر/منف
 - Matcher results now carry worksheet name and ordinal for exact source provenance, including sparse blank coordinates. No persistence, ORM, schema, migration, database, real workbook, Parsian mapping, writer, or activation changed.
 - Final test command: `.\\.venv\\Scripts\\python.exe -m pytest -q --basetemp .pytest_task014_20261120 src/tests/test_excel_canonical_input.py src/tests/test_excel_source_reader.py src/tests/test_excel_observation_dto.py src/tests/test_excel_template_matching.py` — **51 passed in 1.55s**, exit code 0.
 - Task 014 remains PARTIAL because locale-specific parsing for Persian digits/separators and an authoritative runtime approval catalog/resolver are unavailable. Synthetic fixture identities are tests only, not production approvals. Full report: `database/reports/DB_ING_001_CANONICAL_INPUT_DTO_IMPLEMENTATION.md`; Master Packet §9.35 and dashboard were updated.
+
+# TASK 014 correction / DB-ING-001 — review gaps closed — 2026-11-20
+
+- Native Excel integer cells now convert directly to exact `Decimal(int)`. Native float cells are explicitly rejected with `SOURCE_FLOAT_PRECISION_UNAVAILABLE` when the source lexical representation is unavailable. Literal text, native integer, blank and explicit zero remain distinguishable. Reader/DTO behavior was unchanged.
+- Candidate now retains the exact supplied approval references for company, report type/version, Metric, unit, currency, scale, period mapping, optional label/header, and dimension plus dimension value. Period mapping identity is retained as well.
+- Matcher results expose approved owned extraction ranges; candidate construction requires exactly one owner. Unowned areas inside a broad table, explicit exclusions and ambiguous ownership are rejected; matcher rejects owned/excluded overlap.
+- Focused command: `.\\.venv\\Scripts\\python.exe -m pytest -q --basetemp .pytest_task014_correction_20261120 src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py` — **26 passed in 1.61s**, exit code 0.
+- Task 014 remains PARTIAL because locale-specific Persian numeric parsing and an authoritative production approval resolver/catalog remain unresolved. Master Packet §9.36 and the implementation report were updated; dashboard unchanged because Task status did not change.

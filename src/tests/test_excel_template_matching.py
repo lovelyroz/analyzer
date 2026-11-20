@@ -57,6 +57,7 @@ def test_exact_approved_template_matches_and_records_both_hashes():
     assert len(result.template_sha256) == 64
     assert result.source_workbook_sha256 == _observation().source.sha256
     assert result.coordinate_map == (("T1", "A1:B2"), ("T1-P1", "A2:B2"))
+    assert result.owned_coordinate_map == (("T1-P1", "A2:B2"),)
 
 
 def test_unapproved_candidate_is_rejected():
@@ -91,6 +92,30 @@ def test_overlapping_extraction_ownership_is_rejected():
 
     assert result.status == "REJECTED"
     assert "OWNERSHIP_OVERLAP" in {item.code for item in result.diagnostics}
+
+
+def test_owned_range_overlapping_excluded_range_is_rejected():
+    template = _template(child_owned=("A2:B2",))
+    table = template.tables[0]
+    child = table.partitions[0]
+    changed_child = PartitionRule(
+        code=child.code, marker_cell=child.marker_cell, marker_text=child.marker_text,
+        bounds=child.bounds, header_inheritance=child.header_inheritance,
+        owned_ranges=child.owned_ranges, excluded_ranges=("B2:B2",),
+    )
+    changed_table = TableRule(
+        code=table.code, title_cell=table.title_cell, title_text=table.title_text,
+        bounds=table.bounds, title_search_range=table.title_search_range,
+        header_cells=table.header_cells, partitions=(changed_child,), owned_ranges=table.owned_ranges,
+    )
+    result = match_template(
+        TemplateVersion(template.template_id, template.version, template.approved,
+                        template.source_workbook_sha256, template.worksheet_name,
+                        template.worksheet_ordinal, (changed_table,)),
+        _observation(),
+    )
+    assert result.status == "REJECTED"
+    assert "OWNED_EXCLUDED_RANGE_OVERLAP" in {item.code for item in result.diagnostics}
 
 
 def test_partition_outside_parent_is_rejected():

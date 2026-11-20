@@ -24,6 +24,7 @@ class PartitionRule:
     bounds: str
     header_inheritance: str
     owned_ranges: tuple[str, ...] = ()
+    excluded_ranges: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +37,7 @@ class TableRule:
     header_cells: tuple[tuple[str, str], ...] = ()
     partitions: tuple[PartitionRule, ...] = ()
     owned_ranges: tuple[str, ...] = ()
+    excluded_ranges: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,12 +66,14 @@ class TemplateVersion:
                     "title_search_range": t.title_search_range,
                     "header_cells": list(t.header_cells),
                     "owned_ranges": list(t.owned_ranges),
+                    "excluded_ranges": list(t.excluded_ranges),
                     "partitions": [
                         {
                             "code": p.code, "marker_cell": p.marker_cell,
                             "marker_text": p.marker_text, "bounds": p.bounds,
                             "header_inheritance": p.header_inheritance,
                             "owned_ranges": list(p.owned_ranges),
+                            "excluded_ranges": list(p.excluded_ranges),
                         } for p in t.partitions
                     ],
                 } for t in self.tables
@@ -98,6 +102,7 @@ class TemplateMatchResult:
     diagnostics: tuple[MatchDiagnostic, ...] = ()
     worksheet_name: str | None = None
     worksheet_ordinal: int | None = None
+    owned_coordinate_map: tuple[tuple[str, str], ...] = ()
 
 
 def _inside(inner: str, outer: str) -> bool:
@@ -133,6 +138,7 @@ def _template_diagnostics(template: TemplateVersion) -> list[MatchDiagnostic]:
     if len(all_node_codes) != len(set(all_node_codes)):
         diagnostics.append(MatchDiagnostic("DUPLICATE_NODE_CODE", "Table and partition codes must be unique."))
     ownership: list[tuple[str, str]] = []
+    exclusions: list[tuple[str, str]] = []
     partition_codes: set[str] = set()
     for table in template.tables:
         try:
@@ -146,6 +152,10 @@ def _template_diagnostics(template: TemplateVersion) -> list[MatchDiagnostic]:
                 if not _inside(owned, table.bounds):
                     diagnostics.append(MatchDiagnostic("OWNED_RANGE_OUTSIDE_TABLE", "Owned range must be inside its table bounds.", table.code))
                 ownership.append((table.code, owned))
+            for excluded in table.excluded_ranges:
+                if not _inside(excluded, table.bounds):
+                    diagnostics.append(MatchDiagnostic("EXCLUDED_RANGE_OUTSIDE_TABLE", "Excluded range must be inside its table bounds.", table.code))
+                exclusions.append((table.code, excluded))
             sibling_ranges: list[tuple[str, str]] = []
             for partition in table.partitions:
                 if partition.code in partition_codes:
@@ -163,12 +173,20 @@ def _template_diagnostics(template: TemplateVersion) -> list[MatchDiagnostic]:
                     if not _inside(owned, partition.bounds):
                         diagnostics.append(MatchDiagnostic("OWNED_RANGE_OUTSIDE_PARTITION", "Owned range must be inside its partition.", partition.code))
                     ownership.append((partition.code, owned))
+                for excluded in partition.excluded_ranges:
+                    if not _inside(excluded, partition.bounds):
+                        diagnostics.append(MatchDiagnostic("EXCLUDED_RANGE_OUTSIDE_PARTITION", "Excluded range must be inside its partition.", partition.code))
+                    exclusions.append((partition.code, excluded))
         except (ValueError, TypeError):
             diagnostics.append(MatchDiagnostic("TEMPLATE_RANGE_INVALID", "Template contains an invalid A1 reference.", table.code))
     for index, (code, first) in enumerate(ownership):
         for other_code, second in ownership[index + 1:]:
             if _overlaps(first, second):
                 diagnostics.append(MatchDiagnostic("OWNERSHIP_OVERLAP", f"Owned range overlaps node {other_code}.", code))
+    for owner_code, owned in ownership:
+        for excluded_code, excluded in exclusions:
+            if _overlaps(owned, excluded):
+                diagnostics.append(MatchDiagnostic("OWNED_EXCLUDED_RANGE_OVERLAP", f"Owned extraction range overlaps excluded range from {excluded_code}.", owner_code))
     for index, (code, first) in enumerate((t.code, t.bounds) for t in template.tables):
         for other_code, second in ((t.code, t.bounds) for t in template.tables[index + 1:]):
             if _overlaps(first, second):
@@ -237,6 +255,15 @@ def match_template(template: TemplateVersion, observation: WorkbookObservation) 
             diagnostics.append(MatchDiagnostic("TEMPLATE_REFERENCE_INVALID", "Template contains an invalid coordinate.", table.code))
 
     status = "REJECTED" if diagnostics else "MATCHED"
+    owned_coordinate_map = tuple(
+        (node_code, bounds)
+        for table in template.tables
+        for node_code, ranges in (
+            (table.code, table.owned_ranges),
+            *((partition.code, partition.owned_ranges) for partition in table.partitions),
+        )
+        for bounds in ranges
+    ) if status == "MATCHED" else ()
     return TemplateMatchResult(
         status=status,
         template_id=template.template_id,
@@ -247,5 +274,6 @@ def match_template(template: TemplateVersion, observation: WorkbookObservation) 
         diagnostics=tuple(diagnostics),
         worksheet_name=template.worksheet_name if status == "MATCHED" else None,
         worksheet_ordinal=template.worksheet_ordinal if status == "MATCHED" else None,
+        owned_coordinate_map=owned_coordinate_map,
     )
     
