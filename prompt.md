@@ -1,299 +1,147 @@
-# TASK: MARKET/FX DOCUMENTATION CONSISTENCY AUDIT & CLOSURE
+# TASK 3 — IMPLEMENT MARKET/FX ARTIFACT PREFLIGHT VALIDATOR
 
-## Mission
+## Objective
 
-Perform a complete, evidence-based consistency and traceability audit of the Market/FX ingestion documentation in the `lovelyroz/analyzer` repository.
+Implement a working, read-only preflight validation tool for the existing MarketDaily and FX source artifacts.
 
-The objective is to close documentation inconsistencies, verify that all approved decisions are represented consistently, and ensure that unresolved evidence gaps are explicitly recorded without being silently converted into assumptions.
+This is an implementation task, not an investigation or documentation-only task.
 
-This is a bounded documentation task. Do not expand its scope into implementation, database changes, or new business decisions.
+The deliverable must include executable code, automated tests, and a sample validation report.
 
-You are expected to complete the task autonomously, verify your changes, commit the approved documentation changes, and provide a concise, auditable completion report.
+## Scope
 
-## 1. Repository and branch
+Inspect the existing repository structure and implement a validator for:
 
-- Repository: `analyzer`
-- Target branch: `master`
-- Before editing, inspect the current branch, working tree, latest commit, and current versions of all target files.
-- Fetch the latest version of each target file before modifying it.
-- Do not overwrite newer remote changes.
-- Preserve existing document structure, identifiers, historical decisions, and established terminology.
-- Do not modify `WORKFLOW_RULES.md`.
+1. `saman_price_history.csv`
+2. `dollar-history.xlsx`
 
-## 2. Authoritative documents in scope
+Also inspect whether a FREE_MARKET sample exists. If it does not exist, report that feed as `BLOCKED_NO_SAMPLE`; do not fabricate a sample or infer its schema.
 
-Inspect the latest versions of:
+## Required implementation
 
-1. `database/reports/DB_DES_005_INGESTION_ATOMICITY_CONTRACT.md`
-   - Focus: §13.7, §13.8, §13.9 and related acceptance criteria.
+Create a reusable validation module and a command-line entry point consistent with the project's existing language, architecture, and conventions.
 
-2. `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
-   - Focus: §9.28 and §9.29, plus any directly related Market/FX sections.
+The validator must:
 
-3. `database/reports/DB_STD_005_AND_DB_AUD_001_MARKET_FX_EVIDENCE_REVIEW.md`
-   - Focus: §18 and all relevant preceding evidence and decision registers.
+### A. Artifact identity
+- Resolve input paths safely.
+- Calculate SHA-256.
+- Record file size and file type.
+- Record worksheet names for Excel files.
+- Never modify, rename, or overwrite source artifacts.
 
-Search for additional directly relevant documents only when necessary to verify a cross-reference or identify a contradiction. Do not expand the audit into unrelated database domains.
+### B. MarketDaily validation
+- Inspect CSV headers and actual row structure.
+- Validate the approved fields where present:
+  - `J-Date`
+  - `Close`
+  - `Volume`
+  - `No`
+  - `Value`
+- Validate Jalali date format without silently converting or changing the source value.
+- Detect missing values, malformed numeric values, duplicate economic keys, and conflicting payloads for the same economic key.
+- Preserve `Value` independently. Never replace it with `Volume × Close`.
+- Do not introduce mappings for `Final`, `Open`, `High`, or `Low`.
 
-## 3. Approved facts that must be preserved
+### C. FX validation
+- Inspect workbook sheets and actual headers.
+- Validate the approved sell-rate mapping only.
+- Validate Jalali date values and numeric sell rates.
+- Preserve the original source values and row references.
+- Detect duplicate economic keys and conflicting rates.
+- Do not infer a buy/sell mapping beyond the approved sell-rate field.
+- Do not multiply or divide rates unless the existing approved mapping explicitly requires it.
 
-Treat the following as established owner decisions. Do not reinterpret or reverse them.
+### D. Provenance checks
+For every artifact, report these fields separately:
+- `source_published_at`
+- `source_available_at`
+- `ingested_at`
 
-### MarketDaily / CODAL
+Do not derive the first two from filesystem timestamps, file upload times, row dates, or Git timestamps.
 
-- The source is CODAL.
-- The owner downloads the data using their own script.
-- `J-Date` is a Jalali date in `YYYY-MM-DD` form.
-- `Close` represents the daily closing market price in Rial per share.
-- `Volume` represents the number of shares traded.
-- `No` represents the transaction count.
-- `Value` represents the source-provided total traded value in Rial.
-- Preserve `Value` independently. Do not replace it with `Volume × Close`.
-- `Final`, `Open`, `High`, and `Low` are excluded from the approved ingestion mapping.
-- The reviewed sample contains 21 records from 1402-01-08 through 1402-02-12.
-- Reviewed CSV SHA-256:
-  `d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413`
-- Publication time, first availability time, and revision/correction identity have not yet been evidenced.
+If a timestamp is not evidenced, return `UNKNOWN`, not a guessed value.
 
-### FX / EXCHANGE_CENTER
+Clearly distinguish:
+- artifact identity,
+- source identity,
+- source publication identity,
+- revision identity.
 
-- The owner has identified the reviewed FX source as `EXCHANGE_CENTER`.
-- Use the sell-rate column only.
-- The canonical rate is Rial per USD.
-- Do not create an inferred buy/sell split in the canonical FX mapping.
-- Reviewed workbook SHA-256:
-  `eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf`
-- The hash identifies the exact reviewed file bytes. It does not independently prove publisher identity, source-profile identity, publication time, or revision identity.
-- The exact traceable link between this artifact and the `EXCHANGE_CENTER` source profile remains to be evidenced.
+A matching SHA-256 proves byte equality only. It does not prove publisher identity or revision order.
 
-### FX / FREE_MARKET
+### E. Validation result
+Produce structured results with:
+- `PASS`
+- `WARNING`
+- `FAIL`
+- `BLOCKED`
 
-- The approved unit conversion is Toman per USD multiplied by 10 to obtain canonical Rial per USD.
-- A real sample artifact and its complete source/header/calendar/provenance audit are still outstanding.
-- Do not copy the `EXCHANGE_CENTER` column mapping into `FREE_MARKET`.
-- Do not activate this profile based only on the unit conversion decision.
+The overall status must fail closed when required fields are missing, economic keys are invalid, or conflicting payloads cannot be resolved.
 
-### Provenance and revision controls
+Do not invent a winning revision. Do not use last-arrival-wins.
 
-Keep these timestamps distinct:
+## Tests
 
-- `source_published_at`: official source publication time.
-- `source_available_at`: first provable availability time.
-- `ingested_at`: system receipt/ingestion time.
+Write automated tests covering at least:
 
-Do not infer publication or availability times from:
+1. Valid MarketDaily input.
+2. Missing required MarketDaily field.
+3. Invalid Jalali date.
+4. Invalid numeric value.
+5. Duplicate identical economic key and payload.
+6. Duplicate economic key with conflicting payload.
+7. Valid FX workbook.
+8. Missing FX sell-rate field.
+9. Invalid FX date or rate.
+10. Missing FREE_MARKET sample.
+11. Unknown provenance timestamps.
+12. SHA-256 stability and source-file immutability.
 
-- Upload time.
-- Filesystem modification time.
-- The date contained in a market or FX row.
-- The order in which files were received.
-
-A SHA-256 hash proves byte equality, not publisher identity or revision identity.
-
-A changed payload for an existing economic key without valid revision evidence must remain a conflict/review case. Do not introduce overwrite or last-arrival-wins behavior.
-
-Economic keys currently documented:
-
-- MarketDaily: Company + Jalali date.
-- FX: Jalali date + currency pair + rate type.
-
-Do not invent a revision identifier, fingerprint algorithm, conflict winner, or final version-ranking policy.
-
-## 4. Required work
-
-### Task A — Build a source-of-truth comparison matrix
-
-Compare the three authoritative documents.
-
-For every material Market/FX decision, record:
-
-- Decision or fact.
-- Current value.
-- Evidence type: owner-approved, artifact-observed, or unresolved.
-- Documents and sections where it appears.
-- Whether all documents agree.
-- Any contradiction, omission, stale wording, or ambiguous statement.
-- Required documentation correction, if any.
-
-At minimum, audit:
-
-1. CODAL source identity.
-2. Market CSV hash and sample scope.
-3. Market field mappings and units.
-4. Jalali date handling.
-5. EXCHANGE_CENTER source identity.
-6. FX workbook hash and sell-column mapping.
-7. FREE_MARKET conversion and missing evidence.
-8. The three provenance timestamps.
-9. Artifact hash limitations.
-10. Economic keys.
-11. Duplicate and conflicting payload behavior.
-12. Revision/correction evidence requirements.
-13. Feed activation restrictions.
-14. DB-DES-005 acceptance criteria and unresolved decisions.
-15. Cross-references between the report and master packet.
-
-Do not treat repeated statements in multiple documents as independent evidence. Identify the original evidence or owner decision where possible.
-
-### Task B — Verify evidence traceability
-
-Inspect the repository for the actual reviewed artifacts, evidence records, and references.
-
-For each artifact:
-
-- Determine whether the exact file is present.
-- If present, independently calculate its SHA-256.
-- Compare it with the documented hash.
-- Record the path and verification result.
-- Do not modify or resave source artifacts.
-- Do not claim an artifact was verified if it was not accessible.
-
-For CODAL, distinguish the owner's source decision from proof of publication/availability/revision metadata.
-
-For EXCHANGE_CENTER, distinguish the owner's source decision from proof that the exact workbook bytes came from that source.
-
-For FREE_MARKET, explicitly state whether a real sample and source evidence exist in the repository.
-
-If evidence is missing, record the exact missing item. Do not search for a substitute artifact and silently treat it as the reviewed source.
-
-### Task C — Correct documentation inconsistencies
-
-If the comparison reveals contradictions, stale statements, missing cross-references, or inconsistent status labels:
-
-- Correct them in the appropriate existing documents.
-- Preserve approved facts exactly.
-- Keep unresolved facts explicitly unresolved.
-- Make the smallest sufficient edits.
-- Do not duplicate entire sections unnecessarily.
-- Ensure the master packet accurately summarizes the detailed evidence report and ingestion contract.
-- Ensure the ingestion contract does not present provisional controls as final approved implementation policy.
-
-Do not create new business decisions merely to make the documents appear complete.
-
-### Task D — Produce a final audit register
-
-Add or update an appropriately located section in the existing Market/FX evidence review report.
-
-The register must contain:
-
-| ID | Subject | Evidence/status | Verified result | Remaining gap | Closure condition |
-|---|---|---|---|---|---|
-
-Include separate entries for:
-
-- CODAL source and mapping.
-- CODAL publication/availability evidence.
-- CODAL revision/correction behavior.
-- EXCHANGE_CENTER source and artifact linkage.
-- EXCHANGE_CENTER publication/availability evidence.
-- EXCHANGE_CENTER revision/correction behavior.
-- FREE_MARKET artifact and source audit.
-- Provenance timestamp policy.
-- Economic-key and conflict policy.
-- Feed activation status.
-
-Use precise status terminology. At minimum distinguish:
-
-- VERIFIED
-- OWNER-APPROVED
-- ARTIFACT-OBSERVED
-- UNVERIFIED
-- BLOCKED
-- PARTIAL
-
-Do not label an item VERIFIED merely because an owner decision exists.
-
-### Task E — Cross-document validation
-
-After editing:
-
-1. Re-read all modified sections.
-2. Check every hash character by character.
-3. Check that dates, units, field names, and economic keys agree.
-4. Check that the detailed report and master packet do not contradict each other.
-5. Check that no provisional control is described as a final implementation decision.
-6. Check that all unresolved evidence gaps remain visible.
-7. Check Markdown tables, headings, section numbering, and internal references.
-8. Check the final Git diff for unrelated changes.
-
-If an inconsistency cannot be resolved from repository evidence, preserve it as an explicit blocker rather than guessing.
-
-## 5. Strict change restrictions
-
-You are authorized to edit documentation files in scope only.
-
-You are NOT authorized to:
-
-- Modify Python source code.
-- Modify tests.
-- Modify ORM models.
-- Modify schemas or migrations.
-- Open, create, modify, or query any database.
-- Modify ingestion behavior.
-- Activate or deactivate a feed in runtime configuration.
-- Change source mappings or units.
-- Invent a revision policy or conflict winner.
-- Modify `WORKFLOW_RULES.md`.
-- Delete or rewrite historical evidence.
-- Change any source artifact.
-
-Do not run application code or database scripts.
-
-Do not claim tests were run. This is a documentation audit, not an implementation test.
-
-## 6. Completion criteria
-
-The task is complete only when all of the following are true:
-
-1. All three authoritative documents have been inspected at their latest available versions.
-2. A source-of-truth comparison has been completed.
-3. Artifact availability and hash verification have been reported honestly.
-4. Every identified documentation contradiction has either been corrected or explicitly recorded as unresolved with a reason.
-5. The final audit register exists and covers every required subject.
-6. The master packet accurately reflects the detailed report.
-7. Cross-document validation has been completed.
-8. The Git diff contains only authorized documentation changes.
-9. All authorized changes have been committed to `master`.
-10. The final report includes commit SHA, modified paths, and verification results.
-
-Important: Missing external evidence does not prevent closure of this bounded documentation-consistency task. It does, however, prevent the relevant source-provenance item or feed from being marked VERIFIED or production-ready. Record those items as BLOCKED/UNVERIFIED with exact closure conditions.
-
-Do not claim that the underlying Market/FX ingestion design is fully approved merely because this documentation task is complete.
-
-## 7. Required final response
-
-Return a concise but complete report with these headings:
-
-### A. Completion
-- COMPLETE or NOT COMPLETE.
-- Exact reason.
-
-### B. Changes
-- Each modified path.
-- Sections changed.
-- Short description of each correction.
-
-### C. Evidence verification
-- Each artifact path, expected hash, actual hash, and result.
-- Explicitly identify artifacts that were unavailable.
-
-### D. Remaining blockers
-- Exact missing evidence.
-- What would close each blocker.
-- Whether any feed remains blocked from activation.
-
-### E. Validation
-- Cross-document checks performed.
-- Git diff scope check.
-- Confirm no code, tests, ORM, schema, migration, or database changes.
-- Confirm no tests were run.
-
-### F. Git
-- Branch.
-- Commit SHA.
-- Working-tree status after commit.
-
-### G. Next action
-Identify the single highest-value next task. Do not begin that next task without authorization.
-
-Be factual. Do not report success based on intention. A task is complete only when the requested outputs and verification evidence actually exist.
+Use temporary test fixtures. Never modify the actual source artifacts during tests.
+
+## CLI behavior
+
+Provide a documented command that runs validation against the existing artifacts.
+
+The command must:
+- Run without opening a database connection.
+- Perform no ingestion or database writes.
+- Return a non-zero exit code when validation has FAIL or BLOCKED status.
+- Produce a machine-readable JSON report.
+- Produce a concise human-readable summary.
+
+## Output files
+
+Create:
+1. The validator implementation.
+2. Automated tests.
+3. A usage document.
+4. A sample JSON validation report.
+5. `database/reports/DB_IMP_003_MARKET_FX_PREFLIGHT_VALIDATOR.md`
+
+Append a concise completion entry to `reply.md`. Preserve all previous content.
+
+## Restrictions
+
+- Do not modify database schemas, ORM models, migrations, migration runners, or database records.
+- Do not run ingestion.
+- Do not modify source CSV/XLSX files.
+- Do not fabricate missing provenance.
+- Do not claim that validation success means a feed is production-ready.
+- Do not change approved source mappings.
+- Do not spend this task on prompt.md or Git reporting.
+- Do not stop after writing a plan. Implement the code and tests.
+
+## Completion criteria
+
+This task is complete only when:
+1. The implementation exists.
+2. Automated tests execute and their actual results are reported.
+3. The CLI runs against the available real artifacts.
+4. The JSON report is generated.
+5. Source artifact hashes before and after execution match.
+6. No database connection or write occurred.
+7. Known limitations and blocked feeds are explicitly reported.
+
+If an implementation detail is genuinely blocked by missing project information, implement all independent parts and document the exact blocker. Do not replace implementation with another investigation report.

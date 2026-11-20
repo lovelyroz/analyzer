@@ -210,3 +210,9 @@ Excel: ۱۹ رکورد کامل؛ تاریخ تکراری، Null، صفر/منف
 ### G. Next action
 
 بالاترین اولویت بعدی، تهیهٔ بستهٔ provenance قابل‌ردیابی برای artifactهای بررسی‌شدهٔ CODAL و EXCHANGE_CENTER است: اتصال هر فایل به منبع/profile و شواهد زمان انتشار، نخستین دسترس‌پذیری و رفتار اصلاحیه.
+# DB-IMP-003 Market/FX preflight validator — 2026-11-20
+
+- Implemented the read-only validator, CLI, usage guide, JSON sample report, and 12 temporary-fixture tests. Tests: `python -m pytest -q src/tests/test_market_fx_preflight.py` — **12 passed**.
+- Ran CLI against the real artifacts. Results: MarketDaily **BLOCKED** (21 rows; stable company key not supplied), EXCHANGE_CENTER **WARNING** (19 rows; one sheet named `Sheet`), FREE_MARKET **BLOCKED_NO_SAMPLE**; overall **BLOCKED**. This is a preflight result, not a production-readiness assertion. Source publisher linkage, source publication/availability times, and revision identities remain unverified; timestamps are not guessed.
+- Source hashes before and after execution are identical: CSV `d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413`; XLSX `eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf`. No database connection, ingestion, or source-file write occurred. `git diff --check` passed.
+- Deliverables: [validator](../src/preflight/market_fx.py), [CLI](../src/scripts/market_fx_preflight.py), [tests](../src/tests/test_market_fx_preflight.py), [usage](../docs/market_fx_preflight.md), [sample report](./reports/market_fx_preflight_sample.json), [implementation report](./reports/DB_IMP_003_MARKET_FX_PREFLIGHT_VALIDATOR.md).

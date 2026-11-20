@@ -1,0 +1,280 @@
+{
+  "generated_at_utc": "2026-11-20T09:37:30.602286+00:00",
+  "read_only": true,
+  "database_connection": false,
+  "ingestion_performed": false,
+  "results": [
+    {
+      "feed": "MarketDaily",
+      "status": "BLOCKED",
+      "artifact": {
+        "path": "D:\\winprojects\\analyzer\\saman_price_history.csv",
+        "sha256": "d94f27405f257b4010e1d2b7db4a554311484a6dde2b35a9c81c548f381c1413",
+        "size_bytes": 2400,
+        "file_type": "csv",
+        "worksheet_names": []
+      },
+      "headers": [
+        "J-Date",
+        "Open",
+        "High",
+        "Low",
+        "Close",
+        "Final",
+        "Volume",
+        "Value",
+        "No",
+        "Ticker",
+        "Name",
+        "Market"
+      ],
+      "data_rows": 21,
+      "validated_rows": 0,
+      "approved_fields": [
+        "J-Date",
+        "Close",
+        "Volume",
+        "No",
+        "Value"
+      ],
+      "ignored_fields": [
+        "Final",
+        "Open",
+        "High",
+        "Low"
+      ],
+      "value_policy": "Value validated and preserved independently; never computed from Volume × Close.",
+      "economic_key": {
+        "company_key": "UNKNOWN",
+        "date_field": "J-Date"
+      },
+      "provenance": {
+        "source_identity": "CODAL (owner-approved; artifact linkage unverified)",
+        "source_publication_identity": "UNKNOWN",
+        "artifact_identity": "SHA-256 identifies byte equality only",
+        "revision_identity": "UNKNOWN",
+        "source_published_at": "UNKNOWN",
+        "source_available_at": "UNKNOWN",
+        "ingested_at": "NOT_INGESTED"
+      },
+      "issues": [
+        {
+          "severity": "BLOCKED",
+          "code": "COMPANY_KEY_UNRESOLVED",
+          "message": "Supply a stable, owner-resolved company key; ticker alone is not canonical."
+        },
+        {
+          "severity": "WARNING",
+          "code": "PROVENANCE_UNKNOWN",
+          "message": "Publication, first availability, and revision evidence are absent; artifact hash does not establish source identity."
+        }
+      ]
+    },
+    {
+      "feed": "EXCHANGE_CENTER",
+      "status": "WARNING",
+      "artifact": {
+        "path": "D:\\winprojects\\analyzer\\dollar-history.xlsx",
+        "sha256": "eb85250100438335accb06ca1fdf364304887a71e361258b93836d3a90dd6fcf",
+        "size_bytes": 14349,
+        "file_type": "xlsx",
+        "worksheet_names": [
+          "Sheet"
+        ]
+      },
+      "mapping": {
+        "date_headers": [
+          "تاریخ",
+          "تاريخ"
+        ],
+        "sell_headers": [
+          "فروش (ریال)",
+          "فروش(ریال)",
+          "فروش"
+        ],
+        "rate_type": "EXCHANGE_CENTER",
+        "pair": "USD/IRR",
+        "conversion": "none"
+      },
+      "observations": [
+        {
+          "sheet": "Sheet",
+          "date_cell": "A4",
+          "source_date": "1405-08-28",
+          "sell_cell": "C4",
+          "source_sell_rate": "1936329",
+          "economic_key": "1405-08-28|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A5",
+          "source_date": "1405-08-27",
+          "sell_cell": "C5",
+          "source_sell_rate": "1932464",
+          "economic_key": "1405-08-27|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A6",
+          "source_date": "1405-08-26",
+          "sell_cell": "C6",
+          "source_sell_rate": "1928607",
+          "economic_key": "1405-08-26|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A7",
+          "source_date": "1405-08-25",
+          "sell_cell": "C7",
+          "source_sell_rate": "1924758",
+          "economic_key": "1405-08-25|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A8",
+          "source_date": "1405-08-24",
+          "sell_cell": "C8",
+          "source_sell_rate": "1920916",
+          "economic_key": "1405-08-24|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A9",
+          "source_date": "1405-08-23",
+          "sell_cell": "C9",
+          "source_sell_rate": "1917082",
+          "economic_key": "1405-08-23|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A10",
+          "source_date": "1405-08-22",
+          "sell_cell": "C10",
+          "source_sell_rate": "1913255",
+          "economic_key": "1405-08-22|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A11",
+          "source_date": "1405-08-21",
+          "sell_cell": "C11",
+          "source_sell_rate": "1913255",
+          "economic_key": "1405-08-21|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A12",
+          "source_date": "1405-08-20",
+          "sell_cell": "C12",
+          "source_sell_rate": "1909436",
+          "economic_key": "1405-08-20|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A13",
+          "source_date": "1405-08-19",
+          "sell_cell": "C13",
+          "source_sell_rate": "1905625",
+          "economic_key": "1405-08-19|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A14",
+          "source_date": "1405-08-18",
+          "sell_cell": "C14",
+          "source_sell_rate": "1901821",
+          "economic_key": "1405-08-18|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A15",
+          "source_date": "1405-08-17",
+          "sell_cell": "C15",
+          "source_sell_rate": "1898025",
+          "economic_key": "1405-08-17|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A16",
+          "source_date": "1405-08-16",
+          "sell_cell": "C16",
+          "source_sell_rate": "1894237",
+          "economic_key": "1405-08-16|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A17",
+          "source_date": "1405-08-15",
+          "sell_cell": "C17",
+          "source_sell_rate": "1890456",
+          "economic_key": "1405-08-15|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A18",
+          "source_date": "1405-08-14",
+          "sell_cell": "C18",
+          "source_sell_rate": "1890456",
+          "economic_key": "1405-08-14|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A19",
+          "source_date": "1405-08-13",
+          "sell_cell": "C19",
+          "source_sell_rate": "1886682",
+          "economic_key": "1405-08-13|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A20",
+          "source_date": "1405-08-12",
+          "sell_cell": "C20",
+          "source_sell_rate": "1882917",
+          "economic_key": "1405-08-12|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A21",
+          "source_date": "1405-08-11",
+          "sell_cell": "C21",
+          "source_sell_rate": "1879158",
+          "economic_key": "1405-08-11|USD/IRR|EXCHANGE_CENTER"
+        },
+        {
+          "sheet": "Sheet",
+          "date_cell": "A22",
+          "source_date": "1405-08-10",
+          "sell_cell": "C22",
+          "source_sell_rate": "1875407",
+          "economic_key": "1405-08-10|USD/IRR|EXCHANGE_CENTER"
+        }
+      ],
+      "validated_rows": 19,
+      "provenance": {
+        "source_identity": "EXCHANGE_CENTER (owner-approved; workbook linkage unverified)",
+        "source_publication_identity": "UNKNOWN",
+        "artifact_identity": "SHA-256 identifies byte equality only",
+        "revision_identity": "UNKNOWN",
+        "source_published_at": "UNKNOWN",
+        "source_available_at": "UNKNOWN",
+        "ingested_at": "NOT_INGESTED"
+      },
+      "issues": [
+        {
+          "severity": "WARNING",
+          "code": "PROVENANCE_UNKNOWN",
+          "message": "Workbook-to-profile linkage, publication/availability times, and revision identity remain unverified."
+        }
+      ]
+    },
+    {
+      "feed": "FREE_MARKET",
+      "status": "BLOCKED",
+      "code": "BLOCKED_NO_SAMPLE",
+      "samples": [],
+      "message": "No FREE_MARKET sample found; schema and mapping not inferred."
+    }
+  ],
+  "overall_status": "BLOCKED"
+}
