@@ -2387,3 +2387,12 @@ DB-ING-006 / Task 033 PARTIAL باقی می‌ماند. این گام صرفاً
 **موارد باز واقعی:** زمان انتشار/دسترس‌پذیری و revision/correction برای MarketDaily؛ اتصال artifact فعلی FX به provenance پروفایل EXCHANGE_CENTER و زمان انتشار/دسترس‌پذیری؛ نمونه و Feed profile واقعی FREE_MARKET؛ و سیاست تکرار/اصلاحیه و تطبیق implementation با قراردادها. دو ردیف خالی انتهایی CSV رکورد داده نیستند و نباید به‌عنوان خطای رکورد شمرده شوند.
 
 این مرحله صرفاً تطبیق مستندات و ثبت شواهد artifact بود. DB-STD-005 و بخش Market/FX از DB-AUD-001 همچنان PARTIAL هستند؛ هیچ Feed فعال یا آمادهٔ ingestion اعلام نمی‌شود. هیچ کد، ORM، schema، migration، دیتابیس یا داده‌ای تغییر نکرد و تست یا query اجرا نشد.
+
+
+## 9.29 حداقل provenance و guardrail موقت revision برای Feedهای Market/FX — 2026-11-20
+
+در گزارش DB-DES-005 §13.9 تفکیک سه زمان source_published_at، source_available_at و ingested_at و حداقل شواهد provenance برای artifact ثبت شد. زمان upload، mtime فایل و تاریخ جلالی ردیف‌ها جایگزین زمان انتشار رسمی نیستند. SHA-256 فایل فقط برابری بایت‌ها را می‌سنجد و شناسهٔ revision یا اثبات ناشر نیست.
+
+Guardrail موقت: برای کلید اقتصادی موجود MarketDaily یا FX، payload متفاوت بدون evidence معتبر revision باید conflict/review شود؛ overwrite و last-arrival-wins ممنوع است. نبود publication/availability نیز اجازهٔ ساخت chronology یا current-winner برای PIT نمی‌دهد. Hash فعلی XLSX ارز فقط به artifact بررسی‌شده متصل است و به‌تنهایی EXCHANGE_CENTER بودن آن را ثابت نمی‌کند. Feed بازار سامان همچنان نیازمند evidence زمان انتشار/دسترس‌پذیری و رفتار اصلاحیه است؛ Feed مرکز مبادله نیازمند اتصال provenance artifact به profile؛ FREE_MARKET نیازمند نمونهٔ واقعی و profile مستقل است.
+
+این ثبت، تصمیم نهایی fingerprint algorithm، revision key، retention، batch boundary یا conflict winner نیست و مجوز schema/implementation محسوب نمی‌شود. DB-DES-005 و DB-STD-005 PARTIAL باقی می‌مانند. فقط مستندات تغییر کردند؛ هیچ کد، ORM، schema، migration، DB یا داده‌ای تغییر نکرد و تستی اجرا نشد.
