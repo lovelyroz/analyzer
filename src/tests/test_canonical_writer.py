@@ -258,7 +258,7 @@ def test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded(m
     assert MigrationRunner(engine).upgrade() == 8
     with engine.begin() as connection:
         connection.execute(text("INSERT INTO industries (industry_code, industry_name) VALUES ('BANK','Bank')"))
-        connection.execute(text("INSERT INTO companies (ticker, company_name, industry_id, codal_symbol, status) VALUES ('DUP','One',1,'A','ACTIVE'),('DUP','Two',1,'B','ACTIVE')"))
+        connection.execute(text("INSERT INTO companies (ticker, company_name, industry_id, codal_symbol, status, is_active) VALUES ('DUP','One',1,'A','ACTIVE',1),('DUP','Two',1,'B','ACTIVE',1)"))
     monkeypatch.setattr(migration_runner, "_migration_list", lambda: all_migrations)
     with pytest.raises(RuntimeError, match="duplicate legacy values"):
         MigrationRunner(engine).upgrade()
