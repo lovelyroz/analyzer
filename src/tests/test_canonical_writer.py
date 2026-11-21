@@ -92,10 +92,10 @@ def db(tmp_path):
     engine.dispose()
 
 
-def _approval_rows(version="version-1"):
+def _approval_rows(version="version-1", report_type_id="PERIODIC_FINANCIAL"):
     rows = [
         ("company", "company-1", "approval-company"),
-        ("report_type", "report-periodic", "approval-report-type"),
+        ("report_type", report_type_id, "approval-report-type"),
         ("report_version", version, f"approval-{version}"),
         ("metric", "metric-sales", "approval-metric"),
         ("source_unit", "unit-rial", "approval-unit"),
@@ -110,11 +110,11 @@ def _approval_rows(version="version-1"):
     return rows
 
 
-def _plan(*, version="version-1", source_revision="revision-1", amount=12, supersedes=None):
+def _plan(*, version="version-1", source_revision="revision-1", amount=12, supersedes=None, report_type_id="PERIODIC_FINANCIAL", period_identity=("DURATION", (1404, 1, 1), (1404, 3, 31))):
     fact = PlannedFact(
-        company_id="company-1", report_type_id="report-periodic", report_id="report-1",
+        company_id="company-1", report_type_id=report_type_id, report_id="report-1",
         report_version_id=version,
-        period_identity=("DURATION", (1404, 1, 1), (1404, 3, 31)),
+        period_identity=period_identity,
         metric_id="metric-sales", dimensions=(), source_value_decimal=Decimal(amount),
         value_integer=amount, value_origin=ValueOrigin.SOURCE_REPORTED,
         source_unit="unit-rial", source_currency="currency-irr", source_scale="scale-unit",
@@ -123,7 +123,7 @@ def _plan(*, version="version-1", source_revision="revision-1", amount=12, super
         revision_identity=source_revision, source_artifact_sha256="a" * 64,
         template_id="template-fixture", template_version="1", template_sha256="b" * 64,
         extraction_owner="test-table", approval_references=tuple([
-            (kind, identity, ref) for kind, identity, ref in _approval_rows(version)
+            (kind, identity, ref) for kind, identity, ref in _approval_rows(version, report_type_id)
             if kind not in {"extraction_standard", "template"}
         ]),
         worksheet_ordinal=1, worksheet_name="Annual", source_coordinate="B2",
@@ -181,7 +181,7 @@ def test_synthetic_xlsx_runs_reader_match_admission_writer_and_readback(db):
 
     spec = CanonicalInputSpec(
         company=approved("company-1", "approval-company"),
-        report_type=approved("report-periodic", "approval-report-type"),
+        report_type=approved("PERIODIC_FINANCIAL", "approval-report-type"),
         report_version=approved("version-1", "approval-version-1"),
         metric=approved("metric-sales", "approval-metric"),
         source_unit=approved("unit-rial", "approval-unit"),
@@ -319,6 +319,35 @@ def test_writer_rejects_impossible_jalali_date_without_partial_rows(db):
     invalid = replace(plan.facts[0], period_identity=("DURATION", (1404, 1, 1), (1402, 12, 30)))
     with pytest.raises(CanonicalWriteError, match="JALALI_DATE_INVALID"):
         write_canonical_plan(replace(plan, facts=(invalid,)), _metadata(), factory)
+    with factory() as session:
+        assert session.query(CanonicalFinancialFact).count() == 0
+
+
+def test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment(db):
+    _engine, factory = db
+    with factory.begin() as session:
+        session.add(CanonicalApproval(
+            approval_kind="report_type", external_identity="MONTHLY_ACTIVITY",
+            approval_ref="approval-monthly-activity", is_active=True,
+        ))
+    plan = _plan(
+        report_type_id="MONTHLY_ACTIVITY",
+        period_identity=("DURATION", (1404, 1, 1), (1404, 2, 31)),
+    )
+    result = write_canonical_plan(plan, _metadata(), factory)
+    with factory() as session:
+        stored = session.scalar(select(CanonicalFinancialFact))
+        period = session.get(CanonicalFinancialPeriod, stored.period_id)
+        assert result.inserted_count == 1
+        assert stored.duration_basis == "YTD"
+        assert (period.start_month, period.end_month, period.end_day) == (1, 2, 31)
+
+
+def test_periodic_financial_ytd_still_requires_three_six_nine_or_twelve_months(db):
+    _engine, factory = db
+    plan = _plan(period_identity=("DURATION", (1404, 1, 1), (1404, 2, 31)))
+    with pytest.raises(CanonicalWriteError, match="BANK_YTD_PERIOD_ALIGNMENT_INVALID"):
+        write_canonical_plan(plan, _metadata(), factory)
     with factory() as session:
         assert session.query(CanonicalFinancialFact).count() == 0
 
