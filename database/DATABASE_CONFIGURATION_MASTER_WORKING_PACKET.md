@@ -2662,3 +2662,8 @@ DB-IMPL-001, DB-ING-002/003, DB-TEST-002/003, DB-ING-008 and DB-EXIT-001 remain 
 ## 2026-11-21 — DB-CONSOLIDATION-002 owner-test correction
 
 The first owner-run focused command returned **14 failed, 140 passed**. Direct fixes were applied to canonical approval scope resolution, the invalid-number test token, the Migration 10 fixture's required company fields, and the MarketDaily ticker/CODAL conflict fixture. Details and changed paths are recorded in `database/reports/DB_CONSOLIDATION_002_IMPLEMENTATION.md` under “Owner-run test failure corrections”. The same focused command must be rerun by the owner; these fixes are not yet owner-accepted. No real database was opened or migrated. Production workbook/approval records, Stage 5/6 compatibility, and historical Migration 9 lineage remain open.
+
+
+## 2026-11-21 — Final synthetic XLSX fixture correction
+
+The second owner-run DB-CONSOLIDATION-002 focused suite returned **1 failed, 153 passed**. The remaining synthetic XLSX end-to-end failure was a stale placeholder template fingerprint in the fixture's source-label/source-header approval scopes. The fixture now binds both scopes to the actual generated template fingerprint; runtime validation was not weakened. See `database/reports/DB_CONSOLIDATION_002_IMPLEMENTATION.md`. Rerun the isolated test, then the full focused command. No real DB was opened or migrated.
