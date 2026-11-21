@@ -1,4 +1,4 @@
-"""Synthetic end-to-end coverage for the Excel-to-canonical adapter."""
+"""Synthetic end-to-end coverage; fixtures are not production approvals."""
 from dataclasses import replace
 from decimal import Decimal
 from hashlib import sha256
@@ -46,6 +46,7 @@ def _spec(*, metric_count=1, period=None):
 
 
 def _source_and_template(values=("125.50",)):
+    """Build a synthetic workbook and matching test-only template fixture."""
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Annual"
@@ -129,6 +130,38 @@ def test_valid_source_matches_builds_explicit_candidate_and_admits_only_on_reque
     assert admitted.accepted
     assert admitted.admission_plan is not None
     assert admitted.admission_plan.execution_allowed is False
+    assert admitted.admission_plan.physical_persistence_compatible is False
+    assert admitted.admission_plan.atomicity_unit == "REPORT_VERSION"
+    fact, = admitted.admission_plan.facts
+    assert fact.company_id == "company-1"
+    assert fact.report_type_id == "report-periodic"
+    assert fact.report_version_id == "version-1"
+    assert fact.metric_id == "metric-sales"
+    assert fact.source_unit == "unit-rial"
+    assert fact.source_currency == "currency-irr"
+    assert fact.source_scale == "scale-unit"
+    assert fact.period_identity == ("DURATION", (1404, 1, 1), (1404, 12, 29))
+    assert fact.duration_basis == "YTD"
+    assert fact.source_value_decimal == Decimal("125.50")
+    assert fact.value_integer == 126
+    assert fact.source_artifact_sha256 == source_hash
+    assert fact.template_id == "fixture-template"
+    assert fact.template_version == "3"
+    assert fact.template_sha256 == template.template_sha256
+    assert fact.extraction_owner == "income-statement"
+    assert set(fact.approval_references) >= {
+        ("company", "company-1", "approval-company-1"),
+        ("report_type", "report-periodic", "approval-report-periodic"),
+        ("report_version", "version-1", "approval-version-1"),
+        ("metric", "metric-sales", "approval-metric-sales"),
+        ("unit", "unit-rial", "approval-unit-rial"),
+        ("currency", "currency-irr", "approval-currency-irr"),
+        ("scale", "scale-unit", "approval-scale-unit"),
+        ("period_mapping", "period-1404-ytd", "approval-period-1404-ytd"),
+    }
+    # The source locator is available on the submission candidate. PlannedFact
+    # intentionally does not persist cell coordinates under the current contract.
+    assert admitted.submissions[0].candidate.source_coordinate == "B2"
 
 
 def test_multi_period_report_preserves_explicit_ytd_and_standalone_semantics():
@@ -170,7 +203,71 @@ def test_multi_period_report_preserves_explicit_ytd_and_standalone_semantics():
     assert facts_by_period[("DURATION", (1404, 1, 1), (1404, 6, 31))].duration_basis == "YTD"
     assert facts_by_period[("DURATION", (1404, 4, 1), (1404, 6, 31))].duration_basis == "STANDALONE"
     assert {fact.value_integer for fact in facts_by_period.values()} == {1240, 330}
+    assert facts_by_period[("DURATION", (1404, 1, 1), (1404, 6, 31))].source_value_decimal == Decimal("1240")
+    assert facts_by_period[("DURATION", (1404, 4, 1), (1404, 6, 31))].source_value_decimal == Decimal("330")
     assert {submission.candidate.source_coordinate for submission in result.submissions} == {"B2", "C2"}
+
+
+def test_instant_period_and_exact_decimal_survive_the_full_chain():
+    source, template = _source_and_template(("0.1250",))
+    instant = replace(
+        _spec(),
+        period=JalaliPeriod(TemporalType.INSTANT, (1404, 6, 31), (1404, 6, 31)),
+        period_mapping=_approved("period-1404-06-instant"),
+    )
+    source_hash = sha256(source).hexdigest()
+
+    result = adapt_excel_source(
+        source,
+        template=template,
+        selections_by_coordinate={"B2": instant},
+        expected_source_sha256=source_hash,
+        admit=True,
+        revision=_revision(source_hash),
+    )
+
+    assert result.accepted
+    submission, = result.submissions
+    assert submission.candidate.source_coordinate == "B2"
+    assert submission.candidate.temporal_type is TemporalType.INSTANT
+    assert submission.candidate.period_start_jalali == (1404, 6, 31)
+    assert submission.candidate.period_end_jalali == (1404, 6, 31)
+    assert result.admission_plan is not None
+    fact, = result.admission_plan.facts
+    assert fact.period_identity == ("INSTANT", (1404, 6, 31), (1404, 6, 31))
+    assert fact.duration_basis is None
+    assert fact.source_value_decimal == Decimal("0.1250")
+    assert fact.value_integer == 0
+
+
+def test_duplicate_and_conflicting_facts_keep_all_or_nothing_admission_semantics():
+    same_source, same_template = _source_and_template(("42", "42"))
+    same_hash = sha256(same_source).hexdigest()
+    same = adapt_excel_source(
+        same_source,
+        template=same_template,
+        selections_by_coordinate={"B2": _spec(), "C2": _spec()},
+        admit=True,
+        revision=_revision(same_hash),
+    )
+    assert same.accepted
+    assert same.admission_plan is not None
+    assert len(same.admission_plan.facts) == 1
+    assert same.admission_plan.duplicate_count == 1
+
+    conflict_source, conflict_template = _source_and_template(("42", "43"))
+    conflict_hash = sha256(conflict_source).hexdigest()
+    conflict = adapt_excel_source(
+        conflict_source,
+        template=conflict_template,
+        selections_by_coordinate={"B2": _spec(), "C2": _spec()},
+        admit=True,
+        revision=_revision(conflict_hash),
+    )
+    assert not conflict.accepted
+    assert "INTRA_BATCH_CONFLICT" in {item.code for item in conflict.diagnostics}
+    assert conflict.admission_plan is None
+    assert conflict.submissions == ()
 
 
 def test_unapproved_template_and_wrong_worksheet_fail_closed():
@@ -195,11 +292,14 @@ def test_unapproved_template_and_wrong_worksheet_fail_closed():
 
 def test_expected_source_hash_mismatch_is_rejected():
     source, template = _source_and_template()
+    original_hash = sha256(source).hexdigest()
+    changed_source, _ = _source_and_template(("125.51",))
+    assert sha256(changed_source).hexdigest() != original_hash
     result = adapt_excel_source(
-        source,
+        changed_source,
         template=template,
         selections_by_coordinate={"B2": _spec()},
-        expected_source_sha256="f" * 64,
+        expected_source_sha256=original_hash,
     )
     assert [item.code for item in result.diagnostics] == ["SOURCE_HASH_MISMATCH"]
     assert result.submissions == ()
@@ -229,6 +329,15 @@ def test_missing_or_ambiguous_semantic_and_temporal_selections_reject():
         selections_by_coordinate={"B2": _spec(metric_count=2)},
     )
     assert "MAPPING_AMBIGUOUS" in {item.code for item in ambiguous.diagnostics}
+
+    unapproved = adapt_excel_source(
+        source,
+        template=template,
+        selections_by_coordinate={
+            "B2": replace(_spec(), source_currency=ApprovedSelection("currency-irr", False, 1, None))
+        },
+    )
+    assert "MAPPING_NOT_APPROVED" in {item.code for item in unapproved.diagnostics}
 
     # A missing temporal selection is rejected by the existing candidate builder.
     missing_period = adapt_excel_source(
@@ -282,10 +391,18 @@ def test_blank_zero_and_zero_fallback_remain_distinct_through_adapter():
 
 def test_unknown_in_scope_observation_rejects_whole_unit_with_stable_diagnostics():
     source, template = _source_and_template(("1", "2", "3"))
+    source_hash = sha256(source).hexdigest()
     first = {"B2": _spec(), "C2": _spec(metric_count=2)}
     second = {"C2": _spec(metric_count=2), "B2": _spec()}
-    left = adapt_excel_source(source, template=template, selections_by_coordinate=first)
-    right = adapt_excel_source(source, template=template, selections_by_coordinate=second)
+    left = adapt_excel_source(
+        source, template=template, selections_by_coordinate=first,
+        expected_source_sha256=source_hash, admit=True, revision=_revision(source_hash),
+    )
+    right = adapt_excel_source(
+        source, template=template, selections_by_coordinate=second,
+        expected_source_sha256=source_hash, admit=True, revision=_revision(source_hash),
+    )
     assert left.diagnostics == right.diagnostics
     assert {item.code for item in left.diagnostics} == {"MAPPING_AMBIGUOUS", "IN_SCOPE_SELECTION_MISSING"}
     assert left.submissions == right.submissions == ()
+    assert left.admission_plan is right.admission_plan is None

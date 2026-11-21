@@ -1,86 +1,112 @@
-# Task DB-TEST-002-CORRECTION — Align Stage 6 Test Fixtures with Runtime ForecastRecord
+# Task 019 — DB-TEST-003: Excel Integration and Downstream Contract Tests
 
-## نوع کار
-**Code change + test correction**
+## Execution mode
+**CODE + TEST IMPLEMENTATION.** Do not perform a report-only audit. Make concrete progress on Task 019.
 
-## هدف
-رفع ۴۲ خطای ثبت‌شده در `zErrors.md` با هماهنگ‌کردن fixtureهای تست Stage 6 با قرارداد فعلی `ForecastRecord`.
+## Mandatory first action: record owner acceptance
 
-علت اصلی شناسایی‌شده:
-- تست‌ها هنوز `forecast_id` را به `ForecastRecord` می‌فرستند.
-- تست‌ها هنوز `forecast_version` را به `ForecastRecord` می‌فرستند.
-- هیچ‌کدام از این دو فیلد در dataclass فعلی `src/forecast/schema.py` تعریف نشده‌اند.
-- `ForecastRecord` یک runtime record است و شناسه دیتابیسی یا version assignment ندارد.
+The owner has executed the DB-TEST-002 correction test command. Exact result:
 
-## فایل‌های مجاز برای تغییر
+`167 passed in 55.40s`
 
-1. `src/tests/test_stage6_p25_selection.py`
-2. `src/tests/test_stage6_p25_adversarial.py`
-3. `src/tests/test_stage6_evaluation_foundation.py`
+Update all relevant records:
+1. `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`, §9.42
+2. `database/reports/DB_TEST_002_CORRECTION.md`
+3. The Task 018 / DB-TEST-002 status entry, where appropriate.
 
-ابتدا `src/forecast/schema.py` و تمام failureهای مربوط به این سه فایل در `zErrors.md` را بررسی کن.
+Record this as owner-run acceptance of the corrected Stage 6 test suites. Do not mark DB-TEST-002 fully DONE if its broader integration or production limitations remain. Do not change dashboard percentages unless you recalculate the complete task denominator and all task statuses.
 
-## الزامات اجرایی
+## Main implementation: Task 019 / DB-TEST-003
 
-### 1. اصلاح fixtureها
-در تابع `_record()` هر سه فایل:
-- `forecast_id` را حذف کن.
-- `forecast_version` را حذف کن.
-- سایر فیلدها را دقیقاً مطابق قرارداد فعلی `ForecastRecord` نگه دار.
-- تمام overrideهای تست‌ها را بررسی کن تا هیچ تستی به‌صورت غیرمستقیم این دو فیلد را ارسال نکند.
+The Master Packet defines Task 019 as:
 
-### 2. حفظ معنای تست‌ها
-صرفاً حذف دو آرگومان کافی نیست. تمام تست‌هایی را که به شناسه یا نسخه پیش‌بینی وابسته‌اند بررسی کن.
+> تست یکپارچهٔ Excel و downstream contracts: adapter و مسیر Excel صورت‌های مالی به ورودی canonical مصوب برسند و مصرف‌کنندگان downstream بدون تغییر معنای دوره/مقدار کار کنند. این Task شامل تست PDF نیست.
 
-به‌خصوص:
-- تست `test_key_forecast_id_does_not_affect_key` را با قرارداد فعلی بازنویسی کن.
-- چون `ForecastRecord` شناسه دیتابیسی ندارد، تست باید نشان دهد هویت EvaluationKey به فیلدهای قراردادی ForecastRecord وابسته است و نه شناسه دیتابیسی فرضی.
-- اگر یک assertion دیگر با قرارداد فعلی بی‌معنا شده، آن را با تستی معنادار و منطبق با تصمیم معماری جایگزین کن.
-- تست‌های PIT، انتخاب Actual، سناریو، Horizon، Model Version، کیفیت داده و quarantine را حفظ کن.
-- assertionها را برای سبزشدن مصنوعی تست ضعیف نکن.
+Implement the strongest integration coverage currently possible, using the existing architecture and real public interfaces.
 
-### 3. محدودیت‌های مهم
-- هیچ فایل production را تغییر نده.
-- `src/forecast/schema.py` را تغییر نده.
-- هیچ شناسه یا فیلد حذف‌شده‌ای را به مدل برنگردان.
-- قرارداد Stage 6، Stage 5 یا EvaluationKey را بدون ضرورت تغییر نده.
-- تست‌های نامرتبط را حذف یا skip نکن.
-- هیچ تغییر ORM، schema، migration یا database انجام نده.
-- فایل `WORKFLOW_RULES.md` مطلقاً نباید تغییر کند.
-- تست‌ها را اجرا نکن؛ اجرای تست با مالک پروژه است.
+### Required inspection
+Read the actual implementations and existing tests for:
+- `src/ingestion/excel/reader.py`
+- `src/ingestion/excel/deterministic_matcher.py`
+- `src/ingestion/excel/canonical_input.py`
+- `src/ingestion/excel/adapter.py`
+- `src/ingestion/canonical_admission.py`
+- Relevant Stage 1 / downstream period and financial-value consumers.
+- Existing Excel adapter, canonical admission, temporal semantics, and Stage 6 tests.
 
-## کنترل نهایی
+Do not repeat broad repository audits. Follow the actual call chain and identify which downstream interfaces can currently consume the canonical output.
 
-قبل از تحویل:
-1. هر سه فایل را برای باقی‌ماندن `forecast_id` و `forecast_version` در سازنده `ForecastRecord` بررسی کن.
-2. تمام محل‌های استفاده از این دو نام را بررسی کن؛ صرفاً حذف کورکورانه کافی نیست.
-3. اطمینان بده که هیچ تستی به‌خاطر این اصلاح حذف یا غیرفعال نشده است.
-4. تغییرات را با diff بررسی کن.
+### Implementation requirements
 
-## گزارش تحویل
+1. Add or extend focused integration tests that exercise the real chain:
 
-گزارش را در `database/reports/DB_TEST_002_CORRECTION.md` ایجاد کن و شامل این موارد باشد:
-- علت دقیق ۴۲ خطا
-- فایل‌های تغییرکرده
-- تعداد و نوع تست‌های اصلاح‌شده
-- توضیح تغییر تست وابسته به `forecast_id`
-- تأیید عدم تغییر production و schema
-- دستور دقیق تست برای اجرای مالک پروژه
-- وضعیت: `READY_FOR_OWNER_TEST`
+   `synthetic XLSX → read_excel_source → approved synthetic TemplateVersion → match_template → adapt_excel_source → canonical candidate submission → prepare_canonical_batch`
 
-`reply.md` و `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md` را نیز به‌روزرسانی کن:
-- این اصلاح را به‌عنوان correction برای Task DB-TEST-002 ثبت کن.
-- تا قبل از موفقیت تست مالک، Task را DONE اعلام نکن.
-- آمار داشبورد را بدون محاسبه و بررسی واقعی تغییر نده.
+2. The synthetic template and explicit semantic/temporal selections are test fixtures only. Label them clearly as synthetic; they are not production approvals.
 
-## خروجی نهایی ایجنت
+3. Test both successful and fail-closed paths:
+   - Correct source fingerprint and matching template.
+   - Explicit company/report/version/metric/unit/currency/scale approvals.
+   - Explicit Jalali period mapping.
+   - INSTANT versus DURATION.
+   - YTD versus STANDALONE.
+   - Exact preservation of source value, including zero versus missing.
+   - Provenance and source coordinates survive the entire chain.
+   - A changed source workbook or mismatched fingerprint is rejected.
+   - Missing, ambiguous, or unapproved selections are rejected.
+   - A partially invalid batch does not produce an accepted partial plan.
+   - Duplicate/conflicting facts retain the existing admission semantics.
 
-در پاسخ نهایی دقیقاً اعلام کن:
-- `DONE` یا `PARTIAL`
-- فایل‌های تغییرکرده
-- خلاصه اصلاحات
-- تأیید اینکه تست اجرا نکرده‌ای
-- دستور تست مالک
-- هر مانع یا مورد باز باقی‌مانده
+4. Test downstream compatibility using existing real consumer interfaces wherever a supported bridge exists. In particular, check that period identity, duration basis, metric identity, and numeric value are not silently changed or inferred.
 
-هیچ ادعای موفقیت تست بدون اجرای واقعی و خروجی معتبر مجاز نیست.
+5. If there is no actual production bridge from `CanonicalPersistencePlan` / `PlannedFact` to a downstream consumer, do not invent one merely to make an integration test pass. Record the missing bridge as a concrete blocker, with exact modules/interfaces involved.
+
+6. Do not introduce inferred financial semantics, automatic YTD-to-standalone conversion, guessed metric mappings, or guessed units/scales.
+
+7. Keep the implementation deterministic and independent of external CODAL access or user-specific workbook files. Do not claim that synthetic fixtures prove production template readiness.
+
+### Strict boundaries
+
+- No ORM/model changes.
+- No schema or migration changes.
+- No database writes or real ingestion.
+- No changes to `WORKFLOW_RULES.md`.
+- No PDF extraction code, tests, fixtures, or fallback.
+- Do not weaken existing tests or alter production contracts just to satisfy fixtures.
+- Do not add a production template or mark any synthetic mapping as owner-approved.
+- Do not run tests; the owner runs them.
+
+### Deliverables
+
+1. Focused integration test file(s), preferably extending existing relevant test files rather than creating unnecessary duplicate suites.
+2. `database/reports/DB_TEST_003_EXCEL_DOWNSTREAM_INTEGRATION.md`, containing:
+   - Exact integration path exercised.
+   - Test cases and assertions added.
+   - Which downstream contracts were genuinely exercised.
+   - Which bridges or production approvals remain unavailable.
+   - Exact changed-file list.
+   - Static checks performed.
+   - Explicit statement that tests were not run by the agent.
+   - Exact owner test command.
+3. Update `reply.md` with:
+   - Owner acceptance: `167 passed in 55.40s`.
+   - Task 019 implementation summary and status.
+4. Update `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`:
+   - Record the 167-pass owner acceptance under §9.42.
+   - Add a new evidence section for Task 019.
+   - Update Task 019's status accurately.
+   - Do not mark it DONE while production template/mapping approval or a required downstream bridge remains unproven.
+   - Do not silently alter dashboard totals.
+
+### Final response format
+
+Return:
+- `DONE`, `PARTIAL`, or `BLOCKED` for Task 019.
+- Owner acceptance recording status for Task 018.
+- Exact files created/modified.
+- Number and purpose of tests added.
+- Concrete blockers, if any.
+- Exact owner test command.
+- Explicit confirmation that no tests were run by the agent.
+
+Do actual implementation. Do not return another broad audit or a list of recommendations instead of code.

@@ -388,3 +388,16 @@ The owner test command and exact changed/deleted-file inventory are in `database
 ................................................................................................................ [ 67%]
 .......................................................                                                          [100%]
 167 passed in 55.40s
+
+# DB-TEST-002 owner acceptance and Task 019 - 2026-11-21
+
+- Owner reran the DB-TEST-002 correction command and reported **167 passed in 55.40s**. This accepts the corrected Stage 6 suites; Task 018 / DB-TEST-002 remains PARTIAL due to the absent production Excel-to-canonical persistence bridge and related integration limitations.
+- Task 019 added two integration tests to `src/tests/test_excel_adapter.py` and strengthened existing full-chain cases for exact values, explicit approvals, fingerprints, temporal identity, provenance, unapproved selection, partial rejection, and duplicate/conflict semantics. Templates and mappings are synthetic test fixtures only.
+- Task 019 status: PARTIAL, owner test run pending. The existing downstream forecast query consumes `NormalizedFinancialFact` and `FinancialPeriod`; no supported writer maps `CanonicalPersistencePlan` / `PlannedFact` to those models. Cell coordinates remain on candidate submissions but are not included in `PlannedFact`, in line with the current Section 3.11 decision.
+- Tests were not run by the agent. Exact owner command, evidence, and blockers: `database/reports/DB_TEST_003_EXCEL_DOWNSTREAM_INTEGRATION.md`. Master Packet Sections 9.42 and 9.43 record owner acceptance and Task 019. Dashboard unchanged.
+
+
+(analyzer) PS D:\Winprojects\analyzer> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task019_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_excel_source_reader.py src/tests/test_canonical_ingestion_admission.py src/tests/test_stage6_evaluation_foundation.py src/tests/test_stage6_p25_selection.py
+................................................................................................................ [ 97%]
+...                                                                                                              [100%]
+115 passed in 2.75s
