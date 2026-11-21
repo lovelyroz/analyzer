@@ -63,3 +63,14 @@ No migration command is included: deployment requires a separate read-only inven
 - `src/tests/test_task017_model_constraints.py`
 
 `src/models/entity.py` and legacy physical models remain unchanged. `WORKFLOW_RULES.md`, PDF extraction code, real databases, and stored user data were not touched.
+
+
+## Post-implementation code review — 2026-11-21 (before owner test run)
+
+Static review found a temporal-scope defect that must be corrected before the owner runs the new test suite or treats the writer as accepted:
+
+1. `_validate_report_calendar()` currently applies the BANK periodic YTD alignment rule (3/6/9/12 complete Jalali months and month-end) to every BANK `DURATION/YTD` fact. It does not check `report_type_id`. This incorrectly couples `MONTHLY_ACTIVITY` to the separately reviewed `PERIODIC_FINANCIAL` standard. Apply the 3/6/9/12 rule only to BANK `PERIODIC_FINANCIAL`; monthly activity must use its own approved temporal standard and must not inherit periodic-report rules.
+2. `CanonicalCompanyFiscalCalendar` stores only `fiscal_year_start_month`, and the writer hardcodes start day 1. The approved contract requires the actual company fiscal-year start, not an assumed first day. Store and approve the exact Jalali start month and day, validate YTD starts against both, and do not infer either from a generic calendar convention.
+3. Add focused regression tests for both report types and for a non-first-day fiscal-year start, including migration/model coverage. Keep all date identity Jalali-native.
+
+This is a concrete implementation defect, not an owner-data or production-approval blocker. DB-IMPL-001 remains PARTIAL pending this correction, the focused owner test run, historical migration-9 lineage reconciliation, and production approvals. No tests were run during this static review; no real database or migration was used.
