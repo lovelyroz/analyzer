@@ -131,6 +131,48 @@ def test_valid_source_matches_builds_explicit_candidate_and_admits_only_on_reque
     assert admitted.admission_plan.execution_allowed is False
 
 
+def test_multi_period_report_preserves_explicit_ytd_and_standalone_semantics():
+    source, template = _source_and_template(("1240", "330"))
+    ytd = replace(
+        _spec(),
+        period=JalaliPeriod(
+            TemporalType.DURATION,
+            (1404, 1, 1),
+            (1404, 6, 31),
+            DurationBasis.YTD,
+        ),
+        period_mapping=_approved("period-1404-six-month-ytd"),
+    )
+    standalone = replace(
+        _spec(),
+        period=JalaliPeriod(
+            TemporalType.DURATION,
+            (1404, 4, 1),
+            (1404, 6, 31),
+            DurationBasis.STANDALONE,
+        ),
+        period_mapping=_approved("period-1404-q2-standalone"),
+    )
+    source_hash = sha256(source).hexdigest()
+
+    result = adapt_excel_source(
+        source,
+        template=template,
+        selections_by_coordinate={"B2": ytd, "C2": standalone},
+        admit=True,
+        revision=_revision(source_hash),
+    )
+
+    assert result.accepted
+    assert result.admission_plan is not None
+    facts_by_period = {fact.period_identity: fact for fact in result.admission_plan.facts}
+    assert len(facts_by_period) == 2
+    assert facts_by_period[("DURATION", (1404, 1, 1), (1404, 6, 31))].duration_basis == "YTD"
+    assert facts_by_period[("DURATION", (1404, 4, 1), (1404, 6, 31))].duration_basis == "STANDALONE"
+    assert {fact.value_integer for fact in facts_by_period.values()} == {1240, 330}
+    assert {submission.candidate.source_coordinate for submission in result.submissions} == {"B2", "C2"}
+
+
 def test_unapproved_template_and_wrong_worksheet_fail_closed():
     source, template = _source_and_template()
     unapproved = adapt_excel_source(

@@ -1,131 +1,166 @@
-# TASK 017 — DB-TEST-001: Model Constraints and Migration Tests
-**Type: TEST IMPLEMENTATION + DOCUMENTATION**
+# EXECUTION PROMPT — Task 017 Acceptance Record + Task 018 / DB-TEST-002
 
 Repository: `analyzer`  
 Branch: `master`
 
-## Objective
+## نوع کار
+**Code create/change — تست‌های خودکار و مستندات وضعیت Taskها.**
 
-Implement focused automated tests for the existing database models and Migration Runner.
+این اجرا باید Task 018 را واقعاً پیش ببرد؛ صرف بررسی فایل‌ها یا نوشتن گزارش، انجام Task محسوب نمی‌شود.
 
-This is an execution task. Add meaningful tests, not another broad audit.
+## بخش اول — ثبت پذیرش مالک برای Task 017
 
-## 1. Record latest owner acceptance
+نتیجه اجرای مالک را عیناً ثبت کن:
 
-Task 016 owner-run command:
+```text
+.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task017_20261120 src/tests/test_task017_model_constraints.py src/tests/test_stage1_database_integrity.py
 
-`.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task016_20261120 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_canonical_ingestion_admission.py`
+23 passed in 76.32s (0:01:16)
+```
 
-Result: **51 passed in 1.59s**.
+در `reply.md` و بخش وضعیت Task 017 در `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md` ثبت کن که اجرای تست توسط مالک موفق بوده است.
 
-Record this exact result in `reply.md` and Master Packet under Task 016. Task 016 remains PARTIAL because production template and real semantic/temporal mappings and representative real-workbook validation are still missing.
+**Task 017 همچنان PARTIAL است.** موارد زیر نباید به‌عنوان حل‌شده اعلام شوند:
+- نبود constraint جلالی برای FinancialPeriod در مدل فعلی؛
+- محدودیت پوشش schemaهای پشتیبانی‌شده؛
+- شکاف‌های uniqueness ناشی از NULL در SQLite؛
+- تضمین‌های محیط production و concurrency.
 
-## 2. Inspect existing test coverage
+فقط نتیجه پذیرش مالک را ثبت کن. Task 017 را DONE نکن.
 
-Read the current implementations before adding tests:
-- `src/models/entity.py`
-- `src/models/period.py`
-- `src/models/report.py`
-- `src/models/normalized.py`
-- `src/models/audit.py`
-- `src/models/market.py`
-- `src/models/fx.py`
-- `src/models/share_action.py`
-- `src/migrations/runner.py`
-- `src/core/database.py`
+## بخش دوم — اجرای Task 018 / DB-TEST-002
 
-Inspect existing tests for model constraints, foreign keys and migrations. Reuse existing fixtures and avoid duplicate test coverage.
+هدف: ساخت مجموعه تست‌های خودکار برای اثبات رفتار ingestion و Point-in-Time (PIT) بر اساس قراردادهای مصوب و مرزهای پیاده‌سازی موجود.
 
-## 3. Implement model constraint tests
+ابتدا فقط فایل‌های مرتبط زیر را بررسی کن و از تست‌ها و پیاده‌سازی‌های موجود استفاده مجدد کن:
 
-Add focused tests for currently implemented constraints:
+- `src/ingestion/canonical_admission.py`
+- `src/ingestion/excel/canonical_input.py`
+- `src/ingestion/excel/adapter.py`
+- `src/ingestion/excel/deterministic_matcher.py`
+- `src/ingestion/market/ingestion.py`
+- `src/ingestion/service.py`
+- `src/ingestion/common/atomic.py`
+- ماژول‌های موجود Report / ReportVersion / FinancialPeriod / NormalizedFinancialFact
+- تست‌های موجود مربوط به همین ماژول‌ها، به‌ویژه تست‌های Task 014 تا 017 و تست‌های atomic ingestion.
 
-- Company → Industry foreign key and required fields.
-- Unique Industry code and unique non-null national ID where supported by the database.
-- FinancialPeriod:
-  - `end_date >= start_date`
-  - allowed `period_type`
-  - uniqueness of `(company_id, fiscal_year, period_type, end_date)`.
-- ReportVersion:
-  - unique `(report_id, version_number)`
-  - at most one current version per report.
-- FinancialMetric:
-  - allowed `flow_or_stock`
-  - allowed `statement_type`
-  - allowed `sign_convention`.
-- MappingDecision:
-  - allowed mapping method and review status
-  - allowed composition role
-  - confidence range.
-- NormalizedFinancialFact:
-  - unique economic identity as currently defined
-  - allowed quality status.
-- DerivedFinancialFactInput:
-  - exactly one input source populated
-  - uniqueness of the declared input identity.
+از ایجاد تست تکراری که همان رفتار را قبلاً به‌طور مؤثر پوشش داده خودداری کن.
 
-For each constraint, test both an accepted case and a rejected case where practical.
+### 2.1 پوشش‌های الزامی
 
-Use isolated temporary SQLite databases. Ensure foreign-key enforcement is actually enabled in the test engine.
+برای هر مورد، تست مثبت و منفی مناسب بنویس:
 
-Do not assume that a model constraint exists merely because the architecture document requires it. Test the actual declared behavior.
+**A. Multi-period و Temporal semantics**
+- گزارش دارای چند دوره و چند مقدار زمانی؛
+- تمایز INSTANT و DURATION؛
+- تمایز YTD و STANDALONE؛
+- ممنوعیت duration_basis برای INSTANT؛
+- رد period یا temporal mapping ناقص، مبهم یا ناسازگار؛
+- جلوگیری از ترکیب ناخواسته دوره‌ها یا نسخه‌های ناسازگار.
 
-## 4. Implement Migration Runner tests
+**B. ReportVersion و correction**
+- حفظ نسخه قبلی هنگام ورود correction؛
+- correction به‌عنوان نسخه جدید و بدون overwrite نسخه قبلی؛
+- replay همان نسخه با payload یکسان؛
+- رد replay با payload متفاوت؛
+- انتخاب نسخه هم‌رتبه جدیدتر بر اساس تاریخ انتشار معتبر؛
+- عدم استفاده از نسخه‌ای که بعد از PIT منتشر شده است؛
+- عدم انتخاب خودکار در نبود تاریخ انتشار معتبر یا ترتیب زمانی قابل اثبات.
 
-Test the currently supported migration sequence only:
+**C. Provenance**
+- حفظ ارتباط candidate و persistence plan با company، report، report version، metric، period، template/standard و approval references؛
+- رد provenance ناقص یا متناقض؛
+- جلوگیری از یکی‌گرفتن دو مقدار اقتصادی که provenance متفاوت دارند؛
+- عدم ایجاد الزام دائمی برای exact workbook/sheet/cell locator، برخلاف تصمیم مالک.
 
-- Empty database upgrade.
-- Expected current migration version (currently version 8).
-- Repeated upgrade is idempotent.
-- Migration history contains each applied version once.
-- Existing supported legacy baseline is recognized without recreating or deleting existing business rows.
-- Additive migrations preserve unrelated existing data.
-- Migration 4 rejects multiple current ReportVersions and does not silently repair the data.
-- Migration 8 behavior is tested explicitly, including its intended removal of forecast output tables and preservation of unrelated/input-side tables.
-- Failure during a migration must not incorrectly record that migration as successfully applied.
+**D. Atomicity و batch admission**
+- اعتبارسنجی کامل batch پیش از پذیرش؛
+- وجود یک ردیف نامعتبر باید کل batch را رد کند؛
+- duplicate یکسان باید بدون درج مجدد تشخیص داده شود؛
+- conflict باید کل batch را رد کند؛
+- شکست در مراحل persistence/commit نباید partial canonical write باقی بگذارد؛
+- وضعیت audit در حد تضمین واقعی پیاده‌سازی بررسی شود؛
+- هیچ تستی نباید تضمین concurrency یا DB uniqueness را فراتر از توان schema فعلی ادعا کند.
 
-Use temporary test databases only. Never use the user's real database.
+**E. Mapping**
+- فقط mapping صریح و approved پذیرفته شود؛
+- mapping مفقود، چندمعنا، تکراری یا ناسازگار باید fail-closed باشد؛
+- mappingهای پیشنهادی یا candidate-only نباید به‌عنوان mapping تولیدی پذیرفته شوند؛
+- تطبیق صرفاً بر اساس شباهت متن یا حدس ممنوع است.
 
-## 5. Jalali and schema gaps — report honestly
+**F. NULL، صفر و ZERO_FALLBACK**
+- NULL/BLANK از صفر واقعی متمایز باشد؛
+- صفر گزارش‌شده حفظ شود؛
+- ZERO_FALLBACK فقط با approval صریح و منطبق پذیرفته شود؛
+- نبود approval یا approval ناسازگار باید رد شود؛
+- هیچ مقدار ساختگی نباید به‌عنوان مقدار گزارش‌شده ثبت شود.
 
-The current FinancialPeriod model uses SQL Date columns and Gregorian date comparisons. Do not invent a Jalali constraint or silently convert Jalali dates.
+**G. ممنوعیت raw/calculated persistence**
+- raw rows و calculated facts نباید از مرز admission عبور کنند؛
+- محاسبات runtime-only نباید به‌عنوان fact گزارش‌شده پذیرفته شوند؛
+- plan باید غیرقابل‌اجرا باقی بماند (`execution_allowed=False`) تا writer و schema مصوب وجود داشته باشند؛
+- تست‌ها نباید صرفاً با بررسی یک flag، نبود persistence ممنوع را در کل برنامه اثبات‌شده اعلام کنند. ادعا باید محدود به مرز واقعی تست‌شده باشد.
 
-Inspect whether a currently implemented Jalali validation utility exists. If it does, test its actual behavior. If no enforceable Jalali model contract exists, record it as an uncovered requirement / blocker.
+### 2.2 قواعد اجرای تست
 
-Similarly, do not claim that SQLite tests prove production-database concurrency or cross-database constraint behavior.
+- تست‌ها باید deterministic و مستقل از ترتیب اجرا باشند.
+- برای تست‌های دیتابیسی فقط از temporary isolated database استفاده کن.
+- هیچ دیتابیس واقعی یا owner database را باز نکن.
+- هیچ داده واقعی یا production ingestion اجرا نکن.
+- تست‌ها نباید به شبکه یا سرویس خارجی وابسته باشند.
+- تست‌های موجود را بی‌دلیل حذف یا تضعیف نکن.
+- اگر یک رفتار به‌علت محدودیت schema یا نبود writer قابل اثبات نیست، آن را صریحاً به‌عنوان GAP ثبت کن؛ با mock یا assertion صوری، PASS جعلی نساز.
+- در صورت کشف bug واقعی در کد pure/service، فقط اصلاح محدود و ضروری همان بخش مجاز است؛ تغییر ORM، schema، migration یا database ممنوع است.
 
-## 6. Strict exclusions
+## محدودیت‌های غیرقابل‌مذاکره
 
-- No ORM/model changes.
-- No schema changes.
-- No migration creation, modification, deletion or reordering.
-- Do not resolve Migration 9.
-- No database upgrade against a real or owner database.
-- No data modification outside isolated temporary test databases.
-- No production ingestion.
-- No changes to `WORKFLOW_RULES.md`.
-- Do not weaken constraints to make tests pass.
-- Do not run tests; the owner runs them.
+- هیچ تغییری در ORM، schema، migration یا دیتابیس.
+- Migration 9 را اجرا یا ایجاد نکن؛ Migration 10 نساز.
+- هیچ cleanup یا ingestion واقعی اجرا نکن.
+- هیچ Template یا mapping پیشنهادی را approved نکن.
+- `WORKFLOW_RULES.md` را تغییر نده.
+- قراردادهای مصوب مالک را دوباره باز نکن.
+- تست‌ها را خودت اجرا نکن؛ اجرای تست با مالک است.
 
-If a desired invariant is not currently implemented, document the gap rather than changing production code in this Task.
+## فایل‌های مجاز برای تغییر
 
-## 7. Deliverables
+- تست‌های جدید یا موجود مرتبط با Task 018 در `src/tests/`
+- اصلاح محدود کد pure/service فقط در صورت کشف bug اثبات‌شده
+- `database/reports/DB_TEST_002_INGESTION_PIT_TESTS.md` (گزارش جدید)
+- `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
+- `reply.md`
 
-1. Focused model constraint tests.
-2. Focused Migration Runner tests.
-3. Report: `database/reports/DB_TEST_001_MODEL_MIGRATION_TESTS.md`
-4. Update `reply.md`.
-5. Update Task 017 in Master Packet with exact evidence.
-6. Recalculate dashboard if Task 017 changes from OPEN to PARTIAL.
-7. Exact changed-file list and exact owner test command.
+فایل‌های دیگر فقط در صورت ضرورت فنی و با توضیح دقیق؛ بدون تغییر سند معماری یا `WORKFLOW_RULES.md`.
 
-Task 017 may become PARTIAL after meaningful test implementation, but must not become DONE while Jalali constraints, supported-schema coverage or other required migration guarantees remain unproven.
+## معیار پایان Task 018
 
-Report:
-- What tests were added.
-- What existing behavior they verify.
-- What requirements remain unsupported.
-- Which tests were not run.
-- Exact command for owner acceptance.
+Task 018 فقط زمانی DONE است که:
+1. تمام هفت گروه پوشش بالا با تست‌های واقعی و معنادار پوشش داده شده باشند؛
+2. تست‌ها در اختیار مالک برای اجرا قرار گرفته باشند؛
+3. هیچ تستی به‌صورت mock یا assertion صوری، رفتار پیاده‌سازی‌نشده را PASS نکند؛
+4. محدودیت‌ها و GAPهای اثبات‌نشده صریحاً ثبت شده باشند؛
+5. فرمان اجرای کامل و دقیق تست‌ها ارائه شده باشد.
 
-Do not mark any task DONE without corresponding evidence.
+اگر هر بخش مهم به علت نبود writer، schema یا قرارداد اجرایی قابل تست نیست، Task را PARTIAL نگه دار و دقیقاً مشخص کن چه چیزی مانع تکمیل است.
+
+## گزارش اجباری
+
+در `reply.md` و گزارش مستقل، این موارد را ثبت کن:
+
+1. وضعیت Task 017 و ثبت نتیجه پذیرش مالک: `23 passed in 76.32s`.
+2. وضعیت Task 018: DONE یا PARTIAL با دلیل.
+3. شناسه و عنوان دقیق تمام Taskهای اجراشده.
+4. فهرست تست‌های اضافه/اصلاح‌شده و رفتار هرکدام.
+5. فهرست فایل‌های تغییرکرده.
+6. فرمان دقیق تست برای اجرای مالک.
+7. GAPهای باقی‌مانده و اینکه هرکدام ناشی از تست، کد، schema یا نبود writer است.
+8. تأیید صریح عدم تغییر ORM/schema/migration/DB و عدم اجرای تست توسط ایجنت.
+
+در Master Packet:
+- نتیجه پذیرش مالک Task 017 را ثبت کن.
+- Task 017 را PARTIAL نگه دار.
+- وضعیت Task 018 را بر اساس پوشش واقعی تعیین کن.
+- داشبورد را بر اساس وضعیت واقعی Taskها دوباره محاسبه کن.
+- هیچ Task دیگری را صرفاً به دلیل پیشرفت این اجرا DONE نکن.
+
+**اولویت: تست‌های جدید و ارزشمند برای Task 018 بساز؛ ممیزی‌های تکراری و گزارش‌سازی بدون پیشرفت ممنوع.**

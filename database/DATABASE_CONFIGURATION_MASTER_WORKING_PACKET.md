@@ -24,8 +24,8 @@
 | طراحی قراردادها (DB-DES) | **64%** | 2 | 5 | 0 | 0 |
 | Migration (DB-MIG) | **0%** | 0 | 0 | 3 | 0 |
 | Ingestion و Adapterها (DB-ING) | **69%** | 3 | 5 | 0 | 0 |
-| Testing & Exit (DB-TEST / DB-EXIT) | **13%** | 0 | 1 | 3 | 0 |
-| **Total (35 Tasks)** | **53%** | **8** | **21** | **6** | **0** |
+| Testing & Exit (DB-TEST / DB-EXIT) | **25%** | 0 | 2 | 2 | 0 |
+| **Total (35 Tasks)** | **54%** | **8** | **22** | **5** | **0** |
 
 **روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014، 015، 016، 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
 
@@ -726,8 +726,8 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 ### فاز E — اثبات و بستن کار
 
-- [~] **017 / DB-TEST-001 - Model and migration tests:** focused SQLite tests are in Section 9.39; FinancialPeriod Jalali constraint, full supported-schema coverage, and owner execution remain open.
-- [ ] **018 · DB-TEST-002 — تست‌های ingestion و PIT:** گزارش چنددوره‌ای، YTD/standalone، correction version، provenance، atomicity، mapping، NULL/ZERO_FALLBACK و عدم raw/calculated persistence پوشش داده شوند.
+- [~] **017 / DB-TEST-001 - Model and migration tests:** focused SQLite tests are in Section 9.39; FinancialPeriod Jalali constraint, full supported-schema coverage, and owner execution remain open. Owner acceptance recorded: exact Task 017 command returned **23 passed in 76.32s (0:01:16)**. Task remains PARTIAL due to the listed schema/Jalali/SQLite/production limits.
+- [~] **018 / DB-TEST-002 - Ingestion and PIT tests:** prior focused coverage is reused and a multi-period Excel-to-admission regression is added; Task report and remaining unsupported behavior are in Section 9.40.
 - [ ] **019 · DB-TEST-003 — تست یکپارچهٔ Excel و downstream contracts:** adapter و مسیر Excel صورت‌های مالی به ورودی canonical مصوب برسند و مصرف‌کنندگان downstream بدون تغییر معنای دوره/مقدار کار کنند. این Task شامل تست PDF نیست.
 - [ ] **020 · DB-EXIT-001 — تأیید نهایی Database Configuration:** تمام معیارهای خروج این Packet با PASS/BLOCKED/OPEN و شواهد واقعی ارزیابی شوند. تکمیل این مسیر فقط با بسته‌شدن معیارهای حیاتی اعلام می‌شود.
 
@@ -2573,4 +2573,17 @@ Migration checks cover a genuinely empty upgrade to version 8, repeated upgrade/
 
 `src/core/jalali.py` provides `validate_jalali_date()` and this increment checks valid/invalid examples. `FinancialPeriod` stores SQL Date and enforces only Gregorian `end_date >= start_date`; it has no Jalali date contract. SQLite also treats NULLs as distinct in composite UNIQUE constraints, so duplicate `DerivedFinancialFactInput` rows with one NULL source side currently pass despite the declared unique identity; the new test documents this observed limitation. SQLite tests do not establish production concurrency or cross-database behavior.
 
-No tests were run by the agent, as required. Owner command: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task017_20261120 src/tests/test_task017_model_constraints.py src/tests/test_stage1_database_integrity.py`. Task 017 remains PARTIAL pending owner execution and broader supported-schema/Jalali/production-database guarantees. Dashboard recalculated: 35 tasks, 8 DONE / 21 PARTIAL / 6 OPEN = 53%; DB-TEST/DB-EXIT: 0 DONE / 1 PARTIAL / 3 OPEN = 13%.
+No tests were run by the agent, as required. Owner command: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task017_20261120 src/tests/test_task017_model_constraints.py src/tests/test_stage1_database_integrity.py`. Task 017 remains PARTIAL pending broader supported-schema/Jalali/production-database guarantees. Owner-run command `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task017_20261120 src/tests/test_task017_model_constraints.py src/tests/test_stage1_database_integrity.py` returned **23 passed in 76.32s (0:01:16)**. Current dashboard after Task 018 moved to PARTIAL: 35 tasks, 8 DONE / 22 PARTIAL / 5 OPEN = 54%; DB-TEST/DB-EXIT: 0 DONE / 2 PARTIAL / 2 OPEN = 25%.
+
+
+## 9.40 Task 018 / DB-TEST-002 - ingestion and Point-in-Time tests
+
+**Status: PARTIAL.** Added `test_multi_period_report_preserves_explicit_ytd_and_standalone_semantics` to `src/tests/test_excel_adapter.py`. It sends two values for the same metric through synthetic XLSX reading, approved-template matching, explicit coordinate/temporal selections and canonical batch admission, then verifies the resulting facts retain separate Jalali ranges, YTD versus STANDALONE basis, source coordinates, and values. Tests were not run by the agent.
+
+The focused pre-existing suites provide meaningful coverage reused for this Task: `test_excel_canonical_input.py` and `test_excel_adapter.py` cover INSTANT/DURATION, YTD/STANDALONE selection and invalid/missing temporal mappings; `test_canonical_ingestion_admission.py` covers all-or-nothing batches, correction as a new version, preservation of the prior version, identical replay, changed-payload conflict, provenance conflict, explicit mapping/approval, blank/zero/ZERO_FALLBACK, and raw/calculated rejection. CODAL extraction tests cover version-chain preservation and idempotent replay; Stage 6 P25 selection/adversarial tests and CODAL PIT corpus tests cover publication-time selection and future-version exclusion. `test_market_fx_atomic_ingestion.py` covers market/FX batch validation, replay/conflict, transaction rollback, and audit-failure behavior.
+
+No canonical Excel ORM writer exists, and the admission plan remains `execution_allowed=False`; therefore physical canonical commit/rollback and audit status for that future writer are not asserted. No approved real Excel template or production semantic mapping is available. SQLite/fixture tests do not claim production concurrency or cross-database guarantees. Task 018 remains PARTIAL.
+
+Owner command (Task 018 focused suites plus the related existing regression suites): `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task018_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_canonical_ingestion_admission.py src/tests/test_codal_extraction.py src/tests/test_codal_pdf_extraction.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py`.
+
+Dashboard after OPEN-to-PARTIAL: 35 tasks, 8 DONE / 22 PARTIAL / 5 OPEN = 54%; DB-TEST/DB-EXIT: 0 DONE / 2 PARTIAL / 2 OPEN = 25%.
