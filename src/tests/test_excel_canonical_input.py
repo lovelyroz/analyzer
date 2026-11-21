@@ -213,7 +213,7 @@ def test_rejects_missing_source_coordinate_and_invalid_numeric_text():
         build_candidate(observation, match, coordinate="", spec=_spec())
     with pytest.raises(CandidateValidationError, match="STRUCTURAL_OWNERSHIP_MISSING"):
         build_candidate(observation, match, coordinate="C9", spec=_spec())
-    with pytest.raises(CandidateValidationError, match="SOURCE_NUMBER_INVALID"):
+    with pytest.raises(CandidateValidationError, match="AMBIGUOUS_SEPARATOR"):
         _build(value="1,00")
 
 
