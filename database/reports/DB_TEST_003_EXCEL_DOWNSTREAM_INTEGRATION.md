@@ -1,6 +1,6 @@
 # DB-TEST-003 - Excel integration and downstream contracts
 
-Status: `PARTIAL` (owner test run pending)
+Status: `PARTIAL` (owner tests accepted)
 
 ## Integration path exercised
 
@@ -53,4 +53,10 @@ Owner command:
 .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task019_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_excel_source_reader.py src/tests/test_canonical_ingestion_admission.py src/tests/test_stage6_evaluation_foundation.py src/tests/test_stage6_p25_selection.py
 ```
 
-Task 019 remains `PARTIAL` until owner-run results are supplied and production approvals/downstream persistence contracts are addressed. Dashboard totals were not changed.
+Owner acceptance for the command above was reported exactly as:
+
+```text
+115 passed in 2.75s
+```
+
+Task 019 remains `PARTIAL`: production template and semantic mapping approvals are unavailable, no physical writer connects the plan to downstream ORM models, and compatibility with `NormalizedFinancialFact` / `FinancialPeriod` has not been proven. The owner test result does not resolve those blockers. Dashboard totals were not changed.
