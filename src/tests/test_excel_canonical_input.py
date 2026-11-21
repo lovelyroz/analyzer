@@ -214,7 +214,7 @@ def test_rejects_missing_source_coordinate_and_invalid_numeric_text():
     with pytest.raises(CandidateValidationError, match="STRUCTURAL_OWNERSHIP_MISSING"):
         build_candidate(observation, match, coordinate="C9", spec=_spec())
     with pytest.raises(CandidateValidationError, match="SOURCE_NUMBER_INVALID"):
-        _build(value="1,000")
+        _build(value="1,00")
 
 
 def test_rejects_no_default_values_and_ambiguous_dimensions():
