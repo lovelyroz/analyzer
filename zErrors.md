@@ -1,29 +1,7 @@
-> **Historical reference/status as of 2026-11-21:** Any PDF extraction implementation, test command, corpus, or pre-retirement status described here is superseded. Excel/CSV are the supported file inputs, and CODAL PDF extraction is retired. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
-
-(analyzer) PS D:\Winprojects\analyzer>
->> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task018_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_canonical_ingestion_admission.py src/tests/test_codal_extraction.py src/tests/test_codal_pdf_extraction.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py
->>
-........................................................sF...................................................... [ 41%]
-........................................................................................................FFFFFFFF [ 83%]
-FFFFFFFFFFFFFFFFFFFFFFF...FFFFFFFFFF......F                                                                      [100%]
+(analyzer) PS D:\Winprojects\analyzer> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_codal_retire_001_20261121 src/tests/test_codal_extraction.py src/tests/test_codal_digit_normalization.py src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_excel_source_reader.py src/tests/test_excel_observation_dto.py src/tests/test_canonical_ingestion_admission.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py
+................................................................................................................ [ 67%]
+....FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF...FFFFFFFFFF......F                                                          [100%]
 ====================================================== FAILURES =======================================================
-__________________________ test_codal_validation_corpus_inventory_is_exactly_locked_19_pdfs ___________________________
-
-    def test_codal_validation_corpus_inventory_is_exactly_locked_19_pdfs():
-        """SCOPE gate: validation corpus must be exactly the locked 19-PDF set."""
-        assert PDF_ROOT.is_dir(), f"SCOPE_ERROR: PDF root missing: {PDF_ROOT}"
-        present = {path.name for path in PDF_ROOT.glob("*.pdf")}
-        missing = LOCKED_CODAL_VALIDATION_CORPUS - present
-        unexpected = present - LOCKED_CODAL_VALIDATION_CORPUS
->       assert not missing and not unexpected and len(present) == 19, (
-            "SCOPE_ERROR: CODAL validation corpus drifted from the locked 19-PDF set. "
-            f"expected_count=19 actual_count={len(present)} "
-            f"missing={sorted(missing)} unexpected={sorted(unexpected)}"
-        )
-E       AssertionError: SCOPE_ERROR: CODAL validation corpus drifted from the locked 19-PDF set. expected_count=19 actual_count=20 missing=[] unexpected=['Fzar.pdf']
-E       assert (not frozenset() and not {'Fzar.pdf'})
-
-src\tests\test_codal_pdf_extraction.py:60: AssertionError
 _______________________________________ test_key_is_7_tuple_with_scenario_last ________________________________________
 
     def test_key_is_7_tuple_with_scenario_last():
@@ -1775,7 +1753,6 @@ E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 
 
 src\tests\test_stage6_evaluation_foundation.py:66: TypeError
 =============================================== short test summary info ===============================================
-FAILED src/tests/test_codal_pdf_extraction.py::test_codal_validation_corpus_inventory_is_exactly_locked_19_pdfs - AssertionError: SCOPE_ERROR: CODAL validation corpus drifted from the locked 19-PDF set. expected_count=19 actual_c...
 FAILED src/tests/test_stage6_p25_selection.py::test_key_is_7_tuple_with_scenario_last - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
 FAILED src/tests/test_stage6_p25_selection.py::test_key_scenario_distinct_keys_differ - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
 FAILED src/tests/test_stage6_p25_selection.py::test_key_forecast_id_does_not_affect_key - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
@@ -1818,4 +1795,4 @@ FAILED src/tests/test_stage6_evaluation_foundation.py::test_zero_actual_preserve
 FAILED src/tests/test_stage6_evaluation_foundation.py::test_missing_forecast_metric_is_none - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
 FAILED src/tests/test_stage6_evaluation_foundation.py::test_unknown_metric_code_is_missing_not_zero - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
 FAILED src/tests/test_stage6_evaluation_foundation.py::test_metadata_counts_without_scoring - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-43 failed, 223 passed, 1 skipped in 196.03s (0:03:16)
+42 failed, 125 passed in 52.63s
