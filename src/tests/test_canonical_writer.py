@@ -342,7 +342,7 @@ def test_migration_ten_duplicate_preflight_rolls_back_and_preserves_rows(
     if table_name == "market_daily":
         with engine.begin() as connection:
             connection.execute(text("INSERT INTO industries (industry_code,industry_name) VALUES ('BANK','Bank')"))
-            connection.execute(text("INSERT INTO companies (ticker,company_name,industry_id) VALUES ('DUP','Duplicate',1)"))
+            connection.execute(text("INSERT INTO companies (ticker,company_name,industry_id,status,is_active) VALUES ('DUP','Duplicate',1,'ACTIVE',1)"))
     with engine.begin() as connection:
         connection.execute(text(f'DROP INDEX "{drop_index}"'))
         connection.execute(text(insert_sql))
