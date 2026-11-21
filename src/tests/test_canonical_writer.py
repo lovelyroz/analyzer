@@ -258,7 +258,7 @@ def test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded(m
     assert MigrationRunner(engine).upgrade() == 8
     with engine.begin() as connection:
         connection.execute(text("INSERT INTO industries (industry_code, industry_name) VALUES ('BANK','Bank')"))
-        connection.execute(text("INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')"))
+        connection.execute(text("INSERT INTO companies (ticker, company_name, industry_id, codal_symbol, status) VALUES ('DUP','One',1,'A','ACTIVE'),('DUP','Two',1,'B','ACTIVE')"))
     monkeypatch.setattr(migration_runner, "_migration_list", lambda: all_migrations)
     with pytest.raises(RuntimeError, match="duplicate legacy values"):
         MigrationRunner(engine).upgrade()
@@ -328,7 +328,7 @@ def test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment(db):
     with factory.begin() as session:
         session.add(CanonicalApproval(
             approval_kind="report_type", external_identity="MONTHLY_ACTIVITY",
-            approval_ref="approval-monthly-activity", is_active=True,
+            approval_ref="approval-report-type", is_active=True,
         ))
     plan = _plan(
         report_type_id="MONTHLY_ACTIVITY",
