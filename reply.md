@@ -405,3 +405,14 @@ The owner test command and exact changed/deleted-file inventory are in `database
 نتیجهٔ مالک، `115 passed in 2.75s`، عیناً در [گزارش DB-TEST-003](D:/winprojects/analyzer/database/reports/DB_TEST_003_EXCEL_DOWNSTREAM_INTEGRATION.md) و بخش 9.43 [Master Packet](D:/winprojects/analyzer/database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md) ثبت شد. وضعیت Task 019 همچنان **PARTIAL** است؛ تأییدهای production و اتصال فیزیکی به مدل‌های downstream هنوز اثبات نشده‌اند.
 
 فقط همین دو سند تغییر کردند. هیچ کد یا تستی را تغییر ندادم یا اجرا نکردم؛ dashboard و سایر وضعیت Taskها نیز دست‌نخورده ماندند. قدم بعدی مشخص‌شده در PROMPT، `020 / DB-EXIT-001` است و آن را اجرا نکردم.
+
+# Task 020 / DB-EXIT-001 — final Database Configuration exit assessment — 2026-11-21
+
+- Completed the ten-criterion exit assessment directly against the current Master Packet, architecture contract, ORM models, migration runner, Excel canonical adapter/admission boundary, downstream consumers, and recorded owner test evidence.
+- Result: **PARTIAL; Database Configuration is not complete.** Criteria 2 (physical ORM/schema alignment), 3 (Jalali per-fact period persistence), 5 (canonical-only persistence), 8 (safe migration plan / Migration 9 reconciliation), and 9 (production canonical Excel writer) are BLOCKED. Criteria 1, 4, 6, 7, and 10 are PARTIAL.
+- Critical finding: the Excel path ends at `CanonicalPersistencePlan`, whose `execution_allowed` and `physical_persistence_compatible` flags are both false. Current `FinancialPeriod` uses Gregorian dates and period-wide `is_ytd`; `NormalizedFinancialFact` uses `Numeric(30,4)` and lacks the required canonical identity/value-origin/provenance contract. The existing CODAL service remains a raw-row ingestion path. Migration Runner defines versions 1–8 only; Migration 9 is unreconciled.
+- The next work is consolidated into two tracks in `database/reports/DB_EXIT_001_FINAL_ASSESSMENT.md`: (1) owner-authorized canonical physical schema + safe migration reconciliation + transactional writer; (2) production Excel template/semantic approval, authoritative resolver, locale numeric parsing, and real-workbook acceptance. Do not create a workaround writer against the incompatible current model.
+- Task 019 is correctly marked PARTIAL (owner acceptance: 115 passed in 2.75s); Task 020 is PARTIAL because the assessment is complete but exit criteria remain unmet. Cross-cutting PDF retirement in Sections 8.46 and 9.41 is one activity and is not double-counted.
+- Master Packet Phase E checkboxes and dashboard reconciled: 35 tasks, **8 DONE / 24 PARTIAL / 3 OPEN = 57%**; DB-TEST/DB-EXIT: **0 DONE / 4 PARTIAL / 0 OPEN = 50%**.
+- No production code, ORM, schema, migration, database, or data was changed; no tests were run; `WORKFLOW_RULES.md` was not modified.
+- Files changed: `database/reports/DB_EXIT_001_FINAL_ASSESSMENT.md`, `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`, and `reply.md`.
