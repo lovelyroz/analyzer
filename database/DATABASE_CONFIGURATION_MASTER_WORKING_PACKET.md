@@ -24,8 +24,8 @@
 | طراحی قراردادها (DB-DES) | **64%** | 2 | 5 | 0 | 0 |
 | Migration (DB-MIG) | **0%** | 0 | 0 | 3 | 0 |
 | Ingestion و Adapterها (DB-ING) | **69%** | 3 | 5 | 0 | 0 |
-| تست و خروج (DB-TEST / DB-EXIT) | **0%** | 0 | 0 | 4 | 0 |
-| **کل مسیر (35 Task)** | **51%** | **8** | **20** | **7** | **0** |
+| Testing & Exit (DB-TEST / DB-EXIT) | **13%** | 0 | 1 | 3 | 0 |
+| **Total (35 Tasks)** | **53%** | **8** | **21** | **6** | **0** |
 
 **روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014، 015، 016، 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
 
@@ -726,7 +726,7 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 ### فاز E — اثبات و بستن کار
 
-- [ ] **017 · DB-TEST-001 — تست‌های مدل و migration:** constraints، Jalali validation، uniqueness، FK، upgrade از schemaهای پشتیبانی‌شده، idempotency و حفظ داده‌ها اثبات شوند.
+- [~] **017 / DB-TEST-001 - Model and migration tests:** focused SQLite tests are in Section 9.39; FinancialPeriod Jalali constraint, full supported-schema coverage, and owner execution remain open.
 - [ ] **018 · DB-TEST-002 — تست‌های ingestion و PIT:** گزارش چنددوره‌ای، YTD/standalone، correction version، provenance، atomicity، mapping، NULL/ZERO_FALLBACK و عدم raw/calculated persistence پوشش داده شوند.
 - [ ] **019 · DB-TEST-003 — تست یکپارچهٔ Excel و downstream contracts:** adapter و مسیر Excel صورت‌های مالی به ورودی canonical مصوب برسند و مصرف‌کنندگان downstream بدون تغییر معنای دوره/مقدار کار کنند. این Task شامل تست PDF نیست.
 - [ ] **020 · DB-EXIT-001 — تأیید نهایی Database Configuration:** تمام معیارهای خروج این Packet با PASS/BLOCKED/OPEN و شواهد واقعی ارزیابی شوند. تکمیل این مسیر فقط با بسته‌شدن معیارهای حیاتی اعلام می‌شود.
@@ -2560,4 +2560,17 @@ Focused correction command: `.\\.venv\\Scripts\\python.exe -m pytest -q --basete
 
 Synthetic tests in `src/tests/test_excel_adapter.py` cover approved-match candidate creation, explicit-only admission, unapproved and worksheet/hash mismatch rejection, missing/ambiguous semantic and temporal selections, source/template/coordinate/header provenance, formula rejection, BLANK/actual-zero/ZERO_FALLBACK distinction, whole-unit rejection, and deterministic diagnostics. The suite is not run by the agent. Owner command: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task016_20261120 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_canonical_ingestion_admission.py`.
 
+Owner-reported Task 016 acceptance: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task016_20261120 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_canonical_ingestion_admission.py` - **51 passed in 1.59s**. This is owner-run and does not cover Task 017.
+
 Owner-reported Task 014/015 acceptance is **36 passed in 1.61s** with the exact command recorded in §9.35 and §9.37. It is not evidence for Task 016. Task 016 remains PARTIAL because no approved production template or authenticated real semantic/temporal mapping is available and representative real-workbook end-to-end validation has not occurred. The unapproved Parsian candidate register remains unused. Overall dashboard after OPEN→PARTIAL: 35 tasks, 8 DONE / 20 PARTIAL / 7 OPEN = 51%; DB-ING: 3 DONE / 5 PARTIAL / 0 OPEN = 69%. Full API, diagnostics, limitations, and changed files: `database/reports/DB_ING_003_EXCEL_ADAPTER_READINESS.md`.
+
+
+## 9.39 Task 017 / DB-TEST-001 — model constraints and Migration Runner tests
+
+**Status: PARTIAL.** Added `src/tests/test_task017_model_constraints.py` with isolated temporary SQLite databases and explicit `PRAGMA foreign_keys=ON` verification. Tests exercise Company required fields/Industry FK, Industry code and nullable national-ID uniqueness, FinancialPeriod date/type/identity checks, ReportVersion version/current uniqueness, FinancialMetric enums, MappingDecision enums/confidence, NormalizedFinancialFact identity/quality, and DerivedFinancialFactInput XOR and declared uniqueness behavior.
+
+Migration checks cover a genuinely empty upgrade to version 8, repeated upgrade/history uniqueness, recognized non-empty legacy baseline row preservation, Migration 4 rejection of multiple current ReportVersions without repair/recording version 4, and failure without recording migration success. Existing `src/tests/test_stage1_database_integrity.py` already covers Migration 8 removal of forecast output tables and preservation of unrelated/input-side data, and contains the version-eight/idempotency coverage; this task adds focused complementary cases rather than duplicating it.
+
+`src/core/jalali.py` provides `validate_jalali_date()` and this increment checks valid/invalid examples. `FinancialPeriod` stores SQL Date and enforces only Gregorian `end_date >= start_date`; it has no Jalali date contract. SQLite also treats NULLs as distinct in composite UNIQUE constraints, so duplicate `DerivedFinancialFactInput` rows with one NULL source side currently pass despite the declared unique identity; the new test documents this observed limitation. SQLite tests do not establish production concurrency or cross-database behavior.
+
+No tests were run by the agent, as required. Owner command: `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task017_20261120 src/tests/test_task017_model_constraints.py src/tests/test_stage1_database_integrity.py`. Task 017 remains PARTIAL pending owner execution and broader supported-schema/Jalali/production-database guarantees. Dashboard recalculated: 35 tasks, 8 DONE / 21 PARTIAL / 6 OPEN = 53%; DB-TEST/DB-EXIT: 0 DONE / 1 PARTIAL / 3 OPEN = 13%.

@@ -1,93 +1,131 @@
-# TASK 016 — DB-ING-003: Excel Adapter Readiness
-**Type: CODE IMPLEMENTATION + DOCUMENTATION**
+# TASK 017 — DB-TEST-001: Model Constraints and Migration Tests
+**Type: TEST IMPLEMENTATION + DOCUMENTATION**
 
 Repository: `analyzer`  
 Branch: `master`
 
 ## Objective
 
-Implement the next executable increment of the Excel-to-canonical ingestion adapter.
+Implement focused automated tests for the existing database models and Migration Runner.
 
-The existing components are:
-- `src/ingestion/excel/reader.py`
-- `src/ingestion/excel/dto.py`
-- `src/ingestion/excel/deterministic_matcher.py`
-- `src/ingestion/excel/canonical_input.py`
-- `src/ingestion/canonical_admission.py`
+This is an execution task. Add meaningful tests, not another broad audit.
 
-Read their actual current implementations before changing anything. Reuse these contracts; do not create competing DTOs or duplicate validation logic.
+## 1. Record latest owner acceptance
 
-## A. Implement the adapter boundary
+Task 016 owner-run command:
 
-Create a focused Excel adapter that connects the existing components:
+`.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task016_20261120 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_canonical_ingestion_admission.py`
 
-1. Read an XLSX source through `read_excel_source()`.
-2. Accept an explicitly supplied, versioned `TemplateVersion`.
-3. Run `match_template()` and reject any result other than an exact approved `MATCHED` result.
-4. Preserve source workbook fingerprint, worksheet identity, exact cell coordinates, literal values and relevant table/header context.
-5. Accept explicit, caller-supplied semantic and temporal selections for candidate construction. Never infer Metric, dimensions, unit, currency, scale, Jalali period or YTD/standalone from position or text similarity alone.
-6. Build candidates through the existing `build_candidate()` / `build_candidate_submission()` APIs.
-7. Pass the resulting submissions to the existing canonical admission boundary only when the caller explicitly requests admission.
-8. Return structured, deterministic diagnostics for failures. Do not log complete financial payloads.
+Result: **51 passed in 1.59s**.
 
-Keep the adapter pure with respect to persistence: no database session, ORM writes, transactions, commits or file archiving.
+Record this exact result in `reply.md` and Master Packet under Task 016. Task 016 remains PARTIAL because production template and real semantic/temporal mappings and representative real-workbook validation are still missing.
 
-## B. Fail-closed requirements
+## 2. Inspect existing test coverage
 
-- Unapproved, missing, ambiguous or structurally mismatched templates must stop processing.
-- Unknown or ambiguous in-scope observations must not be silently skipped.
-- Do not invent mappings or use fuzzy matching.
-- Do not treat every populated cell as a financial fact.
-- Do not derive a financial period from workbook name, publication date or column order.
-- Preserve BLANK, actual zero and approved ZERO_FALLBACK as distinct states.
-- Formula cells remain prohibited under the approved Reader contract.
-- Do not introduce a new numeric parser or locale policy in this Task. Use only currently supported candidate construction behavior.
-- Do not use the unapproved Parsian candidate register as a production template.
+Read the current implementations before adding tests:
+- `src/models/entity.py`
+- `src/models/period.py`
+- `src/models/report.py`
+- `src/models/normalized.py`
+- `src/models/audit.py`
+- `src/models/market.py`
+- `src/models/fx.py`
+- `src/models/share_action.py`
+- `src/migrations/runner.py`
+- `src/core/database.py`
 
-## C. Tests
+Inspect existing tests for model constraints, foreign keys and migrations. Reuse existing fixtures and avoid duplicate test coverage.
 
-Add focused synthetic end-to-end tests for:
-- valid read → approved template match → explicit candidate construction;
-- rejected/unapproved template;
-- source hash or worksheet mismatch;
-- missing/ambiguous semantic or temporal selection;
-- preservation of exact source coordinates and template provenance;
-- blank versus actual zero versus approved ZERO_FALLBACK;
-- deterministic diagnostics and whole-unit rejection.
+## 3. Implement model constraint tests
 
-Use synthetic fixtures only where no approved real template exists. Do not claim production workbook coverage or semantic correctness based on synthetic tests.
+Add focused tests for currently implemented constraints:
 
-Do not run tests. The owner runs them.
+- Company → Industry foreign key and required fields.
+- Unique Industry code and unique non-null national ID where supported by the database.
+- FinancialPeriod:
+  - `end_date >= start_date`
+  - allowed `period_type`
+  - uniqueness of `(company_id, fiscal_year, period_type, end_date)`.
+- ReportVersion:
+  - unique `(report_id, version_number)`
+  - at most one current version per report.
+- FinancialMetric:
+  - allowed `flow_or_stock`
+  - allowed `statement_type`
+  - allowed `sign_convention`.
+- MappingDecision:
+  - allowed mapping method and review status
+  - allowed composition role
+  - confidence range.
+- NormalizedFinancialFact:
+  - unique economic identity as currently defined
+  - allowed quality status.
+- DerivedFinancialFactInput:
+  - exactly one input source populated
+  - uniqueness of the declared input identity.
 
-## D. Explicit exclusions
+For each constraint, test both an accepted case and a rejected case where practical.
 
-- No ORM, schema, migration or database changes.
-- No real database access or real ingestion.
-- No activation of any unapproved company template.
-- No PDF extraction or PDF retirement work.
+Use isolated temporary SQLite databases. Ensure foreign-key enforcement is actually enabled in the test engine.
+
+Do not assume that a model constraint exists merely because the architecture document requires it. Test the actual declared behavior.
+
+## 4. Implement Migration Runner tests
+
+Test the currently supported migration sequence only:
+
+- Empty database upgrade.
+- Expected current migration version (currently version 8).
+- Repeated upgrade is idempotent.
+- Migration history contains each applied version once.
+- Existing supported legacy baseline is recognized without recreating or deleting existing business rows.
+- Additive migrations preserve unrelated existing data.
+- Migration 4 rejects multiple current ReportVersions and does not silently repair the data.
+- Migration 8 behavior is tested explicitly, including its intended removal of forecast output tables and preservation of unrelated/input-side tables.
+- Failure during a migration must not incorrectly record that migration as successfully applied.
+
+Use temporary test databases only. Never use the user's real database.
+
+## 5. Jalali and schema gaps — report honestly
+
+The current FinancialPeriod model uses SQL Date columns and Gregorian date comparisons. Do not invent a Jalali constraint or silently convert Jalali dates.
+
+Inspect whether a currently implemented Jalali validation utility exists. If it does, test its actual behavior. If no enforceable Jalali model contract exists, record it as an uncovered requirement / blocker.
+
+Similarly, do not claim that SQLite tests prove production-database concurrency or cross-database constraint behavior.
+
+## 6. Strict exclusions
+
+- No ORM/model changes.
+- No schema changes.
+- No migration creation, modification, deletion or reordering.
+- Do not resolve Migration 9.
+- No database upgrade against a real or owner database.
+- No data modification outside isolated temporary test databases.
+- No production ingestion.
 - No changes to `WORKFLOW_RULES.md`.
-- No unrelated refactoring or reopening completed tasks.
-- Do not weaken existing Reader, Matcher, Candidate or Admission validation to make integration pass.
+- Do not weaken constraints to make tests pass.
+- Do not run tests; the owner runs them.
 
-## E. Record the latest owner test acceptance
+If a desired invariant is not currently implemented, document the gap rather than changing production code in this Task.
 
-The owner has now run:
+## 7. Deliverables
 
-`.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task015_20261120 src/tests/test_canonical_ingestion_admission.py src/tests/test_excel_canonical_input.py`
+1. Focused model constraint tests.
+2. Focused Migration Runner tests.
+3. Report: `database/reports/DB_TEST_001_MODEL_MIGRATION_TESTS.md`
+4. Update `reply.md`.
+5. Update Task 017 in Master Packet with exact evidence.
+6. Recalculate dashboard if Task 017 changes from OPEN to PARTIAL.
+7. Exact changed-file list and exact owner test command.
 
-Result: **36 passed in 1.61s**.
+Task 017 may become PARTIAL after meaningful test implementation, but must not become DONE while Jalali constraints, supported-schema coverage or other required migration guarantees remain unproven.
 
-Record this exact owner-run evidence in `reply.md`, the relevant Task 014/015 evidence sections, and the Master Packet. Do not mark either Task DONE solely because of this test result.
+Report:
+- What tests were added.
+- What existing behavior they verify.
+- What requirements remain unsupported.
+- Which tests were not run.
+- Exact command for owner acceptance.
 
-## F. Required deliverables
-
-1. New adapter implementation and focused tests.
-2. A report describing architecture, API, fail-closed behavior, diagnostics and limitations.
-3. Exact changed-file list.
-4. Exact owner test command.
-5. Update `reply.md` and Master Packet.
-6. Recalculate the dashboard if Task 016 status changes.
-
-Task 016 must remain PARTIAL if approved production templates, real semantic mappings, temporal mappings or representative real-workbook end-to-end validation are still missing.
-
-Report each affected Task ID with DONE / PARTIAL / NOT DONE and evidence. Do not claim tests were run by the agent.
+Do not mark any task DONE without corresponding evidence.

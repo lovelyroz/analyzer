@@ -77,6 +77,7 @@ def test_version_seven_upgrade_removes_only_legacy_forecast_tables_and_rows():
     assert runner.upgrade() == 8
     tables = set(inspect(engine).get_table_names())
     assert not ({"forecast_versions", "forecast_input_refs"} & tables)
+    assert "normalized_financial_fact_inputs" in tables
     with engine.connect() as connection:
         assert connection.execute(text("SELECT raw_item_name FROM raw_financial_facts")).scalar_one() == "preserve-me"
         assert connection.execute(text("SELECT value_irr FROM normalized_financial_facts")).scalar_one() == 123
