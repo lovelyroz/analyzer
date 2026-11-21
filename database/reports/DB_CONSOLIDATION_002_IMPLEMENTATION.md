@@ -51,3 +51,10 @@ The first owner run of the DB-CONSOLIDATION-002 focused command returned **14 fa
 - `src/tests/test_market_fx_atomic_ingestion.py`: corrected the identity-conflict fixture so the CSV ticker resolves to a company whose configured `codal_symbol` actually differs. The previous fixture added an unrelated second company and did not create a conflict.
 
 No production database was opened or migrated. These corrections have not been test-executed by the assistant; owner rerun is required. Existing production template/approval, Stage 5/6 bridge, and historical Migration 9 lineage gates remain unchanged.
+
+
+## Second owner-run test result and follow-up — 2026-11-21
+
+After the first correction set, the owner reran the focused suite: **1 failed, 153 passed**. The only remaining failure was the synthetic XLSX end-to-end test, caused by its shared source-label/source-header approval fixtures retaining a placeholder template fingerprint (`b` repeated 64 times), while the test's actual generated template has a different fingerprint. The test now updates those two approval scopes to the exact generated template fingerprint before exercising reader → matcher → admission → writer → readback. This is a test-fixture correction; production exact-scope validation remains unchanged.
+
+Owner should rerun the isolated test first, then the focused suite if it passes. No production database was opened or migrated.
