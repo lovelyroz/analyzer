@@ -17,7 +17,7 @@ The repository has owner-reported evidence of an earlier migration 9 named `coda
 
 ## Writer, transactions, and replay behavior
 
-`src/ingestion/canonical_writer.py::ingest_excel_source()` creates and commits an `IngestionRun` in STARTED state before calling the current Excel adapter with admission enabled. It then validates the admitted plan again and resolves its BANK company, Metric, extraction standard, template, and all supplied approvals against active catalog rows. The caller must supply report title, positive version number, publication datetime, audit/restatement flags, and scenario explicitly. A DURATION YTD fact is accepted only when its start is the configured company's first fiscal month and day; BANK periods must span 3, 6, 9, or 12 complete Jalali months. INSTANT requires equal endpoints and no duration basis. Metric FLOW/STOCK must match DURATION/INSTANT. Derived Metrics and malformed source coordinates are rejected.
+`src/ingestion/canonical_writer.py::ingest_excel_source()` creates and commits an `IngestionRun` in STARTED state before calling the current Excel adapter with admission enabled. It then validates the admitted plan again and resolves its BANK company, Metric, extraction standard, template, and all supplied approvals against active catalog rows. The caller must supply report title, positive version number, publication datetime, audit/restatement flags, and scenario explicitly. For BANK PERIODIC_FINANCIAL only, a DURATION YTD fact must start on day 1 of the explicitly configured Jalali fiscal-start month and span 3, 6, 9, or 12 complete Jalali months ending at month-end. MONTHLY_ACTIVITY is excluded from this periodic-report validator and remains governed by its separately reviewed temporal standard. INSTANT requires equal endpoints and no duration basis. Metric FLOW/STOCK must match DURATION/INSTANT. Derived Metrics and malformed source coordinates are rejected.
 
 The writer owns a SQLAlchemy session. A report version, every period/dimension/fact/provenance row, accepted/duplicate/rejected audit counts, and the transition to COMPLETED are committed together. A failed validation or write rolls that transaction back, then marks the same run FAILED in a separate transaction using a stable code without source values or raw exception details. No commit occurs inside the fact loop. An exact replay of report metadata, source revision, fact payload, source locator, and approval provenance returns duplicate counts without inserting rows. Any difference under the same external version is a conflict. Reuse of a source revision or version number is rejected. A correction must identify a prior version and is appended while the prior version remains stored.
 
@@ -74,3 +74,22 @@ Static review found a temporal-scope defect that must be corrected before the ow
 3. Add focused regression tests for both report types and for a non-first-day fiscal-year start, including migration/model coverage. Keep all date identity Jalali-native.
 
 This is a concrete implementation defect, not an owner-data or production-approval blocker. DB-IMPL-001 remains PARTIAL pending this correction, the focused owner test run, historical migration-9 lineage reconciliation, and production approvals. No tests were run during this static review; no real database or migration was used.
+
+## Post-implementation correction — report-type scope — 2026-11-21
+
+The static review's report-type finding has been corrected in src/ingestion/canonical_writer.py: _validate_report_calendar() now receives the exact shared report-type code and applies the BANK 3/6/9/12-month cumulative YTD rule only to PERIODIC_FINANCIAL. MONTHLY_ACTIVITY returns from this periodic-specific validator and is not forced into the periodic template's month-count or month-end pattern. The writer still validates each fact's Jalali period and approved report-type/period mapping through the normal admission path.
+
+A second point in the earlier review note is superseded by the existing owner-approved architecture decision: only fiscal_year_start_month is collected; the start day is day 1 of that month. No fiscal-start-day column, approval-identity change, model change, or migration change is warranted. The existing month-only calendar implementation is retained.
+
+Added regression coverage:
+- test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment
+- test_periodic_financial_ytd_still_requires_three_six_nine_or_twelve_months
+
+Changed in this correction:
+- src/ingestion/canonical_writer.py
+- src/tests/test_canonical_writer.py
+- database/reports/DB_IMPL_001_CANONICAL_DATABASE_AND_EXCEL_WRITER.md
+- database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md
+- reply.md (temporary handoff only)
+
+No tests were run. No migration, real database, production workbook, or user data was touched. DB-IMPL-001 remains PARTIAL pending the owner-run test command above, historical Migration 9 lineage reconciliation, and approved production templates/mappings.
