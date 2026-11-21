@@ -12,6 +12,14 @@ The database configuration is **not production-ready**. The principal blocker is
 
 No production code, ORM model, schema, migration, database, or data was changed for this assessment. No tests were run.
 
+## Owner clarifications recorded after this assessment — 2026-11-21
+
+The owner has confirmed that the current financial-report standardization and ingestion scope is **BANK only**. Other industries must not be pre-modeled with hypothetical report patterns, metrics, or extraction schemas; the shared core remains extensible and each new industry's standard is added after reviewing its real reports.
+
+The BANK periodic financial reports reviewed to date follow the cumulative pattern: 3-, 6-, 9-, and 12-month values are YTD from the company's actual fiscal-year start. Standalone-quarter values needed by the frontend are runtime calculations from compatible cumulative periods, not presumed independent source inputs and not persisted. This clarification supersedes any generic wording in this assessment that suggests standalone source values should be anticipated for current BANK reports.
+
+The approved Jalali calendar contract remains authoritative: FinancialPeriod identity and endpoints are Jalali. The current Gregorian SQL Date implementation is a code/schema gap to fix, not a reason to weaken or reinterpret the contract. The technical implementation decisions are delegated to ChatGPT; the assessment's previous request for further owner authorization of technical design is superseded. Any migration must still be non-destructive and must not be applied to a real database without a separately controlled deployment step.
+
 ## Ten exit criteria
 
 | # | Exit criterion | Status | Evidence and reason |
