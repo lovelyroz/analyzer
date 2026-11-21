@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 import re
+from typing import Callable
 
 from openpyxl.utils.cell import coordinate_to_tuple, get_column_letter, range_boundaries
 
@@ -72,6 +73,7 @@ def adapt_excel_source(
     admit: bool = False,
     revision: RevisionContext | None = None,
     reader_config: ExcelReaderConfig | None = None,
+    approval_validator: Callable[[CanonicalPersistencePlan], None] | None = None,
 ) -> ExcelAdapterResult:
     """Read, match, and build explicitly selected submissions; optionally admit.
 
@@ -244,6 +246,13 @@ def adapt_excel_source(
                 for item in exc.diagnostics
             )
             return _result(observation, match, (), None, diagnostics)
+        if approval_validator is not None:
+            try:
+                approval_validator(plan)
+            except Exception as exc:
+                code = getattr(exc, "code", "APPROVAL_CATALOG_VALIDATION_FAILED")
+                diagnostics.append(ExcelAdapterDiagnostic(str(code)))
+                return _result(observation, match, (), None, diagnostics)
         return _result(observation, match, tuple(submissions), plan, ())
 
     return _result(observation, match, tuple(submissions), None, ())

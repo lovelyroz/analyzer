@@ -344,9 +344,7 @@ def ingest_fx_rates(
             return FxIngestionResult(run_id, found, 0, 0, found, "FAILED", duplicate_count, len(invalid))
         for idx, item in enumerate(items, 1):
             code = None
-            if item.rate_type == "EXCHANGE_CENTER":
-                code = "SCHEMA_RATE_TYPE_UNSUPPORTED"
-            elif not isinstance(item.rate_type, str) or item.rate_type not in VALID_FX_RATE_TYPES:
+            if not isinstance(item.rate_type, str) or item.rate_type not in VALID_FX_RATE_TYPES:
                 code = "INVALID_RATE_TYPE"
             try:
                 rate = Decimal(item.rate) if item.rate is not None else None

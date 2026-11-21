@@ -13,6 +13,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import TypeAlias
 import zipfile
+import posixpath
+import xml.etree.ElementTree as ET
 
 import openpyxl
 from openpyxl import load_workbook
@@ -86,6 +88,35 @@ class ExcelSourceContractError(ExcelSourceReadError):
             "EXCEL_LITERAL_VALUE_CONTRACT_VIOLATION",
             "The workbook contains one or more unsupported populated cell kinds or error cells.",
         )
+
+
+def _raw_numeric_lexicals(payload: bytes) -> dict[tuple[str, str], str]:
+    """Read numeric <v> tokens directly from worksheet XML, before float decoding."""
+    try:
+        with zipfile.ZipFile(BytesIO(payload)) as archive:
+            workbook_root = ET.fromstring(archive.read("xl/workbook.xml"))
+            rels_root = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+            main_ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+            rel_ns = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+            package_ns = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+            targets = {item.attrib["Id"]: item.attrib["Target"] for item in rels_root.findall(f"{package_ns}Relationship")}
+            result: dict[tuple[str, str], str] = {}
+            for sheet in workbook_root.findall(f"{main_ns}sheets/{main_ns}sheet"):
+                sheet_name = sheet.attrib["name"]
+                target = targets.get(sheet.attrib.get(f"{rel_ns}id", ""))
+                if not target:
+                    continue
+                sheet_path = target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join("xl", target))
+                root = ET.fromstring(archive.read(sheet_path))
+                for cell in root.iter(f"{main_ns}c"):
+                    if cell.attrib.get("t") not in (None, "n") or cell.find(f"{main_ns}f") is not None:
+                        continue
+                    value = cell.find(f"{main_ns}v")
+                    if value is not None and value.text is not None:
+                        result[(sheet_name, cell.attrib.get("r", ""))] = value.text
+            return result
+    except Exception as exc:
+        raise ExcelSourceReadError("EXCEL_NUMERIC_TOKEN_READ_FAILED", "Numeric source tokens could not be read from the XLSX package.") from exc
 
 
 def _diagnostic_scalar(value: object) -> str | int | float | bool | date | datetime | time | timedelta:
@@ -222,6 +253,7 @@ def read_excel_source(
         source, file_name=file_name, max_file_bytes=settings.max_file_bytes
     )
     _preflight_package(payload, settings)
+    numeric_lexicals = _raw_numeric_lexicals(payload)
 
     try:
         workbook = load_workbook(
@@ -375,6 +407,7 @@ def read_excel_source(
                             value_kind=CellValueKind.PRESENT_NUMBER,
                             data_type=cell.data_type,
                             numeric_value=value,
+                            numeric_lexical=numeric_lexicals.get((worksheet.title, cell.coordinate)),
                             number_format=cell.number_format,
                             style_id=cell.style_id,
                             border_top=getattr(cell.border.top, "style", None),

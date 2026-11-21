@@ -1,415 +1,353 @@
-# PROMPT DB-IMPL-001 — Implement Canonical Database Architecture, Jalali Periods, Migration Reconciliation & Atomic Excel Writer
+# EXECUTION PROMPT — DB-CONSOLIDATION-002
+## Multi-task implementation: Excel ingestion, canonical DB, approval infrastructure, and downstream readiness
 
-## نوع کار
-**CODE IMPLEMENTATION — تغییر واقعی کد و تست‌ها الزامی است.**
-
-این تسک باید پروژه را از وضعیت فعلی به مرحلهٔ اتصال واقعی Excel ingestion به دیتابیس نزدیک کند. صرفاً بررسی، مستندسازی، گزارش‌نویسی یا پیشنهاد معماری قابل قبول نیست.
-
-Repo: `analyzer`  
-Branch: `master`
+**Repository:** `analyzer`  
+**Branch:** `master`  
+**Priority:** EXECUTION — implement and close as many tasks as technically possible in this run.  
+**Code changes:** REQUIRED.  
+**Tests:** Add/update tests, but DO NOT execute pytest or other test suites. The owner runs tests locally.
 
 ---
 
-## 1. اختیار تصمیم‌گیری
+## 1. Mission
 
-تصمیمات فنی این تسک کاملاً به عهدهٔ توست. برای انتخاب راهکار فنی، طراحی مدل‌ها، نوع داده‌ها، ساختار Migration و پیاده‌سازی writer از کاربر سؤال نکن.
+Continue from the current repository state. Do not restart previous work, repeat completed audits, or produce another report-only assessment.
 
-اسناد مرجع و تصمیمات قطعی مالک:
+The owner has now accepted the DB-IMPL-001 focused test suite:
 
-- `12_Database_Architecture_V1.1.md`
+- 93 tests passed in the full run.
+- The remaining failed test was corrected.
+- Its isolated rerun passed: `1 passed in 1.11s`.
+- Therefore, the focused DB-IMPL-001 test set has 94 successful tests and zero known failures.
+
+Your job is to convert the remaining PARTIAL tasks into DONE wherever the implementation and evidence genuinely permit it.
+
+Work across the following related tasks in one coherent implementation:
+
+1. DB-IMPL-001 — canonical database, migration, and Excel writer.
+2. DB-ING-002 / DB-ING-003 — canonical admission, deterministic Excel mapping, and adapter readiness.
+3. DB-TEST-002 / DB-TEST-003 — integration and downstream contract coverage.
+4. DB-EXIT-001 — database configuration exit readiness.
+5. DB-ING-007 / DB-ING-008 — Market/FX schema and atomic ingestion limitations, where they can be resolved safely as part of the schema work.
+
+Do not spend this run merely reviewing these tasks. Implement concrete changes.
+
+## 2. Mandatory owner decisions and constraints
+
+These decisions are final. Do not reopen them or implement alternatives:
+
+- Current financial-report standardization scope is **BANK only**. Do not invent templates, metrics, or report rules for other industries.
+- Supported financial source files are Excel and CSV only. Do not reintroduce PDF extraction or PDF dependencies.
+- BANK periodic financial reports use cumulative YTD values for 3, 6, 9, and 12 months from the company's actual fiscal-year start.
+- Standalone-quarter values required by the frontend are runtime calculations from compatible cumulative values. Do not presume they are separately reported source facts and do not persist calculated quarter values.
+- MONTHLY_ACTIVITY is a separate report type. Do not impose periodic-report temporal rules on it.
+- Jalali dates are authoritative for financial-period identity, storage, validation, and comparison. Gregorian conversion must not become the primary identity or comparison mechanism.
+- Only `fiscal_year_start_month` is collected. The fiscal year starts on day 1 of that explicitly configured Jalali month. Do not add a fiscal-start-day field.
+- Each company belongs to exactly one industry. Do not add sub-industries or subsidiary handling.
+- Listed-company tickers are unique. `codal_symbol` is the approved unique ticker identity.
+- FREE_MARKET and EXCHANGE_CENTER FX workbooks share one file structure and parser:
+  - EXCHANGE_CENTER values are Rial/USD.
+  - FREE_MARKET values are Toman/USD and must be multiplied by 10 to produce canonical Rial/USD.
+  - Use the sell column only.
+- MarketDaily CSV mapping:
+  - `J-Date` = Jalali date.
+  - `Ticker` = unique listed ticker; use as `codal_symbol` when present and consistent.
+  - `Close` = Rial/share.
+  - `Volume` = shares.
+  - `No` = transaction count.
+  - `Value` = source-provided traded value in Rial; preserve independently. Never derive it from `Volume × Close`.
+  - Exclude `Final`, `Open`, `High`, and `Low`.
+- Persist input facts only. Do not persist derived/calculated financial values or analysis/decision outputs.
+- Frontend-entered data does not require external source provenance, URL, API, or download manifest.
+- Preserve all report versions and their provenance. Apply the approved version/PIT selection policy; do not delete prior versions.
+- Do not edit `WORKFLOW_RULES.md`.
+- Never run migrations against an actual user database, never modify or delete real user data, and never reset a database.
+- The owner runs tests. You must not run tests.
+
+## 3. First: establish the exact starting point
+
+Read these files before implementation:
+
 - `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
+- `database/reports/DB_IMPL_001_CANONICAL_DATABASE_AND_EXCEL_WRITER.md`
 - `database/reports/DB_EXIT_001_FINAL_ASSESSMENT.md`
-- `database/reports/DB_TEST_003_EXCEL_DOWNSTREAM_INTEGRATION.md`
-- `database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md`
-
-در صورت وجود تعارض، تصمیمات صریح و جدیدتر مالک در اسناد معماری و Master Packet اولویت دارند.
-
-### تصمیمات قطعی مالک
-
-1. دامنهٔ استانداردسازی و ingestion گزارش‌های مالی در نسخهٔ فعلی فقط **BANK** است.
-2. گزارش‌های مالی دوره‌ای بانک‌ها شامل دوره‌های ۳، ۶، ۹ و ۱۲ماهه با مقادیر تجمعی YTD از ابتدای سال مالی هستند.
-3. مقدار مستقل هر فصل، در صورت نیاز، در runtime از دوره‌های تجمعی سازگار محاسبه می‌شود؛ نباید به‌عنوان ورودی مستقل گزارش فرض یا در دیتابیس ذخیره شود.
-4. شروع سال مالی از اطلاعات واقعی شرکت تعیین می‌شود و لزوماً اول فروردین نیست.
-5. گزارش‌های فعالیت ماهانه و گزارش‌های مالی دوره‌ای دو نوع گزارش مستقل هستند و استانداردهای آن‌ها نباید با یکدیگر اشتباه شوند.
-6. استاندارد صنایع دیگر در این مرحله طراحی یا پیاده‌سازی نمی‌شود. هستهٔ دیتابیس باید توسعه‌پذیر بماند تا استاندارد هر صنعت پس از بررسی گزارش واقعی آن صنعت اضافه شود.
-7. ورودی‌های قابل استخراج Excel و CSV هستند. هیچ مسیر PDF extraction نباید بازگردانده شود.
-8. تاریخ جلالی قرارداد اصلی تاریخ در لایهٔ داده است. تاریخ میلادی نباید هویت اصلی FinancialPeriod یا مبنای مقایسهٔ دوره‌ها باشد.
-9. فقط داده‌های ورودی در دیتابیس ذخیره می‌شوند. خروجی تحلیل، محاسبات مشتق‌شده و تاریخچهٔ تصمیم‌ها نباید به‌عنوان دادهٔ دائمی ذخیره شوند، مگر آنکه قرارداد مصوب صریحاً خلاف آن را مقرر کرده باشد.
-10. دادهٔ موجود نباید با حدس، تبدیل غیرقابل‌اثبات یا overwrite اصلاح شود.
-11. نماد بورسی (`codal_symbol`) یکتا است؛ اگر مدل فعلی این قاعده را تضمین نمی‌کند، آن را به‌عنوان بخشی از اصلاح فیزیکی بررسی و پیاده‌سازی کن.
-12. منبع خارجی برای داده‌ای که کاربر مستقیماً در فرانت‌اند وارد می‌کند الزامی نیست.
-
----
-
-## 2. هدف نهایی
-
-مسیر زیر باید به یک مسیر واقعی، قابل استفاده و اتمیک تبدیل شود:
-
-`Excel/CSV source → Reader → Approved Template Matching → Canonical Candidate → Canonical Admission → Canonical Persistence Writer → Database`
-
-در حال حاضر بخش‌هایی از مسیر تا `CanonicalPersistencePlan` پیاده‌سازی شده‌اند، اما طرح persistence به دیتابیس واقعی متصل نیست و `execution_allowed=False` است.
-
-این تسک باید این فاصله را برطرف کند.
-
-**هدف، ساخت یک writer واقعی برای داده‌های پذیرفته‌شده است؛ نه ایجاد یک writer موقت که محدودیت‌های مدل فعلی را دور بزند.**
-
----
-
-## 3. مرحله اول: بررسی دقیق قرارداد و وضعیت واقعی کد
-
-قبل از تغییر کد، فقط فایل‌های مرتبط با موارد زیر را بررسی کن:
-
-- مدل‌های `FinancialPeriod`، `NormalizedFinancialFact`، `RawFinancialFact`، `FinancialMetric`، `Report`، `ReportVersion` و مدل‌های provenance.
-- `src/core/jalali.py`
-- `src/migrations/runner.py` و تمام migrationهای موجود.
-- `src/ingestion/excel/`
+- `12_Database_Architecture_V1.1.md`
+- `src/models/canonical.py`
+- `src/ingestion/canonical_writer.py`
 - `src/ingestion/canonical_admission.py`
-- مسیر فعلی CODAL ingestion که پس از حذف PDF باقی مانده است.
-- مصرف‌کنندگان downstream، به‌ویژه `src/forecast/queries.py`.
-- تست‌های مرتبط با مدل‌ها، Migration، canonical admission، Excel adapter و PIT.
+- `src/migrations/runner.py`
+- `src/forecast/canonical_queries.py`
 
-از ابتدا کل پروژه را اسکن نکن. فقط وابستگی‌های مستقیم این مسیر را بررسی کن.
+Also inspect the exact current implementations and tests for the related Market/FX adapters, template matching, canonical input, and Stage 5/6 consumers.
 
-خروجی این مرحله باید برای خودت روشن کند:
-- چه قراردادهایی در حال حاضر قابل اجرا هستند؟
-- چه قسمت‌هایی فقط در DTO و طرح canonical وجود دارند؟
-- کدام ستون‌ها یا constraints مانع persistence هستند؟
-- Migration 9 دقیقاً چه وضعیتی دارد و چرا حل نشده است؟
-- چه مصرف‌کننده‌هایی با تغییر مدل تاریخ یا Fact تحت تأثیر قرار می‌گیرند؟
+Use the existing reports and Master Packet as the task baseline. Do not repeat their completed work.
 
-بعد از بررسی، مستقیماً وارد پیاده‌سازی شو؛ برای تأیید طرح متوقف نشو.
+The latest owner test results are accepted evidence. Do not revert or rewrite the recent test fixes.
 
----
+## 4. Workstream A — Approval catalog and deterministic semantic resolution
 
-## 4. مرحله دوم: اصلاح فیزیکی مدل داده
+**Goal: remove the current gap between caller-supplied approval references and authenticated, authoritative approval records.**
 
-مدل فیزیکی باید با قرارداد canonical مصوب منطبق شود.
+Implement a complete, deterministic approval-resolution boundary.
 
-### 4.1 Jalali FinancialPeriod
+Requirements:
 
-مدل فعلی `FinancialPeriod` از `SQL Date` برای `start_date` و `end_date` استفاده می‌کند. این وضعیت باید اصلاح شود.
+1. Inspect the current approval/catalog models and the code paths that accept:
+   - Company identity
+   - Industry identity
+   - Report type
+   - Report/template identity and version
+   - Metric identity
+   - Unit, currency, and scale
+   - Temporal type and duration basis
+   - Row/column semantic mapping
+2. Implement a single authoritative resolver/service that verifies every approval reference against the active catalog and its exact scope.
+3. Reject:
+   - Missing approvals.
+   - Inactive or revoked approvals.
+   - Approval references belonging to another company, industry, report type, template version, or semantic identity.
+   - Ambiguous matches.
+   - Duplicate active approvals where uniqueness is required.
+4. Do not trust a caller merely because it supplies a string that looks like an approval ID.
+5. Ensure the canonical writer and adapter use the same authoritative resolution rules. Avoid duplicated, inconsistent approval logic.
+6. Keep the resolver deterministic and fail-closed. No inferred mappings or fallback to the first matching metric.
+7. Add focused tests for valid approval, missing approval, inactive approval, scope mismatch, ambiguous approval, and revoked approval.
+8. Do not create production approvals or mark synthetic test approvals as production-approved.
 
-الزامات:
+**Expected result:** the approval infrastructure and resolver are implemented and tested. Production approval data remains a separate owner-data gate unless genuine approved source evidence already exists.
 
-- تاریخ شروع و پایان دوره باید به‌صورت اجزای معتبر جلالی ذخیره شوند.
-- اعتبارسنجی واقعی روز، ماه و سال جلالی الزامی است.
-- مقایسه، مرتب‌سازی و کنترل ترتیب دوره‌ها باید بر اساس تاریخ جلالی انجام شود.
-- تبدیل تاریخ جلالی به میلادی نباید برای ایجاد هویت یا uniqueness دوره استفاده شود.
-- تاریخ شروع و پایان دوره نباید با یکدیگر اشتباه یا ناسازگار باشند.
-- دوره‌های مالی شرکت باید با سال مالی واقعی همان شرکت سازگار باشند.
-- هویت دوره باید برای یک شرکت یکتا و قابل تشخیص باشد.
-- امکان PIT و مرتب‌سازی زمانی در queryهای downstream حفظ شود.
+## 5. Workstream B — Persian/Arabic numeric normalization
 
-از `src/core/jalali.py` به‌عنوان نقطهٔ شروع استفاده کن و در صورت نیاز آن را به یک API کامل و مشترک تبدیل کن.
+**Goal: complete the locale-aware numeric input layer without losing financial precision.**
 
-از ایجاد چند پیاده‌سازی مستقل برای تاریخ جلالی در بخش‌های مختلف جلوگیری کن.
+Implement a strict parser/normalizer for Excel and CSV financial values.
 
-### 4.2 Temporal semantics
+Requirements:
 
-در قرارداد فعلی، `is_ytd` در سطح FinancialPeriod قرار دارد. این طراحی را با توجه به قرارداد canonical بررسی و اصلاح کن.
+1. Support Persian and Arabic-Indic digits and ASCII digits.
+2. Support explicitly defined Persian/Arabic/ASCII decimal and thousands separators.
+3. Normalize supported negative-number representations only when their meaning is unambiguous.
+4. Preserve exact Decimal semantics. Never pass financial values through binary float.
+5. Distinguish:
+   - Blank cell.
+   - Explicit numeric zero.
+   - Textual zero.
+   - Invalid numeric token.
+   - Ambiguous separator pattern.
+   - Negative value.
+6. Reject ambiguous or malformed strings. Do not silently guess whether a separator is decimal or thousands.
+7. Do not convert blank values to zero.
+8. Do not change the approved rounding boundary or silently round source values during parsing.
+9. Preserve source-token evidence needed by the existing canonical provenance contract.
+10. Integrate the parser into the actual Excel/CSV canonical ingestion path, not merely expose an unused helper.
+11. Add comprehensive parameterized tests, including mixed digit systems, separator combinations, negative values, blanks, explicit zeros, malformed tokens, and precision edge cases.
 
-مبنای زمانی مقدار، ویژگی خود Fact است، نه صرفاً دورهٔ تقویمی.
+Document the accepted lexical grammar precisely. If a pattern cannot be safely interpreted, reject it with a stable diagnostic code.
 
-حداقل باید بتوان موارد زیر را بدون ابهام تشخیص داد:
+**Expected result:** close the implementation portion of the locale-normalization blocker. Do not claim production acceptance of every possible workbook format.
 
-- INSTANT
-- DURATION
-- YTD برای Factهای DURATION
-- عدم کاربرد duration basis برای INSTANT
+## 6. Workstream C — Real BANK workbook template and mapping progress
 
-در گزارش‌های دوره‌ای بانک‌ها، Factهای گزارش‌شده برای دوره‌های ۳، ۶، ۹ و ۱۲ماهه با مبنای YTD ثبت می‌شوند.
+**Goal: advance the actual BANK template work using available source evidence, without inventing financial meaning.**
 
-مراقب باش که:
-- یک FinancialPeriod به‌تنهایی تعیین‌کنندهٔ معنای تمام Factهای آن نباشد.
-- ماهیت گزارش فعالیت ماهانه با گزارش مالی دوره‌ای مخلوط نشود.
-- برای صنایع بررسی‌نشده، الگوهای فرضی ایجاد نشود.
-- ارقام standalone محاسبه‌شده به‌عنوان Fact ورودی ذخیره نشوند.
+Use the existing real workbook if it is present in the repository, particularly:
 
-### 4.3 Canonical Financial Fact
+- `excel/parsian_periodic.xlsx`
 
-مدل‌های موجود را با قرارداد `CanonicalPersistencePlan` و `PlannedFact` تطبیق بده.
+Also inspect the existing Parsian template audit, DB-DES-009 mapping/geometry decisions, and the related reports before changing anything.
 
-حداقل این ابعاد باید به‌درستی و بدون از دست رفتن معنا قابل ذخیره و بازیابی باشند:
+Requirements:
 
-- Company identity
-- Report identity
-- Report version identity
-- Metric identity
-- Financial period identity
-- Temporal type and basis
-- Exact numeric value
-- Unit
-- Currency
-- Scale
-- Value origin (reported, blank/missing, zero fallback و سایر حالت‌های مصوب)
-- Source artifact identity
-- Source revision identity
-- Extraction/template identity
-- Mapping/approval references
-- Source provenance و مختصات لازم برای audit
+1. Reproduce the workbook's structural characteristics from the actual workbook:
+   - Worksheet names and dimensions.
+   - Merged cells.
+   - Header paths and repeated headers.
+   - Row-axis hierarchy.
+   - Relevant data regions.
+   - Candidate extraction bounds and partitions.
+2. Reassess existing proposed bounds/partitions against the actual workbook. Do not accept historical candidate counts as proof.
+3. Implement only structural rules that are unambiguously supported by the workbook.
+4. Keep structural identification separate from financial semantic approval.
+5. Do not assign a Metric, aggregation rule, unit, currency, scale, temporal basis, or accounting meaning based solely on a plausible Persian label.
+6. Preserve the existing approved decisions, including the already-decided repeated header at row 95 and documented exclusions. Do not reopen settled decisions without concrete contradictory evidence.
+7. Where a semantic decision cannot be established from the available source, create a precise unresolved item with:
+   - Exact worksheet/cell/row/header evidence.
+   - The competing interpretations, if any.
+   - Why the available evidence is insufficient.
+   - The minimum additional evidence required.
+8. If a structural template can be safely approved from the actual workbook, implement its exact fingerprint/version and deterministic matching rules. Do not create a generic template that matches unrelated workbooks.
+9. Add tests using the actual workbook where licensing/repository test policy permits, otherwise use synthetic fixtures that reproduce verified geometry.
+10. Keep all production ingestion fail-closed until the required semantic and temporal approvals exist.
 
-فقط فیلدهایی را ذخیره کن که در قرارداد مصوب یا برای اثبات منشأ و هویت داده لازم هستند.
+**Expected result:** close any structural-template/matcher work that can genuinely be established from the real workbook. Do not label the entire production mapping complete while semantic decisions remain unapproved.
 
-از ذخیرهٔ فیلدهای مشتق‌شده و محاسباتی غیرضروری خودداری کن.
+## 7. Workstream D — Canonical schema, Market/FX constraints, and migration safety
 
-دقت عددی باید با قرارداد canonical هماهنگ باشد. استفاده از `float` برای مقادیر مالی ممنوع است.
+**Goal: resolve schema-level limitations coherently rather than adding application workarounds.**
 
-اگر مدل‌های موجود برای نگهداری اطلاعات لازم مناسب نیستند، آن‌ها را اصولی اصلاح کن؛ اطلاعات را در `error_log` یا متن آزاد پنهان نکن.
+Inspect the current ORM models, migration runner, all migration history available in the repository, and the exact Market/FX schema constraints.
 
-### 4.4 Uniqueness and constraints
+### D1. Historical Migration 9 lineage
 
-Constraints باید هویت اقتصادی Fact را تضمین کنند.
+The repository reports an older migration 9 named `codal_excel_source_metadata`, while the current source migration 9 is `canonical_jalali_excel_writer`.
 
-به‌خصوص:
+1. Search repository Git history, branches, tags, and available historical source files for the original migration implementation.
+2. Determine whether its exact source and schema effects can be recovered.
+3. Do not infer equivalence from migration names or column names.
+4. If recovered, document the exact old schema effects and provide a safe, read-only reconciliation procedure.
+5. If not recovered, state precisely what evidence is missing and keep the conflict guard.
+6. Do not rename, delete, overwrite, or silently mark historical migration records as applied.
+7. Do not connect to or inspect an actual user database. Provide a read-only inventory/preflight utility only if it can operate safely on an explicitly supplied database connection by the owner later.
 
-- شرکت، دوره، Metric و نسخهٔ گزارش باید هویت روشن داشته باشند.
-- duplicate واقعی از conflict متفاوت باشد.
-- رفتار NULL در SQLite برای UniqueConstraint بررسی شود؛ وجود NULL نباید باعث شود uniqueness موردنیاز عملاً بی‌اثر شود.
-- شناسهٔ ticker شرکت‌ها باید مطابق تصمیم مالک یکتا باشد.
-- Foreign keyها و CheckConstraintها باید با قرارداد جدید هماهنگ باشند.
+### D2. Market/FX physical schema limitations
 
-برای هر constraint مهم تست واقعی بنویس.
+Resolve the known limitations where safely possible:
 
----
+- EXCHANGE_CENTER currently conflicts with an old FX schema constraint.
+- Jalali-key uniqueness is not guaranteed under concurrent ingestion by the current physical uniqueness model.
+- Any required uniqueness must be enforced at the database level, not only by an application pre-check.
 
-## 5. مرحله سوم: Migration 9 و سازگاری داده‌های موجود
+Design the additive schema/migration changes needed to support the already-approved FX source contract and Jalali uniqueness.
 
-Migration 9 یکی از موانع اصلی فعلی است. این موضوع باید در همین تسک تعیین تکلیف و پیاده‌سازی شود.
+If a new migration version is necessary, implement it as a new migration. Do not rewrite migration 9 or alter its historical meaning.
 
-الزامات:
+Ensure the design:
+- Preserves all existing data.
+- Has a duplicate preflight that stops safely before creating a unique constraint/index.
+- Does not fabricate Jalali-to-Gregorian conversions.
+- Uses the correct natural identity for each source.
+- Is safe and idempotent on the explicitly supported schema baseline.
+- Has isolated temporary-database tests for success, duplicate preflight failure, rerun/idempotency, and rollback.
 
-1. ابتدا وضعیت migrationهای 1 تا 8 و schema واقعی حاصل از آن‌ها را بررسی کن.
-2. Migration 9 را بر اساس مدل نهایی و بدون دست‌کاری تاریخچهٔ migrationهای قبلی طراحی کن.
-3. Migration باید روی دیتابیس خالی و دیتابیس legacy پشتیبانی‌شده رفتار مشخص داشته باشد.
-4. migration نباید داده‌های موجود را بی‌صدا حذف یا overwrite کند.
-5. اگر دادهٔ قدیمی تاریخ میلادی دارد و تبدیل دقیق آن به تاریخ جلالی ممکن است، تبدیل باید deterministic و قابل آزمون باشد.
-6. اگر تبدیل داده‌ای قطعی نیست، آن داده باید در وضعیت قابل شناسایی باقی بماند و migration نباید تاریخ یا هویت جعلی بسازد.
-7. اگر حفظ داده‌های legacy نیازمند ستون‌های compatibility یا مرحلهٔ انتقال است، راه‌حل مناسب را انتخاب کن.
-8. Migration باید تا حد امکان idempotent باشد و شکست آن نباید در تاریخچه به‌عنوان موفق ثبت شود.
-9. تست‌های migration باید دیتابیس موقت بسازند و سناریوهای empty، legacy، failure و repeated upgrade را پوشش دهند.
+Do not run migrations against real databases.
 
-**ممنوع:**
-- اجرای Migration روی دیتابیس واقعی کاربر.
-- دسترسی به `tehran_stock.db` واقعی.
-- حذف یا reset دیتابیس.
-- استفاده از `create_all` به‌عنوان جایگزین Migration برای دیتابیس موجود.
-- اصلاح دادهٔ قدیمی با حدس.
+### D3. Canonical schema consistency
 
-در صورت وجود چند راه‌حل، راه‌حلی را انتخاب کن که حفظ داده و قابلیت audit را بیشترین حد تضمین کند.
+Check that canonical ORM declarations, migration definitions, constraints, indexes, and writer assumptions agree exactly.
 
----
+Fix any discrepancies found, including:
+- Uniqueness and nullable identity behavior.
+- Foreign keys and delete/update behavior.
+- Report/version identity.
+- Fact-level Jalali period identity.
+- Dimension-set identity.
+- Provenance identity.
+- Audit state transitions.
+- Company ticker/codal_symbol uniqueness.
 
-## 6. مرحله چهارم: Canonical Transactional Writer
+Do not change the approved month-only fiscal calendar rule.
 
-این بخش خروجی اصلی تسک است.
+**Expected result:** close code-level schema gaps that can be resolved without knowing the historical contents of a user's database. Historical lineage remains PARTIAL if source evidence cannot be recovered.
 
-یک writer واقعی ایجاد کن که فقط `CanonicalPersistencePlan` معتبر را بپذیرد.
+## 8. Workstream E — Downstream consumer compatibility
 
-Writer باید:
+**Goal: remove the current dead end between canonical Excel persistence and the application's financial-data consumers.**
 
-1. Plan را دوباره از نظر ساختار، هویت‌ها و مجوزهای لازم اعتبارسنجی کند.
-2. هیچ mapping یا approval را خودش حدس نزند.
-3. فقط ورودی‌هایی را بپذیرد که admission و approval لازم را گذرانده‌اند.
-4. همهٔ موجودیت‌های لازم مانند Company، Report، ReportVersion، FinancialPeriod، Metric و Fact را با هویت صحیح resolve کند.
-5. نسخهٔ گزارش را append-only نگه دارد.
-6. نسخهٔ قبلی را overwrite نکند.
-7. replay یک ورودی کاملاً یکسان را به‌عنوان duplicate بدون تغییر تشخیص دهد.
-8. دادهٔ دارای همان هویت ولی مقدار یا provenance متفاوت را conflict تشخیص دهد.
-9. در صورت وجود هرگونه خطا، کل عملیات persistence را rollback کند.
-10. هیچ Fact ناقص یا نامعتبر را در بخشی از batch ذخیره نکند.
-11. عملیات commit را فقط در مرز تراکنش انجام دهد، نه داخل loop.
-12. وضعیت اجرای ingestion و تعداد رکوردهای پذیرفته، تکراری و ردشده را به شکل قابل audit ثبت کند.
-13. خطاها را بدون افشای payload حساس یا exception خام به caller برگرداند.
-14. transaction ownership را شفاف نگه دارد.
-15. از ورود دوبارهٔ داده با یک source revision جلوگیری کند.
-
-### رفتار مهم نسخه‌های گزارش
-
-قواعد مصوب انتخاب نسخه را حفظ کن:
-
-- نسخه‌های گزارش و provenance آن‌ها حفظ می‌شوند.
-- گزارش‌های دارای رتبهٔ یکسان طبق قواعد audit/restatement با جدیدترین publication انتخاب می‌شوند.
-- نسخهٔ جدید نباید نسخهٔ قبلی را حذف کند.
-- PIT باید بتواند فقط نسخه‌ای را انتخاب کند که تا cutoff قابل مشاهده بوده است.
-
-### اتصال به Excel
-
-Writer را به مسیر فعلی Excel متصل کن، به‌گونه‌ای که ورودی مسیر تولیدی همان Candidate/Plan تأییدشده باشد.
-
-مسیر نباید برای عبور از Writer، DTO یا Admission را دور بزند.
-
-در صورت نبود Template یا Semantic Mapping تأییدشده، ingestion باید fail-closed بماند. برای تست integration می‌توان از Template و mapping مصنوعی و صریح استفاده کرد، اما آن‌ها را به‌عنوان استاندارد production معرفی نکن.
-
----
-
-## 7. مرحله پنجم: Downstream compatibility و PIT
-
-تغییر مدل‌ها نباید مصرف‌کنندگان فعلی را بی‌صدا خراب کند.
-
-به‌خصوص بررسی و اصلاح کن:
+Inspect:
 
 - `src/forecast/queries.py`
-- queryهای دوره‌های مالی
-- Stage 5 و Stage 6 که از Factهای مالی استفاده می‌کنند
-- انتخاب نسخه بر اساس cutoff
-- ترتیب زمانی دوره‌ها
-- خواندن مقادیر عددی دقیق
-- provenance ورودی‌ها
+- `src/forecast/canonical_queries.py`
+- Existing Stage 5/6 query and service interfaces.
+- Legacy normalized-fact and period models.
+- Canonical models and writer.
 
-هر جا قرارداد قدیمی میلادی یا `is_ytd` استفاده شده، آن را به قرارداد جدید منتقل کن.
+Implement a safe compatibility/read boundary.
 
-PIT باید همچنان از publication datetime نسخهٔ گزارش استفاده کند؛ تاریخ دوره نباید جای تاریخ انتشار را بگیرد.
+Requirements:
 
-هیچ اطلاعات منتشرشده بعد از cutoff نباید وارد query نتیجه شود.
+1. Do not silently switch legacy Stage 5/6 consumers to the new schema.
+2. Do not convert Jalali periods into Gregorian identity keys.
+3. Do not duplicate canonical facts into legacy tables just to satisfy old consumers.
+4. Define an explicit canonical read contract that can supply the required downstream facts and metadata.
+5. Where Stage 5/6 logic can consume that contract without changing financial semantics, implement the adapter and focused tests.
+6. Where the existing consumer assumes an incompatible schema or semantics, isolate the incompatibility and document the smallest required future change.
+7. Preserve PIT behavior: no future publication versions, corrections, or restatements may leak into an earlier cutoff.
+8. Preserve exact integer/Decimal values; do not introduce float conversion.
+9. Preserve BANK periodic YTD semantics and runtime-only standalone-quarter derivation.
+10. Do not persist TTM or other calculated outputs.
 
----
+**Expected result:** close all consumer integration work that can be implemented without weakening the Jalali/PIT/financial contracts. Clearly identify any downstream stage that still requires a separate reviewed change.
 
-## 8. مرحله ششم: تست‌های الزامی
+## 9. Workstream F — Atomic Market/FX ingestion completion
 
-تست‌ها را بنویس، اما **خودت اجرا نکن**. اجرای تست‌ها با مالک پروژه است.
+Review the current implementation and tests for DB-ING-007 and DB-ING-008.
 
-حداقل این گروه‌ها باید پوشش داده شوند:
+Resolve remaining code-level gaps that are not already addressed by Workstream D:
 
-### A. Jalali
-- تاریخ معتبر و نامعتبر
-- leap year
-- پایان ماه‌های جلالی
-- مرتب‌سازی و مقایسه
-- دورهٔ شروع و پایان
-- سال مالی غیرتقویمی
-- uniqueness دوره
-- عدم تبدیل ضمنی به میلادی
+- Full-batch validation before persistence.
+- No partial writes.
+- Deterministic duplicate/replay/conflict semantics.
+- Correct transaction rollback.
+- Durable and accurate audit status/counts.
+- Safe failure diagnostics.
+- Correct Rial/Toman conversion.
+- Correct source-specific identity and Jalali date handling.
+- Concurrency safety backed by physical constraints.
 
-### B. Model and schema
-- constraints جدید
-- uniqueness هویت Fact
-- رفتار NULL در SQLite
-- ticker uniqueness
-- temporal semantics
-- exact Decimal
-- provenance
+Do not change the approved MarketDaily field mapping. In particular, preserve source `Value` independently.
 
-### C. Migration
-- empty database
-- supported legacy database
-- migration failure
-- repeated upgrade
-- preservation of legacy rows
-- عدم ثبت migration شکست‌خورده به‌عنوان موفق
+If a gap depends on a schema migration implemented in Workstream D, coordinate the implementation rather than creating a second workaround.
 
-### D. Writer
-- batch معتبر
-- یک رکورد نامعتبر در batch
-- duplicate یکسان
-- conflicting duplicate
-- replay نسخهٔ گزارش
-- correction به‌صورت نسخهٔ جدید
-- rollback کامل
-- audit failure
-- commit failure
-- independent sessions
-- no partial persistence
+## 10. Documentation and task closure
 
-### E. Excel end-to-end
-مسیر واقعی:
+Update these durable documents:
 
-`synthetic XLSX → reader → explicit approved synthetic template → matching → adapter → canonical admission → writer → database → read-back`
+- `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
+- `database/reports/DB_IMPL_001_CANONICAL_DATABASE_AND_EXCEL_WRITER.md`
+- `database/reports/DB_EXIT_001_FINAL_ASSESSMENT.md`
 
-موارد زیر باید در تست end-to-end بررسی شوند:
+Create focused reports for substantial new workstreams if useful. Do not create a separate report for every tiny code change.
 
-- مقادیر دقیق Decimal
-- تاریخ جلالی
-- دوره‌های ۳، ۶، ۹ و ۱۲ماههٔ YTD بانک
-- مقادیر صفر و missing
-- source coordinates
-- report version
-- provenance
-- duplicate/conflict
-- rollback
-- PIT read-back
+Update the Master Packet task statuses and dashboard accurately.
 
-تست‌ها نباید صرفاً توابع داخلی را mock کنند؛ باید با دیتابیس موقت واقعی و تراکنش واقعی کار کنند.
+Rules:
 
----
+- `[x] DONE` only when implementation, required tests, and acceptance evidence are complete.
+- `[~] PARTIAL` when code is implemented but real source approval, owner validation, historical DB evidence, or another genuine gate remains.
+- Do not mark a task DONE just because tests were added.
+- Do not leave tasks PARTIAL merely because a report has not been updated if all substantive criteria are actually met.
+- Reconcile task counts and percentages. Do not double-count cross-cutting work.
+- Explicitly record the 94 accepted DB-IMPL-001 tests.
+- Distinguish owner-run tests from agent-created tests.
+- Update the database exit assessment based on actual implementation, not optimistic wording.
 
-## 9. محدودیت‌های قطعی
+`reply.md` is a temporary execution handoff only:
+1. Use it if needed to record the current execution.
+2. Transfer every durable decision/result to the proper report and Master Packet.
+3. Verify the durable transfer.
+4. Clear `reply.md` to zero bytes at the end.
 
-- `WORKFLOW_RULES.md` را تغییر نده.
-- هیچ مسیر PDF extraction را ایجاد یا احیا نکن.
-- برای صنایع بررسی‌نشده استاندارد یا mapping فرضی نساز.
-- از Template مصنوعی به‌عنوان Template تولیدی استفاده نکن.
-- migration را روی دیتابیس واقعی اجرا نکن.
-- دادهٔ موجود را حذف یا overwrite نکن.
-- تست‌ها را اجرا نکن؛ فقط تست‌های لازم را اضافه کن و دستور اجرای دقیق را تحویل بده.
-- به‌جای تکمیل writer، یک interface خالی یا TODO تحویل نده.
-- `execution_allowed=True` را فقط زمانی فعال کن که مسیر واقعی و کامل persistence با constraints و transaction صحیح کار کند.
-- تست‌های قبلی را برای سازگار کردن با پیاده‌سازی جدید بی‌دلیل حذف یا ضعیف نکن.
-- هیچ تغییر نامرتبطی در Stageهای دیگر انجام نده.
+Do not edit `WORKFLOW_RULES.md`.
 
----
+## 11. Engineering and execution rules
 
-## 10. مدیریت موانع
+- Implement coherent changes across the workstreams. Do not stop after one workstream merely because it is large.
+- Do not ask the owner technical-design questions. Technical decisions are delegated to ChatGPT.
+- Do not invent source semantics, financial mappings, historical migration effects, or production approvals.
+- Do not add hypothetical industry-specific structures outside BANK.
+- Do not reintroduce PDF extraction.
+- Do not run tests. Add or update tests and provide exact commands for the owner.
+- Do not run migrations against a real database.
+- Do not change or delete user data.
+- Do not claim a test passed unless the owner has run it and supplied the result.
+- Do not claim a production workbook was accepted unless actual evidence supports that claim.
+- Do not perform another broad repository audit. Read only the related files necessary to implement and verify these workstreams.
+- Use stable diagnostic codes and deterministic behavior.
+- Run static checks only if they do not execute tests or touch a database.
+- Keep changes focused and avoid unrelated refactoring.
 
-اگر در حین کار با مانعی مواجه شدی:
+## 12. Required final response
 
-- ابتدا راه‌حل فنی مستقل را بررسی کن.
-- اگر مانع ناشی از ناسازگاری schema است، schema و migration را اصلاح کن.
-- اگر مانع ناشی از نبود approval واقعی است، fail-closed بمان و تست مصنوعی صریح بساز.
-- اگر قرارداد یک بخش واقعاً در اسناد تعیین نشده، آن را با قراردادهای مصوب موجود سازگار کن و تصمیم را مستند کن.
-- کار را به‌خاطر یک مانع غیرحیاتی متوقف نکن؛ سایر بخش‌های مستقل و قابل انجام را تکمیل کن.
-- هیچ تصمیم فنی را صرفاً به این دلیل که قبلاً implementation ناقص وجود داشته، به همان شکل حفظ نکن.
+At completion, provide one consolidated execution report containing:
 
-فقط اگر اجرای صحیح مستلزم تصمیم کسب‌وکاری جدید و خارج از اختیارات فنی است، آن مورد را مشخص کن و بقیهٔ کار را ادامه بده.
+1. **Tasks closed:** exact task IDs, why each now meets DONE criteria, and changed files.
+2. **Tasks advanced but still PARTIAL:** exact remaining gate and why it cannot honestly be closed.
+3. **Implementation summary:** concrete code/schema behavior delivered in each workstream.
+4. **Migration safety:** exact migration versions added/changed and confirmation that no real database was opened or modified.
+5. **Tests added/changed:** exact test names and test files. State clearly that you did not execute them.
+6. **Owner test plan:** grouped exact PowerShell commands, not one command per tiny change. Separate fast focused tests from the broader regression command.
+7. **Documentation:** exact Master Packet sections and report files updated.
+8. **Task dashboard:** reconciled DONE/PARTIAL/OPEN totals and percentages.
+9. **Remaining owner decisions/evidence:** only genuinely unavoidable items, such as missing source semantics or unrecovered historical migration evidence.
 
----
-
-## 11. اسناد و گزارش تحویل
-
-پس از پیاده‌سازی:
-
-1. معماری و Master Packet را با مدل واقعی و migration جدید هماهنگ کن.
-2. `DB_EXIT_001_FINAL_ASSESSMENT.md` را از حالت صرفاً ارزیابی به وضعیت واقعی جدید به‌روزرسانی کن.
-3. گزارش جدید ایجاد کن:
-
-`database/reports/DB_IMPL_001_CANONICAL_DATABASE_AND_EXCEL_WRITER.md`
-
-گزارش باید شامل موارد زیر باشد:
-
-- معماری نهایی و تصمیمات فنی
-- مدل‌ها و ستون‌های تغییرکرده
-- Migration 9 و رفتار آن
-- مسیر واقعی writer
-- transaction و duplicate/conflict semantics
-- PIT و downstream compatibility
-- تست‌های اضافه‌شده
-- مواردی که هنوز به production approval نیاز دارند
-- محدودیت‌ها و ریسک‌های باقی‌مانده
-- فایل‌های دقیق تغییرکرده
-- دستورهای دقیق تست برای مالک
-
-`reply.md` را با گزارش واقعی اجرا به‌روزرسانی کن.
-
-Master Packet را هم‌زمان با نتیجهٔ واقعی هماهنگ کن:
-- `[x]` فقط برای کار کاملاً تکمیل‌شده.
-- `[~]` برای کار ناقص یا دارای مانع.
-- هیچ Taskی صرفاً با ایجاد گزارش DONE نشود.
-- درصد پیشرفت را از روی ledger واقعی محاسبه کن؛ تسک‌های cross-cutting را دوباره نشمار.
-
----
-
-## 12. معیار پذیرش نهایی
-
-این تسک فقط وقتی DONE است که:
-
-- مدل فیزیکی با قرارداد canonical منطبق شده باشد.
-- قرارداد تاریخ جلالی در دوره‌های مالی واقعاً اجرا شود.
-- Migration 9 پیاده‌سازی و با تست‌های موقت پوشش داده شده باشد.
-- Writer واقعی و transactional وجود داشته باشد.
-- مسیر Excel تا دیتابیس و read-back به‌صورت end-to-end تست‌پذیر باشد.
-- PIT و downstream مصرف‌کنندگان با قرارداد جدید سازگار باشند.
-- هیچ داده‌ای با حدس یا overwrite وارد نشده باشد.
-- محدودیت‌های production approval به‌صورت دقیق و صادقانه باقی مانده باشند.
-
-اگر بخشی از این موارد تکمیل نشد، Task را PARTIAL اعلام کن و دقیقاً مشخص کن چه کدی انجام شده، چه چیزی مانده و چرا.
-
-**خروجی مورد انتظار، کد اجرایی و تست‌های واقعی است؛ نه یک گزارش دیگر دربارهٔ اینکه چرا هنوز نمی‌توانیم کد اجرایی بنویسیم.**
+**Success criterion:** this run must deliver substantial implementation and close multiple tasks where justified. A report that only restates blockers, proposes future work, or creates more audit tasks is not an acceptable completion.

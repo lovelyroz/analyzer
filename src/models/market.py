@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Date, Numeric, ForeignKey, UniqueConstraint, String, CheckConstraint
+from sqlalchemy import Column, Integer, Date, Numeric, ForeignKey, UniqueConstraint, String, CheckConstraint, Index, text
 from src.core.database import Base
 
 
@@ -32,4 +32,12 @@ class MarketDaily(Base):
             "jalali_day IS NULL OR (jalali_day >= 1 AND jalali_day <= 31)",
             name="chk_jalali_day",
         ),
+        CheckConstraint(
+            "(jalali_year IS NULL AND jalali_month IS NULL AND jalali_day IS NULL) OR "
+            "(jalali_year IS NOT NULL AND jalali_month IS NOT NULL AND jalali_day IS NOT NULL)",
+            name="chk_market_jalali_identity_complete",
+        ),
+        Index("uq_market_daily_jalali_identity", "company_id", "jalali_year", "jalali_month", "jalali_day",
+              unique=True,
+              sqlite_where=text("jalali_year IS NOT NULL AND jalali_month IS NOT NULL AND jalali_day IS NOT NULL")),
     )

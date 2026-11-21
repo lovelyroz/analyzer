@@ -144,6 +144,7 @@ class PlannedFact:
     worksheet_name: str
     source_coordinate: str
     source_value_kind: str
+    source_token: str | None = None
 
     @property
     def identity(self) -> tuple[object, ...]:
@@ -181,7 +182,7 @@ class PlannedFact:
             self.template_id, self.template_version, self.template_sha256,
             source_mapping, self.extraction_owner, self.approval_references,
             self.worksheet_ordinal, self.worksheet_name, self.source_coordinate,
-            self.source_value_kind,
+            self.source_value_kind, self.source_token,
         )
 
 
@@ -596,6 +597,7 @@ def _prepare_fact(
         worksheet_name=candidate.worksheet_name,
         source_coordinate=candidate.source_coordinate,
         source_value_kind=candidate.source_value_kind.value,
+        source_token=candidate.source_token,
     )
 
 

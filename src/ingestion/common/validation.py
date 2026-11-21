@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Optional
 
 VALID_FX_RATE_TYPES = frozenset(
-    {"FREE_MARKET", "OPERATIONAL", "OFFICIAL", "ESTIMATED", "MANUAL_OPERATOR"}
+    {"FREE_MARKET", "EXCHANGE_CENTER", "OPERATIONAL", "OFFICIAL", "ESTIMATED", "MANUAL_OPERATOR"}
 )
 
 

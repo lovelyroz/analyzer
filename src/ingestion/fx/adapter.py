@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from src.ingestion.common.parsing import parse_jalali_components, to_decimal
+from src.ingestion.common.financial_numbers import parse_financial_number
+from src.ingestion.excel.reader import _raw_numeric_lexicals
 from src.ingestion.service import FxRateInput
 
 
@@ -29,7 +31,9 @@ def parse_fx_xlsx(path: Union[str, Path], *, rate_type: str, source_label: Optio
         raise ImportError("openpyxl is required for FX XLSX adapter") from exc
     if rate_type not in {"FREE_MARKET", "EXCHANGE_CENTER"}:
         raise ValueError("rate_type must be FREE_MARKET or EXCHANGE_CENTER")
-    wb = openpyxl.load_workbook(Path(path), read_only=True, data_only=True)
+    source_path = Path(path)
+    numeric_lexicals = _raw_numeric_lexicals(source_path.read_bytes())
+    wb = openpyxl.load_workbook(source_path, read_only=True, data_only=True)
     inputs: List[FxRateInput] = []
     errors: List[str] = []
     mappings = []
@@ -59,7 +63,9 @@ def parse_fx_xlsx(path: Union[str, Path], *, rate_type: str, source_label: Optio
                     continue
                 records_found += 1
                 comp = parse_jalali_components(str(date).strip()) if date is not None else None
-                parsed = to_decimal(str(rate)) if rate is not None else None
+                rate_cell = f"{get_column_letter(sell_col + 1)}{row_idx}"
+                lexical = numeric_lexicals.get((ws.title, rate_cell)) if isinstance(rate, (int, float)) and not isinstance(rate, bool) else str(rate) if rate is not None else None
+                parsed = parse_financial_number(lexical, source_kind="NUMERIC" if isinstance(rate, (int, float)) and not isinstance(rate, bool) else "TEXT").value if lexical is not None else None
                 if comp is None:
                     errors.append(f"{ws.title}!row {row_idx}: invalid Jalali date {date!r}")
                     continue
@@ -74,7 +80,6 @@ def parse_fx_xlsx(path: Union[str, Path], *, rate_type: str, source_label: Optio
                     current_ref = f"{ws.title}!{get_column_letter(date_col + 1)}{row_idx}/{get_column_letter(sell_col + 1)}{row_idx}"
                     errors.append(f"{current_ref}: {kind} for {date!r}; prior source {previous_ref}")
                     continue
-                from openpyxl.utils import get_column_letter
                 seen[key] = (canonical, f"{ws.title}!{get_column_letter(date_col + 1)}{row_idx}/{get_column_letter(sell_col + 1)}{row_idx}")
                 observations.append({"sheet": ws.title, "row": row_idx, "date": str(date).strip(),
                     "source_sell_rate": str(parsed), "canonical_rate": str(canonical),

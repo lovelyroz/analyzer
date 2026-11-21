@@ -219,9 +219,8 @@ def test_ingest_fx_xlsx_conversion_and_exchange_schema_blocker(session, tmp_path
     assert free_row.rate == Decimal("1017850")
 
     r_exchange = ingest_fx_xlsx(session, exchange_path, rate_type="EXCHANGE_CENTER", rates_in_toman=False, source_label="EXCHANGE_XLSX")
-    assert r_exchange.status == "FAILED"
-    assert "SCHEMA_RATE_TYPE_UNSUPPORTED" in session.get(IngestionRun, r_exchange.ingestion_id).error_log
-    assert session.query(FXRate).filter_by(rate_type="EXCHANGE_CENTER").count() == 0
+    assert r_exchange.status == "COMPLETED"
+    assert session.query(FXRate).filter_by(rate_type="EXCHANGE_CENTER").one().rate == Decimal("687390")
 
     # Supported legacy Rial inputs pass through unchanged; service performs no unit conversion.
     r_ops = ingest_fx_rates(session, [FxRateInput(

@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Iterable
 
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
+from src.core.jalali import is_valid_jalali_components
 from src.models.canonical import (
     CanonicalDimensionMember, CanonicalFactProvenance,
     CanonicalFinancialFact, CanonicalFinancialPeriod, CanonicalReport,
@@ -38,6 +40,72 @@ class CanonicalFactAtCutoff:
     source_identity: str
     revision_identity: str
     source_coordinate: str
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalStandaloneQuarter:
+    company_id: int
+    report_type_id: str
+    metric_id: int
+    scenario: str
+    quarter_number: int
+    period_start_jalali: tuple[int, int, int]
+    period_end_jalali: tuple[int, int, int]
+    value_integer: int
+    source_report_version_ids: tuple[int, ...]
+
+
+def derive_standalone_quarters(
+    facts: Iterable[CanonicalFactAtCutoff],
+) -> list[CanonicalStandaloneQuarter]:
+    """Derive quarter-only values in memory from compatible BANK YTD facts.
+
+    This is a read-side calculation only. It returns no ORM objects and writes
+    no calculated values. Inputs must already have been PIT-filtered by
+    ``load_canonical_financial_facts``.
+    """
+    ytd: dict[tuple[object, ...], dict[int, CanonicalFactAtCutoff]] = {}
+    for fact in facts:
+        if (fact.report_type_id != "PERIODIC_FINANCIAL" or fact.temporal_type != "DURATION"
+                or fact.duration_basis != "YTD" or fact.value_integer is None
+                or fact.value_state not in {"REPORTED_VALUE", "ZERO_FALLBACK"}):
+            continue
+        start, end = fact.start_jalali, fact.end_jalali
+        if start[2] != 1 or not _is_jalali_month_end(end):
+            continue
+        months = (end[0] - start[0]) * 12 + end[1] - start[1] + 1
+        if months not in {3, 6, 9, 12}:
+            continue
+        key = (fact.company_id, fact.report_type_id, fact.metric_id, fact.scenario,
+               start, fact.dimensions, fact.source_unit, fact.source_currency, fact.source_scale)
+        periods = ytd.setdefault(key, {})
+        if months in periods:
+            # Duplicate period identities make caller-supplied snapshots ambiguous.
+            periods[months] = None  # type: ignore[assignment]
+        else:
+            periods[months] = fact
+
+    result: list[CanonicalStandaloneQuarter] = []
+    for key, periods in ytd.items():
+        company_id, report_type_id, metric_id, scenario, fiscal_start, *_ = key
+        for months in (3, 6, 9, 12):
+            current = periods.get(months)
+            if current is None:
+                continue
+            previous = None if months == 3 else periods.get(months - 3)
+            if months != 3 and previous is None:
+                continue
+            value = current.value_integer if previous is None else current.value_integer - previous.value_integer
+            quarter_start = fiscal_start if previous is None else _next_jalali_month(previous.end_jalali)
+            result.append(CanonicalStandaloneQuarter(
+                company_id=company_id, report_type_id=report_type_id, metric_id=metric_id,
+                scenario=scenario, quarter_number=months // 3,
+                period_start_jalali=quarter_start, period_end_jalali=current.end_jalali,
+                value_integer=value,
+                source_report_version_ids=((current.report_version_id,) if previous is None else
+                                           (previous.report_version_id, current.report_version_id)),
+            ))
+    return sorted(result, key=lambda item: (item.period_end_jalali, item.metric_id, item.scenario))
 
 
 def load_canonical_financial_facts(
@@ -115,4 +183,17 @@ def _utc_naive(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
     return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _is_jalali_month_end(value: tuple[int, int, int]) -> bool:
+    year, month, day = value
+    if not is_valid_jalali_components(year, month, day):
+        return False
+    max_day = 31 if month <= 6 else 30 if month <= 11 else 30 if is_valid_jalali_components(year, 12, 30) else 29
+    return day == max_day
+
+
+def _next_jalali_month(value: tuple[int, int, int]) -> tuple[int, int, int]:
+    year, month, _day = value
+    return (year + 1, 1, 1) if month == 12 else (year, month + 1, 1)
 

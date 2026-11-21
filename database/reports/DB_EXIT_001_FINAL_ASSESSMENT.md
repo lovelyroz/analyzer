@@ -62,3 +62,10 @@ Market/FX follow-up (EXCHANGE_CENTER schema support and Jalali concurrent unique
 - No tests were run as part of this assessment.
 
 **Conclusion:** Database Configuration is not complete. The critical next step is one authorized canonical physical-schema + migration + writer implementation, coordinated with production Excel approval. Additional report-only audits do not resolve these blockers.
+
+
+## Consolidation reassessment ? 2026-11-21
+
+The implementation now includes Migration 10 for FX `EXCHANGE_CENTER`, Jalali physical uniqueness, complete Jalali identities and canonical approval/source-token columns; a shared exact-scope approval resolver; a strict Decimal parser integrated with Excel/CSV canonical input; and runtime-only standalone-quarter derivation for compatible BANK periodic YTD facts. Market CSV resolution now checks the approved `codal_symbol` identity and rejects conflicts. Details and tests are in `DB_CONSOLIDATION_002_IMPLEMENTATION.md`.
+
+The owner-accepted DB-IMPL-001 evidence is 94 successful focused tests (93 in the full run, plus the corrected isolated case, 1 passed in 1.11s). This does not cover the newly added consolidation tests, which were not run. Exit remains PARTIAL: production approvals and verified workbook evidence are absent, historical Migration 9 lineage remains unrecovered, and Stage 5/6 are not integrated with Jalali canonical reads. `excel/parsian_periodic.xlsx` is absent from this checkout. Dashboard remains 36 tasks, 8 DONE / 25 PARTIAL / 3 OPEN = 57%; DB-TEST/DB-EXIT remains 0 DONE / 4 PARTIAL / 0 OPEN = 50%. No real database was opened or migrated.

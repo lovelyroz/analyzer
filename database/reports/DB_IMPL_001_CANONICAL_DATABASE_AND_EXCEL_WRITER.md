@@ -93,3 +93,11 @@ Changed in this correction:
 - reply.md (temporary handoff only)
 
 No tests were run. No migration, real database, production workbook, or user data was touched. DB-IMPL-001 remains PARTIAL pending the owner-run test command above, historical Migration 9 lineage reconciliation, and approved production templates/mappings.
+
+## Consolidation update ? 2026-11-21
+
+The owner has since accepted the focused DB-IMPL-001 test set: 93 passed in the full run, followed by 1 passed in 1.11s for the corrected isolated case (94 successful tests, zero known failures). This is owner-run evidence and predates DB-CONSOLIDATION-002 changes. No tests were executed during that later implementation.
+
+Migration 10 (`market_fx_approval_scope_schema`) was added without rewriting Migration 9. Canonical approval rows now have exact scope JSON; fact provenance can retain the original source token. A shared resolver validates active approval reference, exact scope and uniqueness. Strict Decimal parsing is wired into canonical Excel/CSV inputs, and EXCHANGE_CENTER plus DB-level Jalali Market/FX uniqueness are supported by Migration 10. See `DB_CONSOLIDATION_002_IMPLEMENTATION.md` for exact grammar, tests and owner commands.
+
+Status remains PARTIAL: owner tests for the new changes are pending, production approvals and a verified real BANK workbook are unavailable (`excel/parsian_periodic.xlsx` is absent), Stage 5/6 still consume legacy interfaces, and the historical `codal_excel_source_metadata` Migration 9 implementation was not recovered from repository Git history. No actual database was opened or migrated.

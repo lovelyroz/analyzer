@@ -210,10 +210,10 @@ def test_derived_input_xor_is_enforced_but_sqlite_null_unique_gap_is_visible(db)
 def test_runner_empty_upgrade_repeated_upgrade_and_single_history_entries(tmp_path):
     empty_engine = create_engine(f"sqlite:///{tmp_path / 'empty.sqlite'}")
     runner = MigrationRunner(empty_engine)
-    assert runner.upgrade() == runner.upgrade() == 9
+    assert runner.upgrade() == runner.upgrade() == 10
     with empty_engine.connect() as c:
         versions = c.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all()
-    assert versions == list(range(1, 10))
+    assert versions == list(range(1, 11))
     empty_engine.dispose()
 
 
@@ -221,7 +221,7 @@ def test_runner_recognizes_legacy_baseline_without_losing_business_row(db):
     with db.begin() as c:
         c.execute(text("CREATE TABLE legacy_business (id INTEGER PRIMARY KEY, payload TEXT NOT NULL)"))
         c.execute(text("INSERT INTO legacy_business VALUES (1, 'keep')"))
-    assert MigrationRunner(db).upgrade() == 9
+    assert MigrationRunner(db).upgrade() == 10
     with db.connect() as c:
         assert c.execute(text("SELECT payload FROM legacy_business WHERE id=1")).scalar_one() == "keep"
         assert c.execute(text("SELECT name FROM schema_migrations WHERE version=1")).scalar_one() == "legacy_baseline"

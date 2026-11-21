@@ -68,6 +68,7 @@ def test_builds_immutable_instant_candidate_with_decimal_precision():
     assert candidate.source_value_kind.value == "PRESENT_TEXT"
     assert candidate.source_text == "12345678901234567890.1234567890123456789"
     assert candidate.source_workbook_sha256
+    assert candidate.source_token == "12345678901234567890.1234567890123456789"
     with pytest.raises(FrozenInstanceError):
         candidate.metric_id = "other"
 
@@ -133,8 +134,20 @@ def test_native_integer_is_exact_and_native_float_is_rejected():
     assert zero_candidate.source_native_integer == 0
     assert integer_candidate.source_text is None
 
-    with pytest.raises(CandidateValidationError, match="SOURCE_FLOAT_PRECISION_UNAVAILABLE"):
-        _build(value=0.1)
+    decimal_cell = _build(value=0.1)
+    assert decimal_cell.value == Decimal("0.1")
+    assert decimal_cell.source_token == "0.1"
+
+
+def test_persian_financial_text_is_normalized_and_token_is_retained():
+    candidate = _build(value="۱۲۳٬۴۵۶٫۷۸")
+    assert candidate.value == Decimal("123456.78")
+    assert candidate.source_token == "۱۲۳٬۴۵۶٫۷۸"
+
+
+def test_ambiguous_financial_text_is_rejected_with_stable_code():
+    with pytest.raises(CandidateValidationError, match="AMBIGUOUS_SEPARATOR"):
+        _build(value="۱,۲۳")
 
 
 def test_candidate_preserves_approval_refs_and_period_mapping_identity():

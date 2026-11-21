@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from openpyxl.utils.cell import coordinate_to_tuple, get_column_letter
 
 from src.core.jalali import validate_jalali_date
+from src.ingestion.approval_catalog import ApprovalResolutionError, resolve_approval
 from src.ingestion.canonical_admission import CanonicalPersistencePlan, PlannedFact, ValueOrigin
 from src.models.audit import IngestionRun
 from src.models.canonical import (
@@ -94,38 +95,8 @@ def _write_in_transaction(
     metadata: ReportWriteMetadata,
     ingestion_id: int | None,
 ) -> CanonicalWriteResult:
-    _validate_plan_envelope(plan, metadata)
-    if not plan.facts:
-        raise CanonicalWriteError("BATCH_EMPTY")
+    company_id, industry_code, template_approval_ref = resolve_plan_approvals(session, plan, metadata)
     first = plan.facts[0]
-    _check_approval(session, "extraction_standard", plan.extraction_standard_id, plan.extraction_standard_approval_ref)
-    if not isinstance(metadata.scenario_approval_ref, str) or not metadata.scenario_approval_ref.strip():
-        raise CanonicalWriteError("SCENARIO_APPROVAL_MISSING")
-    _check_approval(session, "scenario", metadata.scenario, metadata.scenario_approval_ref)
-    company_id = _resolve_binding(session, "company", first.company_id, _approval_ref(first, "company"))
-    if any(item.company_id != first.company_id or item.report_id != plan.report_id
-           or item.report_version_id != plan.report_version_id
-           or item.report_type_id != first.report_type_id
-           or item.source_identity != plan.source_identity
-           or item.revision_identity != plan.revision_identity
-           or item.source_artifact_sha256 != plan.source_artifact_sha256
-           or item.extraction_standard_id != plan.extraction_standard_id
-           or item.extraction_standard_approval_ref != plan.extraction_standard_approval_ref
-           for item in plan.facts):
-        raise CanonicalWriteError("PLAN_IDENTITY_MISMATCH")
-    company = session.get(Company, company_id)
-    if company is None:
-        raise CanonicalWriteError("COMPANY_NOT_FOUND")
-    industry = session.get(Industry, company.industry_id)
-    if industry is None or industry.industry_code != "BANK":
-        raise CanonicalWriteError("INDUSTRY_OUT_OF_SCOPE")
-    template_approval_refs = {
-        _validate_fact(session, fact, company_id, plan) for fact in plan.facts
-    }
-    if len(template_approval_refs) != 1:
-        raise CanonicalWriteError("TEMPLATE_VERSION_MISMATCH")
-    template_approval_ref = next(iter(template_approval_refs))
-    _validate_report_calendar(session, plan.facts, company_id, first.report_type_id)
 
     existing = session.scalar(select(CanonicalReportVersion).where(
         CanonicalReportVersion.external_version_id == plan.report_version_id
@@ -209,7 +180,10 @@ def _write_in_transaction(
     for fact in plan.facts:
         period = _get_or_create_period(session, fact, company_id)
         dimension_set = _get_or_create_dimensions(session, fact)
-        metric_id = _resolve_binding(session, "metric", fact.metric_id, _approval_ref(fact, "metric"))
+        metric_id = _resolve_binding(
+            session, "metric", fact.metric_id, _approval_ref(fact, "metric"),
+            {"industry_code": industry_code},
+        )
         metric = session.get(FinancialMetric, metric_id)
         if metric is None:
             raise CanonicalWriteError("METRIC_NOT_FOUND")
@@ -243,6 +217,7 @@ def _write_in_transaction(
             source_coordinate=fact.source_coordinate, source_value_kind=fact.source_value_kind,
             extraction_owner=fact.extraction_owner,
             source_decimal_text=format(fact.source_value_decimal, "f"),
+            source_token=fact.source_token,
             approval_references_json=refs_json,
         ))
         inserted += 1
@@ -251,6 +226,56 @@ def _write_in_transaction(
     assert ingestion_id is not None
     return CanonicalWriteResult(ingestion_id, version.canonical_report_version_id,
                                 inserted, plan.duplicate_count)
+
+
+def resolve_plan_approvals(
+    session: Session,
+    plan: CanonicalPersistencePlan,
+    metadata: ReportWriteMetadata,
+) -> tuple[int, str, str]:
+    """Shared approval boundary used by the Excel adapter and transactional writer."""
+    _validate_plan_envelope(plan, metadata)
+    if not plan.facts:
+        raise CanonicalWriteError("BATCH_EMPTY")
+    first = plan.facts[0]
+    company_binding = _active_binding(session, "company", first.company_id)
+    if company_binding is None or company_binding.approval_ref != _approval_ref(first, "company"):
+        raise CanonicalWriteError("IDENTITY_BINDING_NOT_RESOLVED")
+    company_id = company_binding.internal_id
+    if any(item.company_id != first.company_id or item.report_id != plan.report_id
+           or item.report_version_id != plan.report_version_id
+           or item.report_type_id != first.report_type_id
+           or item.source_identity != plan.source_identity
+           or item.revision_identity != plan.revision_identity
+           or item.source_artifact_sha256 != plan.source_artifact_sha256
+           or item.extraction_standard_id != plan.extraction_standard_id
+           or item.extraction_standard_approval_ref != plan.extraction_standard_approval_ref
+           for item in plan.facts):
+        raise CanonicalWriteError("PLAN_IDENTITY_MISMATCH")
+    company = session.get(Company, company_id)
+    if company is None:
+        raise CanonicalWriteError("COMPANY_NOT_FOUND")
+    industry = session.get(Industry, company.industry_id)
+    if industry is None or industry.industry_code != "BANK":
+        raise CanonicalWriteError("INDUSTRY_OUT_OF_SCOPE")
+    _check_approval(session, "company", first.company_id, company_binding.approval_ref,
+                    scope={"industry_code": industry.industry_code})
+    industry_binding = _active_binding(session, "industry", industry.industry_code)
+    if industry_binding is None or industry_binding.internal_id != industry.industry_id:
+        raise CanonicalWriteError("INDUSTRY_BINDING_NOT_RESOLVED")
+    _check_approval(session, "industry", industry.industry_code, industry_binding.approval_ref, scope={})
+    _check_approval(session, "scenario", metadata.scenario, metadata.scenario_approval_ref, scope={})
+    _check_approval(session, "extraction_standard", plan.extraction_standard_id,
+                    plan.extraction_standard_approval_ref,
+                    scope={"industry_code": industry.industry_code, "report_type_id": first.report_type_id})
+    template_approval_refs = {
+        _validate_fact(session, fact, company_id, plan, industry.industry_code) for fact in plan.facts
+    }
+    if len(template_approval_refs) != 1:
+        raise CanonicalWriteError("TEMPLATE_VERSION_MISMATCH")
+    template_approval_ref = next(iter(template_approval_refs))
+    _validate_report_calendar(session, plan.facts, company_id, first.report_type_id, industry.industry_code)
+    return company_id, industry.industry_code, template_approval_ref
 
 
 def ingest_excel_source(
@@ -272,14 +297,22 @@ def ingest_excel_source(
         session.add(run)
         session.commit()
         ingestion_id = run.ingestion_id
+
+    def validate_approvals(plan: CanonicalPersistencePlan) -> None:
+        with session_factory() as validation_session:
+            with validation_session.begin():
+                resolve_plan_approvals(validation_session, plan, metadata)
+
     try:
         adapted = adapt_excel_source(
             source, template=template, selections_by_coordinate=selections_by_coordinate,
-            admit=True, revision=revision, **adapter_options,
+            admit=True, revision=revision, approval_validator=validate_approvals,
+            **adapter_options,
         )
         if adapted.diagnostics or adapted.admission_plan is None:
-            _mark_failed(session_factory, ingestion_id, "EXCEL_ADMISSION_REJECTED", len(adapted.submissions))
-            raise CanonicalWriteError("EXCEL_ADMISSION_REJECTED")
+            failure_code = adapted.diagnostics[0].code if adapted.diagnostics else "EXCEL_ADMISSION_REJECTED"
+            _mark_failed(session_factory, ingestion_id, failure_code, max(1, len(adapted.submissions)))
+            raise CanonicalWriteError(failure_code)
         with session_factory() as session:
             with session.begin():
                 audit = session.get(IngestionRun, ingestion_id)
@@ -307,6 +340,8 @@ def _validate_plan_envelope(plan: CanonicalPersistencePlan, metadata: ReportWrit
         raise CanonicalWriteError("REPORT_VERSION_FLAGS_INVALID")
     if not isinstance(metadata.scenario, str) or metadata.scenario not in {"ACTUAL", "FORECAST", "PLAN"}:
         raise CanonicalWriteError("SCENARIO_INVALID")
+    if not isinstance(metadata.scenario_approval_ref, str) or not metadata.scenario_approval_ref.strip():
+        raise CanonicalWriteError("SCENARIO_APPROVAL_MISSING")
     if (not isinstance(plan.report_id, str) or not plan.report_id.strip()
             or not isinstance(plan.report_version_id, str) or not plan.report_version_id.strip()
             or not isinstance(plan.facts, tuple) or not plan.facts):
@@ -352,7 +387,8 @@ def _validate_plan_envelope(plan: CanonicalPersistencePlan, metadata: ReportWrit
     _normalize_datetime(metadata.publication_datetime)
 
 
-def _validate_fact(session: Session, fact: PlannedFact, company_id: int, plan: CanonicalPersistencePlan) -> str:
+def _validate_fact(session: Session, fact: PlannedFact, company_id: int, plan: CanonicalPersistencePlan,
+                   industry_code: str) -> str:
     if not isinstance(fact.value_origin, ValueOrigin):
         raise CanonicalWriteError("VALUE_ORIGIN_INVALID")
     kind, start, end = fact.period_identity
@@ -367,7 +403,8 @@ def _validate_fact(session: Session, fact: PlannedFact, company_id: int, plan: C
         raise CanonicalWriteError("PERIOD_INVALID")
     if kind == "DURATION" and fact.duration_basis not in {"YTD", "STANDALONE"}:
         raise CanonicalWriteError("DURATION_BASIS_INVALID")
-    metric_id = _resolve_binding(session, "metric", fact.metric_id, _approval_ref(fact, "metric"))
+    metric_scope = {"industry_code": industry_code}
+    metric_id = _resolve_binding(session, "metric", fact.metric_id, _approval_ref(fact, "metric"), metric_scope)
     metric = session.get(FinancialMetric, metric_id)
     if metric is None:
         raise CanonicalWriteError("METRIC_NOT_FOUND")
@@ -409,7 +446,9 @@ def _validate_fact(session: Session, fact: PlannedFact, company_id: int, plan: C
     elif fact.source_value_kind not in {"PRESENT_TEXT", "PRESENT_NUMBER"}:
         raise CanonicalWriteError("SOURCE_VALUE_KIND_INVALID")
     for approval_kind, identity, ref in fact.approval_references:
-        _check_approval(session, _APPROVAL_KIND_ALIASES.get(approval_kind, approval_kind), identity, ref)
+        resolved_kind = _APPROVAL_KIND_ALIASES.get(approval_kind, approval_kind)
+        _check_approval(session, resolved_kind, identity, ref,
+                        scope=_approval_scope(fact, resolved_kind, industry_code, identity=identity))
     template_approval_ref = _template_approval_ref(session, fact)
     if fact.extraction_standard_id != plan.extraction_standard_id:
         raise CanonicalWriteError("EXTRACTION_STANDARD_MISMATCH")
@@ -423,41 +462,77 @@ def _approval_ref(fact: PlannedFact, kind: str) -> str:
     raise CanonicalWriteError("APPROVAL_REFERENCE_MISSING")
 
 
-def _check_approval(session: Session, kind: str, identity: str, ref: str | None) -> None:
-    query = select(CanonicalApproval).where(
-        CanonicalApproval.approval_kind == kind,
-        CanonicalApproval.external_identity == identity,
-        CanonicalApproval.is_active.is_(True),
-    )
-    if ref is not None:
-        query = query.where(CanonicalApproval.approval_ref == ref)
-    if session.scalar(query.limit(1)) is None:
-        raise CanonicalWriteError("APPROVAL_NOT_RESOLVED")
+def _approval_scope(fact: PlannedFact, kind: str, industry_code: str,
+                    *, identity: str | None = None) -> dict[str, str]:
+    scopes: dict[str, dict[str, str]] = {
+        "company": {"industry_code": industry_code},
+        "report_type": {"company_id": fact.company_id},
+        "report_version": {"company_id": fact.company_id, "report_type_id": fact.report_type_id},
+        "metric": {"industry_code": industry_code},
+        "source_unit": {"metric_id": fact.metric_id},
+        "source_currency": {"metric_id": fact.metric_id},
+        "source_scale": {"metric_id": fact.metric_id},
+        "period_mapping": {"report_type_id": fact.report_type_id,
+                           "temporal_type": fact.period_identity[0],
+                           "duration_basis": fact.duration_basis or "INSTANT"},
+        "source_label": {"report_type_id": fact.report_type_id,
+                         "template_id": fact.template_id, "template_version": fact.template_version,
+                         "template_sha256": fact.template_sha256.lower()},
+        "source_header": {"report_type_id": fact.report_type_id,
+                          "template_id": fact.template_id, "template_version": fact.template_version,
+                          "template_sha256": fact.template_sha256.lower()},
+        "dimension": {"company_id": fact.company_id, "report_type_id": fact.report_type_id},
+        "other_metric_rule": {"report_type_id": fact.report_type_id, "metric_id": fact.metric_id},
+        "zero_fallback_rule": {"report_type_id": fact.report_type_id, "metric_id": fact.metric_id},
+    }
+    if kind == "dimension_value":
+        dimensions = [dimension for dimension, value in fact.dimensions
+                      if value == identity]
+        if len(dimensions) != 1:
+            raise CanonicalWriteError("APPROVAL_SCOPE_AMBIGUOUS")
+        scopes[kind] = {"company_id": fact.company_id, "report_type_id": fact.report_type_id,
+                        "dimension_id": dimensions[0]}
+    if kind not in scopes:
+        raise CanonicalWriteError("APPROVAL_SCOPE_KIND_UNSUPPORTED")
+    return scopes[kind]
+
+
+def _check_approval(session: Session, kind: str, identity: str, ref: str | None,
+                    *, scope: Mapping[str, str] | None = None) -> CanonicalApproval:
+    try:
+        return resolve_approval(session, approval_kind=kind, external_identity=identity,
+                                approval_ref=ref, expected_scope=scope)
+    except ApprovalResolutionError as exc:
+        raise CanonicalWriteError(exc.code) from exc
 
 
 def _template_approval_ref(session: Session, fact: PlannedFact) -> str:
-    rows = session.scalars(select(CanonicalApproval).where(
-        CanonicalApproval.approval_kind == "template",
-        CanonicalApproval.external_identity == f"{fact.template_id}:{fact.template_version}:{fact.template_sha256}",
-        CanonicalApproval.is_active.is_(True),
-    ).limit(2)).all()
-    if not rows:
-        raise CanonicalWriteError("APPROVAL_NOT_RESOLVED")
-    if len(rows) != 1:
-        raise CanonicalWriteError("TEMPLATE_APPROVAL_AMBIGUOUS")
-    return rows[0].approval_ref
+    row = _check_approval(
+        session, "template", f"{fact.template_id}:{fact.template_version}:{fact.template_sha256}", None,
+        scope={"company_id": fact.company_id, "report_type_id": fact.report_type_id,
+               "template_id": fact.template_id, "template_version": fact.template_version,
+               "template_sha256": fact.template_sha256.lower()},
+    )
+    return row.approval_ref
 
 
-def _resolve_binding(session: Session, kind: str, external_identity: str, approval_ref: str) -> int:
-    binding = session.scalar(select(CanonicalIdentityBinding).where(
+def _active_binding(session: Session, kind: str, external_identity: str) -> CanonicalIdentityBinding | None:
+    return session.scalar(select(CanonicalIdentityBinding).where(
         CanonicalIdentityBinding.identity_kind == kind,
         CanonicalIdentityBinding.external_identity == external_identity,
-        CanonicalIdentityBinding.approval_ref == approval_ref,
         CanonicalIdentityBinding.is_active.is_(True),
     ))
+
+
+def _resolve_binding(session: Session, kind: str, external_identity: str, approval_ref: str,
+                     scope: Mapping[str, str]) -> int:
+    binding = _active_binding(session, kind, external_identity)
+    if binding is not None and binding.approval_ref == approval_ref:
+        _check_approval(session, kind, external_identity, approval_ref, scope=scope)
     if binding is None:
         raise CanonicalWriteError("IDENTITY_BINDING_NOT_RESOLVED")
-    _check_approval(session, kind, external_identity, approval_ref)
+    if binding.approval_ref != approval_ref:
+        raise CanonicalWriteError("IDENTITY_BINDING_NOT_RESOLVED")
     return binding.internal_id
 
 
@@ -466,6 +541,7 @@ def _validate_report_calendar(
     facts: tuple[PlannedFact, ...],
     company_id: int,
     report_type_id: str,
+    industry_code: str,
 ) -> None:
     # The 3/6/9/12-month cumulative rule is specific to the reviewed BANK
     # PERIODIC_FINANCIAL standard. MONTHLY_ACTIVITY has a separate standard;
@@ -485,7 +561,7 @@ def _validate_report_calendar(
         _check_approval(
             session, "fiscal_year_start_month",
             f"{company_external_id}:{calendar.fiscal_year_start_month}",
-            calendar.approval_ref,
+            calendar.approval_ref, scope={"company_id": company_external_id, "industry_code": industry_code},
         )
         # Owner-approved company calendar contract: month is explicit and
         # fiscal year starts on day 1 of that Jalali month.
@@ -611,7 +687,7 @@ def _matches_existing_facts(session: Session, rows: list[CanonicalFinancialFact]
             return False
         provenance = session.scalar(select(CanonicalFactProvenance).where(CanonicalFactProvenance.fact_id == row.fact_id))
         refs_json = json.dumps(fact.approval_references, ensure_ascii=False, separators=(",", ":"))
-        if provenance is None or provenance.source_identity != fact.source_identity or provenance.revision_identity != fact.revision_identity or provenance.source_artifact_sha256 != fact.source_artifact_sha256.lower() or provenance.worksheet_ordinal != fact.worksheet_ordinal or provenance.worksheet_name != fact.worksheet_name or provenance.source_coordinate != fact.source_coordinate or provenance.source_value_kind != fact.source_value_kind or provenance.source_decimal_text != format(fact.source_value_decimal, "f") or provenance.approval_references_json != refs_json:
+        if provenance is None or provenance.source_identity != fact.source_identity or provenance.revision_identity != fact.revision_identity or provenance.source_artifact_sha256 != fact.source_artifact_sha256.lower() or provenance.worksheet_ordinal != fact.worksheet_ordinal or provenance.worksheet_name != fact.worksheet_name or provenance.source_coordinate != fact.source_coordinate or provenance.source_value_kind != fact.source_value_kind or provenance.source_decimal_text != format(fact.source_value_decimal, "f") or provenance.source_token != fact.source_token or provenance.approval_references_json != refs_json:
             return False
     return True
 

@@ -23,6 +23,7 @@ class CanonicalApproval(Base):
     approval_ref = Column(String(200), nullable=False, unique=True)
     approval_kind = Column(String(40), nullable=False)
     external_identity = Column(String(200), nullable=False)
+    scope_json = Column(Text, nullable=False, default="{}")
     is_active = Column(Boolean, nullable=False, default=True)
     __table_args__ = (UniqueConstraint("approval_kind", "external_identity", "approval_ref", name="uq_canonical_approval_identity"),)
 
@@ -179,5 +180,6 @@ class CanonicalFactProvenance(Base):
     source_value_kind = Column(String(20), nullable=False)
     extraction_owner = Column(String(200), nullable=False)
     source_decimal_text = Column(Text, nullable=False)
+    source_token = Column(Text, nullable=True)
     approval_references_json = Column(Text, nullable=False)
 

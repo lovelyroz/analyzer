@@ -287,6 +287,7 @@ class CellObservation:
     data_type: str
     text_value: str | None = None
     numeric_value: int | float | None = None
+    numeric_lexical: str | None = None
     unexpected_value: ScalarValue = None
     number_format: str | None = None
     style_id: int | None = None
@@ -312,6 +313,10 @@ class CellObservation:
                 raise ValueError("PRESENT_NUMBER cells must retain a literal int or float value.")
         elif self.numeric_value is not None:
             raise ValueError("Only PRESENT_NUMBER cells may carry numeric_value.")
+        if self.numeric_lexical is not None and (
+            self.value_kind is not CellValueKind.PRESENT_NUMBER or not isinstance(self.numeric_lexical, str)
+        ):
+            raise ValueError("numeric_lexical is only valid on PRESENT_NUMBER cells.")
         if self.value_kind in (CellValueKind.PRESENT_TEXT, CellValueKind.PRESENT_NUMBER, CellValueKind.BLANK) and self.unexpected_value is not None:
             raise ValueError("Present literal and blank cells cannot carry unexpected_value.")
         if self.value_kind is CellValueKind.UNEXPECTED_NON_TEXT and self.unexpected_value is None:

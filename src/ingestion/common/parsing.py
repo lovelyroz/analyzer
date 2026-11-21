@@ -6,15 +6,12 @@ from decimal import Decimal
 from typing import Optional, Tuple
 
 from src.core.jalali import is_valid_jalali_components
+from src.ingestion.common.financial_numbers import parse_financial_number
 
 
 def to_decimal(raw: Optional[str]) -> Optional[Decimal]:
-    if raw is None or str(raw).strip() == "":
-        return None
-    try:
-        return Decimal(str(raw).strip().replace(",", ""))
-    except Exception:
-        return None
+    parsed = parse_financial_number(raw, source_kind="TEXT")
+    return parsed.value
 
 
 def to_int(raw: Optional[str]) -> Optional[int]:

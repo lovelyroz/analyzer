@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Numeric, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, Integer, String, Date, Numeric, UniqueConstraint, CheckConstraint, Index, text
 from src.core.database import Base
 
 
@@ -21,7 +21,7 @@ class FXRate(Base):
     __table_args__ = (
         UniqueConstraint("rate_date", "currency_from", "currency_to", "rate_type", name="uq_fx_rate"),
         CheckConstraint(
-            "rate_type IN ('FREE_MARKET','OPERATIONAL','OFFICIAL','ESTIMATED','MANUAL_OPERATOR')",
+            "rate_type IN ('FREE_MARKET','EXCHANGE_CENTER','OPERATIONAL','OFFICIAL','ESTIMATED','MANUAL_OPERATOR')",
             name="chk_fx_rate_type",
         ),
         CheckConstraint(
@@ -32,6 +32,14 @@ class FXRate(Base):
             "jalali_day IS NULL OR (jalali_day >= 1 AND jalali_day <= 31)",
             name="chk_fx_jalali_day",
         ),
+        CheckConstraint(
+            "(jalali_year IS NULL AND jalali_month IS NULL AND jalali_day IS NULL) OR "
+            "(jalali_year IS NOT NULL AND jalali_month IS NOT NULL AND jalali_day IS NOT NULL)",
+            name="chk_fx_jalali_identity_complete",
+        ),
+        Index("uq_fx_jalali_identity", "jalali_year", "jalali_month", "jalali_day",
+              "currency_from", "currency_to", "rate_type", unique=True,
+              sqlite_where=text("jalali_year IS NOT NULL AND jalali_month IS NOT NULL AND jalali_day IS NOT NULL")),
     )
 
 
@@ -50,7 +58,7 @@ class FXConversionRule(Base):
             name="chk_fx_metric_type",
         ),
         CheckConstraint(
-            "rate_type IN ('FREE_MARKET','OPERATIONAL','OFFICIAL','ESTIMATED','MANUAL_OPERATOR')",
+            "rate_type IN ('FREE_MARKET','EXCHANGE_CENTER','OPERATIONAL','OFFICIAL','ESTIMATED','MANUAL_OPERATOR')",
             name="chk_fx_rule_rate_type",
         ),
     )

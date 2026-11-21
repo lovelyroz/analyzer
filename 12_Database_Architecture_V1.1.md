@@ -13,7 +13,7 @@ All supporting database-design documents, audit reports, working checklists, dic
 
 **ORM:** SQLAlchemy
 
-**Schema migration version:** 8
+**Architecture reference schema version:** 8 (historical contract baseline; repository runner now defines migrations through version 10)
 
 This document is reopened for review. The decisions explicitly recorded as reviewed/approved below are the current working contract; sections not yet audited remain provisional. Earlier V1 / V1.1 / V1.2 references are historical context and do not override the decisions recorded here. The database stores selected canonical financial inputs and minimal provenance, not raw financial statement rows; backend services own runtime calculations and analytical outputs. This contract supports Stages 2–9 without persisting calculated analytical results.
 
@@ -903,8 +903,9 @@ The repository migration runner currently reaches schema version **9**. Migratio
 | 7 | `forecast_version_repository` |
 | 8 | `remove_forecast_output_persistence` |
 | 9 | `canonical_jalali_excel_writer` |
+| 10 | `market_fx_approval_scope_schema` |
 
-Migrations are ordered and idempotent. Existing source values must not be silently rewritten. Migration 9 is additive and preserves legacy Gregorian period/fact tables; it adds a separate Jalali-native canonical store, approval/binding registries, and an explicit company fiscal-calendar table. Its runner refuses a conflicting historical v9 ledger name. It has not been applied to any real database, and the historical `codal_excel_source_metadata` lineage remains unresolved. Migration 8's removal of forecast-output persistence is consistent with the runtime-only analytical-output policy.
+Migrations are ordered and idempotent. Existing source values must not be silently rewritten. Migration 9 is additive and preserves legacy Gregorian period/fact tables; Migration 10 adds scoped canonical approvals, original source-token provenance, EXCHANGE_CENTER constraint support, and partial Jalali natural-key uniqueness after duplicate preflight; it adds a separate Jalali-native canonical store, approval/binding registries, and an explicit company fiscal-calendar table. Its runner refuses a conflicting historical v9 ledger name. It has not been applied to any real database, and the historical `codal_excel_source_metadata` lineage remains unresolved. Migration 8's removal of forecast-output persistence is consistent with the runtime-only analytical-output policy.
 
 ### DB-IMPL-001 — canonical BANK Excel persistence implementation (2026-11-21)
 

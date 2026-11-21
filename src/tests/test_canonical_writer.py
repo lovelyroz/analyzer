@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from hashlib import sha256
 from io import BytesIO
+import json
 
 import pytest
 from sqlalchemy import create_engine, event, inspect, select, text
@@ -48,7 +49,7 @@ def db(tmp_path):
     def enable_foreign_keys(connection, _record):
         connection.execute("PRAGMA foreign_keys=ON")
 
-    assert MigrationRunner(engine).upgrade() == 9
+    assert MigrationRunner(engine).upgrade() == 10
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory.begin() as session:
         industry = Industry(industry_code="BANK", industry_name="Bank")
@@ -61,6 +62,7 @@ def db(tmp_path):
         fiscal_approval = CanonicalApproval(
             approval_kind="fiscal_year_start_month", external_identity="company-1:1",
             approval_ref="approval-fiscal-start-1", is_active=True,
+            scope_json=json.dumps({"company_id": "company-1", "industry_code": "BANK"}, sort_keys=True, separators=(",", ":")),
         )
         session.add(fiscal_approval)
         session.flush()
@@ -81,10 +83,13 @@ def db(tmp_path):
                 continue
             seeded_approvals.add((kind, identity, ref))
             session.add(CanonicalApproval(approval_kind=kind, external_identity=identity,
-                                          approval_ref=ref, is_active=True))
+                                          approval_ref=ref, is_active=True,
+                                          scope_json=json.dumps(_approval_scope(kind, "PERIODIC_FINANCIAL", identity), sort_keys=True, separators=(",", ":"))))
         session.add_all([
             CanonicalIdentityBinding(identity_kind="company", external_identity="company-1",
                                      internal_id=company.company_id, approval_ref="approval-company", is_active=True),
+            CanonicalIdentityBinding(identity_kind="industry", external_identity="BANK",
+                                     internal_id=industry.industry_id, approval_ref="approval-industry", is_active=True),
             CanonicalIdentityBinding(identity_kind="metric", external_identity="metric-sales",
                                      internal_id=metric.metric_id, approval_ref="approval-metric", is_active=True),
         ])
@@ -93,24 +98,45 @@ def db(tmp_path):
 
 
 def _approval_rows(version="version-1", report_type_id="PERIODIC_FINANCIAL"):
+    suffix = "" if report_type_id == "PERIODIC_FINANCIAL" else f"-{report_type_id.lower()}"
     rows = [
         ("company", "company-1", "approval-company"),
+        ("industry", "BANK", "approval-industry"),
         ("report_type", report_type_id, "approval-report-type" if report_type_id == "PERIODIC_FINANCIAL" else f"approval-report-type-{report_type_id.lower()}"),
-        ("report_version", version, f"approval-{version}"),
+        ("report_version", version, f"approval-{version}{suffix}"),
         ("metric", "metric-sales", "approval-metric"),
         ("source_unit", "unit-rial", "approval-unit"),
         ("source_currency", "currency-irr", "approval-currency"),
         ("source_scale", "scale-unit", "approval-scale"),
-        ("period_mapping", "period-map-q1", "approval-period"),
-        ("source_label", "label-sales", "approval-label-sales"),
-        ("source_header", "header-current", "approval-header-current"),
-        ("extraction_standard", "standard-v1", "approval-standard-v1"),
-        ("template", "template-fixture:1:" + "b" * 64, "approval-template"),
+        ("period_mapping", "period-map-q1", f"approval-period{suffix}"),
+        ("source_label", "label-sales", f"approval-label-sales{suffix}"),
+        ("source_header", "header-current", f"approval-header-current{suffix}"),
+        ("extraction_standard", "standard-v1", f"approval-standard-v1{suffix}"),
+        ("template", "template-fixture:1:" + "b" * 64, f"approval-template{suffix}"),
     ]
     return rows
 
 
+def _approval_scope(kind, report_type_id, identity=None):
+    return {
+        "company": {"industry_code": "BANK"},
+        "industry": {},
+        "report_type": {"company_id": "company-1"},
+        "report_version": {"company_id": "company-1", "report_type_id": report_type_id, "report_version_id": identity or "version-1"},
+        "metric": {"industry_code": "BANK"},
+        "source_unit": {"metric_id": "metric-sales"},
+        "source_currency": {"metric_id": "metric-sales"},
+        "source_scale": {"metric_id": "metric-sales"},
+        "period_mapping": {"report_type_id": report_type_id, "temporal_type": "DURATION", "duration_basis": "YTD"},
+        "source_label": {"report_type_id": report_type_id, "template_id": "template-fixture", "template_version": "1", "template_sha256": "b" * 64},
+        "source_header": {"report_type_id": report_type_id, "template_id": "template-fixture", "template_version": "1", "template_sha256": "b" * 64},
+        "extraction_standard": {"industry_code": "BANK", "report_type_id": report_type_id},
+        "template": {"company_id": "company-1", "report_type_id": report_type_id, "template_id": "template-fixture", "template_version": "1", "template_sha256": "b" * 64},
+    }.get(kind, {})
+
+
 def _plan(*, version="version-1", source_revision="revision-1", amount=12, supersedes=None, report_type_id="PERIODIC_FINANCIAL", period_identity=("DURATION", (1404, 1, 1), (1404, 3, 31))):
+    standard_ref = "approval-standard-v1" if report_type_id == "PERIODIC_FINANCIAL" else f"approval-standard-v1-{report_type_id.lower()}"
     fact = PlannedFact(
         company_id="company-1", report_type_id=report_type_id, report_id="report-1",
         report_version_id=version,
@@ -119,7 +145,7 @@ def _plan(*, version="version-1", source_revision="revision-1", amount=12, super
         value_integer=amount, value_origin=ValueOrigin.SOURCE_REPORTED,
         source_unit="unit-rial", source_currency="currency-irr", source_scale="scale-unit",
         duration_basis="YTD", extraction_standard_id="standard-v1",
-        extraction_standard_approval_ref="approval-standard-v1", source_identity="source-1",
+        extraction_standard_approval_ref=standard_ref, source_identity="source-1",
         revision_identity=source_revision, source_artifact_sha256="a" * 64,
         template_id="template-fixture", template_version="1", template_sha256="b" * 64,
         extraction_owner="test-table", approval_references=tuple([
@@ -133,7 +159,7 @@ def _plan(*, version="version-1", source_revision="revision-1", amount=12, super
         report_id="report-1", report_version_id=version,
         source_identity="source-1", revision_identity=source_revision,
         source_artifact_sha256="a" * 64, extraction_standard_id="standard-v1",
-        extraction_standard_approval_ref="approval-standard-v1", supersedes_version_id=supersedes,
+        extraction_standard_approval_ref=standard_ref, supersedes_version_id=supersedes,
         facts=(fact,), duplicate_count=0, unchanged_existing_count=0,
         preserved_report_version_ids=(), execution_allowed=True,
         physical_persistence_compatible=True, persistence_block_code=None,
@@ -173,6 +199,9 @@ def test_synthetic_xlsx_runs_reader_match_admission_writer_and_readback(db):
             approval_kind="template",
             external_identity=f"{template.template_id}:{template.version}:{template.template_sha256}",
             approval_ref="approval-template-e2e", is_active=True,
+            scope_json=json.dumps({"company_id": "company-1", "report_type_id": "PERIODIC_FINANCIAL",
+                                   "template_id": template.template_id, "template_version": template.version,
+                                   "template_sha256": template.template_sha256}, sort_keys=True, separators=(",", ":")),
         ))
 
     def approved(identity, reference):
@@ -221,12 +250,12 @@ def test_synthetic_xlsx_runs_reader_match_admission_writer_and_readback(db):
         assert (audit.records_accepted, audit.records_duplicate, audit.records_rejected) == (1, 0, 0)
 
 
-def test_migration_nine_is_repeatable_and_preserves_supported_legacy_rows(db):
+def test_migration_ten_is_repeatable_and_preserves_supported_legacy_rows(db):
     engine, _factory = db
     with engine.begin() as connection:
         connection.execute(text("CREATE TABLE preserved_legacy (id INTEGER PRIMARY KEY, value TEXT NOT NULL)"))
         connection.execute(text("INSERT INTO preserved_legacy VALUES (1, 'keep')"))
-    assert MigrationRunner(engine).upgrade() == 9
+    assert MigrationRunner(engine).upgrade() == 10
     with engine.connect() as connection:
         assert connection.execute(text("SELECT value FROM preserved_legacy WHERE id=1")).scalar_one() == "keep"
         assert connection.execute(text("SELECT COUNT(*) FROM schema_migrations WHERE version=9")).scalar_one() == 1
@@ -241,7 +270,7 @@ def test_supported_v8_database_receives_additive_migration_nine(monkeypatch, tmp
         connection.execute(text("CREATE TABLE legacy_sentinel (id INTEGER PRIMARY KEY, payload TEXT NOT NULL)"))
         connection.execute(text("INSERT INTO legacy_sentinel VALUES (1, 'preserve')"))
     monkeypatch.setattr(migration_runner, "_migration_list", lambda: migrations)
-    assert MigrationRunner(engine).upgrade() == 9
+    assert MigrationRunner(engine).upgrade() == 10
     with engine.connect() as connection:
         assert connection.execute(text("SELECT payload FROM legacy_sentinel WHERE id=1")).scalar_one() == "preserve"
         assert connection.execute(text("SELECT COUNT(*) FROM schema_migrations WHERE version=9")).scalar_one() == 1
@@ -278,6 +307,70 @@ def test_migration_nine_refuses_a_historical_conflicting_version_name(tmp_path):
         MigrationRunner(engine).upgrade()
     with engine.connect() as connection:
         assert connection.execute(text("SELECT name FROM schema_migrations WHERE version=9")).scalar_one() == "codal_excel_source_metadata"
+    engine.dispose()
+
+
+def test_migration_ten_adds_jalali_keys_scope_and_source_token_and_is_idempotent(db):
+    engine, _factory = db
+    with engine.connect() as connection:
+        indexes = {item["name"] for item in inspect(engine).get_indexes("market_daily")}
+        fx_indexes = {item["name"] for item in inspect(engine).get_indexes("fx_rates")}
+        approval_columns = {item["name"] for item in inspect(engine).get_columns("canonical_approvals")}
+        provenance_columns = {item["name"] for item in inspect(engine).get_columns("canonical_fact_provenance")}
+        versions = connection.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all()
+    assert "uq_market_daily_jalali_identity" in indexes
+    assert "uq_fx_jalali_identity" in fx_indexes
+    assert "scope_json" in approval_columns and "source_token" in provenance_columns
+    assert versions == list(range(1, 11))
+    assert MigrationRunner(engine).upgrade() == 10
+
+
+@pytest.mark.parametrize("table_name,drop_index,insert_sql", [
+    ("market_daily", "uq_market_daily_jalali_identity",
+     "INSERT INTO market_daily (company_id,jalali_year,jalali_month,jalali_day) VALUES (1,1404,1,1),(1,1404,1,1)"),
+    ("fx_rates", "uq_fx_jalali_identity",
+     "INSERT INTO fx_rates (jalali_year,jalali_month,jalali_day,currency_from,currency_to,rate,rate_type) "
+     "VALUES (1404,1,1,'USD','IRR',100,'FREE_MARKET'),(1404,1,1,'USD','IRR',101,'FREE_MARKET')"),
+])
+def test_migration_ten_duplicate_preflight_rolls_back_and_preserves_rows(
+    monkeypatch, tmp_path, table_name, drop_index, insert_sql,
+):
+    engine = create_engine(f"sqlite:///{tmp_path / (table_name + '-duplicate.sqlite')}")
+    migrations = tuple(migration_runner._migration_list())
+    monkeypatch.setattr(migration_runner, "_migration_list", lambda: migrations[:9])
+    assert MigrationRunner(engine).upgrade() == 9
+    if table_name == "market_daily":
+        with engine.begin() as connection:
+            connection.execute(text("INSERT INTO industries (industry_code,industry_name) VALUES ('BANK','Bank')"))
+            connection.execute(text("INSERT INTO companies (ticker,company_name,industry_id) VALUES ('DUP','Duplicate',1)"))
+    with engine.begin() as connection:
+        connection.execute(text(f'DROP INDEX "{drop_index}"'))
+        connection.execute(text(insert_sql))
+    monkeypatch.setattr(migration_runner, "_migration_list", lambda: migrations)
+    with pytest.raises(RuntimeError, match="duplicate MarketDaily or FX natural keys"):
+        MigrationRunner(engine).upgrade()
+    with engine.connect() as connection:
+        assert connection.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar_one() == 2
+        assert connection.execute(text("SELECT COUNT(*) FROM schema_migrations WHERE version=10")).scalar_one() == 0
+    assert drop_index not in {item["name"] for item in inspect(engine).get_indexes(table_name)}
+    engine.dispose()
+
+
+def test_migration_ten_refuses_a_reserved_temporary_table_without_dropping_it(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'reserved-name.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(text(
+            "CREATE TABLE fx_rates (fx_rate_id INTEGER PRIMARY KEY, rate_type TEXT NOT NULL, "
+            "CONSTRAINT chk_fx_rate_type CHECK (rate_type IN ('FREE_MARKET','OPERATIONAL','OFFICIAL','ESTIMATED','MANUAL_OPERATOR')))"
+        ))
+        connection.execute(text("INSERT INTO fx_rates VALUES (1,'FREE_MARKET')"))
+        connection.execute(text("CREATE TABLE fx_rates__migration10 (payload TEXT NOT NULL)"))
+        connection.execute(text("INSERT INTO fx_rates__migration10 VALUES ('preserve')"))
+    with engine.connect() as connection:
+        with pytest.raises(RuntimeError, match="reserved temporary name"):
+            migration_runner._sqlite_rebuild_rate_type_check(connection, "fx_rates")
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT payload FROM fx_rates__migration10")).scalar_one() == "preserve"
     engine.dispose()
 
 
@@ -326,10 +419,16 @@ def test_writer_rejects_impossible_jalali_date_without_partial_rows(db):
 def test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment(db):
     _engine, factory = db
     with factory.begin() as session:
-        session.add(CanonicalApproval(
-            approval_kind="report_type", external_identity="MONTHLY_ACTIVITY",
-            approval_ref="approval-report-type-monthly_activity", is_active=True,
-        ))
+        shared_kinds = {"company", "industry", "metric", "source_unit", "source_currency", "source_scale"}
+        for kind, identity, reference in _approval_rows("version-1", "MONTHLY_ACTIVITY"):
+            if kind in shared_kinds:
+                continue
+            session.add(CanonicalApproval(
+                approval_kind=kind, external_identity=identity, approval_ref=reference,
+                is_active=True,
+                scope_json=json.dumps(_approval_scope(kind, "MONTHLY_ACTIVITY", identity),
+                                      sort_keys=True, separators=(",", ":")),
+            ))
     plan = _plan(
         report_type_id="MONTHLY_ACTIVITY",
         period_identity=("DURATION", (1404, 1, 1), (1404, 2, 31)),
@@ -358,6 +457,7 @@ def test_writer_accepts_explicit_non_calendar_fiscal_start_and_ytd_period(db):
         session.add(CanonicalApproval(
             approval_kind="fiscal_year_start_month", external_identity="company-1:7",
             approval_ref="approval-fiscal-start-7", is_active=True,
+            scope_json=json.dumps({"company_id": "company-1", "industry_code": "BANK"}, sort_keys=True, separators=(",", ":")),
         ))
         session.flush()
         calendar = session.get(CanonicalCompanyFiscalCalendar, 1)
@@ -378,7 +478,8 @@ def test_writer_persists_only_approved_blank_zero_fallback_as_fallback(db):
     with factory.begin() as session:
         session.add(CanonicalApproval(approval_kind="zero_fallback_rule",
                                       external_identity="rule-zero", approval_ref="approval-zero",
-                                      is_active=True))
+                                      is_active=True,
+                                      scope_json=json.dumps({"report_type_id": "PERIODIC_FINANCIAL", "metric_id": "metric-sales"}, sort_keys=True, separators=(",", ":"))))
     plan = _plan()
     fact = replace(
         plan.facts[0], source_value_decimal=Decimal(0), value_integer=0,

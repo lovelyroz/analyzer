@@ -7,13 +7,14 @@ Numeric values are parsed from the Reader's literal text using Decimal.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from enum import StrEnum
 import re
 
 from openpyxl.utils.cell import coordinate_to_tuple, range_boundaries
 
 from src.core.jalali import validate_jalali_date
+from src.ingestion.common.financial_numbers import parse_financial_number
 from src.ingestion.excel.deterministic_matcher import TemplateMatchResult
 from src.ingestion.excel.dto import CellObservation, CellValueKind, WorkbookObservation
 
@@ -115,9 +116,9 @@ class CanonicalInputCandidate:
     source_label_approval_ref: str | None
     source_header_approval_ref: str | None
     dimension_approval_refs: tuple[tuple[str, str, str, str], ...]
+    source_token: str | None = None
 
 
-_DECIMAL_TEXT = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
 _SHA256 = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
@@ -203,21 +204,31 @@ def build_candidate(
     if not is_blank_source and zero_fallback_rule is not None:
         raise CandidateValidationError("ZERO_FALLBACK_SOURCE_UNSUPPORTED", "ZERO_FALLBACK approval can only accompany an observed BLANK cell.")
     source_text: str | None = None
+    source_token: str | None = None
     native_integer: int | None = None
     if is_blank_source:
         amount = Decimal(0)
     elif cell.value_kind is CellValueKind.PRESENT_TEXT and cell.text_value is not None:
         source_text = cell.text_value
-        literal = source_text
-        if not _DECIMAL_TEXT.fullmatch(literal):
-            raise CandidateValidationError("SOURCE_NUMBER_INVALID", "Literal numeric text does not match the approved invariant decimal syntax.")
-        try:
-            amount = Decimal(literal)
-        except InvalidOperation as exc:
-            raise CandidateValidationError("SOURCE_NUMBER_INVALID", "Literal value cannot be represented as Decimal.") from exc
+        parsed_number = parse_financial_number(source_text, source_kind="TEXT")
+        if parsed_number.value is None:
+            raise CandidateValidationError(parsed_number.diagnostic_code or "SOURCE_NUMBER_INVALID", "Literal numeric text is invalid or ambiguous.")
+        amount = parsed_number.value
+        source_token = parsed_number.source_token
     elif cell.value_kind is CellValueKind.PRESENT_NUMBER:
         numeric = cell.numeric_value
-        if type(numeric) is int:
+        numeric_lexical = cell.numeric_lexical
+        if numeric_lexical is None and type(numeric) is int:
+            numeric_lexical = str(numeric)
+        if numeric_lexical is not None:
+            parsed_number = parse_financial_number(numeric_lexical, source_kind="NUMERIC")
+            if parsed_number.value is None:
+                raise CandidateValidationError(parsed_number.diagnostic_code or "SOURCE_NUMBER_INVALID", "Native numeric token is invalid.")
+            amount = parsed_number.value
+            source_token = parsed_number.source_token
+            if type(numeric) is int:
+                native_integer = numeric
+        elif type(numeric) is int:
             native_integer = numeric
             amount = Decimal(numeric)
         elif type(numeric) is float:
@@ -290,6 +301,7 @@ def build_candidate(
         source_label_approval_ref=approval_ref(spec.source_label, "source label") if spec.source_label else None,
         source_header_approval_ref=approval_ref(spec.source_header, "source header") if spec.source_header else None,
         dimension_approval_refs=dimension_refs,
+        source_token=source_token,
     )
 
 

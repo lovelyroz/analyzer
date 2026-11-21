@@ -41,6 +41,18 @@ def _existing_payload(row) -> tuple:
     return (row.close_price, row.volume, row.trade_count, row.value)
 
 
+def _resolve_company(session: Session, ticker: str) -> tuple[Company | None, str | None]:
+    """Resolve the CSV ticker against the approved unique CODAL identity."""
+    by_codal = session.query(Company).filter_by(codal_symbol=ticker).one_or_none()
+    by_ticker = session.query(Company).filter_by(ticker=ticker).one_or_none()
+    if by_codal is not None and by_ticker is not None and by_codal.company_id != by_ticker.company_id:
+        return None, "TICKER_IDENTITY_CONFLICT"
+    company = by_codal or by_ticker
+    if company is not None and company.codal_symbol not in (None, ticker):
+        return None, "TICKER_IDENTITY_CONFLICT"
+    return company, None
+
+
 def _fits_numeric(value: Decimal, *, max_integer_digits: int, scale: int) -> bool:
     if not value.is_finite():
         return False
@@ -133,7 +145,11 @@ def ingest_ohlc_csv(session: Session, path: Union[str, Path], *,
                         issue_codes.append(f"ROW_{index}_IN_BATCH_CONFLICT")
                     continue
                 seen[key] = payload
-                company = session.query(Company).filter_by(ticker=row.ticker).one_or_none()
+                company, identity_error = _resolve_company(session, row.ticker)
+                if identity_error:
+                    invalid_count += 1
+                    issue_codes.append(f"ROW_{index}_{identity_error}")
+                    continue
                 if company is None:
                     invalid_count += 1
                     issue_codes.append(f"ROW_{index}_COMPANY_NOT_FOUND")

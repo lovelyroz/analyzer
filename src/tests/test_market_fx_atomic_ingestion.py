@@ -69,6 +69,19 @@ def test_market_invalid_row_rejects_whole_batch(db, tmp_path):
         assert "invalid_count=1" in run.error_log
 
 
+def test_market_ticker_codal_symbol_conflict_rejects_batch(db, tmp_path):
+    _, factory = db
+    with factory() as session:
+        original = session.query(Company).filter_by(ticker="SAMAN").one()
+        session.add(Company(ticker="OTHER", company_name="Other", industry_id=original.industry_id,
+                            codal_symbol="SAMAN-ALT", status="ACTIVE", is_active=True))
+        session.commit()
+        result = ingest_ohlc_csv(session, market_csv(tmp_path, [market_row(1)]))
+        assert result.status == "FAILED"
+        audit = session.get(IngestionRun, result.ingestion_id)
+        assert "ROW_1_TICKER_IDENTITY_CONFLICT" in audit.error_log
+
+
 def test_market_inbatch_identical_duplicate_and_existing_replay_are_unchanged(db, tmp_path):
     _, factory = db
     path = market_csv(tmp_path, [market_row(1), market_row(1)])
@@ -161,14 +174,14 @@ def test_fx_inbatch_and_existing_conflicts_fail_without_overwrite(db):
         assert session.query(FXRate).one().rate == Decimal("100.0000")
 
 
-def test_exchange_center_is_blocked_by_existing_model_constraint(db):
+def test_exchange_center_is_accepted_after_schema_migration(db):
     _, factory = db
     with factory() as session:
         result = ingest_fx_rates(session, [fx("100", rate_type="EXCHANGE_CENTER")])
-        assert result.status == "FAILED" and result.records_invalid == 1
-        assert session.query(FXRate).count() == 0
+        assert result.status == "COMPLETED" and result.records_inserted == 1
+        assert session.query(FXRate).filter_by(rate_type="EXCHANGE_CENTER").count() == 1
         run = session.get(IngestionRun, result.ingestion_id)
-        assert "SCHEMA_RATE_TYPE_UNSUPPORTED" in run.error_log
+        assert run.status == "COMPLETED"
 
 
 def test_fx_commit_failure_rolls_back_and_records_failed(db, monkeypatch):

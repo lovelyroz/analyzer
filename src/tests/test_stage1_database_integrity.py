@@ -27,12 +27,12 @@ from src.models.share_action import CorporateAction, ShareCountHistory  # noqa: 
 from src.models.forecast import LegacyForecastBase
 
 
-def test_migration_reaches_version_nine_without_forecast_tables_and_is_idempotent():
+def test_migration_reaches_version_ten_without_forecast_tables_and_is_idempotent():
     engine = create_engine("sqlite:///:memory:")
     runner = MigrationRunner(engine)
 
-    assert runner.upgrade() == 9
-    assert runner.upgrade() == 9
+    assert runner.upgrade() == 10
+    assert runner.upgrade() == 10
     tables = set(inspect(engine).get_table_names())
     assert "normalized_financial_fact_inputs" in tables
     assert not ({"forecast_versions", "forecast_input_refs"} & tables)
@@ -45,7 +45,7 @@ def test_migration_reaches_version_nine_without_forecast_tables_and_is_idempoten
 
     with engine.connect() as connection:
         versions = connection.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all()
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert versions == list(range(1, 11))
 
 
 def test_active_metadata_does_not_recreate_forecast_output_tables():
@@ -75,8 +75,8 @@ def test_version_seven_upgrade_removes_only_legacy_forecast_tables_and_rows():
         connection.execute(text("INSERT INTO forecast_input_refs (forecast_version_id, fact_key) VALUES (:id, 'REV')"), {"id": forecast_id})
 
     runner = MigrationRunner(engine)
-    assert runner.upgrade() == 9
-    assert runner.upgrade() == 9
+    assert runner.upgrade() == 10
+    assert runner.upgrade() == 10
     tables = set(inspect(engine).get_table_names())
     assert not ({"forecast_versions", "forecast_input_refs"} & tables)
     assert "normalized_financial_fact_inputs" in tables
@@ -88,7 +88,7 @@ def test_version_seven_upgrade_removes_only_legacy_forecast_tables_and_rows():
         assert connection.execute(text("SELECT shares_outstanding FROM share_count_history")).scalar_one() == 1000
         assert connection.execute(text("SELECT source FROM corporate_actions")).scalar_one() == "preserve-action"
         versions = connection.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all()
-    assert versions == list(range(1, 10))
+    assert versions == list(range(1, 11))
 
 
 def test_current_report_version_unique_index_is_present_on_bootstrap():
