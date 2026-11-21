@@ -1,3 +1,5 @@
+> **Historical reference/status as of 2026-11-21:** PDF report identity and corpus references below describe retired sample artifacts, not supported input or active test fixtures. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
 # CODAL Report Identity Manifest
 
 ## 1. Purpose and scope

@@ -897,7 +897,7 @@
     {
       "path": "src/ingestion/codal/*",
       "status": "ARTIFACT_OBSERVED",
-      "details": "Implements CODAL financial-report/PDF acquisition and ingestion; no reference to this CSV or daily market-history extraction."
+      "details": "HISTORICAL PRE-RETIREMENT evidence: this module implemented CODAL financial-report/PDF acquisition and ingestion; it had no reference to this CSV or daily market-history extraction."
     },
     {
       "path": "dollar-history.xlsx",

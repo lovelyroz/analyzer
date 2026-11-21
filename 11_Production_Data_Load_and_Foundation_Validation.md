@@ -1,3 +1,4 @@
+> **SUPERSEDED — 2026-11-21:** This operational document describes an earlier CODAL PDF implementation boundary. It is retained as historical evidence, not an active workflow or acceptance plan. Current supported input formats are Excel and CSV. See 10_Production_Codal_Extraction_and_Data_Load.md and database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
 # Analyzer V1 — Production Data Load & Foundation Validation
 
 ## Phase status

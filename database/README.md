@@ -1,3 +1,5 @@
+
+> **Current ingestion policy (2026-11-21):** Excel and CSV are the supported file formats. CODAL PDF extraction and its audit script are retired. DB-AUD-012 and DB-PLAN-013 are historical records; see reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
 # Database Documentation Hub
 
 این پوشه محل مرکزی اسناد، شواهد و ابزارهای مستندسازی مرتبط با طراحی و پیکربندی دیتابیس پروژه است.
@@ -63,27 +65,9 @@
 - [DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md](reports/DB_AUD_011_LEGACY_RAW_FACT_PROVENANCE_DECISION.md) — ارزیابی پنج فیلد provenance قدیمی، وابستگی‌های downstream و مسیر persistence فعلی.
 
 
-## ممیزی مسیر PDF در CODAL
+## Historical CODAL PDF retirement records
 
-- [DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md](reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md) — ممیزی تکمیل‌شده مسیر PDF و inventory محلی؛ تفکیک اجزای PDF-only از قراردادهای legacy و schema.
-- اسکریپت read-only: `src/scripts/audit_codal_pdf_dependencies.py`.
-- [DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md](reports/DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md) — طرح مرحله‌ای بازنشستگی PDF با حفظ RawFinancialFact و persistence مشترک تا تصمیم مستقل.
-- [DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md](reports/DB_AUD_013_EXCEL_CANONICAL_PERSISTENCE_READINESS.md) — مقایسه قرارداد FinancialFact هدف با ORM فعلی و شناسایی شکاف‌های Report/Version، Period، NormalizedFact و provenance.
-- [DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md](reports/DB_AUD_014_NORMALIZED_DERIVED_FACT_CONSUMER_AUDIT.md) — inventory مصرف‌کنندگان runtime، وابستگی Stage 5 و گپ linkage جداول Derived.
-
-- اسکریپت read-only برای تکمیل linkage جداول Normalized/Derived: `src/scripts/audit_normalized_derived_fact_links.py` — اجرا از ریشه پروژه با `python src/scripts/audit_normalized_derived_fact_links.py`؛ خروجی در `reply.md`.
-- [DB_AUD_015_LOCAL_NORMALIZED_DERIVED_FACT_LINKAGE_RESULTS.md](reports/DB_AUD_015_LOCAL_NORMALIZED_DERIVED_FACT_LINKAGE_RESULTS.md) — نتایج شمارش و linkage جداول Normalized/Derived در دیتابیس محلی (snapshot مورخ 2026-11-18).
-- [DB_DES_010_STAGE5_FINANCIAL_FACT_QUERY_MIGRATION_CONTRACT.md](reports/DB_DES_010_STAGE5_FINANCIAL_FACT_QUERY_MIGRATION_CONTRACT.md) — قرارداد انتقال Stage 5 به FinancialFact با PIT، ابعاد، دوره‌های Jalali و provenance.
-
-| [DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md](reports/DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md) | قرارداد پیشنهادی تاریخ‌های جلالی، INSTANT/DURATION و تفکیک YTD از بازه مالی |
-
-- [DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md](reports/DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md) — تطبیق Architecture V1.3 و قراردادهای زمانی؛ تعارض مالکیت YTD و موارد باز months_length و Fiscal Calendar.
-
-- [DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md](reports/DB_DES_011_FINANCIAL_PERIOD_TEMPORAL_BASIS_CONTRACT.md) — قرارداد پذیرفته‌شده مالکیت fact-level برای YTD/Standalone و دوره‌های جلالی.
-- [DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md](reports/DB_AUD_016_TEMPORAL_CONTRACT_RECONCILIATION.md) — ممیزی تطبیق قراردادهای زمانی و ثبت gateهای باقی‌مانده.
-
-- [DB_AUD_017_FISCAL_CALENDAR_SOURCE_AND_LIFECYCLE_AUDIT.md](reports/DB_AUD_017_FISCAL_CALENDAR_SOURCE_AND_LIFECYCLE_AUDIT.md) — ممیزی شواهد منبع، مدل فعلی Company و چرخه عمر سال مالی اختصاصی هر شرکت.
-
-- [DB_DES_012_COMPANY_FISCAL_YEAR_LOGICAL_MODEL.md](reports/DB_DES_012_COMPANY_FISCAL_YEAR_LOGICAL_MODEL.md) — مدل منطقی سال مالی واقعی هر شرکت، شواهد، تغییر سال مالی و ارتباط با FinancialPeriod.
-
-- [DB_AUD_018_CODAL_FISCAL_YEAR_METADATA_CAPABILITY_AUDIT.md](reports/DB_AUD_018_CODAL_FISCAL_YEAR_METADATA_CAPABILITY_AUDIT.md) — بررسی endpoint فهرست پایان سال مالی CODAL و قواعد اعتبارسنجی آن با صورت‌های مالی سالانه.
+- DB-AUD-012 is a historical dependency audit; its final status points to the completed retirement report.
+- DB-PLAN-013 is superseded and no longer gates Excel/CSV work.
+- The former audit script and PDF extraction corpus were removed.
+- Current implementation inventory: [DB-CODAL-RETIRE-001 retirement report](reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md).

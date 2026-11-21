@@ -1,3 +1,4 @@
+> **Current format decision — 2026-11-21:** CODAL file input is Excel/CSV only. PDF is excluded and its acquisition/extraction implementation is retired. RawLineInput and shared Report/ReportVersion/RawFinancialFact persistence remain format-neutral legacy contracts for already parsed rows; no Excel ORM writer is added by this decision. Historical PDF descriptions below are not active requirements. See DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
 # DB-DES-006 — قرارداد منطقی مسیر CODAL تا FinancialFact canonical
 
 **تاریخ:** 2026-11-15  

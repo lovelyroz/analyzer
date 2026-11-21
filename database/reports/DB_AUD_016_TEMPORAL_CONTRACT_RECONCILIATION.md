@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED — 2026-11-21:** PDF-path observations and plans in this document describe the retired implementation and do not define current support or acceptance. File inputs are Excel/CSV only. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
 # DB-DES-012 — Temporal Contract Reconciliation Audit
 
 **Status:** RECONCILIATION AUDIT COMPLETE — fact-level duration_basis decision accepted and coordinated document amendments applied; source-evidence and implementation gates remain open  

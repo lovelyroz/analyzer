@@ -1,4 +1,6 @@
-﻿(analyzer) PS D:\Winprojects\analyzer>
+> **Historical reference/status as of 2026-11-21:** Any PDF extraction implementation, test command, corpus, or pre-retirement status described here is superseded. Excel/CSV are the supported file inputs, and CODAL PDF extraction is retired. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
+(analyzer) PS D:\Winprojects\analyzer>
 >> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task018_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_canonical_ingestion_admission.py src/tests/test_codal_extraction.py src/tests/test_codal_pdf_extraction.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py
 >>
 ........................................................sF...................................................... [ 41%]

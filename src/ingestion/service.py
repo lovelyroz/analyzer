@@ -137,9 +137,7 @@ def ingest_codal_report(
 
     All textual CODAL fields persisted here are normalized so Persian/Arabic
     digits cannot enter the database. Numeric values remain Decimal. The
-    source PDF itself remains the authoritative original source artifact.
-
-    PDF extraction is outside this function (CHANGE-007 / codal.adapter).
+    Original source-file parsing is outside this persistence function.
     """
     run = IngestionRun(source="CODAL", status="STARTED", records_found=len(raw_lines))
     session.add(run)

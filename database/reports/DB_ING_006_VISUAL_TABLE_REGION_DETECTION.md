@@ -1,4 +1,6 @@
-﻿# DB-ING-006 — Conservative Visual Table-Region Detection
+> **Historical reference/status as of 2026-11-21:** Any PDF extraction implementation, test command, corpus, or pre-retirement status described here is superseded. Excel/CSV are the supported file inputs, and CODAL PDF extraction is retired. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
+# DB-ING-006 — Conservative Visual Table-Region Detection
 
 **Date:** 2026-11-15  
 **Task:** 033  

@@ -1,3 +1,5 @@
+> **Historical reference/status as of 2026-11-21:** Any PDF extraction implementation, test command, corpus, or pre-retirement status described here is superseded. Excel/CSV are the supported file inputs, and CODAL PDF extraction is retired. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
 # DB-DES-011 — FinancialPeriod and Duration-Basis Temporal Contract
 
 **Status:** ACCEPTED DESIGN DECISION — fact-level duration_basis is the canonical temporal ownership rule; implementation gates remain open; no ORM, migration, runtime code, data, or tests changed  

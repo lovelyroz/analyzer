@@ -1,3 +1,4 @@
+> **Reconciliation — 2026-11-21:** This audit records historical readiness findings. Any description of PDF as the active CODAL input path is superseded by the owner decision and completed retirement. Excel/CSV are the only supported file inputs; the shared parsed-row persistence contract remains. See DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
 # DB-AUD-006 — ممیزی آمادگی مسیر CODAL برای پیاده‌سازی canonical
 
 **تاریخ:** 2026-11-15  

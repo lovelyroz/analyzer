@@ -1,3 +1,5 @@
+> **Historical reference/status as of 2026-11-21:** Any PDF extraction implementation, test command, corpus, or pre-retirement status described here is superseded. Excel/CSV are the supported file inputs, and CODAL PDF extraction is retired. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
 # Stage 7 — آرشیو خلاصهٔ تصمیم‌ها و شواهد
 
 > **این فایل مرجع اجرایی نیست. تنها مرجع وضعیت Taskها، ترتیب کار، وابستگی‌ها و معیارهای پایان Stage 7، فایل `STAGE7_MASTER_WORKING_PACKET.md` است.** در صورت هرگونه اختلاف، فقط Master Packet ملاک است. این آرشیو صرفاً چند تصمیم پایدار و شاهد تاریخی را نگه می‌دارد و هیچ مرجعیت مستقلی برای تعیین وضعیت Taskها ندارد.

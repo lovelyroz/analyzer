@@ -1,3 +1,5 @@
+> **Historical reference/status as of 2026-11-21:** Any PDF extraction implementation, test command, corpus, or pre-retirement status described here is superseded. Excel/CSV are the supported file inputs, and CODAL PDF extraction is retired. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
 # DB-AUD-013 — ممیزی آمادگی Persistence برای CODAL Excel
 
 **تاریخ:** 2026-11-18  

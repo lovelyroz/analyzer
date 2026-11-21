@@ -1,3 +1,4 @@
+> **Current input-format decision — 2026-11-21:** Historical PDF workflow diagrams and references in this handoff are superseded. Supported file inputs are Excel and CSV; CODAL PDF extraction is retired. See 10_Production_Codal_Extraction_and_Data_Load.md and database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
 # PROJECT HANDOFF INSTRUCTIONS
 # Repository: analyzer
 

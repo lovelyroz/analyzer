@@ -1,3 +1,6 @@
+
+
+> **SUPERSEDED — 2026-11-21.** This staged plan is historical. The owner decided file inputs are Excel/CSV only, so its condition to retain PDF until Excel persistence is ready no longer applies. PDF retirement is implemented in database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
 # DB-PLAN-013 — طرح مرحله‌ای بازنشستگی مسیر PDF در CODAL
 
 **تاریخ:** 2026-11-18  

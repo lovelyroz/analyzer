@@ -4,7 +4,7 @@ Physical structure:
 
     src/ingestion/
       common/     shared parse, validation, identity, run tracker
-      codal/      PDF extraction boundary + CODAL persistence entry
+      codal/      parsed-row CODAL persistence entry
       market/     OHLC adapters + persistence entry
       fx/         FX adapters (incl. Toman→Rial) + persistence entry
       service.py  core DTOs + core persistence (stable public surface)

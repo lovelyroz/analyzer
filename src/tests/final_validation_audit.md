@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED — 2026-11-21:** PDF-path observations and plans in this document describe the retired implementation and do not define current support or acceptance. File inputs are Excel/CSV only. See database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
 # Final Validation Audit — CODAL 19-PDF Corpus
 
 This is the final independent audit required by the validation programme. It

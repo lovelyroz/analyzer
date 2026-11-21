@@ -1,4 +1,6 @@
-﻿# Database Configuration — Master Working Packet
+> **Historical references:** Sections and audit notes written before 2026-11-21 may describe the former CODAL PDF path. Those statements are historical evidence and do not define current supported input or acceptance. The retirement decision and current state are recorded in DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
+
+# Database Configuration — Master Working Packet
 
 ## 1. Purpose and authority
 
@@ -2584,6 +2586,18 @@ The focused pre-existing suites provide meaningful coverage reused for this Task
 
 No canonical Excel ORM writer exists, and the admission plan remains `execution_allowed=False`; therefore physical canonical commit/rollback and audit status for that future writer are not asserted. No approved real Excel template or production semantic mapping is available. SQLite/fixture tests do not claim production concurrency or cross-database guarantees. Task 018 remains PARTIAL.
 
-Owner command (Task 018 focused suites plus the related existing regression suites): `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task018_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_canonical_ingestion_admission.py src/tests/test_codal_extraction.py src/tests/test_codal_pdf_extraction.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py`.
+Owner command (Task 018 focused suites plus the related existing regression suites): `.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task018_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_canonical_ingestion_admission.py src/tests/test_codal_extraction.py src/tests/test_codal_digit_normalization.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py`.
 
 Dashboard after OPEN-to-PARTIAL: 35 tasks, 8 DONE / 22 PARTIAL / 5 OPEN = 54%; DB-TEST/DB-EXIT: 0 DONE / 2 PARTIAL / 2 OPEN = 25%.
+
+## 8.46 DB-CODAL-RETIRE-001 — Excel/CSV-only input and CODAL PDF retirement
+
+Owner decision: supported file inputs are Excel workbooks and CSV. CODAL PDF acquisition/extraction is retired. The implementation and repository inventory are in `database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md`. Shared Report/ReportVersion/RawFinancialFact persistence and numeric digit normalization remain; no ORM, schema, migration, or database change was made. Retained contract coverage uses synthetic RawLineInput rows in `src/tests/test_codal_extraction.py`. Excel-to-canonical ORM persistence remains a separate open task.
+
+**Status: PARTIAL — owner acceptance pending.** The required owner test command is in the retirement report. No tests were run by this agent.
+
+## 9.41 DB-CODAL-RETIRE-001 — PDF input retirement
+
+**Status: PARTIAL; owner test results pending.** Removed CODAL PDF acquisition, extraction, parsing, pipeline entry points, public exports, the PDF-only dependency, corpus, extraction plans, and PDF-only suites. Rebuilt the mixed CODAL test file around the retained persistence contracts: report identity/versioning, replay, PIT selection, provenance, digit normalization, NULL versus explicit zero, cross-company rejection, and failure rollback/audit. No tests were run; no ORM/schema/migration/real database changes were made. Excel-to-canonical persistence remains open independently.
+
+Static acceptance evidence: repository scan reports zero active PDF production imports/APIs and zero active PDF extraction tests or commands; dependency scan reports no PDF extractor; models, migrations, schema, and the real database are unchanged. No tests were run. Owner command: see the retirement report. Exact changed/deleted file inventory and residual-reference classification: `database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md`. Status remains PARTIAL until owner-run results arrive.

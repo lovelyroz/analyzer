@@ -1,3 +1,4 @@
+> **2026-11-21 reconciliation:** PDF corpus coverage described in historical notes below is retired. The retained CODAL persistence and PIT contracts now use synthetic parsed-row DTOs in src/tests/test_codal_extraction.py. The active owner command below excludes PDF suites. See DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
 # DB-TEST-002 — Ingestion and Point-in-Time Test Increment
 
 ## Status
@@ -12,7 +13,7 @@ Added `test_multi_period_report_preserves_explicit_ytd_and_standalone_semantics`
 
 - `test_excel_canonical_input.py` and `test_excel_adapter.py`: explicit INSTANT/DURATION and YTD/STANDALONE semantics, incomplete or ambiguous temporal selections, approved matching, and provenance.
 - `test_canonical_ingestion_admission.py`: all-or-nothing batch rejection, identical replay, changed-payload conflict, correction as a new version with prior-version preservation, provenance conflicts, explicit mapping approvals, BLANK/zero/ZERO_FALLBACK distinctions, and raw/calculated record rejection.
-- `test_codal_extraction.py` and `test_codal_pdf_extraction.py`: ReportVersion chain, replay/idempotency, and publication-time PIT behavior against the existing CODAL persistence path.
+- `test_codal_extraction.py`: synthetic parsed-row coverage for ReportVersion chain, replay/idempotency, and publication-time PIT behavior against the existing CODAL persistence path.
 - `test_market_fx_atomic_ingestion.py`: atomic multi-row batches, replay/conflict, rollback on commit failure, and audit failure behavior for existing Market/FX writers.
 - `test_stage6_p25_selection.py`, `test_stage6_p25_adversarial.py`, and `test_stage6_evaluation_foundation.py`: deterministic publication-order selection, tie handling, future-version exclusion and PIT leakage status.
 
@@ -31,7 +32,7 @@ Task 017 remains PARTIAL because the FinancialPeriod model has no Jalali constra
 ## Owner command for Task 018
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task018_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_canonical_ingestion_admission.py src/tests/test_codal_extraction.py src/tests/test_codal_pdf_extraction.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py
+.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task018_20261121 src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_canonical_ingestion_admission.py src/tests/test_codal_extraction.py src/tests/test_codal_digit_normalization.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py
 ```
 
 ## Exact changed files

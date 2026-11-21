@@ -1,3 +1,8 @@
+
+
+## Final status — historical audit, retirement completed 2026-11-21
+
+The findings above describe the repository before retirement. The PDF acquisition/extraction path, public API, dependency, corpus, and PDF-only tests have now been removed. Shared persistence contracts were retained and are covered with synthetic parsed-row tests. See DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md for exact file changes, residual-reference classification, validation limits, and owner command. This audit is no longer an active implementation gate.
 # DB-AUD-012 — ممیزی وابستگی‌های مسیر PDF در CODAL
 
 **تاریخ:** 2026-11-18  

@@ -1,3 +1,4 @@
+> **Input-format contract — 2026-11-21:** CODAL, market, and FX file inputs are Excel/CSV only. PDF input, OCR, conversion, and PDF compatibility are outside the supported workflow. Historical PDF transition notes below are superseded by database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md.
 # CODAL Excel Preprocessing — Master Working Packet
 
 ## 1. Purpose and authority

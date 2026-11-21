@@ -1,166 +1,199 @@
-# EXECUTION PROMPT — Task 017 Acceptance Record + Task 018 / DB-TEST-002
+# Task DB-CODAL-RETIRE-001 — Retire PDF Extraction Completely; Establish Excel/CSV-Only Input
 
-Repository: `analyzer`  
-Branch: `master`
+## Objective
 
-## نوع کار
-**Code create/change — تست‌های خودکار و مستندات وضعیت Taskها.**
+The owner has explicitly decided that all extractable input files for this application are Excel workbooks or CSV files.
 
-این اجرا باید Task 018 را واقعاً پیش ببرد؛ صرف بررسی فایل‌ها یا نوشتن گزارش، انجام Task محسوب نمی‌شود.
+PDF extraction was never intended to be part of the target application workflow. It must not remain as an active, supported, planned, or acceptance-required ingestion path.
 
-## بخش اول — ثبت پذیرش مالک برای Task 017
+Retire the CODAL PDF acquisition/extraction implementation and reconcile all active project documentation with the Excel/CSV-only architecture.
 
-نتیجه اجرای مالک را عیناً ثبت کن:
+This is an implementation task, not another audit-only task.
 
-```text
-.\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_task017_20261120 src/tests/test_task017_model_constraints.py src/tests/test_stage1_database_integrity.py
+## 1. Binding architectural decision
 
-23 passed in 76.32s (0:01:16)
-```
+The supported file-input formats are:
 
-در `reply.md` و بخش وضعیت Task 017 در `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md` ثبت کن که اجرای تست توسط مالک موفق بوده است.
+- Excel workbooks
+- CSV files
 
-**Task 017 همچنان PARTIAL است.** موارد زیر نباید به‌عنوان حل‌شده اعلام شوند:
-- نبود constraint جلالی برای FinancialPeriod در مدل فعلی؛
-- محدودیت پوشش schemaهای پشتیبانی‌شده؛
-- شکاف‌های uniqueness ناشی از NULL در SQLite؛
-- تضمین‌های محیط production و concurrency.
+PDF is NOT a supported ingestion format.
 
-فقط نتیجه پذیرش مالک را ثبت کن. Task 017 را DONE نکن.
+This applies to:
+- CODAL financial reports
+- Market data
+- FX data
+- Future file-based ingestion unless a separate explicit owner decision changes this contract.
 
-## بخش دوم — اجرای Task 018 / DB-TEST-002
+Do not build PDF fallback, OCR, PDF-to-Excel conversion, or PDF compatibility paths.
 
-هدف: ساخت مجموعه تست‌های خودکار برای اثبات رفتار ingestion و Point-in-Time (PIT) بر اساس قراردادهای مصوب و مرزهای پیاده‌سازی موجود.
+Excel and CSV adapters must remain independent of PDF-specific code and dependencies.
 
-ابتدا فقط فایل‌های مرتبط زیر را بررسی کن و از تست‌ها و پیاده‌سازی‌های موجود استفاده مجدد کن:
+## 2. Production source retirement
 
-- `src/ingestion/canonical_admission.py`
-- `src/ingestion/excel/canonical_input.py`
-- `src/ingestion/excel/adapter.py`
-- `src/ingestion/excel/deterministic_matcher.py`
-- `src/ingestion/market/ingestion.py`
+Inspect all callers and imports before editing.
+
+Retire PDF-only modules and entry points, including:
+
+- `src/ingestion/codal/acquisition.py`
+- `src/ingestion/codal/adapter.py`
+- `src/ingestion/codal/pdf_extract.py`
+- PDF-specific functionality in `src/ingestion/codal/parser.py`
+- PDF acquisition/extraction functions in `src/ingestion/codal/pipeline.py`
+- `ingest_codal_pdf` in `src/ingestion/codal/ingestion.py`
+- PDF exports in `src/ingestion/codal/__init__.py`
+
+Delete PDF-only modules when no supported caller remains.
+
+Remove PDF-only imports and public exports. No production module may import `pypdf`, `pdfplumber`, PDF acquisition helpers, or PDF extraction adapters.
+
+Do not retain dead compatibility wrappers that still expose PDF ingestion.
+
+### Important shared-code boundary
+
+Do NOT blindly delete:
 - `src/ingestion/service.py`
-- `src/ingestion/common/atomic.py`
-- ماژول‌های موجود Report / ReportVersion / FinancialPeriod / NormalizedFinancialFact
-- تست‌های موجود مربوط به همین ماژول‌ها، به‌ویژه تست‌های Task 014 تا 017 و تست‌های atomic ingestion.
+- `src/models/normalized.py`
+- `RawFinancialFact`
+- `Report` / `ReportVersion`
+- database migrations
+- legacy database tables or records.
 
-از ایجاد تست تکراری که همان رفتار را قبلاً به‌طور مؤثر پوشش داده خودداری کن.
+These may contain contracts or persistence behavior beyond PDF extraction.
 
-### 2.1 پوشش‌های الزامی
+Preserve shared functionality only where there is an identified current consumer or explicit database compatibility requirement. Clearly report remaining legacy-only code and why it remains.
 
-برای هر مورد، تست مثبت و منفی مناسب بنویس:
+Do not implement a new Excel ORM writer in this task unless it already exists and only requires connection/refactoring. Do not invent a persistence contract.
 
-**A. Multi-period و Temporal semantics**
-- گزارش دارای چند دوره و چند مقدار زمانی؛
-- تمایز INSTANT و DURATION؛
-- تمایز YTD و STANDALONE؛
-- ممنوعیت duration_basis برای INSTANT؛
-- رد period یا temporal mapping ناقص، مبهم یا ناسازگار؛
-- جلوگیری از ترکیب ناخواسته دوره‌ها یا نسخه‌های ناسازگار.
+## 3. Tests and fixtures
 
-**B. ReportVersion و correction**
-- حفظ نسخه قبلی هنگام ورود correction؛
-- correction به‌عنوان نسخه جدید و بدون overwrite نسخه قبلی؛
-- replay همان نسخه با payload یکسان؛
-- رد replay با payload متفاوت؛
-- انتخاب نسخه هم‌رتبه جدیدتر بر اساس تاریخ انتشار معتبر؛
-- عدم استفاده از نسخه‌ای که بعد از PIT منتشر شده است؛
-- عدم انتخاب خودکار در نبود تاریخ انتشار معتبر یا ترتیب زمانی قابل اثبات.
+Remove PDF-only test coverage and PDF-specific test fixtures.
 
-**C. Provenance**
-- حفظ ارتباط candidate و persistence plan با company، report، report version، metric، period، template/standard و approval references؛
-- رد provenance ناقص یا متناقض؛
-- جلوگیری از یکی‌گرفتن دو مقدار اقتصادی که provenance متفاوت دارند؛
-- عدم ایجاد الزام دائمی برای exact workbook/sheet/cell locator، برخلاف تصمیم مالک.
+Review:
+- `src/tests/test_codal_pdf_extraction.py`
+- `src/tests/test_codal_extraction.py`
+- `src/tests/test_codal_acquisition.py`
+- `src/tests/codal_19_pdf_validation_plan.md`
+- `src/tests/codal_19_pdf_validation_matrix.md`
 
-**D. Atomicity و batch admission**
-- اعتبارسنجی کامل batch پیش از پذیرش؛
-- وجود یک ردیف نامعتبر باید کل batch را رد کند؛
-- duplicate یکسان باید بدون درج مجدد تشخیص داده شود؛
-- conflict باید کل batch را رد کند؛
-- شکست در مراحل persistence/commit نباید partial canonical write باقی بگذارد؛
-- وضعیت audit در حد تضمین واقعی پیاده‌سازی بررسی شود؛
-- هیچ تستی نباید تضمین concurrency یا DB uniqueness را فراتر از توان schema فعلی ادعا کند.
+Do not simply delete all CODAL tests.
 
-**E. Mapping**
-- فقط mapping صریح و approved پذیرفته شود؛
-- mapping مفقود، چندمعنا، تکراری یا ناسازگار باید fail-closed باشد؛
-- mappingهای پیشنهادی یا candidate-only نباید به‌عنوان mapping تولیدی پذیرفته شوند؛
-- تطبیق صرفاً بر اساس شباهت متن یا حدس ممنوع است.
+Preserve and relocate any assertions that test independent, still-required contracts, including:
+- Report and ReportVersion identity
+- version chain and replay behavior
+- atomicity and rollback
+- persistence constraints that remain supported
+- source provenance contracts that remain valid
+- numeric normalization that is format-independent
+- NULL versus explicit zero
+- failure handling unrelated to PDF
 
-**F. NULL، صفر و ZERO_FALLBACK**
-- NULL/BLANK از صفر واقعی متمایز باشد؛
-- صفر گزارش‌شده حفظ شود؛
-- ZERO_FALLBACK فقط با approval صریح و منطبق پذیرفته شود؛
-- نبود approval یا approval ناسازگار باید رد شود؛
-- هیچ مقدار ساختگی نباید به‌عنوان مقدار گزارش‌شده ثبت شود.
+Use Excel/CSV fixtures for file-format-specific tests.
 
-**G. ممنوعیت raw/calculated persistence**
-- raw rows و calculated facts نباید از مرز admission عبور کنند؛
-- محاسبات runtime-only نباید به‌عنوان fact گزارش‌شده پذیرفته شوند؛
-- plan باید غیرقابل‌اجرا باقی بماند (`execution_allowed=False`) تا writer و schema مصوب وجود داشته باشند؛
-- تست‌ها نباید صرفاً با بررسی یک flag، نبود persistence ممنوع را در کل برنامه اثبات‌شده اعلام کنند. ادعا باید محدود به مرز واقعی تست‌شده باشد.
+Remove PDF corpus tests and references from active test commands.
 
-### 2.2 قواعد اجرای تست
+Do not weaken or remove unrelated assertions merely to make the suite pass.
 
-- تست‌ها باید deterministic و مستقل از ترتیب اجرا باشند.
-- برای تست‌های دیتابیسی فقط از temporary isolated database استفاده کن.
-- هیچ دیتابیس واقعی یا owner database را باز نکن.
-- هیچ داده واقعی یا production ingestion اجرا نکن.
-- تست‌ها نباید به شبکه یا سرویس خارجی وابسته باشند.
-- تست‌های موجود را بی‌دلیل حذف یا تضعیف نکن.
-- اگر یک رفتار به‌علت محدودیت schema یا نبود writer قابل اثبات نیست، آن را صریحاً به‌عنوان GAP ثبت کن؛ با mock یا assertion صوری، PASS جعلی نساز.
-- در صورت کشف bug واقعی در کد pure/service، فقط اصلاح محدود و ضروری همان بخش مجاز است؛ تغییر ORM، schema، migration یا database ممنوع است.
+## 4. Dependency and repository cleanup
 
-## محدودیت‌های غیرقابل‌مذاکره
+- Remove `pypdf` from `requirements.txt` if no other supported feature uses it.
+- Check all dependency manifests and optional dependency declarations for PDF libraries.
+- Remove the PDF sample corpus directory if it has no remaining legitimate use.
+- Remove obsolete PDF-only validation scripts and plans when their purpose is fully retired.
+- Do not remove historical audit reports that explain prior decisions; mark them as historical/superseded instead.
 
-- هیچ تغییری در ORM، schema، migration یا دیتابیس.
-- Migration 9 را اجرا یا ایجاد نکن؛ Migration 10 نساز.
-- هیچ cleanup یا ingestion واقعی اجرا نکن.
-- هیچ Template یا mapping پیشنهادی را approved نکن.
-- `WORKFLOW_RULES.md` را تغییر نده.
-- قراردادهای مصوب مالک را دوباره باز نکن.
-- تست‌ها را خودت اجرا نکن؛ اجرای تست با مالک است.
+## 5. Documentation reconciliation
 
-## فایل‌های مجاز برای تغییر
+Update the active documents:
 
-- تست‌های جدید یا موجود مرتبط با Task 018 در `src/tests/`
-- اصلاح محدود کد pure/service فقط در صورت کشف bug اثبات‌شده
-- `database/reports/DB_TEST_002_INGESTION_PIT_TESTS.md` (گزارش جدید)
-- `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
-- `reply.md`
+1. `10_Production_Codal_Extraction_and_Data_Load.md`
+   - Replace the obsolete PDF-oriented design with the supported Excel/CSV ingestion architecture.
+2. `database/reports/DB_PLAN_013_PDF_PATH_RETIREMENT_SEQUENCE.md`
+   - Mark the staged retirement plan superseded.
+   - Its condition that PDF must remain until Excel production persistence is ready is no longer valid.
+3. `database/reports/DB_AUD_012_CODAL_PDF_PATH_DEPENDENCY_AUDIT.md`
+   - Preserve historical findings.
+   - Add a clear final status and references to the completed retirement.
+4. `database/reports/DB_AUD_006_CODAL_PIPELINE_IMPLEMENTATION_READINESS_AUDIT.md`
+   - Reconcile stale descriptions of PDF as the active path.
+5. `database/reports/DB_DES_006_CODAL_CANONICAL_INGESTION_PIPELINE.md`
+   - Explicitly state Excel/CSV-only input and PDF exclusion.
+6. `CODAL_EXCEL_PREPROCESSING_MASTER_WORKING_PACKET.md`
+   - Align with the final input-format contract.
+7. `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`
+   - Record this task, changed files, acceptance evidence, and final status.
+   - Remove contradictions between the owner decision and active implementation plans.
 
-فایل‌های دیگر فقط در صورت ضرورت فنی و با توضیح دقیق؛ بدون تغییر سند معماری یا `WORKFLOW_RULES.md`.
+Preserve historical audit evidence. Do not rewrite historical findings as if PDF extraction never existed.
 
-## معیار پایان Task 018
+`WORKFLOW_RULES.md` is owner-controlled and MUST NOT be modified.
 
-Task 018 فقط زمانی DONE است که:
-1. تمام هفت گروه پوشش بالا با تست‌های واقعی و معنادار پوشش داده شده باشند؛
-2. تست‌ها در اختیار مالک برای اجرا قرار گرفته باشند؛
-3. هیچ تستی به‌صورت mock یا assertion صوری، رفتار پیاده‌سازی‌نشده را PASS نکند؛
-4. محدودیت‌ها و GAPهای اثبات‌نشده صریحاً ثبت شده باشند؛
-5. فرمان اجرای کامل و دقیق تست‌ها ارائه شده باشد.
+## 6. Required repository-wide verification
 
-اگر هر بخش مهم به علت نبود writer، schema یا قرارداد اجرایی قابل تست نیست، Task را PARTIAL نگه دار و دقیقاً مشخص کن چه چیزی مانع تکمیل است.
+Perform a repository-wide scan for:
+- `pdf`
+- `.pdf`
+- `pypdf`
+- `pdfplumber`
+- `fitz`
+- `extract_raw_lines_from_pdf`
+- `load_codal_pdf`
+- `ingest_codal_pdf`
+- `acquire_pdf_from_url`
+- `acquire_local_pdf`
 
-## گزارش اجباری
+Classify every remaining match as:
+A. Active production code — must be zero.
+B. Active tests/fixtures/commands — must be zero for PDF extraction.
+C. Historical documentation — permitted only when clearly marked historical/superseded.
+D. Unrelated legitimate PDF support — must be explicitly explained.
 
-در `reply.md` و گزارش مستقل، این موارد را ثبت کن:
+Do not claim completion based only on a text search. Inspect imports, public exports, call sites, test discovery, and dependency manifests.
 
-1. وضعیت Task 017 و ثبت نتیجه پذیرش مالک: `23 passed in 76.32s`.
-2. وضعیت Task 018: DONE یا PARTIAL با دلیل.
-3. شناسه و عنوان دقیق تمام Taskهای اجراشده.
-4. فهرست تست‌های اضافه/اصلاح‌شده و رفتار هرکدام.
-5. فهرست فایل‌های تغییرکرده.
-6. فرمان دقیق تست برای اجرای مالک.
-7. GAPهای باقی‌مانده و اینکه هرکدام ناشی از تست، کد، schema یا نبود writer است.
-8. تأیید صریح عدم تغییر ORM/schema/migration/DB و عدم اجرای تست توسط ایجنت.
+## 7. Safety constraints
 
-در Master Packet:
-- نتیجه پذیرش مالک Task 017 را ثبت کن.
-- Task 017 را PARTIAL نگه دار.
-- وضعیت Task 018 را بر اساس پوشش واقعی تعیین کن.
-- داشبورد را بر اساس وضعیت واقعی Taskها دوباره محاسبه کن.
-- هیچ Task دیگری را صرفاً به دلیل پیشرفت این اجرا DONE نکن.
+- Do not modify ORM models or database schema.
+- Do not create or alter migrations.
+- Do not open, mutate, or migrate the real database.
+- Do not delete legacy financial records or tables.
+- Do not change `WORKFLOW_RULES.md`.
+- Do not run tests; the owner runs tests locally.
+- Do not commit or push unless separately instructed.
 
-**اولویت: تست‌های جدید و ارزشمند برای Task 018 بساز؛ ممیزی‌های تکراری و گزارش‌سازی بدون پیشرفت ممنوع.**
+## 8. Deliverables
+
+Create:
+`database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md`
+
+The report must contain:
+- Before/after architecture
+- Exact deleted files
+- Exact modified files
+- Retained legacy components and justification
+- Dependency cleanup
+- Test relocation/removal details
+- Remaining PDF references classified by category
+- Full list of repository-wide search terms and findings
+- Risks or unresolved issues
+- Exact owner-run test command
+
+Update `reply.md` and the Database Master Working Packet.
+
+## 9. Acceptance criteria
+
+The task is not DONE unless all of the following hold:
+
+1. No active production PDF acquisition/extraction path remains.
+2. No active CODAL PDF ingestion API or public export remains.
+3. No PDF-only test is included in active acceptance suites.
+4. Required non-PDF legacy contract tests remain covered.
+5. No unnecessary PDF extraction dependency remains.
+6. Excel/CSV ingestion code does not depend on PDF modules.
+7. Active documentation consistently describes Excel/CSV-only input.
+8. Historical PDF audits are clearly marked historical/superseded.
+9. No ORM/schema/migration/database changes occurred.
+10. Owner-run tests pass.
+
+If Excel/CSV end-to-end persistence is not yet implemented, report that separately as an open implementation task. It is NOT a reason to retain PDF extraction.
+
+Do not mark DONE before owner test results are supplied and verified.
