@@ -1,12 +1,12 @@
 (analyzer) PS D:\Winprojects\analyzer> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_db_impl_001_20261121 src/tests/test_canonical_writer.py src/tests/test_task017_model_constraints.py src/tests/test_stage1_database_integrity.py src/tests/test_canonical_ingestion_admission.py src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py
-...F....F........F...........................................F................................                   [100%]
+...F..........................................................................................                   [100%]
 ====================================================== FAILURES =======================================================
 _____________________ test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded ______________________
 
-self = <sqlalchemy.engine.base.Connection object at 0x000001F4353FB110>
-dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001F435670200>
-context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001F4355AEF00>
-statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x000001F4355AD0D0>, parameters = [()]
+self = <sqlalchemy.engine.base.Connection object at 0x000002D7C1015EE0>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000002D7C123AC60>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000002D7C124BE30>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x000002D7C124BCB0>, parameters = [()]
 
     def _exec_single_context(
         self,
@@ -132,20 +132,20 @@ statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x000001F4
 .venv\Lib\site-packages\sqlalchemy\engine\base.py:1969:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001F435670200>
-cursor = <sqlite3.Cursor object at 0x000001F4356120C0>
-statement = "INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')"
-parameters = (), context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001F4355AEF00>
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000002D7C123AC60>
+cursor = <sqlite3.Cursor object at 0x000002D7C123E5C0>
+statement = "INSERT INTO companies (ticker, company_name, industry_id, codal_symbol, status) VALUES ('DUP','One',1,'A','ACTIVE'),('DUP','Two',1,'B','ACTIVE')"
+parameters = (), context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000002D7C124BE30>
 
     def do_execute(self, cursor, statement, parameters, context=None):
 >       cursor.execute(statement, parameters)
-E       sqlite3.IntegrityError: NOT NULL constraint failed: companies.status
+E       sqlite3.IntegrityError: NOT NULL constraint failed: companies.is_active
 
 .venv\Lib\site-packages\sqlalchemy\engine\default.py:952: IntegrityError
 
 The above exception was the direct cause of the following exception:
 
-monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001F4327C2A20>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002D7C123BE90>
 tmp_path = WindowsPath('D:/winprojects/analyzer/.pytest_db_impl_001_20261121/test_failed_migration_nine_kee0')
 
     def test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded(monkeypatch, tmp_path):
@@ -155,7 +155,7 @@ tmp_path = WindowsPath('D:/winprojects/analyzer/.pytest_db_impl_001_20261121/tes
         assert MigrationRunner(engine).upgrade() == 8
         with engine.begin() as connection:
             connection.execute(text("INSERT INTO industries (industry_code, industry_name) VALUES ('BANK','Bank')"))
->           connection.execute(text("INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')"))
+>           connection.execute(text("INSERT INTO companies (ticker, company_name, industry_id, codal_symbol, status) VALUES ('DUP','One',1,'A','ACTIVE'),('DUP','Two',1,'B','ACTIVE')"))
 
 src\tests\test_canonical_writer.py:261:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
@@ -175,118 +175,18 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
     self.dialect.do_execute(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001F435670200>
-cursor = <sqlite3.Cursor object at 0x000001F4356120C0>
-statement = "INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')"
-parameters = (), context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001F4355AEF00>
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000002D7C123AC60>
+cursor = <sqlite3.Cursor object at 0x000002D7C123E5C0>
+statement = "INSERT INTO companies (ticker, company_name, industry_id, codal_symbol, status) VALUES ('DUP','One',1,'A','ACTIVE'),('DUP','Two',1,'B','ACTIVE')"
+parameters = (), context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000002D7C124BE30>
 
     def do_execute(self, cursor, statement, parameters, context=None):
 >       cursor.execute(statement, parameters)
-E       sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: companies.status
-E       [SQL: INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')]
+E       sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: companies.is_active
+E       [SQL: INSERT INTO companies (ticker, company_name, industry_id, codal_symbol, status) VALUES ('DUP','One',1,'A','ACTIVE'),('DUP','Two',1,'B','ACTIVE')]
 E       (Background on this error at: https://sqlalche.me/e/20/gkpj)
 
 .venv\Lib\site-packages\sqlalchemy\engine\default.py:952: IntegrityError
-_______________________ test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment ________________________
-
-db = (Engine(sqlite:///D:\winprojects\analyzer\.pytest_db_impl_001_20261121\test_monthly_activity_ytd_is_n0\canonical.sqlit...pytest_db_impl_001_20261121\test_monthly_activity_ytd_is_n0\canonical.sqlite), autoflush=True, expire_on_commit=False))
-
-    def test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment(db):
-        _engine, factory = db
-        with factory.begin() as session:
-            session.add(CanonicalApproval(
-                approval_kind="report_type", external_identity="MONTHLY_ACTIVITY",
-                approval_ref="approval-monthly-activity", is_active=True,
-            ))
-        plan = _plan(
-            report_type_id="MONTHLY_ACTIVITY",
-            period_identity=("DURATION", (1404, 1, 1), (1404, 2, 31)),
-        )
->       result = write_canonical_plan(plan, _metadata(), factory)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_canonical_writer.py:337:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-src\ingestion\canonical_writer.py:81: in write_canonical_plan
-    result = _write_in_transaction(session, plan, metadata, effective_ingestion_id)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-src\ingestion\canonical_writer.py:123: in _write_in_transaction
-    _validate_fact(session, fact, company_id, plan) for fact in plan.facts
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-src\ingestion\canonical_writer.py:412: in _validate_fact
-    _check_approval(session, _APPROVAL_KIND_ALIASES.get(approval_kind, approval_kind), identity, ref)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-session = <sqlalchemy.orm.session.Session object at 0x000001F435797D70>, kind = 'report_type'
-identity = 'MONTHLY_ACTIVITY', ref = 'approval-report-type'
-
-    def _check_approval(session: Session, kind: str, identity: str, ref: str | None) -> None:
-        query = select(CanonicalApproval).where(
-            CanonicalApproval.approval_kind == kind,
-            CanonicalApproval.external_identity == identity,
-            CanonicalApproval.is_active.is_(True),
-        )
-        if ref is not None:
-            query = query.where(CanonicalApproval.approval_ref == ref)
-        if session.scalar(query.limit(1)) is None:
->           raise CanonicalWriteError("APPROVAL_NOT_RESOLVED")
-E           src.ingestion.canonical_writer.CanonicalWriteError: APPROVAL_NOT_RESOLVED
-
-src\ingestion\canonical_writer.py:435: CanonicalWriteError
-__________________________ test_company_required_fields_industry_fk_and_supported_uniqueness __________________________
-
-db = Engine(sqlite:///D:\winprojects\analyzer\.pytest_db_impl_001_20261121\test_company_required_fields_i0\constraints.sqlite)
-
-    def test_company_required_fields_industry_fk_and_supported_uniqueness(db):
-        with Session(db) as s:
-            industry, company, *_ = _base_rows(s)
-            s.commit()
-            s.add(Company(ticker="BAD", company_name="Bad FK", industry_id=999))
-            with pytest.raises(IntegrityError):
-                s.flush()
-            s.rollback()
-            _rejected(s, Company(company_name="Missing ticker", industry_id=industry.industry_id))
-            _rejected(s, Company(ticker="NO-NAME", industry_id=industry.industry_id))
-            _rejected(s, Industry(industry_code="NO-NAME"))
-            _rejected(s, Industry(industry_code="BANK", industry_name="Duplicate"))
-            s.add_all([Company(ticker="A", company_name="A", industry_id=industry.industry_id),
-                       Company(ticker="B", company_name="B", industry_id=industry.industry_id)])
-            s.flush()  # Multiple NULL national IDs are allowed by SQLite UNIQUE semantics.
->           _rejected(s, Company(ticker="A", company_name="Duplicate ticker", industry_id=industry.industry_id))
-
-src\tests\test_task017_model_constraints.py:97:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-session = <sqlalchemy.orm.session.Session object at 0x000001F435918CE0>
-row = <src.models.entity.Company object at 0x000001F435796930>
-
-    def _rejected(session, row):
-        session.add(row)
->       with pytest.raises(IntegrityError):
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E       Failed: DID NOT RAISE IntegrityError
-
-src\tests\test_task017_model_constraints.py:77: Failed
-____________________ test_duplicate_and_conflicting_facts_keep_all_or_nothing_admission_semantics _____________________
-
-    def test_duplicate_and_conflicting_facts_keep_all_or_nothing_admission_semantics():
-        same_source, same_template = _source_and_template(("42", "42"))
-        same_hash = sha256(same_source).hexdigest()
-        same = adapt_excel_source(
-            same_source,
-            template=same_template,
-            selections_by_coordinate={"B2": _spec(), "C2": _spec()},
-            admit=True,
-            revision=_revision(same_hash),
-        )
->       assert same.accepted
-E       assert False
-E        +  where False = ExcelAdapterResult(observation=WorkbookObservation(source=SourceArtifactObservation(source_ref=None, file_name=None, f...ksheet_ordinal=None, identity=("'version-1'", "('DURATION', (1404, 1, 1), (1404, 12, 29))", "'metric-sales'", '()')),)).accepted
-
-src\tests\test_excel_adapter.py:254: AssertionError
 =============================================== short test summary info ===============================================
-FAILED src/tests/test_canonical_writer.py::test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded - sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: companies.status
-FAILED src/tests/test_canonical_writer.py::test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment - src.ingestion.canonical_writer.CanonicalWriteError: APPROVAL_NOT_RESOLVED
-FAILED src/tests/test_task017_model_constraints.py::test_company_required_fields_industry_fk_and_supported_uniqueness - Failed: DID NOT RAISE IntegrityError
-FAILED src/tests/test_excel_adapter.py::test_duplicate_and_conflicting_facts_keep_all_or_nothing_admission_semantics - assert False
-4 failed, 90 passed in 406.69s (0:06:46)
+FAILED src/tests/test_canonical_writer.py::test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded - sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: companies.is_active
+1 failed, 93 passed in 390.35s (0:06:30)
