@@ -1,1798 +1,292 @@
-(analyzer) PS D:\Winprojects\analyzer> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_codal_retire_001_20261121 src/tests/test_codal_extraction.py src/tests/test_codal_digit_normalization.py src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_excel_source_reader.py src/tests/test_excel_observation_dto.py src/tests/test_canonical_ingestion_admission.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py
-................................................................................................................ [ 67%]
-....FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF...FFFFFFFFFF......F                                                          [100%]
+(analyzer) PS D:\Winprojects\analyzer> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_db_impl_001_20261121 src/tests/test_canonical_writer.py src/tests/test_task017_model_constraints.py src/tests/test_stage1_database_integrity.py src/tests/test_canonical_ingestion_admission.py src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py
+...F....F........F...........................................F................................                   [100%]
 ====================================================== FAILURES =======================================================
-_______________________________________ test_key_is_7_tuple_with_scenario_last ________________________________________
+_____________________ test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded ______________________
 
-    def test_key_is_7_tuple_with_scenario_last():
->       key = evaluation_key_for(_record(), "REVENUE")
-                                 ^^^^^^^^^
+self = <sqlalchemy.engine.base.Connection object at 0x000001F4353FB110>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001F435670200>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001F4355AEF00>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x000001F4355AD0D0>, parameters = [()]
 
-src\tests\test_stage6_p25_selection.py:196:
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+
+        effective_parameters: Optional[_AnyExecuteParams]
+
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+
+        if self._echo:
+            self._log_info(str_statement)
+
+            stats = context._get_cache_stats()
+
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+.venv\Lib\site-packages\sqlalchemy\engine\base.py:1969:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-overrides = {}
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001F435670200>
+cursor = <sqlite3.Cursor object at 0x000001F4356120C0>
+statement = "INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')"
+parameters = (), context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001F4355AEF00>
 
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlite3.IntegrityError: NOT NULL constraint failed: companies.status
 
-src\tests\test_stage6_p25_selection.py:64: TypeError
-_______________________________________ test_key_scenario_distinct_keys_differ ________________________________________
+.venv\Lib\site-packages\sqlalchemy\engine\default.py:952: IntegrityError
 
-    def test_key_scenario_distinct_keys_differ():
-        assert (
->           evaluation_key_for(_record(scenario="BASE"), "REVENUE").as_tuple()
-                               ^^^^^^^^^^^^^^^^^^^^^^^^
-            != evaluation_key_for(_record(scenario="BULL"), "REVENUE").as_tuple()
-        )
+The above exception was the direct cause of the following exception:
 
-src\tests\test_stage6_p25_selection.py:204:
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001F4327C2A20>
+tmp_path = WindowsPath('D:/winprojects/analyzer/.pytest_db_impl_001_20261121/test_failed_migration_nine_kee0')
+
+    def test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded(monkeypatch, tmp_path):
+        engine = create_engine(f"sqlite:///{tmp_path / 'duplicate-symbols.sqlite'}")
+        all_migrations = tuple(migration_runner._migration_list())
+        monkeypatch.setattr(migration_runner, "_migration_list", lambda: all_migrations[:8])
+        assert MigrationRunner(engine).upgrade() == 8
+        with engine.begin() as connection:
+            connection.execute(text("INSERT INTO industries (industry_code, industry_name) VALUES ('BANK','Bank')"))
+>           connection.execute(text("INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')"))
+
+src\tests\test_canonical_writer.py:261:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\sqlalchemy\engine\base.py:1421: in execute
+    return meth(
+.venv\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+.venv\Lib\site-packages\sqlalchemy\engine\base.py:1643: in _execute_clauseelement
+    ret = self._execute_context(
+.venv\Lib\site-packages\sqlalchemy\engine\base.py:1848: in _execute_context
+    return self._exec_single_context(
+.venv\Lib\site-packages\sqlalchemy\engine\base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+.venv\Lib\site-packages\sqlalchemy\engine\base.py:2365: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+.venv\Lib\site-packages\sqlalchemy\engine\base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-overrides = {'scenario': 'BASE'}
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x000001F435670200>
+cursor = <sqlite3.Cursor object at 0x000001F4356120C0>
+statement = "INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')"
+parameters = (), context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x000001F4355AEF00>
 
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: companies.status
+E       [SQL: INSERT INTO companies (ticker, company_name, industry_id, codal_symbol) VALUES ('DUP','One',1,'A'),('DUP','Two',1,'B')]
+E       (Background on this error at: https://sqlalche.me/e/20/gkpj)
+
+.venv\Lib\site-packages\sqlalchemy\engine\default.py:952: IntegrityError
+_______________________ test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment ________________________
+
+db = (Engine(sqlite:///D:\winprojects\analyzer\.pytest_db_impl_001_20261121\test_monthly_activity_ytd_is_n0\canonical.sqlit...pytest_db_impl_001_20261121\test_monthly_activity_ytd_is_n0\canonical.sqlite), autoflush=True, expire_on_commit=False))
+
+    def test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment(db):
+        _engine, factory = db
+        with factory.begin() as session:
+            session.add(CanonicalApproval(
+                approval_kind="report_type", external_identity="MONTHLY_ACTIVITY",
+                approval_ref="approval-monthly-activity", is_active=True,
+            ))
+        plan = _plan(
+            report_type_id="MONTHLY_ACTIVITY",
+            period_identity=("DURATION", (1404, 1, 1), (1404, 2, 31)),
         )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
+>       result = write_canonical_plan(plan, _metadata(), factory)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-src\tests\test_stage6_p25_selection.py:64: TypeError
-______________________________________ test_key_forecast_id_does_not_affect_key _______________________________________
-
-    def test_key_forecast_id_does_not_affect_key():
-        assert (
->           evaluation_key_for(_record(forecast_id=1), "REVENUE").as_tuple()
-                               ^^^^^^^^^^^^^^^^^^^^^^
-            == evaluation_key_for(_record(forecast_id=999), "REVENUE").as_tuple()
-        )
-
-src\tests\test_stage6_p25_selection.py:211:
+src\tests\test_canonical_writer.py:337:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\ingestion\canonical_writer.py:81: in write_canonical_plan
+    result = _write_in_transaction(session, plan, metadata, effective_ingestion_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\ingestion\canonical_writer.py:123: in _write_in_transaction
+    _validate_fact(session, fact, company_id, plan) for fact in plan.facts
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\ingestion\canonical_writer.py:412: in _validate_fact
+    _check_approval(session, _APPROVAL_KIND_ALIASES.get(approval_kind, approval_kind), identity, ref)
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-overrides = {'forecast_id': 1}
+session = <sqlalchemy.orm.session.Session object at 0x000001F435797D70>, kind = 'report_type'
+identity = 'MONTHLY_ACTIVITY', ref = 'approval-report-type'
 
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
+    def _check_approval(session: Session, kind: str, identity: str, ref: str | None) -> None:
+        query = select(CanonicalApproval).where(
+            CanonicalApproval.approval_kind == kind,
+            CanonicalApproval.external_identity == identity,
+            CanonicalApproval.is_active.is_(True),
         )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
+        if ref is not None:
+            query = query.where(CanonicalApproval.approval_ref == ref)
+        if session.scalar(query.limit(1)) is None:
+>           raise CanonicalWriteError("APPROVAL_NOT_RESOLVED")
+E           src.ingestion.canonical_writer.CanonicalWriteError: APPROVAL_NOT_RESOLVED
 
-src\tests\test_stage6_p25_selection.py:64: TypeError
-________________________________ test_build_observation_invalid_report_version_status _________________________________
+src\ingestion\canonical_writer.py:435: CanonicalWriteError
+__________________________ test_company_required_fields_industry_fk_and_supported_uniqueness __________________________
 
-    def test_build_observation_invalid_report_version_status():
-        observation = build_observation(
->           _record(), "REVENUE", _actual(report_version_id=None)
-            ^^^^^^^^^
-        )
+db = Engine(sqlite:///D:\winprojects\analyzer\.pytest_db_impl_001_20261121\test_company_required_fields_i0\constraints.sqlite)
 
-src\tests\test_stage6_p25_selection.py:221:
+    def test_company_required_fields_industry_fk_and_supported_uniqueness(db):
+        with Session(db) as s:
+            industry, company, *_ = _base_rows(s)
+            s.commit()
+            s.add(Company(ticker="BAD", company_name="Bad FK", industry_id=999))
+            with pytest.raises(IntegrityError):
+                s.flush()
+            s.rollback()
+            _rejected(s, Company(company_name="Missing ticker", industry_id=industry.industry_id))
+            _rejected(s, Company(ticker="NO-NAME", industry_id=industry.industry_id))
+            _rejected(s, Industry(industry_code="NO-NAME"))
+            _rejected(s, Industry(industry_code="BANK", industry_name="Duplicate"))
+            s.add_all([Company(ticker="A", company_name="A", industry_id=industry.industry_id),
+                       Company(ticker="B", company_name="B", industry_id=industry.industry_id)])
+            s.flush()  # Multiple NULL national IDs are allowed by SQLite UNIQUE semantics.
+>           _rejected(s, Company(ticker="A", company_name="Duplicate ticker", industry_id=industry.industry_id))
+
+src\tests\test_task017_model_constraints.py:97:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
-overrides = {}
+session = <sqlalchemy.orm.session.Session object at 0x000001F435918CE0>
+row = <src.models.entity.Company object at 0x000001F435796930>
 
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
+    def _rejected(session, row):
+        session.add(row)
+>       with pytest.raises(IntegrityError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE IntegrityError
+
+src\tests\test_task017_model_constraints.py:77: Failed
+____________________ test_duplicate_and_conflicting_facts_keep_all_or_nothing_admission_semantics _____________________
+
+    def test_duplicate_and_conflicting_facts_keep_all_or_nothing_admission_semantics():
+        same_source, same_template = _source_and_template(("42", "42"))
+        same_hash = sha256(same_source).hexdigest()
+        same = adapt_excel_source(
+            same_source,
+            template=same_template,
+            selections_by_coordinate={"B2": _spec(), "C2": _spec()},
+            admit=True,
+            revision=_revision(same_hash),
         )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_selection.py:64: TypeError
-___________________________________ test_p25_01_multi_rv_earliest_publication_wins ____________________________________
-
-    def test_p25_01_multi_rv_earliest_publication_wins():
->       record = _record(revenue=1000.0)
-                 ^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:85:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': 1000.0}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-_______________________________________ test_p25_02_same_publication_tie_break ________________________________________
-
-    def test_p25_02_same_publication_tie_break():
->       record = _record(revenue=1000.0)
-                 ^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:103:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': 1000.0}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-_____________________________ test_p25_03_restated_later_publication_loses_to_first_known _____________________________
-
-    def test_p25_03_restated_later_publication_loses_to_first_known():
-        # A RESTATED Actual published later is hindsight, not the outcome:
-        # first-known-outcome names the EARLY original as the winner.
->       record = _record(revenue=1000.0)
-                 ^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:130:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': 1000.0}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-___________________________________ test_p25_04_invalid_report_version_never_scores ___________________________________
-
-    def test_p25_04_invalid_report_version_never_scores():
->       record = _record()
-                 ^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:144:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-____________________________________ test_p25_05_missing_actual_value_quarantines _____________________________________
-
-    def test_p25_05_missing_actual_value_quarantines():
->       record = _record()
-                 ^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:162:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-__________________________________ test_p25_06_estimated_scores_with_limited_quality __________________________________
-
-    def test_p25_06_estimated_scores_with_limited_quality():
->       record = _record()
-                 ^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:173:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-_____________________________________ test_p25_07_suspicious_quarantines_verbatim _____________________________________
-
-    def test_p25_07_suspicious_quarantines_verbatim():
->       record = _record()
-                 ^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:186:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-______________________________________ test_p25_08_unmapped_quarantines_verbatim ______________________________________
-
-    def test_p25_08_unmapped_quarantines_verbatim():
->       record = _record()
-                 ^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:198:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-___________________________________ test_p25_09_conflicting_duplicates_fail_closed ____________________________________
-
-    def test_p25_09_conflicting_duplicates_fail_closed():
->       first = _record(forecast_id=1, forecast_period_id=101)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:210:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'forecast_id': 1, 'forecast_period_id': 101}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-________________________________ test_p25_10_dup_key_across_horizons_does_not_collide _________________________________
-
-    def test_p25_10_dup_key_across_horizons_does_not_collide():
->       one = _record(forecast_period_id=101, forecast_horizon="12M")
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:223:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'forecast_period_id': 101, 'forecast_horizon': '12M'}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-________________________________ test_p25_11_dup_key_across_versions_does_not_collide _________________________________
-
-    def test_p25_11_dup_key_across_versions_does_not_collide():
->       one = _record(forecast_period_id=101, model_version="V1.0")
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:233:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'forecast_period_id': 101, 'model_version': 'V1.0'}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-_________________________________ test_p25_12_dup_key_across_cutoffs_does_not_collide _________________________________
-
-    def test_p25_12_dup_key_across_cutoffs_does_not_collide():
-        # Stage 6 Prompt 38: distinct cutoffs never reach joint scoring — the
-        # pipeline fails closed. The non-collision property itself is proved
-        # at the flag_duplicates level (distinct 7-tuple identity keys).
-        import pytest
-
-        from src.evaluation.observation import flag_duplicates
-
->       one = _record(forecast_period_id=101)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:250:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'forecast_period_id': 101}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-__________________________________ test_p25_13_zero_actual_positive_forecast_scores ___________________________________
-
-    def test_p25_13_zero_actual_positive_forecast_scores():
-        # Stage 6 Prompt 38 (spec §9 D4-pointer + §12 D4): A=0/F=1000 stays
-        # scored with absolute error retained and the Bias term eligible, but
-        # is excluded from ordinary MAPE with the dedicated ACTUAL_ZERO code.
->       record = _record(revenue=1000.0)
-                 ^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:272:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': 1000.0}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-__________________________________ test_p25_14_zero_actual_negative_forecast_scores ___________________________________
-
-    def test_p25_14_zero_actual_negative_forecast_scores():
-        # Stage 6 Prompt 38 (§10 RB-2 (1)): A=0/F<0 stays Bias-eligible with
-        # term exactly +100%, while MAPE-excluded with ACTUAL_ZERO.
->       record = _record(revenue=-500.0)
-                 ^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:289:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': -500.0}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-_______________________________________ test_p25_15_zero_over_zero_is_zero_base _______________________________________
-
-    def test_p25_15_zero_over_zero_is_zero_base():
->       record = _record(revenue=0.0)
-                 ^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:304:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': 0.0}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-_______________________________________ test_p25_16_zero_forecast_is_zero_base ________________________________________
-
-    def test_p25_16_zero_forecast_is_zero_base():
->       record = _record(revenue=0.0)
-                 ^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:319:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': 0.0}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-________________________________ test_p25_17_positive_forecast_zero_actual_regime_none ________________________________
-
-    def test_p25_17_positive_forecast_zero_actual_regime_none():
-        # classify_regime requires f*a < 0 for SIGN_CHANGE; here f*a = 0, so no
-        # regime fires even though a naive sign reading sees "positive to zero".
->       record = _record(revenue=1000.0)
-                 ^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_p25_adversarial.py:336:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': 1000.0}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-___________________________________ test_p25_restated_series_flags_limited_quality ____________________________________
-
-    def test_p25_restated_series_flags_limited_quality():
-        observations = [
-            build_observation(
->               _record(forecast_period_id=101 + i),
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                "REVENUE",
-                _actual(financial_period_id=101 + i,
-                        data_quality_state="RESTATED", restated=True),
-            )
-            for i in range(8)
-        ]
-
-src\tests\test_stage6_p25_adversarial.py:355:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'forecast_period_id': 101}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_p25_adversarial.py:51: TypeError
-_____________________________________ test_identity_key_carries_full_mapping_key ______________________________________
-
-    def test_identity_key_carries_full_mapping_key():
->       key = evaluation_key_for(_record(), "REVENUE")
-                                 ^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:92:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-____________________________________ test_identity_scenario_isolates_observations _____________________________________
-
-    def test_identity_scenario_isolates_observations():
-        assert (
->           evaluation_key_for(_record(scenario="BASE"), "REVENUE").as_tuple()
-                               ^^^^^^^^^^^^^^^^^^^^^^^^
-            != evaluation_key_for(_record(scenario="BULL"), "REVENUE").as_tuple()
-        )
-
-src\tests\test_stage6_evaluation_foundation.py:100:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'scenario': 'BASE'}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-___________________________________________ test_identity_differs_by_metric ___________________________________________
-
-    def test_identity_differs_by_metric():
-        assert (
->           evaluation_key_for(_record(), "REVENUE").as_tuple()
-                               ^^^^^^^^^
-            != evaluation_key_for(_record(), "NET_PROFIT").as_tuple()
-        )
-
-src\tests\test_stage6_evaluation_foundation.py:108:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-________________________________________ test_identity_stable_for_same_series _________________________________________
-
-    def test_identity_stable_for_same_series():
-        assert (
->           evaluation_key_for(_record(), "REVENUE").as_tuple()
-                               ^^^^^^^^^
-            == evaluation_key_for(_record(), "REVENUE").as_tuple()
-        )
-
-src\tests\test_stage6_evaluation_foundation.py:115:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-_______________________________________ test_later_published_actual_binds_ready _______________________________________
-
-    def test_later_published_actual_binds_ready():
->       observation = build_observation(_record(), "REVENUE", _actual())
-                                        ^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:124:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-__________________________________________ test_historical_actual_also_binds __________________________________________
-
-    def test_historical_actual_also_binds():
-        observation = build_observation(
->           _record(), "REVENUE", _actual(publication_datetime=BEFORE)
-            ^^^^^^^^^
-        )
-
-src\tests\test_stage6_evaluation_foundation.py:132:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-______________________________________ test_unbound_observation_waits_for_actual ______________________________________
-
-    def test_unbound_observation_waits_for_actual():
->       observation = build_observation(_record(), "REVENUE")
-                                        ^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:138:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-________________________________________ test_leaked_input_freezes_observation ________________________________________
-
-    def test_leaked_input_freezes_observation():
->       record = _record(input_refs=(_ref(at=AFTER),))
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:147:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'input_refs': (ForecastInputRef(fact_key='REVENUE', report_version_id=9, available_at=datetime.datetime(2024, 9, 30, 0, 0, tzinfo=datetime.timezone.utc), source='stage1'),)}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-__________________________________________ test_later_actual_is_not_leakage ___________________________________________
-
-    def test_later_actual_is_not_leakage():
-        refs = (_ref(at=BEFORE),)
-        assert detect_pit_leakage(CUTOFF, refs) == []
-        observation = build_observation(
->           _record(input_refs=refs), "REVENUE", _actual(publication_datetime=AFTER)
-            ^^^^^^^^^^^^^^^^^^^^^^^^
-        )
-
-src\tests\test_stage6_evaluation_foundation.py:156:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'input_refs': (ForecastInputRef(fact_key='REVENUE', report_version_id=9, available_at=datetime.datetime(2024, 3, 31, 0, 0, tzinfo=datetime.timezone.utc), source='stage1'),)}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-______________________________________ test_restated_actual_carried_not_decided _______________________________________
-
-    def test_restated_actual_carried_not_decided():
-        actual = _actual(data_quality_state="RESTATED", restated=True)
-        assert actual.data_quality_state == "RESTATED"
-        assert actual.restated is True
->       observation = build_observation(_record(), "REVENUE", actual)
-                                        ^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:185:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-_________________________________________ test_missing_report_version_carried _________________________________________
-
-    def test_missing_report_version_carried():
-        # Stage 6 Prompt 25 (Part A): an Actual without a ReportVersion id is
-        # INVALID_REPORT_VERSION — carried (actual attached for audit) but
-        # quarantined downstream, never scored.
-        actual = _actual(report_version_id=None)
-        assert actual.report_version_id is None
->       observation = build_observation(_record(), "REVENUE", actual)
-                                        ^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:195:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-____________________________________________ test_horizon_isolates_series _____________________________________________
-
-    def test_horizon_isolates_series():
-        assert (
->           evaluation_key_for(_record(forecast_horizon="12M"), "REVENUE").as_tuple()
-                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            != evaluation_key_for(_record(forecast_horizon="3M"), "REVENUE").as_tuple()
-        )
-
-src\tests\test_stage6_evaluation_foundation.py:205:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'forecast_horizon': '12M'}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-_________________________________________ test_model_version_isolates_series __________________________________________
-
-    def test_model_version_isolates_series():
-        assert (
->           evaluation_key_for(_record(model_version="V1.0"), "REVENUE").as_tuple()
-                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            != evaluation_key_for(_record(model_version="V2.0"), "REVENUE").as_tuple()
-        )
-
-src\tests\test_stage6_evaluation_foundation.py:212:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'model_version': 'V1.0'}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-_____________________________________ test_duplicate_keys_share_flag_and_survive ______________________________________
-
-    def test_duplicate_keys_share_flag_and_survive():
->       first = build_observation(_record(), "REVENUE", _actual())
-                                  ^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:221:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-_________________________________________ test_unique_observations_unflagged __________________________________________
-
-    def test_unique_observations_unflagged():
-        observations = [
->           build_observation(_record(forecast_horizon="3M"), "REVENUE"),
-                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            build_observation(_record(forecast_horizon="6M"), "REVENUE"),
-        ]
-
-src\tests\test_stage6_evaluation_foundation.py:233:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'forecast_horizon': '3M'}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-_____________________________________ test_missing_actual_value_is_none_not_zero ______________________________________
-
-    def test_missing_actual_value_is_none_not_zero():
-        observation = build_observation(
->           _record(), "REVENUE", _actual(value=None, data_quality_state="MISSING")
-            ^^^^^^^^^
-        )
-
-src\tests\test_stage6_evaluation_foundation.py:245:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-_________________________________________ test_zero_actual_preserved_as_zero __________________________________________
-
-    def test_zero_actual_preserved_as_zero():
->       observation = build_observation(_record(), "REVENUE", _actual(value=0.0))
-                                        ^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:252:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-________________________________________ test_missing_forecast_metric_is_none _________________________________________
-
-    def test_missing_forecast_metric_is_none():
->       record = _record(revenue=None)
-                 ^^^^^^^^^^^^^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:258:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {'revenue': None}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-____________________________________ test_unknown_metric_code_is_missing_not_zero _____________________________________
-
-    def test_unknown_metric_code_is_missing_not_zero():
->       observation = build_observation(_record(), "NO_SUCH_METRIC")
-                                        ^^^^^^^^^
-
-src\tests\test_stage6_evaluation_foundation.py:265:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
-________________________________________ test_metadata_counts_without_scoring _________________________________________
-
-    def test_metadata_counts_without_scoring():
-        observations = flag_duplicates([
->           build_observation(_record(), "REVENUE", _actual()),
-                              ^^^^^^^^^
-            build_observation(_record(forecast_horizon="3M"), "REVENUE"),
-            build_observation(_record(input_refs=(_ref(at=AFTER),)), "REVENUE"),
-        ])
-
-src\tests\test_stage6_evaluation_foundation.py:283:
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-
-overrides = {}
-
-    def _record(**overrides):
-        fields = dict(
-            forecast_id=1,
-            forecast_version=1,
-            company_id=7,
-            forecast_period_id=101,
-            industry_code="PETROCHEMICAL",
-            forecast_horizon="12M",
-            scenario="BASE",
-            forecast_timestamp=STAMP,
-            data_cutoff_datetime=CUTOFF,
-            model_version="V1.0",
-            forecast_method="M1",
-            data_quality="VALID",
-            baseline_method="SEASONAL_NAIVE",
-            revenue=1000.0,
-            operating_profit=200.0,
-            operating_margin=0.2,
-            net_profit=150.0,
-            eps=15.0,
-            roe=0.1,
-            input_refs=(),
-        )
-        fields.update(overrides)
->       return ForecastRecord(**fields)
-               ^^^^^^^^^^^^^^^^^^^^^^^^
-E       TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-
-src\tests\test_stage6_evaluation_foundation.py:66: TypeError
+>       assert same.accepted
+E       assert False
+E        +  where False = ExcelAdapterResult(observation=WorkbookObservation(source=SourceArtifactObservation(source_ref=None, file_name=None, f...ksheet_ordinal=None, identity=("'version-1'", "('DURATION', (1404, 1, 1), (1404, 12, 29))", "'metric-sales'", '()')),)).accepted
+
+src\tests\test_excel_adapter.py:254: AssertionError
 =============================================== short test summary info ===============================================
-FAILED src/tests/test_stage6_p25_selection.py::test_key_is_7_tuple_with_scenario_last - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_selection.py::test_key_scenario_distinct_keys_differ - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_selection.py::test_key_forecast_id_does_not_affect_key - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_selection.py::test_build_observation_invalid_report_version_status - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_01_multi_rv_earliest_publication_wins - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_02_same_publication_tie_break - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_03_restated_later_publication_loses_to_first_known - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_04_invalid_report_version_never_scores - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_05_missing_actual_value_quarantines - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_06_estimated_scores_with_limited_quality - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_07_suspicious_quarantines_verbatim - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_08_unmapped_quarantines_verbatim - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_09_conflicting_duplicates_fail_closed - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_10_dup_key_across_horizons_does_not_collide - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_11_dup_key_across_versions_does_not_collide - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_12_dup_key_across_cutoffs_does_not_collide - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_13_zero_actual_positive_forecast_scores - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_14_zero_actual_negative_forecast_scores - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_15_zero_over_zero_is_zero_base - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_16_zero_forecast_is_zero_base - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_17_positive_forecast_zero_actual_regime_none - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_p25_adversarial.py::test_p25_restated_series_flags_limited_quality - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_identity_key_carries_full_mapping_key - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_identity_scenario_isolates_observations - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_identity_differs_by_metric - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_identity_stable_for_same_series - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_later_published_actual_binds_ready - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_historical_actual_also_binds - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_unbound_observation_waits_for_actual - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_leaked_input_freezes_observation - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_later_actual_is_not_leakage - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_restated_actual_carried_not_decided - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_missing_report_version_carried - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_horizon_isolates_series - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_model_version_isolates_series - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_duplicate_keys_share_flag_and_survive - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_unique_observations_unflagged - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_missing_actual_value_is_none_not_zero - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_zero_actual_preserved_as_zero - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_missing_forecast_metric_is_none - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_unknown_metric_code_is_missing_not_zero - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-FAILED src/tests/test_stage6_evaluation_foundation.py::test_metadata_counts_without_scoring - TypeError: ForecastRecord.__init__() got an unexpected keyword argument 'forecast_id'
-42 failed, 125 passed in 52.63s
+FAILED src/tests/test_canonical_writer.py::test_failed_migration_nine_keeps_duplicate_legacy_rows_and_is_not_recorded - sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) NOT NULL constraint failed: companies.status
+FAILED src/tests/test_canonical_writer.py::test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment - src.ingestion.canonical_writer.CanonicalWriteError: APPROVAL_NOT_RESOLVED
+FAILED src/tests/test_task017_model_constraints.py::test_company_required_fields_industry_fk_and_supported_uniqueness - Failed: DID NOT RAISE IntegrityError
+FAILED src/tests/test_excel_adapter.py::test_duplicate_and_conflicting_facts_keep_all_or_nothing_admission_semantics - assert False
+4 failed, 90 passed in 406.69s (0:06:46)
