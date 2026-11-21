@@ -2657,3 +2657,8 @@ The owner reports **94 successful DB-IMPL-001 focused tests**: 93 in the full ru
 The workbook `excel/parsian_periodic.xlsx` is absent from this checkout, so no current fingerprint or bounds were established. Git history search did not recover the old `codal_excel_source_metadata` Migration 9 implementation; the conflict guard remains. No real database was inspected or migrated. Stage 5/6 still require a separately reviewed Jalali canonical read integration.
 
 DB-IMPL-001, DB-ING-002/003, DB-TEST-002/003, DB-ING-008 and DB-EXIT-001 remain PARTIAL because new tests await owner execution and genuine production workbook/approval, consumer integration, or historical lineage evidence remains outstanding. DB-ING-007 retains its previous owner-accepted status. The dashboard remains 36 tasks: 8 DONE / 25 PARTIAL / 3 OPEN = 57%; the cross-cutting work adds no denominator item.
+
+
+## 2026-11-21 — DB-CONSOLIDATION-002 owner-test correction
+
+The first owner-run focused command returned **14 failed, 140 passed**. Direct fixes were applied to canonical approval scope resolution, the invalid-number test token, the Migration 10 fixture's required company fields, and the MarketDaily ticker/CODAL conflict fixture. Details and changed paths are recorded in `database/reports/DB_CONSOLIDATION_002_IMPLEMENTATION.md` under “Owner-run test failure corrections”. The same focused command must be rerun by the owner; these fixes are not yet owner-accepted. No real database was opened or migrated. Production workbook/approval records, Stage 5/6 compatibility, and historical Migration 9 lineage remain open.
