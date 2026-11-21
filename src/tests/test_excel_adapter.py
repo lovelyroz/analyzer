@@ -129,8 +129,8 @@ def test_valid_source_matches_builds_explicit_candidate_and_admits_only_on_reque
     )
     assert admitted.accepted
     assert admitted.admission_plan is not None
-    assert admitted.admission_plan.execution_allowed is False
-    assert admitted.admission_plan.physical_persistence_compatible is False
+    assert admitted.admission_plan.execution_allowed is True
+    assert admitted.admission_plan.physical_persistence_compatible is True
     assert admitted.admission_plan.atomicity_unit == "REPORT_VERSION"
     fact, = admitted.admission_plan.facts
     assert fact.company_id == "company-1"
@@ -159,9 +159,10 @@ def test_valid_source_matches_builds_explicit_candidate_and_admits_only_on_reque
         ("scale", "scale-unit", "approval-scale-unit"),
         ("period_mapping", "period-1404-ytd", "approval-period-1404-ytd"),
     }
-    # The source locator is available on the submission candidate. PlannedFact
-    # intentionally does not persist cell coordinates under the current contract.
+    # The writer-facing plan keeps the locator needed for minimum provenance.
     assert admitted.submissions[0].candidate.source_coordinate == "B2"
+    assert fact.source_coordinate == "B2"
+    assert fact.worksheet_ordinal == 1 and fact.worksheet_name == "Annual"
 
 
 def test_multi_period_report_preserves_explicit_ytd_and_standalone_semantics():

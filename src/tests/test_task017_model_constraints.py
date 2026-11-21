@@ -94,6 +94,12 @@ def test_company_required_fields_industry_fk_and_supported_uniqueness(db):
         s.add_all([Company(ticker="A", company_name="A", industry_id=industry.industry_id),
                    Company(ticker="B", company_name="B", industry_id=industry.industry_id)])
         s.flush()  # Multiple NULL national IDs are allowed by SQLite UNIQUE semantics.
+        _rejected(s, Company(ticker="A", company_name="Duplicate ticker", industry_id=industry.industry_id))
+        s.add_all([Company(ticker="C1", company_name="C1", industry_id=industry.industry_id, codal_symbol="CODAL"),
+                   Company(ticker="C2", company_name="C2", industry_id=industry.industry_id, codal_symbol=None),
+                   Company(ticker="C3", company_name="C3", industry_id=industry.industry_id, codal_symbol=None)])
+        s.flush()
+        _rejected(s, Company(ticker="C4", company_name="C4", industry_id=industry.industry_id, codal_symbol="CODAL"))
         s.add(Company(ticker="C", company_name="C", industry_id=industry.industry_id, national_id="N1"))
         s.flush()
         _rejected(s, Company(ticker="D", company_name="D", industry_id=industry.industry_id, national_id="N1"))
@@ -202,10 +208,10 @@ def test_derived_input_xor_is_enforced_but_sqlite_null_unique_gap_is_visible(db)
 def test_runner_empty_upgrade_repeated_upgrade_and_single_history_entries(tmp_path):
     empty_engine = create_engine(f"sqlite:///{tmp_path / 'empty.sqlite'}")
     runner = MigrationRunner(empty_engine)
-    assert runner.upgrade() == runner.upgrade() == 8
+    assert runner.upgrade() == runner.upgrade() == 9
     with empty_engine.connect() as c:
         versions = c.execute(text("SELECT version FROM schema_migrations ORDER BY version")).scalars().all()
-    assert versions == list(range(1, 9))
+    assert versions == list(range(1, 10))
     empty_engine.dispose()
 
 
@@ -213,7 +219,7 @@ def test_runner_recognizes_legacy_baseline_without_losing_business_row(db):
     with db.begin() as c:
         c.execute(text("CREATE TABLE legacy_business (id INTEGER PRIMARY KEY, payload TEXT NOT NULL)"))
         c.execute(text("INSERT INTO legacy_business VALUES (1, 'keep')"))
-    assert MigrationRunner(db).upgrade() == 8
+    assert MigrationRunner(db).upgrade() == 9
     with db.connect() as c:
         assert c.execute(text("SELECT payload FROM legacy_business WHERE id=1")).scalar_one() == "keep"
         assert c.execute(text("SELECT name FROM schema_migrations WHERE version=1")).scalar_one() == "legacy_baseline"
@@ -250,7 +256,7 @@ def test_failed_migration_is_not_recorded(monkeypatch, tmp_path):
     engine.dispose()
 
 
-def test_jalali_period_validation_is_not_a_financial_period_model_contract():
+def test_jalali_date_api_remains_the_shared_validation_contract():
     from src.core.jalali import validate_jalali_date
     assert validate_jalali_date((1403, 12, 29), label="date") == (1403, 12, 29)
     with pytest.raises(ValueError):

@@ -12,7 +12,7 @@
 
 **سند معماری مبنا:** `../12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-21 — Task 016 / DB-ING-003 به PARTIAL پیش رفت: adapter خالص و fail-closed، تست‌های مصنوعی و گزارش §9.38 افزوده شدند؛ template/semantic mappings تولیدی و workbook واقعی مستقل باقی‌اند. Owner-run suite مربوط به Taskهای 014/015 با فرمان ثبت‌شده در §9.35/§9.37 برابر `36 passed in 1.61s` گزارش شده؛ این نتیجه تست Task 016 نیست. Task 015 / DB-ING-002 همچنان PARTIAL است: ORM/physical schema کلید canonical و هویت‌های لازم را بیان نمی‌کند و writer/atomicity اجرا نشده. اصلاح code review برای Task 014 / DB-ING-001 در §9.36 ثبت شد: Candidate اکنون native integer را دقیق می‌پذیرد، float فاقد lexical evidence را رد می‌کند، approval refs را نگه می‌دارد و extraction coordinate را به مالکیت یکتای range محدود می‌کند؛ 26 تست متمرکز گذشت. Task همچنان PARTIAL است: parser مصوب locale فارسی و resolver معتبر approvalها وجود ندارد (§9.35–§9.36). Task 033 / DB-ING-006 همچنان PARTIAL است؛ workbook نهایی Parsian با hash `55266751...4325db85` مستقیماً audit شد و خروجی کامل در §9.34 است. matcher عمومی fail-closed با 37 تست Excel/DTO و synthetic پیاده شد، اما هیچ Template Parsian approved نیست و persistence کاننیکال آماده نیست. Fillهای جاری 459 gray و 489 theme-dark هستند؛ مقدار تاریخی 492 فرض نشد. مالکیت 17 bounds/15 partitions، workbook دورهٔ مستقل برای drift، semantic approvals و writer transaction باقی‌اند. Task 035 پذیرش مالک `13 passed in 1.67s` دارد اما به‌علت محدودیت EXCHANGE_CENTER و یکتایی concurrency جلالی PARTIAL باقی می‌ماند (§9.33).
+آخرین بازنگری: 2026-11-21 — نتیجهٔ DB-IMPL-001 در §9.45 ثبت شد: مدل canonical افزایشی Jalali، Migration 9 guarded، writer اتمیک Excel و query PIT اضافه شدند؛ تست‌های SQLite موقت نوشته شدند اما طبق PROMPT اجرا نشدند. Task جدید PARTIAL است؛ lineage نسخهٔ تاریخی 9، کاتالوگ‌های approval و پذیرش مالک باقی‌اند. جزئیات تاریخی و وضعیت Taskهای قبلی در بخش‌های بعدی حفظ شده‌اند.
 
 
 ## 1.1 داشبورد سادهٔ پیشرفت Database
@@ -24,12 +24,12 @@
 | استاندارد ورودی‌ها (DB-STD) | **60%** | 1 | 4 | 0 | 0 |
 | ممیزی وضع موجود (DB-AUD) | **63%** | 2 | 6 | 0 | 0 |
 | طراحی قراردادها (DB-DES) | **64%** | 2 | 5 | 0 | 0 |
-| Migration (DB-MIG) | **0%** | 0 | 0 | 3 | 0 |
+| Migration / physical implementation (DB-MIG / DB-IMPL) | **13%** | 0 | 1 | 3 | 0 |
 | Ingestion و Adapterها (DB-ING) | **69%** | 3 | 5 | 0 | 0 |
 | Testing & Exit (DB-TEST / DB-EXIT) | **50%** | 0 | 4 | 0 | 0 |
-| **Total (35 Tasks)** | **57%** | **8** | **24** | **3** | **0** |
+| **Total (36 Tasks)** | **57%** | **8** | **25** | **3** | **0** |
 
-**روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014، 015، 016، 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
+**روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014، 015، 016، 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند؛ DB-IMPL-001 فقط یک بار در ردیف Migration/physical implementation محاسبه شده است. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
 
 **قاعدهٔ STALLED:** اگر دو اجرای متوالی یک Task خروجی قابل‌قبول و پیشرفت قابل‌اثبات نداشته باشند، وضعیت آن STALLED ثبت می‌شود و تا رفع توقف، امتیاز پیشرفت نمی‌گیرد.
 
@@ -2623,8 +2623,16 @@ No ORM/model, schema, migration, database, or production contract changes were m
 
 ## 9.44 Task 020 / DB-EXIT-001 — final Database Configuration exit assessment
 
-**Status: PARTIAL — assessment completed; overall database exit criteria are not met.** The ten exit criteria in Section 6 were evaluated with direct code and task evidence in `database/reports/DB_EXIT_001_FINAL_ASSESSMENT.md`. Criteria 2, 3, 5, 8, and 9 are BLOCKED; the remaining criteria are PARTIAL. The critical issue is the absence of a physical canonical persistence contract/writer compatible with Jalali per-fact periods, canonical integer values, required identity/value-state/provenance, and transactional ReportVersion ingestion. `CanonicalPersistencePlan` remains explicitly non-executable and physically incompatible with current ORM models. Migration Runner currently ends at v8; Migration 9 remains unreconciled. Production template/semantic approvals and an authoritative approval resolver are also absent.
+**Status: PARTIAL — assessment complete; database exit criteria remain unmet.** The ten exit criteria and prior owner-run evidence are recorded in `database/reports/DB_EXIT_001_FINAL_ASSESSMENT.md`. Task 020 remains PARTIAL and the implementation progress that followed is recorded in §9.45. The cross-cutting PDF retirement in Sections 8.46 and 9.41 is one activity and is not double-counted.
 
-The report confirms owner acceptance already recorded for Task 019 (**115 passed in 2.75s**), Task 018 correction suites (**167 passed in 55.40s**), and Task 017 (**23 passed in 76.32s**). These focused tests do not prove production persistence or close the schema blockers.
+## 9.45 Task DB-IMPL-001 — canonical database and atomic Excel writer — 2026-11-21
 
-The cross-cutting PDF-retirement activity in Sections 8.46 and 9.41 is one activity and is not double-counted in the 35-task denominator. Dashboard reconciled to **8 DONE / 24 PARTIAL / 3 OPEN = 57%**; DB-TEST/DB-EXIT is **0 DONE / 4 PARTIAL / 0 OPEN = 50%**. Task 019 and Task 020 are marked PARTIAL in Phase E. No ORM, schema, migration, database, data, or `WORKFLOW_RULES.md` was changed; no tests were run. **Database Configuration is not complete.**
+**Status: PARTIAL; owner test run and production reconciliation remain.** Added an additive canonical BANK schema in `src/models/canonical.py` and migration version 9, `canonical_jalali_excel_writer`. The v1–v8 legacy models and rows are preserved. Migration 9 refuses conflicting v9 history (`codal_excel_source_metadata` is the owner-reported historical name), rejects duplicate existing company ticker/codal symbols before adding unique indexes, and does not convert Gregorian periods or remove populated legacy metadata. A company fiscal calendar is stored explicitly in its own table; absence causes YTD admission to fail closed.
+
+Added `src/ingestion/canonical_writer.py`. Its `ingest_excel_source()` commits STARTED audit before reading the workbook, then calls the existing reader/matcher/adapter/admission path and persists one admitted plan in a caller-owned SQLAlchemy transaction. It revalidates Jalali dates, YTD and metric temporal alignment, integer rounding, active approval references, and company/Metric bindings. It stores report/version, period, dimension set, integer fact, value state/origin and minimum provenance; accepted/duplicate/rejected counts are tracked in a companion audit row. An exact replay returns duplicates, changed payload/provenance conflicts, corrections append versions, and any failure rolls the canonical batch back before a separate FAILED audit update. No raw financial rows or derived quarter values are written by this writer.
+
+Added `src/forecast/canonical_queries.py` for canonical PIT reads by ReportVersion publication time, with Jalali ordering and exact integer values. Existing Stage 5/6 queries remain on the legacy model and are not switched silently. Added temporary SQLite migration/writer/PIT tests in `src/tests/test_canonical_writer.py`, updated migration expectations and executable-plan assertions in related suites, and extended company symbol checks. **No tests were run**, as PROMPT.md directs owner execution.
+
+The implementation report, exact owner command, full file inventory, and remaining gates are in `database/reports/DB_IMPL_001_CANONICAL_DATABASE_AND_EXCEL_WRITER.md`. The task remains PARTIAL until owner tests pass, the historical migration-9 source and each target database are reconciled read-only, and real production template/semantic/temporal approval data is installed. Persian/Arabic locale number parsing and downstream Stage 5/6 canonical compatibility remain open. No real database was opened and no migration was applied. `WORKFLOW_RULES.md` and PDF extraction remain untouched.
+
+Dashboard now counts **36 tasks: 8 DONE / 25 PARTIAL / 3 OPEN = 57%**. DB-TEST/DB-EXIT remains **0 DONE / 4 PARTIAL / 0 OPEN = 50%**; DB-IMPL-001 is counted once under Migration/physical implementation.

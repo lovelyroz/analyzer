@@ -30,6 +30,7 @@ from src.models.forecast import (
 from src.models.period import FinancialPeriod  # noqa: F401
 from src.models.report import Report, ReportVersion  # noqa: F401
 from src.models.share_action import CorporateAction, ShareCountHistory  # noqa: F401
+from src.models import canonical as _canonical  # noqa: F401
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,19 @@ def _baseline_exists(engine: Engine) -> bool:
 
 
 def _apply_baseline(engine: Engine) -> None:
-    Base.metadata.create_all(bind=engine)
+    # Keep the v1 bootstrap frozen: canonical tables belong to migration 9.
+    canonical_tables = {
+        "canonical_approvals", "canonical_identity_bindings", "canonical_reports",
+        "canonical_company_fiscal_calendars",
+        "canonical_ingestion_audits",
+        "canonical_report_versions", "canonical_financial_periods",
+        "canonical_dimension_sets", "canonical_dimension_members",
+        "canonical_financial_facts", "canonical_fact_provenance",
+    }
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[table for table in Base.metadata.sorted_tables if table.name not in canonical_tables],
+    )
 
 
 def _add_column_if_missing(engine: Engine, table_name: str, column_name: str, definition: str) -> None:
@@ -162,6 +175,51 @@ def _apply_remove_forecast_output_persistence(engine: Engine) -> None:
         connection.execute(text("DROP TABLE IF EXISTS forecast_versions"))
 
 
+def _apply_canonical_jalali_excel_schema(engine: Engine) -> None:
+    """CHANGE-009: additive canonical write store; never reinterpret legacy dates.
+
+    Historical installations used version 9 for a different, unrecovered
+    migration. The runner checks that history before invoking this migration.
+    """
+    if "companies" in set(inspect(engine).get_table_names()):
+        with engine.connect() as connection:
+            duplicate_tickers = connection.execute(text(
+                "SELECT COUNT(*) FROM (SELECT ticker FROM companies GROUP BY ticker HAVING COUNT(*) > 1)"
+            )).scalar_one()
+            duplicate_symbols = connection.execute(text(
+                "SELECT COUNT(*) FROM (SELECT codal_symbol FROM companies WHERE codal_symbol IS NOT NULL GROUP BY codal_symbol HAVING COUNT(*) > 1)"
+            )).scalar_one()
+        if duplicate_tickers or duplicate_symbols:
+            raise RuntimeError(
+                "Cannot enforce unique company symbols: duplicate legacy values require explicit resolution."
+            )
+        with engine.begin() as connection:
+            connection.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_company_ticker ON companies(ticker)"
+            ))
+            connection.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_company_codal_symbol "
+                "ON companies(codal_symbol) WHERE codal_symbol IS NOT NULL"
+            ))
+    with engine.begin() as connection:
+        connection.execute(text(
+            "CREATE TABLE IF NOT EXISTS canonical_approvals ("
+            "approval_id INTEGER PRIMARY KEY, approval_ref VARCHAR(200) NOT NULL UNIQUE, "
+            "approval_kind VARCHAR(40) NOT NULL, external_identity VARCHAR(200) NOT NULL, "
+            "is_active BOOLEAN NOT NULL DEFAULT 1, "
+            "CONSTRAINT uq_canonical_approval_identity UNIQUE(approval_kind, external_identity, approval_ref))"
+        ))
+    tables = [
+        "canonical_identity_bindings", "canonical_reports", "canonical_report_versions",
+        "canonical_company_fiscal_calendars",
+        "canonical_ingestion_audits",
+        "canonical_financial_periods", "canonical_dimension_sets",
+        "canonical_dimension_members", "canonical_financial_facts",
+        "canonical_fact_provenance",
+    ]
+    Base.metadata.create_all(bind=engine, tables=[Base.metadata.tables[name] for name in tables])
+
+
 def _migration_list() -> Iterable[Migration]:
     return (
         Migration(1, "baseline_schema", _apply_baseline),
@@ -172,6 +230,7 @@ def _migration_list() -> Iterable[Migration]:
         Migration(6, "fx_rates_jalali_components", _apply_fx_rates_jalali_components),
         Migration(7, "forecast_version_repository", _apply_forecast_version_repository),
         Migration(8, "remove_forecast_output_persistence", _apply_remove_forecast_output_persistence),
+        Migration(9, "canonical_jalali_excel_writer", _apply_canonical_jalali_excel_schema),
     )
 
 
@@ -190,6 +249,17 @@ class MigrationRunner:
     def upgrade(self) -> int:
         _ensure_migration_table(self.engine)
         current = self.current_version()
+
+        # Never reinterpret a historical v9 ledger entry as this migration.
+        if current >= 9:
+            with self.engine.connect() as connection:
+                name = connection.execute(text(
+                    "SELECT name FROM schema_migrations WHERE version = 9"
+                )).scalar_one_or_none()
+            if name != "canonical_jalali_excel_writer":
+                raise RuntimeError(
+                    "Migration 9 history belongs to another migration; reconcile its source before upgrade."
+                )
 
         if current == 0 and _baseline_exists(self.engine):
             with self.engine.begin() as connection:

@@ -1,8 +1,9 @@
-"""Pure all-or-nothing admission and logical persistence-plan preparation.
+"""Pure all-or-nothing admission and canonical persistence-plan preparation.
 
 This module deliberately has no SQLAlchemy/session dependency. The returned
-plan describes one REPORT_VERSION atomic unit for a future caller-owned
-transaction; it is not an executable ORM write plan.
+plan describes one REPORT_VERSION atomic unit for the canonical writer. This
+module proves admission semantics; the writer rechecks identities and live
+approval state inside its own transaction before persisting anything.
 """
 from __future__ import annotations
 
@@ -139,6 +140,10 @@ class PlannedFact:
     template_sha256: str
     extraction_owner: str
     approval_references: tuple[tuple[str, str, str], ...]
+    worksheet_ordinal: int
+    worksheet_name: str
+    source_coordinate: str
+    source_value_kind: str
 
     @property
     def identity(self) -> tuple[object, ...]:
@@ -175,6 +180,8 @@ class PlannedFact:
         return (
             self.template_id, self.template_version, self.template_sha256,
             source_mapping, self.extraction_owner, self.approval_references,
+            self.worksheet_ordinal, self.worksheet_name, self.source_coordinate,
+            self.source_value_kind,
         )
 
 
@@ -194,10 +201,10 @@ class CanonicalPersistencePlan:
     preserved_report_version_ids: tuple[str, ...]
     persistence_target: str = "DB-DES-001 logical canonical input contract"
     atomicity_unit: str = "REPORT_VERSION"
-    transaction_owner: str = "CALLER"
-    execution_allowed: bool = False
-    physical_persistence_compatible: bool = False
-    persistence_block_code: str = "PHYSICAL_SCHEMA_INCOMPATIBLE"
+    transaction_owner: str = "WRITER"
+    execution_allowed: bool = True
+    physical_persistence_compatible: bool = True
+    persistence_block_code: str | None = None
 
 
 _SHA256 = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -213,7 +220,7 @@ def prepare_canonical_batch(
     existing_versions: tuple[ExistingReportVersion, ...] = (),
     existing_facts: tuple[PlannedFact, ...] = (),
 ) -> CanonicalPersistencePlan:
-    """Validate a whole report-version batch and return a non-executable plan.
+    """Validate a whole report-version batch and return a writer-compatible plan.
 
     This function never opens a database, starts a transaction, commits, or
     mutates its inputs. Existing state is supplied as immutable snapshots.
@@ -585,6 +592,10 @@ def _prepare_fact(
         template_sha256=candidate.template_sha256.lower(),
         extraction_owner=candidate.extraction_owner,
         approval_references=tuple(sorted(set(approvals))),
+        worksheet_ordinal=candidate.worksheet_ordinal,
+        worksheet_name=candidate.worksheet_name,
+        source_coordinate=candidate.source_coordinate,
+        source_value_kind=candidate.source_value_kind.value,
     )
 
 

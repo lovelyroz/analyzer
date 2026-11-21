@@ -890,7 +890,7 @@ Production/schema evolution uses the versioned migration runner:
 
 `python -m src.scripts.migrate_db`
 
-The repository migration runner currently reaches schema version **8**. The architecture document must stay synchronized with the executable migration history:
+The repository migration runner currently reaches schema version **9**. Migration 9 adds the canonical BANK Excel persistence boundary; historical installations that already recorded a different migration 9 are rejected for explicit reconciliation.
 
 | Version | Name |
 |---|---|
@@ -902,8 +902,17 @@ The repository migration runner currently reaches schema version **8**. The arch
 | 6 | `fx_rates_jalali_components` |
 | 7 | `forecast_version_repository` |
 | 8 | `remove_forecast_output_persistence` |
+| 9 | `canonical_jalali_excel_writer` |
 
-Migrations are ordered and idempotent. Existing source values must not be silently rewritten. Any future migration implementing the Jalali FinancialPeriod contract or removing/deprecating calculated-fact persistence must first inspect existing rows, report ambiguous data, and avoid destructive or guessed conversions. Migration 8's removal of forecast-output persistence is consistent with the runtime-only analytical-output policy.
+Migrations are ordered and idempotent. Existing source values must not be silently rewritten. Migration 9 is additive and preserves legacy Gregorian period/fact tables; it adds a separate Jalali-native canonical store, approval/binding registries, and an explicit company fiscal-calendar table. Its runner refuses a conflicting historical v9 ledger name. It has not been applied to any real database, and the historical `codal_excel_source_metadata` lineage remains unresolved. Migration 8's removal of forecast-output persistence is consistent with the runtime-only analytical-output policy.
+
+### DB-IMPL-001 — canonical BANK Excel persistence implementation (2026-11-21)
+
+The additive tables in `src/models/canonical.py` are the executable write boundary: `canonical_reports`, `canonical_report_versions`, `canonical_company_fiscal_calendars`, `canonical_ingestion_audits`, `canonical_financial_periods`, `canonical_dimension_sets`, `canonical_dimension_members`, `canonical_financial_facts`, `canonical_fact_provenance`, `canonical_approvals`, and `canonical_identity_bindings`. Period identity stores validated Jalali components without Gregorian conversion. Fact identity uses a non-null dimension-set key, integer `ROUND_HALF_UP` value, explicit temporal type/basis, value origin/state, unit/currency/scale, and report-version identity. Source/revision/artifact, worksheet coordinate/value kind, template/standard, and approval references remain auditable.
+
+`src/ingestion/canonical_writer.py` exposes `ingest_excel_source()` for the reader → approved matcher → admission → writer path and `write_canonical_plan()` for already admitted plans. It requires explicit metadata and active approval records plus identity bindings for company and Metric; unknown fiscal starts, YTD misalignment, metric/time mismatch, missing approvals, duplicate conflicts, and invalid source revisions fail closed. A report version and all facts/provenance plus COMPLETED audit status commit in one transaction. STARTED is committed before Excel reading; failures roll back canonical writes and record a stable error code in a separate transaction. Replays return duplicate only when report metadata, facts, and provenance match. Corrections append a new version and preserve the earlier one.
+
+`src/forecast/canonical_queries.py` provides a Jalali-native PIT read path using ReportVersion publication time and the approved audit/restatement quality order, returning exact integer facts. Existing `src/forecast/queries.py` and Stage 5/6 continue to consume the legacy schema; this implementation does not silently switch those consumers. Test additions exist in `src/tests/test_canonical_writer.py` and related admission/migration suites but have not been run by the implementer. Production approval data, locale-specific Persian numeric parsing, historical migration-9 reconciliation, and owner test acceptance remain open; see `database/reports/DB_IMPL_001_CANONICAL_DATABASE_AND_EXCEL_WRITER.md`.
 
 ---
 
@@ -919,7 +928,7 @@ Database owns selected canonical financial inputs, minimal provenance, controlle
 
 Overall Analyzer architecture remains **V1** with exactly nine analytical stages.
 
-Approved/reviewed decisions recorded in this revision: company/industry admission contract; FinancialPeriod Jalali/YTD contract; selected canonical-input persistence without raw financial-row retention, simple OTHER_* buckets, minimal provenance, and runtime calculation policy; Excel adapter direction with common DTO/persistence boundary and Excel-only input scope and exclusion of PDF; migration history corrected through version 8. CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007 remain historical amendment references pending a complete section-by-section audit.
+Approved/reviewed decisions recorded in this revision: company/industry admission contract; FinancialPeriod Jalali/YTD contract; selected canonical-input persistence without raw financial-row retention, simple OTHER_* buckets, minimal provenance, and runtime calculation policy; Excel adapter direction with common DTO/persistence boundary and Excel-only input scope and exclusion of PDF; repository migration history through version 9. The legacy/production schema is not yet reconciled or verified against migration 9. CHANGE-003, CHANGE-005, CHANGE-006, CHANGE-007 remain historical amendment references pending a complete section-by-section audit.
 
 
 ## 15. CODAL Excel literal-value input contract — owner clarification (2026-11-15)

@@ -425,3 +425,13 @@ The owner test command and exact changed/deleted-file inventory are in `database
 - Jalali date components are the authoritative period identity and date contract. Existing Gregorian SQL Date fields in FinancialPeriod are an implementation gap to fix, not a reason to alter the approved contract.
 - Technical decisions are delegated to ChatGPT. Proceed with the physical schema, safe migration reconciliation, and canonical transactional writer as one coherent implementation track. Preserve existing data; do not apply migrations to a real user database without a separate deployment/backup step.
 - Architecture decisions recorded in 12_Database_Architecture_V1.1.md, Master Packet §3.1–3.2, and DB_EXIT_001_FINAL_ASSESSMENT.md.
+
+# Task DB-IMPL-001 — پیاده‌سازی دیتابیس canonical و Excel writer — 2026-11-21
+
+**وضعیت: PARTIAL.** مدل افزایشی Jalali برای گزارش‌ها، نسخه‌ها، دوره‌ها، dimension set، Fact integer، provenance، approval/binding و تقویم مالی شرکت به `src/models/canonical.py` اضافه شد. Migration 9 با نام `canonical_jalali_excel_writer` داده‌های legacy را تبدیل یا حذف نمی‌کند؛ پیش از ساخت index یکتای ticker و `codal_symbol` duplicateها را بررسی می‌کند و اگر ledger نسخهٔ 9 نام دیگری داشته باشد، برای جلوگیری از اشتباه lineage متوقف می‌شود. Migration روی دیتابیس واقعی اجرا نشده است.
+
+`src/ingestion/canonical_writer.py` مسیر reader → matcher → adapter/admission → writer را به دیتابیس متصل می‌کند. `STARTED` پیش از خواندن فایل ثبت می‌شود؛ ReportVersion، Factها، provenance و وضعیت `COMPLETED` در یک تراکنش ثبت می‌شوند. ورودی با approval یا binding نامشخص، Fiscal calendar گمشده، دوره/Metric ناسازگار، replay متفاوت یا هر خطای batch رد می‌شود؛ کل تراکنش rollback و همان ingestion run با کد خطای پایدار `FAILED` می‌شود. replay کاملاً یکسان duplicate و اصلاح گزارش نسخهٔ append-only جدید است. `src/forecast/canonical_queries.py` خواندن PIT را بر اساس زمان انتشار نسخه و مرتب‌سازی Jalali فراهم می‌کند؛ Stage 5/6 فعلاً روی مصرف‌کنندهٔ legacy باقی مانده‌اند.
+
+تست‌های SQLite موقت برای Migration 9، حفظ legacy، نماد یکتا، replay/conflict، اصلاح نسخه، rollback و PIT افزوده/به‌روز شدند، اما طبق PROMPT اجرا نشدند. دستور دقیق مالک و محدودیت‌های باقی‌مانده در [گزارش DB-IMPL-001](database/reports/DB_IMPL_001_CANONICAL_DATABASE_AND_EXCEL_WRITER.md) آمده است. پیش از هر deploy باید source مهاجرت قدیمی `codal_excel_source_metadata` و ledger/schema هر دیتابیس فقط‌خواندنی تطبیق داده شود. Template و mappingهای production و parser locale فارسی/عربی نیز هنوز تأیید نشده‌اند.
+
+`WORKFLOW_RULES.md`، PDF extraction، دیتابیس واقعی و داده‌های ذخیره‌شده دست‌نخورده ماندند. داشبورد Master Packet اکنون 36 Task را با وضعیت **8 DONE / 25 PARTIAL / 3 OPEN = 57%** می‌شمارد؛ DB-IMPL-001 فقط یک بار محاسبه شده است.

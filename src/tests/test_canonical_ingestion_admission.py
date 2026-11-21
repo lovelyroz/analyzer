@@ -142,16 +142,17 @@ def _blank_observation_and_match(source_value=""):
     return observation, match, spec
 
 
-def test_valid_batch_returns_immutable_caller_owned_non_executable_plan():
+def test_valid_batch_returns_immutable_writer_owned_executable_plan():
     candidate = _candidate()
     plan = prepare_canonical_batch((candidate,), revision=_revision())
 
     assert len(plan.facts) == 1
     assert plan.facts[0].source_value_decimal == Decimal("12.5")
     assert plan.facts[0].value_integer == 13
-    assert plan.transaction_owner == "CALLER"
+    assert plan.transaction_owner == "WRITER"
     assert plan.atomicity_unit == "REPORT_VERSION"
-    assert plan.execution_allowed is False
+    assert plan.execution_allowed is True
+    assert plan.physical_persistence_compatible is True
     assert not hasattr(plan.facts[0], "source_text")
     with pytest.raises((AttributeError, TypeError)):
         plan.facts = ()
@@ -372,8 +373,8 @@ def test_unwrapped_raw_observation_is_rejected_and_no_transaction_side_effects_e
     assert AdmissionCode.CANDIDATE_TYPE_INVALID in _codes(exc)
     plan = prepare_canonical_batch((_candidate(),), revision=_revision())
     assert session.calls == 0
-    assert plan.transaction_owner == "CALLER"
-    assert plan.execution_allowed is False
+    assert plan.transaction_owner == "WRITER"
+    assert plan.execution_allowed is True
 
 
 def test_plan_and_diagnostics_are_deterministic_independent_of_input_order():
