@@ -125,7 +125,7 @@ def _write_in_transaction(
     if len(template_approval_refs) != 1:
         raise CanonicalWriteError("TEMPLATE_VERSION_MISMATCH")
     template_approval_ref = next(iter(template_approval_refs))
-    _validate_report_calendar(session, plan.facts, company_id)
+    _validate_report_calendar(session, plan.facts, company_id, first.report_type_id)
 
     existing = session.scalar(select(CanonicalReportVersion).where(
         CanonicalReportVersion.external_version_id == plan.report_version_id
@@ -461,7 +461,17 @@ def _resolve_binding(session: Session, kind: str, external_identity: str, approv
     return binding.internal_id
 
 
-def _validate_report_calendar(session: Session, facts: tuple[PlannedFact, ...], company_id: int) -> None:
+def _validate_report_calendar(
+    session: Session,
+    facts: tuple[PlannedFact, ...],
+    company_id: int,
+    report_type_id: str,
+) -> None:
+    # The 3/6/9/12-month cumulative rule is specific to the reviewed BANK
+    # PERIODIC_FINANCIAL standard. MONTHLY_ACTIVITY has a separate standard;
+    # never apply periodic-report assumptions to it.
+    if report_type_id != "PERIODIC_FINANCIAL":
+        return
     calendar = session.get(CanonicalCompanyFiscalCalendar, company_id)
     for fact in facts:
         if fact.period_identity[0] != "DURATION" or fact.duration_basis != "YTD":
@@ -477,6 +487,8 @@ def _validate_report_calendar(session: Session, facts: tuple[PlannedFact, ...], 
             f"{company_external_id}:{calendar.fiscal_year_start_month}",
             calendar.approval_ref,
         )
+        # Owner-approved company calendar contract: month is explicit and
+        # fiscal year starts on day 1 of that Jalali month.
         if start[1] != calendar.fiscal_year_start_month or start[2] != 1:
             raise CanonicalWriteError("YTD_START_MISMATCH")
         _kind, _start, end = fact.period_identity
