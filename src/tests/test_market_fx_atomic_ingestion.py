@@ -73,8 +73,9 @@ def test_market_ticker_codal_symbol_conflict_rejects_batch(db, tmp_path):
     _, factory = db
     with factory() as session:
         original = session.query(Company).filter_by(ticker="SAMAN").one()
-        session.add(Company(ticker="OTHER", company_name="Other", industry_id=original.industry_id,
-                            codal_symbol="SAMAN-ALT", status="ACTIVE", is_active=True))
+        # The CSV ticker resolves to this company, but its approved CODAL
+        # symbol differs; the ingestion must reject rather than guess identity.
+        original.codal_symbol = "SAMAN-ALT"
         session.commit()
         result = ingest_ohlc_csv(session, market_csv(tmp_path, [market_row(1)]))
         assert result.status == "FAILED"
