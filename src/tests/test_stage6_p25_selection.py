@@ -9,7 +9,8 @@ L1/L2 tests with exact values:
   single candidate passes through; result is independent of input order.
 * B6 predicate ``is_scoring_eligible``: exact verdict per quality state.
 * ``EvaluationKey``: 7-tuple exact equality with scenario appended last;
-  scenario-distinct keys differ; ``forecast_id`` never affects the key.
+  scenario-distinct keys differ; natural identity comes from the runtime
+  ForecastRecord contract fields.
 """
 
 from datetime import datetime, timezone
@@ -39,8 +40,6 @@ LATE = datetime(2024, 12, 31, tzinfo=timezone.utc)
 
 def _record(**overrides):
     fields = dict(
-        forecast_id=1,
-        forecast_version=1,
         company_id=7,
         forecast_period_id=101,
         industry_code="PETROCHEMICAL",
@@ -206,11 +205,22 @@ def test_key_scenario_distinct_keys_differ():
     )
 
 
-def test_key_forecast_id_does_not_affect_key():
-    assert (
-        evaluation_key_for(_record(forecast_id=1), "REVENUE").as_tuple()
-        == evaluation_key_for(_record(forecast_id=999), "REVENUE").as_tuple()
-    )
+def test_key_identity_uses_forecast_contract_fields():
+    # ForecastRecord has no database ID/version. Its EvaluationKey identity
+    # comes from the declared series fields, while forecast output values are
+    # not identity fields.
+    baseline = evaluation_key_for(_record(), "REVENUE").as_tuple()
+    assert evaluation_key_for(_record(revenue=9999.0), "REVENUE").as_tuple() == baseline
+
+    for changed_identity in (
+        {"company_id": 8},
+        {"forecast_period_id": 102},
+        {"forecast_horizon": "3M"},
+        {"model_version": "V2.0"},
+        {"data_cutoff_datetime": datetime(2024, 5, 31, tzinfo=timezone.utc)},
+        {"scenario": "BULL"},
+    ):
+        assert evaluation_key_for(_record(**changed_identity), "REVENUE").as_tuple() != baseline
 
 
 # --- build_observation: invalid ReportVersion -----------------------------------

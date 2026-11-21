@@ -41,8 +41,6 @@ STAMP = datetime(2024, 7, 1, tzinfo=timezone.utc)
 
 def _record(**overrides):
     fields = dict(
-        forecast_id=1,
-        forecast_version=1,
         company_id=7,
         forecast_period_id=101,
         industry_code="PETROCHEMICAL",

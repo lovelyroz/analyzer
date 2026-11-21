@@ -26,8 +26,6 @@ STAMP = datetime(2024, 7, 1, tzinfo=timezone.utc)
 
 def _record(**overrides):
     fields = dict(
-        forecast_id=1,
-        forecast_version=1,
         company_id=7,
         forecast_period_id=101,
         industry_code="PETROCHEMICAL",
@@ -207,8 +205,11 @@ def test_p25_08_unmapped_quarantines_verbatim():
 
 
 def test_p25_09_conflicting_duplicates_fail_closed():
-    first = _record(forecast_id=1, forecast_period_id=101)
-    second = _record(forecast_id=2, forecast_period_id=101)
+    # The records share their contract-defined EvaluationKey but carry
+    # conflicting forecast values. Runtime records have no database ID that
+    # could make these separate forecast series.
+    first = _record(forecast_period_id=101, revenue=1000.0)
+    second = _record(forecast_period_id=101, revenue=1200.0)
     actuals = {(7, 101, "REVENUE"): _actual()}
     verdict = _verdict(_run([first, second], actuals))
     assert verdict.series.total_observations == 2

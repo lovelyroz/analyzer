@@ -375,3 +375,16 @@ Excel: ۱۹ رکورد کامل؛ تاریخ تکراری، Null، صفر/منف
 **Status: PARTIAL; owner acceptance pending.** The active CODAL PDF acquisition/extraction modules, loader API and exports, pypdf dependency, PDF-only tests/plans, obsolete audit script, and local extraction corpus were removed. The shared parsed-row persistence facade and Report/ReportVersion/RawFinancialFact contracts remain. The mixed CODAL test file now uses synthetic RawLineInput data to cover report identity/version history, replay, PIT selection, provenance, Persian/Arabic digit normalization, NULL versus zero, company/period validation, rollback and failed-run audit. No ORM, schema, migration, real database, or financial record changed, and no tests were run.
 
 The owner test command and exact changed/deleted-file inventory are in `database/reports/DB_CODAL_RETIRE_001_EXCEL_CSV_ONLY_RETIREMENT.md`. Excel-to-canonical ORM persistence remains a separate open task. This task must remain PARTIAL until the owner runs the command and supplies results; it is not marked DONE.
+
+# DB-TEST-002 correction — 2026-11-21
+
+- Corrected the `_record()` fixtures in all three Stage 6 test suites by removing unsupported `forecast_id` and `forecast_version` arguments from `ForecastRecord`.
+- Reworked the EvaluationKey identity case to assert sensitivity to the contract-defined identity fields and insensitivity to forecast output values. Updated the conflicting-duplicate adversarial case to use the same natural identity with conflicting values. All 55 test function definitions remain; none were removed or skipped.
+- No production, schema, ORM, migration, or database files changed. Tests were not run, per PROMPT.md. Static parse, targeted fixture/override search, and `git diff --check` completed.
+- Status: `READY_FOR_OWNER_TEST`; DB-TEST-002 remains PARTIAL pending owner execution. Full report and exact owner command: `database/reports/DB_TEST_002_CORRECTION.md`. Master Packet §9.42 records this correction; dashboard unchanged.
+
+
+(analyzer) PS D:\Winprojects\analyzer> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_codal_retire_001_20261121 src/tests/test_codal_extraction.py src/tests/test_codal_digit_normalization.py src/tests/test_excel_adapter.py src/tests/test_excel_canonical_input.py src/tests/test_excel_template_matching.py src/tests/test_excel_source_reader.py src/tests/test_excel_observation_dto.py src/tests/test_canonical_ingestion_admission.py src/tests/test_market_fx_atomic_ingestion.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_stage6_evaluation_foundation.py
+................................................................................................................ [ 67%]
+.......................................................                                                          [100%]
+167 passed in 55.40s
