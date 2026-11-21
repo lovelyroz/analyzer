@@ -39,3 +39,15 @@ Broader affected regression suites:
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_db_consolidation_002_regression_20261121 src/tests/test_market_fx_preflight.py src/tests/test_ingestion_ohlc.py src/tests/test_ingestion_fx.py src/tests/test_stage5_queries.py src/tests/test_stage6_p25_selection.py src/tests/test_stage6_p25_adversarial.py src/tests/test_excel_template_matching.py src/tests/test_excel_adapter.py src/tests/test_canonical_ingestion_admission.py src/tests/test_canonical_writer.py
 ```
+
+
+## Owner-run test failure corrections — 2026-11-21
+
+The first owner run of the DB-CONSOLIDATION-002 focused command returned **14 failed, 140 passed**. The failures were reviewed against the actual source and corrected directly:
+
+- `src/ingestion/canonical_writer.py`: added the global empty-scope `industry` approval kind and included `report_version_id` in the report-version approval scope. This aligns runtime validation with the exact scoped catalog rows and removes the shared root cause behind the cascading writer failures.
+- `src/tests/test_excel_canonical_input.py`: changed the malformed-number fixture from `1,000` to `1,00`. Under the documented parser grammar, `1,000` is a valid three-digit grouping token and must not be rejected.
+- `src/tests/test_canonical_writer.py`: supplied the required legacy `status` and `is_active` fields in the Migration 10 duplicate-preflight fixture.
+- `src/tests/test_market_fx_atomic_ingestion.py`: corrected the identity-conflict fixture so the CSV ticker resolves to a company whose configured `codal_symbol` actually differs. The previous fixture added an unrelated second company and did not create a conflict.
+
+No production database was opened or migrated. These corrections have not been test-executed by the assistant; owner rerun is required. Existing production template/approval, Stage 5/6 bridge, and historical Migration 9 lineage gates remain unchanged.
