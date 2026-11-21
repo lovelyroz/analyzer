@@ -95,7 +95,7 @@ def db(tmp_path):
 def _approval_rows(version="version-1", report_type_id="PERIODIC_FINANCIAL"):
     rows = [
         ("company", "company-1", "approval-company"),
-        ("report_type", report_type_id, "approval-report-type"),
+        ("report_type", report_type_id, "approval-report-type" if report_type_id == "PERIODIC_FINANCIAL" else f"approval-report-type-{report_type_id.lower()}"),
         ("report_version", version, f"approval-{version}"),
         ("metric", "metric-sales", "approval-metric"),
         ("source_unit", "unit-rial", "approval-unit"),
@@ -328,7 +328,7 @@ def test_monthly_activity_ytd_is_not_subject_to_periodic_quarter_alignment(db):
     with factory.begin() as session:
         session.add(CanonicalApproval(
             approval_kind="report_type", external_identity="MONTHLY_ACTIVITY",
-            approval_ref="approval-report-type", is_active=True,
+            approval_ref="approval-report-type-monthly_activity", is_active=True,
         ))
     plan = _plan(
         report_type_id="MONTHLY_ACTIVITY",
