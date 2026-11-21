@@ -251,10 +251,12 @@ def test_duplicate_and_conflicting_facts_keep_all_or_nothing_admission_semantics
         admit=True,
         revision=_revision(same_hash),
     )
-    assert same.accepted
-    assert same.admission_plan is not None
-    assert len(same.admission_plan.facts) == 1
-    assert same.admission_plan.duplicate_count == 1
+    # Equal values at different source coordinates are not interchangeable provenance.
+    # Reject rather than silently discard one of the two source locations.
+    assert not same.accepted
+    assert "DUPLICATE_PROVENANCE_CONFLICT" in {item.code for item in same.diagnostics}
+    assert same.admission_plan is None
+    assert same.submissions == ()
 
     conflict_source, conflict_template = _source_and_template(("42", "43"))
     conflict_hash = sha256(conflict_source).hexdigest()
