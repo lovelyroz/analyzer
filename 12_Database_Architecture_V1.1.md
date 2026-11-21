@@ -74,6 +74,8 @@ Market and FX foundations remain separate branches and are consumed by their app
 
 V1 will establish a shared, extensible database core before every industry-specific input standard is fully known. The core is expanded incrementally from real, reviewed source examples. Incomplete industry standards do not block core design; however, unknown or unapproved data must not be ingested by guessing.
 
+**Clarification approved by owner — 2026-11-21:** The current implementation and source-standardization scope is BANK only. The fact that the shared Industry catalog can contain other industry codes does not mean their report layouts, metrics, mappings, or ingestion rules must be designed now. For every non-bank industry, only the extensible shared identity/core capability is retained; industry-specific database structures and standards are deferred until that industry's real reports are reviewed. Do not invent hypothetical report patterns or prebuild unused industry-specific schemas. New industry requirements are added incrementally without redesigning the shared core.
+
 The initial **logical domains** are:
 
 | Logical domain | Responsibility in the initial core |
@@ -230,22 +232,22 @@ Retain and define these period attributes:
 - `temporal_kind`: `INSTANT` or `DURATION`.
 - `months_length`: exact calendar-month span where determinable under the approved interval rules.
 
-The value's accumulation basis is not a FinancialPeriod attribute. Each applicable DURATION FinancialFact carries `duration_basis` = `YTD` or `STANDALONE`; INSTANT facts have no duration basis (`NULL` / NOT_APPLICABLE).
+The value's accumulation basis is not a FinancialPeriod attribute. Each applicable DURATION FinancialFact carries the temporal basis established by the approved source standard; INSTANT facts have no duration basis (`NULL` / NOT_APPLICABLE).
 
 The actual start of a fiscal year/period must be resolved from the source or a validated company fiscal calendar. Never infer Farvardin 1 or another start date from a market-wide convention.
 
-For the usual cumulative quarterly filing pattern:
+**Current BANK periodic-report contract — owner clarification, 2026-11-21:** The reviewed bank periodic financial reports use the standardized cumulative reporting pattern: Q1 = 3 months from fiscal-year start, Q2 = 6 months cumulative, Q3 = 9 months cumulative, and Q4 = 12 months cumulative. These source values are stored as reported, with the approved temporal basis `YTD`. Standalone quarter values needed by the frontend/analysis layer are calculated at runtime by differencing compatible cumulative periods; they are not presumed to be separately reported source facts and are not persisted as inputs. Do not infer a different pattern or introduce standalone source facts for BANK without evidence from a reviewed, approved report standard.
 
-| Fiscal quarter | Source period type | months_length | typical source-fact duration_basis |
+| Fiscal quarter | Source period type | months_length | BANK periodic source-fact duration_basis |
 |---|---|---:|---|
-| Q1 | `QUARTER` | 3 | `YTD` when reported cumulatively from fiscal-year start |
-| Q2 | `SEMI_ANNUAL` | 6 | `YTD` when reported cumulatively from fiscal-year start |
-| Q3 | `NINE_MONTH` | 9 | `YTD` when reported cumulatively from fiscal-year start |
-| Q4 | `ANNUAL` | 12 | `YTD` when reported cumulatively for the full fiscal year |
+| Q1 | `QUARTER` | 3 | `YTD` |
+| Q2 | `SEMI_ANNUAL` | 6 | `YTD` |
+| Q3 | `NINE_MONTH` | 9 | `YTD` |
+| Q4 | `ANNUAL` | 12 | `YTD` |
 
-These are common patterns, not automatic assignments. The fact-level basis must be supported by the source and approved temporal mapping.
+This table is the current BANK contract, not a universal assumption for unreviewed industries. Standards for other industries are deferred until their reports are examined. New standards must be based on actual source evidence and must not be guessed.
 
-Monthly source periods use `MONTH` and `months_length=1`; their FinancialFacts use `duration_basis=STANDALONE` only when the source reports the month independently. A source-reported cumulative monthly value uses `YTD`.
+Monthly source periods use `MONTH` and `months_length=1`; their temporal semantics follow the separately reviewed BANK monthly-activity standard. Do not transfer periodic-report YTD rules to monthly activity reports without checking that standard.
 
 Standalone-quarter figures calculated from cumulative source periods are derived analytical results, not database inputs. This database architecture defines no standalone-quarter field, column, table, or stored record. The database retains the source-reported cumulative values and their source-period metadata exactly as admitted under the input/provenance rules. Any quarter-differencing logic belongs to the runtime analytical layer and is outside this database storage contract.
 `TTM` is not a source `FinancialPeriod` type. TTM is a derived analytical window and is computed at runtime.
