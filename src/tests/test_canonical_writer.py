@@ -203,6 +203,17 @@ def test_synthetic_xlsx_runs_reader_match_admission_writer_and_readback(db):
                                    "template_id": template.template_id, "template_version": template.version,
                                    "template_sha256": template.template_sha256}, sort_keys=True, separators=(",", ":")),
         ))
+        # Header/label approvals are bound to the exact template fingerprint;
+        # the shared fixture's b*64 placeholder is not this workbook's hash.
+        template_scope = {
+            "report_type_id": "PERIODIC_FINANCIAL",
+            "template_id": template.template_id,
+            "template_version": template.version,
+            "template_sha256": template.template_sha256.lower(),
+        }
+        for approval_ref in ("approval-label-sales", "approval-header-current"):
+            approval = session.query(CanonicalApproval).filter_by(approval_ref=approval_ref).one()
+            approval.scope_json = json.dumps(template_scope, sort_keys=True, separators=(",", ":"))
 
     def approved(identity, reference):
         return ApprovedSelection(identity=identity, approved=True, candidate_count=1,
