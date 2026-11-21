@@ -416,3 +416,12 @@ The owner test command and exact changed/deleted-file inventory are in `database
 - Master Packet Phase E checkboxes and dashboard reconciled: 35 tasks, **8 DONE / 24 PARTIAL / 3 OPEN = 57%**; DB-TEST/DB-EXIT: **0 DONE / 4 PARTIAL / 0 OPEN = 50%**.
 - No production code, ORM, schema, migration, database, or data was changed; no tests were run; `WORKFLOW_RULES.md` was not modified.
 - Files changed: `database/reports/DB_EXIT_001_FINAL_ASSESSMENT.md`, `database/DATABASE_CONFIGURATION_MASTER_WORKING_PACKET.md`, and `reply.md`.
+
+
+# Owner architecture clarifications — 2026-11-21
+
+- Current financial-report implementation and standardization scope is BANK only. Do not pre-design hypothetical report layouts, metrics, or ingestion cases for unreviewed industries. Keep the shared core extensible; add each industry's standard only after reviewing its actual reports.
+- BANK periodic reports reviewed to date use cumulative YTD values for 3, 6, 9, and 12 months from the company's actual fiscal-year start. Standalone-quarter values required by the frontend are calculated at runtime from compatible cumulative periods; they are not presumed independent source inputs and are not persisted.
+- Jalali date components are the authoritative period identity and date contract. Existing Gregorian SQL Date fields in FinancialPeriod are an implementation gap to fix, not a reason to alter the approved contract.
+- Technical decisions are delegated to ChatGPT. Proceed with the physical schema, safe migration reconciliation, and canonical transactional writer as one coherent implementation track. Preserve existing data; do not apply migrations to a real user database without a separate deployment/backup step.
+- Architecture decisions recorded in 12_Database_Architecture_V1.1.md, Master Packet §3.1–3.2, and DB_EXIT_001_FINAL_ASSESSMENT.md.
