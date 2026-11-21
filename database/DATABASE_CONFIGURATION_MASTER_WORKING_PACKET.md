@@ -17,7 +17,7 @@
 
 ## 1.1 داشبورد سادهٔ پیشرفت Database
 
-**آخرین محاسبه: 2026-11-20** — این درصدها تخمینی‌اند و فقط از وضعیت Taskهای همین Packet محاسبه شده‌اند؛ درصد پیشرفت به معنی درصد کدنویسی یا آمادگی تولید نیست.
+**آخرین محاسبه: 2026-11-21** — این درصدها تخمینی‌اند و فقط از وضعیت Taskهای همین Packet محاسبه شده‌اند؛ درصد پیشرفت به معنی درصد کدنویسی یا آمادگی تولید نیست.
 
 | بخش | پیشرفت تقریبی | DONE | PARTIAL | OPEN | BLOCKED / STALLED |
 |---|---:|---:|---:|---:|---:|
@@ -26,8 +26,8 @@
 | طراحی قراردادها (DB-DES) | **64%** | 2 | 5 | 0 | 0 |
 | Migration (DB-MIG) | **0%** | 0 | 0 | 3 | 0 |
 | Ingestion و Adapterها (DB-ING) | **69%** | 3 | 5 | 0 | 0 |
-| Testing & Exit (DB-TEST / DB-EXIT) | **25%** | 0 | 2 | 2 | 0 |
-| **Total (35 Tasks)** | **54%** | **8** | **22** | **5** | **0** |
+| Testing & Exit (DB-TEST / DB-EXIT) | **50%** | 0 | 4 | 0 | 0 |
+| **Total (35 Tasks)** | **57%** | **8** | **24** | **3** | **0** |
 
 **روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014، 015، 016، 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
 
@@ -730,8 +730,8 @@ Runner در صورت وجود جدول‌های قبلی و نبود رکورد 
 
 - [~] **017 / DB-TEST-001 - Model and migration tests:** focused SQLite tests are in Section 9.39; FinancialPeriod Jalali constraint, full supported-schema coverage, and owner execution remain open. Owner acceptance recorded: exact Task 017 command returned **23 passed in 76.32s (0:01:16)**. Task remains PARTIAL due to the listed schema/Jalali/SQLite/production limits.
 - [~] **018 / DB-TEST-002 - Ingestion and PIT tests:** prior focused coverage is reused and a multi-period Excel-to-admission regression is added; Task report and remaining unsupported behavior are in Section 9.40.
-- [ ] **019 · DB-TEST-003 — تست یکپارچهٔ Excel و downstream contracts:** adapter و مسیر Excel صورت‌های مالی به ورودی canonical مصوب برسند و مصرف‌کنندگان downstream بدون تغییر معنای دوره/مقدار کار کنند. این Task شامل تست PDF نیست.
-- [ ] **020 · DB-EXIT-001 — تأیید نهایی Database Configuration:** تمام معیارهای خروج این Packet با PASS/BLOCKED/OPEN و شواهد واقعی ارزیابی شوند. تکمیل این مسیر فقط با بسته‌شدن معیارهای حیاتی اعلام می‌شود.
+- [~] **019 · DB-TEST-003 — تست یکپارچهٔ Excel و downstream contracts:** adapter و مسیر Excel صورت‌های مالی به ورودی canonical مصوب برسند و مصرف‌کنندگان downstream بدون تغییر معنای دوره/مقدار کار کنند. این Task شامل تست PDF نیست.
+- [~] **020 · DB-EXIT-001 — تأیید نهایی Database Configuration:** تمام معیارهای خروج این Packet با PASS/BLOCKED/OPEN و شواهد واقعی ارزیابی شوند. تکمیل این مسیر فقط با بسته‌شدن معیارهای حیاتی اعلام می‌شود.
 
 ## 6. معیارهای خروج کلی
 
@@ -2617,3 +2617,12 @@ The initial owner-run result recorded 42 setup failures from this common constru
 The test templates and selections are clearly synthetic fixtures and do not establish production approval. The real supported chain ends at `CanonicalPersistencePlan` / `PlannedFact`. No production bridge currently maps these DTOs into `NormalizedFinancialFact` and `FinancialPeriod`; the downstream forecast query in `src/forecast/queries.py` reads those ORM models, and `src/ingestion/service.py` exposes the existing raw-row ingestion path instead. Therefore consumer compatibility for period ID/date, `value_irr`, and metric database identity cannot be established without inventing a writer. A source coordinate survives on the candidate submission but is absent from `PlannedFact`, consistent with the Section 3.11 decision that permanent exact cell locators are not required. Physical canonical persistence and production template/mapping approvals remain blockers.
 
 No ORM/model, schema, migration, database, or production contract changes were made. Tests were not run by the agent, as required. Static syntax/API-shape checks and `git diff --check` were performed. Detailed case inventory and exact owner command are in `database/reports/DB_TEST_003_EXCEL_DOWNSTREAM_INTEGRATION.md`. Dashboard totals were not changed; Task 019 remains PARTIAL.
+
+
+## 9.44 Task 020 / DB-EXIT-001 — final Database Configuration exit assessment
+
+**Status: PARTIAL — assessment completed; overall database exit criteria are not met.** The ten exit criteria in Section 6 were evaluated with direct code and task evidence in `database/reports/DB_EXIT_001_FINAL_ASSESSMENT.md`. Criteria 2, 3, 5, 8, and 9 are BLOCKED; the remaining criteria are PARTIAL. The critical issue is the absence of a physical canonical persistence contract/writer compatible with Jalali per-fact periods, canonical integer values, required identity/value-state/provenance, and transactional ReportVersion ingestion. `CanonicalPersistencePlan` remains explicitly non-executable and physically incompatible with current ORM models. Migration Runner currently ends at v8; Migration 9 remains unreconciled. Production template/semantic approvals and an authoritative approval resolver are also absent.
+
+The report confirms owner acceptance already recorded for Task 019 (**115 passed in 2.75s**), Task 018 correction suites (**167 passed in 55.40s**), and Task 017 (**23 passed in 76.32s**). These focused tests do not prove production persistence or close the schema blockers.
+
+The cross-cutting PDF-retirement activity in Sections 8.46 and 9.41 is one activity and is not double-counted in the 35-task denominator. Dashboard reconciled to **8 DONE / 24 PARTIAL / 3 OPEN = 57%**; DB-TEST/DB-EXIT is **0 DONE / 4 PARTIAL / 0 OPEN = 50%**. Task 019 and Task 020 are marked PARTIAL in Phase E. No ORM, schema, migration, database, data, or `WORKFLOW_RULES.md` was changed; no tests were run. **Database Configuration is not complete.**
