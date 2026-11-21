@@ -80,6 +80,8 @@ def _rejected(session, row):
 
 
 def test_company_required_fields_industry_fk_and_supported_uniqueness(db):
+    # Ticker/CODAL uniqueness is introduced by migration 9, not by the legacy baseline metadata.
+    migration_runner._apply_canonical_jalali_excel_schema(db)
     with Session(db) as s:
         industry, company, *_ = _base_rows(s)
         s.commit()
