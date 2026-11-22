@@ -12,22 +12,22 @@
 
 **سند معماری مبنا:** `../12_Database_Architecture_V1.1.md` (محتوای فعلی آن Database Contract V1.3 است). این سند قرارداد هدف و محل ثبت جزئیات معماری است؛ این Master Packet مرجع پیشرفت و اجرای کارهاست. هر تعارض باید ابتدا در این Packet ثبت و تعیین تکلیف شود؛ تغییر سند معماری یا کد بدون تصمیم روشن مجاز نیست.
 
-آخرین بازنگری: 2026-11-21 — نتیجهٔ DB-IMPL-001 در §9.45 ثبت شد: مدل canonical افزایشی Jalali، Migration 9 guarded، writer اتمیک Excel و query PIT اضافه شدند؛ تست‌های SQLite موقت نوشته شدند اما طبق PROMPT اجرا نشدند. Task جدید PARTIAL است؛ lineage نسخهٔ تاریخی 9، کاتالوگ‌های approval و پذیرش مالک باقی‌اند. جزئیات تاریخی و وضعیت Taskهای قبلی در بخش‌های بعدی حفظ شده‌اند.
+Latest review: 2026-11-22 - DB-IMPL-002 read bridge is recorded in Section 9.49; details, owner commands, and remaining gates are documented below.
 
 
 ## 1.1 داشبورد سادهٔ پیشرفت Database
 
-**آخرین محاسبه: 2026-11-21** — این درصدها تخمینی‌اند و فقط از وضعیت Taskهای همین Packet محاسبه شده‌اند؛ درصد پیشرفت به معنی درصد کدنویسی یا آمادگی تولید نیست.
+**Latest calculation: 2026-11-22** - current dashboard totals are shown in the table below.
 
 | بخش | پیشرفت تقریبی | DONE | PARTIAL | OPEN | BLOCKED / STALLED |
 |---|---:|---:|---:|---:|---:|
 | استاندارد ورودی‌ها (DB-STD) | **60%** | 1 | 4 | 0 | 0 |
 | ممیزی وضع موجود (DB-AUD) | **63%** | 2 | 6 | 0 | 0 |
 | طراحی قراردادها (DB-DES) | **64%** | 2 | 5 | 0 | 0 |
-| Migration / physical implementation (DB-MIG / DB-IMPL) | **13%** | 0 | 1 | 3 | 0 |
+| Migration / physical implementation (DB-MIG / DB-IMPL) | **20%** | 0 | 2 | 3 | 0 |
 | Ingestion و Adapterها (DB-ING) | **69%** | 3 | 5 | 0 | 0 |
 | Testing & Exit (DB-TEST / DB-EXIT) | **50%** | 0 | 4 | 0 | 0 |
-| **Total (36 Tasks)** | **57%** | **8** | **25** | **3** | **0** |
+| **Total (37 Tasks)** | **57%** | **8** | **26** | **3** | **0** |
 
 **روش محاسبه:** DONE = 100 امتیاز، PARTIAL = 50 امتیاز، و OPEN / BLOCKED / STALLED = صفر؛ درصد هر بخش برابر میانگین امتیاز Taskهای همان بخش است. Taskهای 014، 015، 016، 034 و 035 که در §9 ثبت شده‌اند نیز در ردیف DB-ING شمرده شده‌اند؛ DB-IMPL-001 فقط یک بار در ردیف Migration/physical implementation محاسبه شده است. وضعیت هر Task همچنان مرجع اصلی است؛ این داشبورد جایگزین شرح و معیار پذیرش Taskها نیست.
 
@@ -2648,7 +2648,7 @@ Updated src/ingestion/canonical_writer.py so the periodic BANK YTD alignment rul
 
 The existing month-only fiscal calendar is retained in accordance with the owner-approved rule: fiscal-year start day is always day 1 of the explicitly configured Jalali month. No model or migration change is required for this correction. No tests were run. Owner must run the focused suite using the command in the DB-IMPL-001 report. Status remains PARTIAL pending owner tests, historical Migration 9 lineage reconciliation, and production template/semantic/temporal approvals.
 
-## 9.48 DB-CONSOLIDATION-002 ? canonical approvals, numeric parsing, Market/FX schema ? 2026-11-21
+## 9.48 DB-CONSOLIDATION-002 - canonical approvals, numeric parsing, Market/FX schema - 2026-11-21
 
 **Status: PARTIAL.** Migration 10 (`market_fx_approval_scope_schema`) was added without changing Migration 9. It performs duplicate preflight, enforces partial Jalali natural-key uniqueness and complete identities, adds exact approval scope and source-token provenance fields, and supports the approved `EXCHANGE_CENTER` FX type. A shared resolver checks active approval references, exact kind/identity/scope and uniqueness. Strict Decimal parsing is integrated with Excel and CSV canonical inputs; source tokens are retained. Market CSV resolves `codal_symbol` and rejects identity conflicts with `TICKER_IDENTITY_CONFLICT`. Compatible BANK periodic YTD quarter values are calculated at read time only.
 
@@ -2667,3 +2667,14 @@ The first owner-run focused command returned **14 failed, 140 passed**. Direct f
 ## 2026-11-21 — Final synthetic XLSX fixture correction
 
 The second owner-run DB-CONSOLIDATION-002 focused suite returned **1 failed, 153 passed**. The remaining synthetic XLSX end-to-end failure was a stale placeholder template fingerprint in the fixture's source-label/source-header approval scopes. The fixture now binds both scopes to the actual generated template fingerprint; runtime validation was not weakened. See `database/reports/DB_CONSOLIDATION_002_IMPLEMENTATION.md`. Rerun the isolated test, then the full focused command. No real DB was opened or migrated.
+
+
+## 9.49 DB-IMPL-002 - opt-in canonical BANK Stage 5/6 read bridge - 2026-11-22
+
+**Status: PARTIAL.** Added a caller-mapped, fail-closed canonical Stage 5 bridge in `src/forecast/canonical_adapter.py` and an opt-in `canonical_metric_bindings` path in `generate_forecast()`. The omitted argument retains legacy behavior; supplying it bypasses legacy financial-fact reads and prohibits financial `extra_facts`/share-count override. Stage 5 requires explicit mapping for REVENUE, OPERATING_PROFIT, NET_PROFIT, and TOTAL_EQUITY, exact temporal/unit/currency/scale/dimensions, and an explicit `ADDITIVE_YTD` declaration before deriving runtime-only quarters. It preserves Jalali ordering, exact integer inputs and report-version/publication references.
+
+Added `src/kpi/canonical_adapter.py`, an opt-in adapter into unchanged Stage 6 KPI formulas. It requires explicit complete BANK KPI input mapping and exact per-input Jalali period, reads PERIODIC_FINANCIAL at the PIT cutoff, validates metadata, dimensions, and YTD identities against the approved company fiscal-start month, retains each selected canonical period ID and provenance, and keeps missing/null separate from zero. `load_canonical_financial_facts()` now accepts an optional report-type filter. Canonical share-count history is not implemented; Stage 5 leaves weighted shares missing in this mode, so EPS may be unavailable. No real metric mapping or production approval was invented.
+
+New tests cover both adapters, mapping completeness/ambiguity, PIT/query filtering, metadata and dimensional mismatch, company isolation, YTD derivation and approved fiscal-period alignment, missing/zero distinction, provenance, BANK/report-type restriction, KPI invocation, and no fallback to legacy. They were added but **not run**. Focused and broader owner commands plus exact test names are in `reports/DB_IMPL_002_CANONICAL_STAGE5_STAGE6_READ_BRIDGE.md`.
+
+No ORM/schema/migration/database changes were made; `WORKFLOW_RULES.md` is untouched. DB-IMPL-002 remains PARTIAL pending owner test execution and reviewed caller mappings. Dashboard now counts 37 tasks: 8 DONE / 26 PARTIAL / 3 OPEN = 57%; DB-MIG/DB-IMPL is 0 DONE / 2 PARTIAL / 3 OPEN = 20%.

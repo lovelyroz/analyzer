@@ -21,7 +21,7 @@ through ``build_financial_context`` exactly once and is never recalculated.
 """
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -298,6 +298,7 @@ def generate_forecast(
     extra_facts: Optional[Dict[str, Any]] = None,
     share_count: Optional[float] = None,
     calculation_timestamp: Optional[datetime] = None,
+    canonical_metric_bindings: Optional[Mapping[str, Any]] = None,
 ) -> CompanyForecastResult:
     """Run the Stage 5 production path for one company and forecast period.
 
@@ -333,31 +334,55 @@ def generate_forecast(
             f"{industry_code!r}"
         )
 
-    facts, input_refs = load_financial_facts(
-        session, company_id,
-        cutoff=data_cutoff_datetime,
-        metric_codes=DEFAULT_FACT_METRICS,
-    )
+    if canonical_metric_bindings is None:
+        facts, input_refs = load_financial_facts(
+            session, company_id,
+            cutoff=data_cutoff_datetime,
+            metric_codes=DEFAULT_FACT_METRICS,
+        )
+        periods = load_financial_fact_periods(
+            session, company_id,
+            cutoff=data_cutoff_datetime,
+            metric_codes=DEFAULT_FACT_METRICS,
+        )
+        canonical_mode = False
+    else:
+        # Supplying the mapping is the explicit opt-in. Invalid/empty canonical
+        # input raises a stable error; this branch never falls back to legacy
+        # financial facts or caller-provided alternate financial values.
+        if extra_facts or share_count is not None:
+            from src.forecast.canonical_adapter import CanonicalReadError
+            raise CanonicalReadError("CANONICAL_LEGACY_FACT_OVERRIDE_FORBIDDEN")
+        from src.forecast.canonical_adapter import load_stage5_input
+        canonical_input = load_stage5_input(
+            session, company_id, cutoff=data_cutoff_datetime,
+            bindings=canonical_metric_bindings,
+        )
+        facts = dict(canonical_input.facts)
+        input_refs = list(canonical_input.input_refs)
+        periods = list(canonical_input.periods)
+        canonical_mode = True
+        # Canonical BANK statements do not currently define share-history
+        # inputs, so the canonical path leaves weighted shares missing.
 
-    # Inputs the engine needs and Stage 1 already supplies. Reading them here
-    # keeps ``extra_facts`` an override rather than a silent requirement.
-    periods = load_financial_fact_periods(
-        session, company_id,
-        cutoff=data_cutoff_datetime,
-        metric_codes=DEFAULT_FACT_METRICS,
-    )
     derived, derived_refs = _stage1_derived_context(periods)
     dispersion = _stage1_dispersion_series(periods)
     input_refs = [*input_refs, *derived_refs]
-
-    history, actions = load_share_history(
-        session, company_id, cutoff=data_cutoff_datetime,
-    )
-    weighted_shares = build_weighted_average_shares(history, actions,
-                                                    cutoff=data_cutoff_datetime)
+    if canonical_mode:
+        weighted_shares = None
+    else:
+        history, actions = load_share_history(
+            session, company_id, cutoff=data_cutoff_datetime,
+        )
+        weighted_shares = build_weighted_average_shares(history, actions,
+                                                        cutoff=data_cutoff_datetime)
 
     financial_context: Dict[str, Any] = {}
     financial_context.update(_to_context(facts))
+    if canonical_mode and facts.get("REVENUE") is None:
+        # Stage 4 may offer a recent run-rate derived outside this canonical
+        # read. Preserve the canonical missing value instead of filling it.
+        financial_context["recent_run_rate_revenue"] = None
     # The Stage 1 derivations are the baseline. ``extra_facts`` is applied after
     # them, so a caller's explicit declaration still wins and the derivation
     # only ever fills a gap Stage 1 can itself close.

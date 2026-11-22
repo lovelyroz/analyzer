@@ -17,6 +17,9 @@ from sqlalchemy.orm import sessionmaker
 from openpyxl import Workbook
 
 from src.forecast.canonical_queries import load_canonical_financial_facts
+from src.forecast.canonical_adapter import (
+    CanonicalMetricBinding, CanonicalReadError, load_stage5_input,
+)
 from src.ingestion.canonical_admission import RevisionContext
 from src.ingestion.canonical_admission import (
     CanonicalPersistencePlan, PlannedFact, ValueOrigin,
@@ -555,6 +558,80 @@ def test_pit_quality_order_prefers_audited_initial_over_later_unaudited_restatem
         rows = load_canonical_financial_facts(session, 1, cutoff=datetime(2025, 8, 1))
         assert rows[0].value_integer == 18
         assert rows[0].is_audited is True and rows[0].is_restated is False
+
+
+def test_canonical_read_query_supports_explicit_report_type_filter(db):
+    _engine, factory = db
+    write_canonical_plan(_plan(), _metadata(), factory)
+    with factory() as session:
+        periodic = load_canonical_financial_facts(
+            session, 1, cutoff=datetime(2025, 5, 1),
+            report_type_id="PERIODIC_FINANCIAL",
+        )
+        monthly = load_canonical_financial_facts(
+            session, 1, cutoff=datetime(2025, 5, 1),
+            report_type_id="MONTHLY_ACTIVITY",
+        )
+    assert len(periodic) == 1 and periodic[0].report_type_id == "PERIODIC_FINANCIAL"
+    assert monthly == []
+
+
+def test_stage5_loader_requires_approved_company_calendar_and_metric_bindings(db):
+    _engine, factory = db
+    write_canonical_plan(_plan(), _metadata(), factory)
+    with factory() as session:
+        company_id = session.scalar(select(Company.company_id))
+        revenue_id = session.scalar(select(FinancialMetric.metric_id).where(
+            FinancialMetric.metric_code == "BANK_REV"
+        ))
+        ids = {"REVENUE": revenue_id}
+        for key, code, flow_or_stock in (
+            ("OPERATING_PROFIT", "BANK_OP", "FLOW"),
+            ("NET_PROFIT", "BANK_NET", "FLOW"),
+            ("TOTAL_EQUITY", "BANK_EQ", "STOCK"),
+        ):
+            metric = FinancialMetric(metric_code=code, metric_name=key,
+                                     category="BANK", flow_or_stock=flow_or_stock)
+            session.add(metric)
+            session.flush()
+            ref = f"approval-reader-{key.lower()}"
+            external = f"reader-{key.lower()}"
+            session.add(CanonicalApproval(
+                approval_kind="metric", external_identity=external,
+                approval_ref=ref, is_active=True,
+                scope_json=json.dumps({"industry_code": "BANK"}, sort_keys=True, separators=(",", ":")),
+            ))
+            session.add(CanonicalIdentityBinding(
+                identity_kind="metric", external_identity=external,
+                internal_id=metric.metric_id, approval_ref=ref, is_active=True,
+            ))
+            ids[key] = metric.metric_id
+        session.commit()
+        bindings = {
+            key: CanonicalMetricBinding(
+                input_key=key, metric_id=ids[key],
+                temporal_type="INSTANT" if key == "TOTAL_EQUITY" else "DURATION",
+                duration_basis=None if key == "TOTAL_EQUITY" else "YTD",
+                duration_aggregation=None if key == "TOTAL_EQUITY" else "ADDITIVE_YTD",
+                source_unit="unit-rial", source_currency="currency-irr",
+                source_scale="scale-unit",
+            )
+            for key in ("REVENUE", "OPERATING_PROFIT", "NET_PROFIT", "TOTAL_EQUITY")
+        }
+        result = load_stage5_input(
+            session, company_id, cutoff=datetime(2025, 5, 1), bindings=bindings,
+        )
+        assert result.facts["REVENUE"] == 12
+
+        approval = session.scalar(select(CanonicalApproval).where(
+            CanonicalApproval.approval_ref == "approval-reader-operating_profit"
+        ))
+        approval.is_active = False
+        session.commit()
+        with pytest.raises(CanonicalReadError, match="APPROVAL_REVOKED"):
+            load_stage5_input(
+                session, company_id, cutoff=datetime(2025, 5, 1), bindings=bindings,
+            )
 
 
 def test_invalid_fact_rolls_back_entire_report_version_batch(db):

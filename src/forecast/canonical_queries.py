@@ -114,6 +114,7 @@ def load_canonical_financial_facts(
     *,
     cutoff: datetime,
     metric_ids: tuple[int, ...] | None = None,
+    report_type_id: str | None = None,
 ) -> list[CanonicalFactAtCutoff]:
     """Return the highest-quality visible version per report type/fact identity.
 
@@ -139,6 +140,8 @@ def load_canonical_financial_facts(
         if not metric_ids:
             return []
         statement = statement.where(CanonicalFinancialFact.metric_id.in_(metric_ids))
+    if report_type_id is not None:
+        statement = statement.where(CanonicalReport.report_type_id == report_type_id)
     rows = session.execute(statement).all()
     chosen: dict[tuple[object, ...], tuple[CanonicalFactAtCutoff, tuple[int, datetime, int, int]]] = {}
     for fact, period, version, report, provenance in rows:
