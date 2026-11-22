@@ -1,8 +1,14 @@
-(analyzer) PS D:\Winprojects\analyzer> .\.venv\Scripts\python.exe -m pytest -q --basetemp .pytest_db_impl_002_bridge_20261122 src/tests/test_canonical_stage5_adapter.py src/tests/test_canonical_stage6_adapter.py src/tests/test_canonical_queries.py src/tests/test_canonical_writer.py src/tests/test_stage5_forecast.py src/tests/test_stage2_kpis.py
-F....F.F...F......F............................................................................................. [ 30%]
-................................................................................................................ [ 60%]
-................................................................................................................ [ 91%]
-.................................                                                                                [100%]
+(analyzer) PS D:\Winprojects\analyzer>    pytest src/tests/test_canonical_stage5_adapter.py src/tests/test_canonical_stage6_adapter.py src/tests/test_canonical_queries.py src/tests/test_canonical_writer.py
+================================================= test session starts =================================================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
+rootdir: D:\Winprojects\analyzer
+collected 45 items
+
+src\tests\test_canonical_stage5_adapter.py F....F.F...                                                           [ 24%]
+src\tests\test_canonical_stage6_adapter.py F......F                                                              [ 42%]
+src\tests\test_canonical_queries.py ...                                                                          [ 48%]
+src\tests\test_canonical_writer.py .......................                                                       [100%]
+
 ====================================================== FAILURES =======================================================
 __________________________ test_stage5_ytd_is_adapted_to_exact_runtime_quarters_with_lineage __________________________
 
@@ -123,7 +129,7 @@ E           src.forecast.canonical_adapter.CanonicalReadError: CANONICAL_STAGE5_
 src\forecast\canonical_adapter.py:239: CanonicalReadError
 ________________________ test_stage6_opt_in_loader_is_bank_only_and_queries_periodic_pit_facts ________________________
 
-monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001E1D5A47050>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000279A7F5C140>
 
     def test_stage6_opt_in_loader_is_bank_only_and_queries_periodic_pit_facts(monkeypatch):
         from src.kpi import canonical_adapter
@@ -180,4 +186,4 @@ FAILED src/tests/test_canonical_stage5_adapter.py::test_stage5_keeps_latest_repo
 FAILED src/tests/test_canonical_stage5_adapter.py::test_stage5_rejects_inconsistent_units_and_ytd_period_starts - AssertionError: Regex pattern did not match.
 FAILED src/tests/test_canonical_stage6_adapter.py::test_stage6_maps_explicit_bank_inputs_and_preserves_missing_zero_and_lineage - src.forecast.canonical_adapter.CanonicalReadError: CANONICAL_STAGE5_YTD_PERIOD_INVALID
 FAILED src/tests/test_canonical_stage6_adapter.py::test_stage6_opt_in_loader_is_bank_only_and_queries_periodic_pit_facts - src.forecast.canonical_adapter.CanonicalReadError: CANONICAL_STAGE5_YTD_PERIOD_INVALID
-5 failed, 364 passed in 385.00s (0:06:24)
+============================================ 5 failed, 40 passed in 11.21s ============================================
